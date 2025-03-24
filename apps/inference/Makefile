@@ -32,6 +32,9 @@ check-format:
 	$(RUFF) check .
 	$(RUFF) format --check .
 
+check-type:
+	$(POETRY) run pyright .
+
 check-ci: check-format unit-test
 
 install:
