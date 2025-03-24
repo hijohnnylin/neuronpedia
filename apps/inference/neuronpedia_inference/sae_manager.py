@@ -2,6 +2,7 @@ import logging
 import time
 from collections import OrderedDict
 from pathlib import Path
+from typing import Any
 
 from huggingface_hub import snapshot_download
 
@@ -10,7 +11,7 @@ from neuronpedia_inference.config import (
     get_sae_lens_ids_from_neuronpedia_id,
     get_saelens_neuronpedia_directory_df,
 )
-from neuronpedia_inference.saes.saelens import SaeLensSAE
+from neuronpedia_inference.saes.saelens import SaeLensSAE  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -101,10 +102,10 @@ class SAEManager:
 
         self.print_sae_status()
 
-    def get_starting_saes(self, all_sae_ids):
+    def get_starting_saes(self, all_sae_ids: list[str]) -> list[str]:
         return all_sae_ids[: (self.max_loaded_saes)]
 
-    def load_sae(self, model_id, sae_id):
+    def load_sae(self, model_id: str, sae_id: str) -> None:
         start_time = time.time()
         logger.info(f"Loading SAE: {sae_id}")
 
@@ -127,8 +128,13 @@ class SAEManager:
             "neuronpedia_id": loaded_sae.cfg.neuronpedia_id,
             "type": SAE_TYPE.SAELENS,
             # TODO: this should be in SAELens
-            "dfa_enabled": DFA_ENABLED_NP_ID_SEGMENT in loaded_sae.cfg.neuronpedia_id
-            or DFA_ENABLED_NP_ID_SEGMENT_ALT in loaded_sae.cfg.neuronpedia_id,
+            "dfa_enabled": (
+                loaded_sae.cfg.neuronpedia_id is not None
+                and (
+                    DFA_ENABLED_NP_ID_SEGMENT in loaded_sae.cfg.neuronpedia_id
+                    or DFA_ENABLED_NP_ID_SEGMENT_ALT in loaded_sae.cfg.neuronpedia_id
+                )
+            ),
             "transcoder": False,  # You might want to set this based on some condition
         }
 
@@ -143,7 +149,7 @@ class SAEManager:
             f"Successfully loaded SAE: {sae_id} in {end_time - start_time:.2f} seconds"
         )
 
-    def unload_sae(self, sae_id):
+    def unload_sae(self, sae_id: str) -> None:
         start_time = time.time()
         logger.info(f"Starting to unload SAE: {sae_id}")
 
@@ -158,7 +164,7 @@ class SAEManager:
             f"Successfully unloaded SAE: {sae_id} in {end_time - start_time:.2f} seconds"
         )
 
-    def get_sae(self, source):
+    def get_sae(self, source: str) -> Any:
         if source not in self.loaded_saes:
             self.load_sae(
                 (
@@ -189,16 +195,16 @@ class SAEManager:
         self.sae_set_to_saes[self.NEURONS_SOURCESET] = neurons_sourceset
         return neurons_sourceset
 
-    def download_sae_set(self, sae_set):
+    def download_sae_set(self, sae_set: dict[str, str | bool]) -> Path:
         sae_set_id = sae_set["set"]
         sae_set_dir = f"{self.config.MODEL_ID}__{sae_set_id}"
-        sae_set_path = Path(self.config.SAES_PATH).joinpath(sae_set_dir)
+        sae_set_path = Path(self.config.SAES_PATH).joinpath(sae_set_dir)  # type: ignore
 
         if (
             not sae_set["local"] and sae_set["type"] != "saelens-1"
         ):  # SAE Lens one will download prior to loading.
             snapshot_download(
-                repo_id=f"{self.config.HUGGINGFACE_ACCOUNT}/{sae_set_dir}",
+                repo_id=f"{self.config.HUGGINGFACE_ACCOUNT}/{sae_set_dir}",  # type: ignore
                 local_dir=str(sae_set_path),
             )
 
@@ -216,9 +222,9 @@ class SAEManager:
             neuronpedia_id = data.get("neuronpedia_id")
             if neuronpedia_id is not None:
                 neuronpedia_ids.append(neuronpedia_id)
-        return neuronpedia_ids
+        return neuronpedia_ids  # type: ignore
 
-    def get_sae_id_by_neuronpedia_id(self, neuronpedia_id):
+    def get_sae_id_by_neuronpedia_id(self, neuronpedia_id: str):
         """
         Retrieve the SAE ID corresponding to a given Neuronpedia ID.
 
@@ -256,13 +262,13 @@ class SAEManager:
         print(f"\nTotal Loaded: {len(self.loaded_saes)} / {self.max_loaded_saes}")
 
     # Utility methods
-    def get_sae_type(self, sae_id):
+    def get_sae_type(self, sae_id: str) -> str:
         return self.sae_data.get(sae_id, {}).get("type")
 
-    def get_sae_hook(self, sae_id):
+    def get_sae_hook(self, sae_id: str) -> str:
         return self.sae_data.get(sae_id, {}).get("hook")
 
-    def is_dfa_enabled(self, sae_id):
+    def is_dfa_enabled(self, sae_id: str) -> bool:
         return self.sae_data.get(sae_id, {}).get("dfa_enabled", False)
 
     def get_valid_sae_sets(self):
