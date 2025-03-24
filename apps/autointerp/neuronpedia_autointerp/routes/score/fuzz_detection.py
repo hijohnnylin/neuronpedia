@@ -19,6 +19,14 @@ from sae_auto_interp.clients import OpenRouter
 from sae_auto_interp.features import Example, Feature, FeatureRecord
 from sae_auto_interp.scorers import DetectionScorer, FuzzingScorer
 from sae_auto_interp.scorers.scorer import ScorerResult
+<<<<<<< HEAD
+=======
+
+from neuronpedia_autointerp.utils import (
+    convert_classifier_output_to_score_classifier_output,
+    per_feature_scores_fuzz_detection,
+)
+>>>>>>> 3fcd376 (adds type checking to Python apps)
 
 
 async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
