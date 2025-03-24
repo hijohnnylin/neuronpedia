@@ -8,9 +8,9 @@ request_lock = asyncio.Lock()
 
 
 def with_request_lock():
-    def decorator(func):
+    def decorator(func):  # type: ignore
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args, **kwargs):  # type: ignore
             async with request_lock:
                 return await func(*args, **kwargs)
 

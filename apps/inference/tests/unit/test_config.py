@@ -23,7 +23,7 @@ def mock_config():
     )
 
 
-def test_config_initialization(mock_config):
+def test_config_initialization(mock_config: Config):
     assert mock_config.MODEL_ID == "gpt2-small"
     assert mock_config.MODEL_DTYPE == "float16"
     assert mock_config.SAE_DTYPE == "float32"
@@ -49,7 +49,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 
 OUTPUT_FOLDER = "server_files"
-os.path.exists(OUTPUT_FOLDER) or os.makedirs(OUTPUT_FOLDER)
+if not os.path.exists(OUTPUT_FOLDER):
+    os.makedirs(OUTPUT_FOLDER)
 
 
 def test_get_saelens_neuronpedia_directory_df():
@@ -129,7 +130,7 @@ def test_config_to_json():
     assert json_output == expected_json
 
 
-def test_config_no_filtering(mock_config):
+def test_config_no_filtering(mock_config: Config):
     assert mock_config.MODEL_ID == "gpt2-small"
     assert mock_config.MODEL_DTYPE == "float16"
     assert mock_config.SAE_DTYPE == "float32"

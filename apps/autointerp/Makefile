@@ -11,3 +11,6 @@ format:
 check-format:
 	$(RUFF) check .
 	$(RUFF) format --check .
+
+check-type:
+	$(PYTHON) -m pyright .

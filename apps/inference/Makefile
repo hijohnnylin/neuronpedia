@@ -1,4 +1,4 @@
-.PHONY: test test-verbose coverage format unit-test integration-test check-format check-ci install install-dev all run-server
+.PHONY: test-verbose coverage format unit-test check-format check-ci install install-dev all run-server
 
 # Variables
 PYTHON = python
@@ -9,13 +9,8 @@ COVERAGE = $(POETRY) run coverage
 RUFF = $(POETRY) run ruff
 
 # Targets
-test: unit-test integration-test
-
 unit-test:
 	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) tests/unit
-
-integration-test:
-	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) tests/integration
 
 test-verbose:
 	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) -vv
@@ -31,6 +26,9 @@ format:
 check-format:
 	$(RUFF) check .
 	$(RUFF) format --check .
+
+check-type:
+	$(POETRY) run pyright .
 
 check-ci: check-format unit-test
 

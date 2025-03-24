@@ -41,14 +41,14 @@ def parse_env_and_args():
 def list_available_options():
     df = get_saelens_neuronpedia_directory_df()
     df = df[df["neuronpedia_id"].notna()]  # Remove rows with None neuronpedia_id
-    models = df["model"].unique()
-    df = df.sort_values(by=["model", "neuronpedia_set"])
+    models = df["model"].unique()  # type: ignore
+    df = df.sort_values(by=["model", "neuronpedia_set"])  # type: ignore
 
     print("Available models and SAE sets:")
     for model in models:
         print(f"  {model}:")
         model_df = df[df["model"] == model]
-        sae_sets = model_df["neuronpedia_set"].unique()
+        sae_sets = model_df["neuronpedia_set"].unique()  # type: ignore
         for sae_set in sae_sets:
             set_size = len(model_df[model_df["neuronpedia_set"] == sae_set])
             print(f"    - {sae_set} ({set_size} SAEs)")

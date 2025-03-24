@@ -12,8 +12,8 @@ DTYPE_MAP = {
 
 class SaeLensSAE(BaseSAE):
     @staticmethod
-    def load(release, sae_id, device, dtype):
-        loaded_sae, cfg_dict, sparsity = SAE.from_pretrained(
+    def load(release: str, sae_id: str, device: str, dtype: str) -> tuple["SAE", str]:
+        loaded_sae, _, _ = SAE.from_pretrained(
             release=release,
             sae_id=sae_id,
             device=device,

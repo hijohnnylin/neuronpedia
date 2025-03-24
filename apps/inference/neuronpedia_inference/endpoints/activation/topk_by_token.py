@@ -15,6 +15,7 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post200_respon
 from neuronpedia_inference_client.models.activation_topk_by_token_post_request import (
     ActivationTopkByTokenPostRequest,
 )
+from transformer_lens import ActivationCache
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
@@ -112,7 +113,12 @@ async def activation_topk_by_token(
 
 
 # Keep the get_activations_by_index function from the original code
-def get_activations_by_index(sae_type, selected_layer, cache, hook_name):
+def get_activations_by_index(
+    sae_type: str,
+    selected_layer: str,
+    cache: ActivationCache | dict[str, torch.Tensor],
+    hook_name: str,
+) -> torch.Tensor:
     if sae_type == "neurons":
         mlp_activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
         return torch.transpose(mlp_activation_data[0], 0, 1)

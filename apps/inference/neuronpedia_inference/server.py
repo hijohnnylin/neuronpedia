@@ -4,11 +4,13 @@ import logging
 import os
 import sys
 import traceback
+from collections.abc import Awaitable
+from typing import Callable
 
 import sentry_sdk
 import torch
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from transformer_lens import HookedTransformer
@@ -67,7 +69,7 @@ args = parse_env_and_args()
 
 # we have to initialize SAE's AFTER server startup, because some infrastructure providers require
 # our server to respond to health checks within a few minutes of starting up
-@app.on_event("startup")
+@app.on_event("startup")  # pyright: ignore[reportDeprecated]
 async def startup_event():
     logger.info("Starting initialization...")
     # Wait briefly to ensure server is ready
@@ -195,7 +197,7 @@ async def initialize(
                 if tid is not None  # type: ignore
             }
             # cache this one time for steering later use
-            config.set_steer_special_token_ids(special_token_ids)
+            config.set_steer_special_token_ids(special_token_ids)  # type: ignore
 
         logger.info(
             f"Loaded {config.CUSTOM_HF_MODEL_ID if config.CUSTOM_HF_MODEL_ID else config.OVERRIDE_MODEL_ID} on {args.device}"
@@ -214,7 +216,9 @@ async def initialize(
 
 
 @app.middleware("http")
-async def check_secret_key(request, call_next):
+async def check_secret_key(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     if request.url.path == "/health":
         return await call_next(request)
 
@@ -231,18 +235,22 @@ async def check_secret_key(request, call_next):
 
 
 @app.middleware("http")
-async def check_model(request, call_next):
+async def check_model(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     config = Config.get_instance()
     if hasattr(request, "model") and (
-        request.model != config.MODEL_ID and request.model != config.OVERRIDE_MODEL_ID
+        request.model != config.MODEL_ID and request.model != config.OVERRIDE_MODEL_ID  # type: ignore
     ):
-        logger.error("Unsupported model: %s", request.model)
+        logger.error("Unsupported model: %s", request.model)  # type: ignore
         return JSONResponse(content={"error": "Unsupported model"}, status_code=400)
     return await call_next(request)
 
 
 @app.middleware("http")
-async def log_and_check_cuda_error(request, call_next):
+async def log_and_check_cuda_error(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     if not initialized:
         return JSONResponse(
             status_code=500,

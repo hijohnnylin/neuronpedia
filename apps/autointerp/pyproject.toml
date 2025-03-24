@@ -28,6 +28,7 @@ dev = [
     "pytest>=8.3.1",
     "coverage>=7.6.0",
     "ruff>=0.7.4",
+    "pyright>=1.1.351",
 ]
 
 [tool.setuptools.packages.find]
@@ -37,3 +38,27 @@ include = ["neuronpedia_autointerp*"]
 exclude = ["*.ipynb"]
 ignore = ["E203", "E501", "E731", "F722", "E741", "F821", "F403", "ARG002"]
 select = ["UP", "TID", "I", "F", "E", "ARG", "SIM", "RET", "LOG", "T20"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Union".msg = "Use `|` instead"
+"typing.Optional".msg = "Use `| None` instead"
+"typing.Dict".msg = "Use `dict` instead"
+"typing.List".msg = "Use `list` instead"
+
+[tool.pyright]
+include = ["neuronpedia_autointerp"]
+exclude = ["dist", ".venv"]
+# Add this line to ignore import errors for missing libraries
+reportMissingImports = "none"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUntypedFunctionDecorator = "none"
+reportUnnecessaryIsInstance = "none"
+reportUnnecessaryComparison = "none"
+reportConstantRedefinition = "none"
+reportUnknownLambdaType = "none"
+reportUnknownParameterType = "none"
+reportPrivateUsage = "none"
