@@ -1,8 +1,8 @@
 .PHONY: format check-format
 
 # Variables
-PYTHON = python
-RUFF = $(PYTHON) -m ruff
+POETRY = poetry
+RUFF = $(POETRY) run ruff
 
 format:
 	$(RUFF) format .
@@ -13,4 +13,4 @@ check-format:
 	$(RUFF) format --check .
 
 check-type:
-	$(PYTHON) -m pyright .
+	$(POETRY) run pyright .
