@@ -77,7 +77,7 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
         else:
             raise HTTPException(status_code=400, detail="Invalid scoring type")
 
-        result: ScorerResult = await scorer.__call__(feature_record)
+        result: ScorerResult = await scorer.__call__(feature_record)  # type: ignore
         score = per_feature_scores_fuzz_detection(result.score)
 
         breakdown = [
