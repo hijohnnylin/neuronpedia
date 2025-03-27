@@ -38,15 +38,24 @@ RUN apt-get update && apt-get install -y \
     make \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the autointerp service code
-COPY apps/autointerp apps/autointerp
+# Install Poetry
+RUN pip install --upgrade pip \
+    && pip install poetry
 
-# Set working directory to match relative paths in pyproject.toml
-WORKDIR /app/apps/autointerp
+# Copy only pyproject.toml and poetry.lock first to leverage Docker cache
+COPY apps/autointerp/pyproject.toml apps/autointerp/poetry.lock* /app/
+
+# Configure poetry to not create a virtual environment
+RUN poetry config virtualenvs.create false
 
 # Install dependencies
-RUN pip install --upgrade pip
-RUN pip install -e .
+RUN poetry install --no-interaction --no-ansi --no-root
+
+# Now copy the actual code
+COPY apps/autointerp /app/
+
+# Install the project itself
+RUN poetry install --no-interaction --no-ansi
 
 # Expose the port the app runs on
 EXPOSE 5003

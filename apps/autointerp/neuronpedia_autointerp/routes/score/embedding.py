@@ -49,7 +49,7 @@ async def generate_score_embedding(request: ScoreEmbeddingPostRequest, model):  
         feature_record.explanation = request.explanation  # type: ignore
 
         scorer = EmbeddingScorer(model)
-        result: ScorerResult = await scorer.__call__(feature_record)
+        result: ScorerResult = await scorer.__call__(feature_record)  # type: ignore
         score = per_feature_scores_embedding(result.score)
         breakdown = [
             convert_embedding_output_to_score_embedding_output(item)
