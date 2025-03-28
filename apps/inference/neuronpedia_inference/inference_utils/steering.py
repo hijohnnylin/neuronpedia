@@ -1,11 +1,11 @@
 from collections import defaultdict
-from typing import List, Optional
 
 import torch
 from neuronpedia_inference_client.models.np_steer_chat_message import (
     NPSteerChatMessage,
 )
 from neuronpedia_inference_client.models.np_steer_feature import NPSteerFeature
+from transformers import PreTrainedTokenizerBase
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
@@ -20,7 +20,7 @@ async def stream_lock(is_stream: bool):
         async def __aenter__(self):
             pass
 
-        async def __aexit__(self, *args):
+        async def __aexit__(self, *args):  # type: ignore
             pass
 
     return DummyLock()
@@ -36,7 +36,7 @@ def remove_sse_formatting(data: str) -> str:
     return data.rstrip("\n\n")
 
 
-def process_features_vectorized(features: List[NPSteerFeature]):
+def process_features_vectorized(features: list[NPSteerFeature]):
     # Group features by source
     source_groups: defaultdict[str, list[tuple[int, int]]] = defaultdict(list)
     for i, feature in enumerate(features):
@@ -59,10 +59,14 @@ def process_features_vectorized(features: List[NPSteerFeature]):
 
 def convert_to_chat_array(
     text: str,
-    tokenizer,
-    custom_hf_model_id: Optional[str] = None,
+    tokenizer: PreTrainedTokenizerBase | None,
+    custom_hf_model_id: str | None = None,
 ) -> list[NPSteerChatMessage]:
     config = Config.get_instance()
+    if tokenizer is None:
+        # Handle the None case
+        # Either raise an error:
+        raise ValueError("Tokenizer cannot be None for chat array conversion")
     # Tokenize the input text
     tokens = tokenizer.encode(text)
 
@@ -123,6 +127,9 @@ def convert_to_chat_array(
     else:
         # Get special token IDs directly from the tokenizer
         special_token_ids = config.STEER_SPECIAL_TOKEN_IDS
+
+        if special_token_ids is None:
+            special_token_ids = set()
 
         for token in tokens:
             # first case is to check it's a special token that we append to the conversation
