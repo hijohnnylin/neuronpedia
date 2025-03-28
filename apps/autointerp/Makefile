@@ -2,7 +2,12 @@
 
 # Variables
 POETRY = poetry
+PYTEST = $(POETRY) run pytest
+PYTEST_ARGS = -v -s
 RUFF = $(POETRY) run ruff
+
+unit-test:
+	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) tests/unit
 
 format:
 	$(RUFF) format .
