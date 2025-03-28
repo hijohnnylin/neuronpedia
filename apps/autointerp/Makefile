@@ -1,8 +1,13 @@
-.PHONY: format check-format
+.PHONY: unit-test format check-format
 
 # Variables
 POETRY = poetry
+PYTEST = $(POETRY) run pytest
+PYTEST_ARGS = -v -s
 RUFF = $(POETRY) run ruff
+
+unit-test:
+	$(PYTEST) $(PYTEST_ARGS) tests/unit
 
 format:
 	$(RUFF) format .
