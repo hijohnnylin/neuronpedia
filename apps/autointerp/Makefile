@@ -19,3 +19,5 @@ check-format:
 
 check-type:
 	$(POETRY) run pyright .
+
+check-ci: check-format check-type unit-test
