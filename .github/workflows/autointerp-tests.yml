@@ -1,0 +1,41 @@
+name: Autointerp - Tests
+defaults:
+  run:
+    working-directory: ./apps/autointerp
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/autointerp/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/autointerp/**"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+    - name: Install dependencies
+      run: |
+        poetry config virtualenvs.create true
+        poetry install --with dev
+    - name: Check linting
+      run: poetry run ruff check .
+    - name: Check formatting
+      run: poetry run ruff format --check .      
+    - name: Type checking
+      run: poetry run pyright .
+    - name: Run tests
+      run: poetry run pytest
