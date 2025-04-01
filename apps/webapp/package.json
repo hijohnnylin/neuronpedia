@@ -31,7 +31,8 @@
     "test:playwright": "playwright test",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "knip": "knip"
+    "knip": "knip",
+    "test:coverage": "vitest run --coverage"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
