@@ -2,6 +2,10 @@ import traceback
 
 import torch
 from fastapi import HTTPException
+from neuronpedia_autointerp.utils import (
+    convert_embedding_output_to_score_embedding_output,
+    per_feature_scores_embedding,
+)
 from neuronpedia_autointerp_client.models.score_embedding_post200_response import (
     ScoreEmbeddingPost200Response,
 )
@@ -11,11 +15,6 @@ from neuronpedia_autointerp_client.models.score_embedding_post_request import (
 from sae_auto_interp.features import Example, Feature, FeatureRecord
 from sae_auto_interp.scorers import EmbeddingScorer
 from sae_auto_interp.scorers.scorer import ScorerResult
-
-from neuronpedia_autointerp.utils import (
-    convert_embedding_output_to_score_embedding_output,
-    per_feature_scores_embedding,
-)
 
 
 async def generate_score_embedding(request: ScoreEmbeddingPostRequest, model):  # type: ignore
@@ -49,7 +48,7 @@ async def generate_score_embedding(request: ScoreEmbeddingPostRequest, model):  
         feature_record.explanation = request.explanation  # type: ignore
 
         scorer = EmbeddingScorer(model)
-        result: ScorerResult = await scorer.__call__(feature_record)
+        result: ScorerResult = await scorer.__call__(feature_record)  # type: ignore
         score = per_feature_scores_embedding(result.score)
         breakdown = [
             convert_embedding_output_to_score_embedding_output(item)

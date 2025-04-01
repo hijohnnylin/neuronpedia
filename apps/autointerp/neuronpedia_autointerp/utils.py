@@ -1,3 +1,5 @@
+# ruff: noqa: E712
+
 from typing import Any
 
 import pandas as pd
@@ -13,14 +15,11 @@ from sklearn.metrics import roc_auc_score
 def per_feature_scores_embedding(score_data: list[dict[Any, Any]]) -> float:
     data_df = pd.DataFrame(score_data)
     data_df["ground_truth"] = data_df["distance"] > 0
-    auc_score = roc_auc_score(data_df["ground_truth"], data_df["similarity"])
-    return float(auc_score)  # noqa: RET504
+    auc_score = float(roc_auc_score(data_df["ground_truth"], data_df["similarity"]))
+    return auc_score  # noqa: RET504
 
 
 def calculate_balanced_accuracy(dataframe: pd.DataFrame) -> float:
-    # ruff: noqa: E712
-    # flake8: noqa: E712
-    # TODO: "== True" checks should ideally be "is True" but when we check that way, it crashes
     tp = len(
         dataframe[(dataframe["ground_truth"] == True) & (dataframe["correct"] == True)]
     )
