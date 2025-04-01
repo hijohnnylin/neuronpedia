@@ -37,6 +37,7 @@ pytest = "^8.3.1"
 coverage = "^7.6.0"
 ruff = "^0.7.4"
 pyright = "^1.1.351"
+pytest-cov = "^6.0.0"
 
 [tool.ruff.lint]
 exclude = ["*.ipynb"]
