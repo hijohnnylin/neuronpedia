@@ -2,10 +2,6 @@ import traceback
 
 import torch
 from fastapi import HTTPException
-from neuronpedia_autointerp.utils import (
-    convert_classifier_output_to_score_classifier_output,
-    per_feature_scores_fuzz_detection,
-)
 from neuronpedia_autointerp_client.models.np_score_fuzz_detection_type import (
     NPScoreFuzzDetectionType,
 )
@@ -19,6 +15,11 @@ from sae_auto_interp.clients import OpenRouter
 from sae_auto_interp.features import Example, Feature, FeatureRecord
 from sae_auto_interp.scorers import DetectionScorer, FuzzingScorer
 from sae_auto_interp.scorers.scorer import ScorerResult
+
+from neuronpedia_autointerp.utils import (
+    convert_classifier_output_to_score_classifier_output,
+    per_feature_scores_fuzz_detection,
+)
 
 
 async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):

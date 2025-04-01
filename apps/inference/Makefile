@@ -30,7 +30,7 @@ check-format:
 check-type:
 	$(POETRY) run pyright .
 
-check-ci: check-format unit-test
+check-ci: check-format check-type unit-test
 
 install:
 	$(POETRY) config virtualenvs.create true
