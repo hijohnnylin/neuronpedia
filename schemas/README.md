@@ -78,7 +78,7 @@ here's how to create or update an endpoint in the inference server.
 
 ## making changes to the autointerp server
 
-the instructions are the _mostly_ same as [making changes to the inference server](#making-changes-to-the-inference-server), except: pip instead of poetry, and names are changed from `neuronpedia-inference` to `neuronpedia-autointerp`, etc.
+the instructions are _mostly_ the same as [making changes to the inference server](#making-changes-to-the-inference-server), except names are changed from `neuronpedia-inference` to `neuronpedia-autointerp`, etc.
 
 1. spec out your new addition(s) or change(s) under [openapi/inference-server.yaml](openapi/autointerp-server.yaml) and the [openapi/autointerp](openapi/autointerp/) subdirectory.
 2. delete the old autointerp clients
@@ -105,8 +105,7 @@ the instructions are the _mostly_ same as [making changes to the inference serve
 5. make your code changes to the autointerp server
    1. point your local autointerp server code to use the updated local python client
       ```
-      cd ../apps/autointerp
-      pip install -e ../../packages/python/neuronpedia-autointerp-client
+      poetry remove neuronpedia-autointerp-client && poetry add ../../packages/python-autointerp-client/
       ```
    2. update the code under [apps/autointerp/neuronpedia_autointerp](../apps/autointerp/neuronpedia_autointerp/) for your changes.
 6. make your code changes to the webapp server (if necessary)

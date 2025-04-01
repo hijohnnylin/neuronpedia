@@ -1,8 +1,11 @@
 [tool.poetry]
 name = "neuronpedia_autointerp"
 version = "1.0.0"
-description = "Neuronpedia's AutoInterp Server..."
+description = "Neuronpedia's AutoInterp Server - Based on EleutherAI's sae-auto-interp."
 authors = ["Johnny Lin <johnny@neuronpedia.org>"]
+license = "MIT"
+readme = "README.md"
+keywords = ["interpretability", "explainable-ai"]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"

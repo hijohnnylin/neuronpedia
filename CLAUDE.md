@@ -9,7 +9,7 @@
   - Local DB: `cd apps/webapp && npm run build:localhost`
   - Simple build: `cd apps/webapp && npm run build:simple`
 - **Inference**: `cd apps/inference && poetry install && poetry run python start.py`
-- **Autointerp**: `cd apps/autointerp && pip install -e . && python server.py`
+- **Autointerp**: `cd apps/autointerp && poetry install . && poetry run python server.py`
 
 ## Testing
 
