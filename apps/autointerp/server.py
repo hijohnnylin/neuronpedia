@@ -58,7 +58,8 @@ def initialize_globals():
     global model
     if torch.cuda.is_available():
         model = SentenceTransformer(
-            "dunzhang/stella_en_400M_v5", trust_remote_code=True
+            "dunzhang/stella_en_400M_v5",
+            trust_remote_code=True,  # type: ignore[call-arg]
         ).cuda()
         print("initialized embedding model")
     else:
