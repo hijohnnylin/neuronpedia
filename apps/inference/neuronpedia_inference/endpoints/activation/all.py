@@ -1,12 +1,11 @@
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import einops
 import torch
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from jaxtyping import Float, Int
 from neuronpedia_inference_client.models.activation_all_post200_response import (
     ActivationAllPost200Response,
 )
@@ -96,14 +95,14 @@ async def activation_all(
         )
 
 
-def _get_safe_dtype(dtype):
+def _get_safe_dtype(dtype: torch.dtype) -> torch.dtype:
     """
     Convert float16 to float32, leave other dtypes unchanged.
     """
     return torch.float32 if dtype == torch.float16 else dtype
 
 
-def _safe_cast(tensor, target_dtype):
+def _safe_cast(tensor: torch.Tensor, target_dtype: torch.dtype) -> torch.Tensor:
     """
     Safely cast a tensor to the target dtype, creating a copy if needed.
     Convert float16 to float32, leave other dtypes unchanged.
@@ -129,7 +128,7 @@ class ActivationProcessor:
         first_layer = request.selected_sources[0]
         prepend_bos = sae_manager.get_sae(first_layer).cfg.prepend_bos
 
-        tokens, str_tokens, cache = self._tokenize_and_get_cache(
+        _, str_tokens, cache = self._tokenize_and_get_cache(
             request.prompt, prepend_bos, max_layer
         )
         # ensure sort_by_token_indexes doesn't have any out of range indexes
@@ -157,8 +156,8 @@ class ActivationProcessor:
         )
 
     def _tokenize_and_get_cache(
-        self, text: str, prepend_bos: bool, max_layer: Optional[int] = None
-    ) -> Tuple[torch.Tensor, List[str], ActivationCache]:
+        self, text: str, prepend_bos: bool, max_layer: int | None = None
+    ) -> tuple[torch.Tensor, list[str], ActivationCache]:
         """Process input text and return tokens, string tokens, and cache."""
         model = Model.get_instance()
         config = Config.get_instance()
@@ -181,7 +180,7 @@ class ActivationProcessor:
         self,
         request: ActivationAllPostRequest,
         cache: ActivationCache,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Process activations for each selected layer."""
         sae_manager = SAEManager.get_instance()
         source_activations = []
@@ -218,7 +217,7 @@ class ActivationProcessor:
         selected_source: str,
         cache: ActivationCache,
         hook_name: str,
-    ) -> Float[torch.Tensor, "feature token"]:
+    ) -> torch.Tensor:
         """Get activations by index for a specific layer and SAE type."""
         if sae_type == "neurons":
             mlp_activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
@@ -232,10 +231,10 @@ class ActivationProcessor:
 
     def _process_source_activations(
         self,
-        activations_by_index: Float[torch.Tensor, "feature token"],
+        activations_by_index: torch.Tensor,
         layer_num: int,
-        sort_by_token_indexes: List[int],
-    ) -> Dict[str, Any]:
+        sort_by_token_indexes: list[int],
+    ) -> dict[str, Any]:
         """Process activations for a single layer."""
         max_values, max_indices = torch.max(activations_by_index, dim=1)
         layer_num_tensor = torch.full(max_values.shape, layer_num).to(
@@ -263,9 +262,9 @@ class ActivationProcessor:
 
     def _sort_and_filter_results(
         self,
-        source_activations: List[Dict[str, Any]],
+        source_activations: list[dict[str, Any]],
         request: ActivationAllPostRequest,
-    ) -> List[List[float]]:
+    ) -> list[list[float]]:
         """Sort and filter activations based on request parameters."""
         device = Config.get_instance().DEVICE
         all_activations = torch.cat(
@@ -300,13 +299,13 @@ class ActivationProcessor:
 
     def _format_result_and_calculate_dfa(
         self,
-        sorted_activations: List[List[float]],
+        sorted_activations: list[list[float]],
         cache: ActivationCache,
         request: ActivationAllPostRequest,
-    ) -> List[ActivationAllPost200ResponseActivationsInner]:
+    ) -> list[ActivationAllPost200ResponseActivationsInner]:
         """Format results and if needed, calculate DFA values for sorted activations."""
 
-        feature_activations: List[ActivationAllPost200ResponseActivationsInner] = []
+        feature_activations: list[ActivationAllPost200ResponseActivationsInner] = []
         for result in sorted_activations:
             source = (
                 f"{int(result[0])}-{request.source_set}"
@@ -349,7 +348,7 @@ class ActivationProcessor:
         idx: int,
         max_value_index: int,
         source_set: str,
-    ) -> Float[torch.Tensor, "batch dest_pos src_pos"]:
+    ) -> torch.Tensor:
         """Calculate DFA values for a specific feature, supporting both standard and GQA models."""
         model = Model.get_instance()
         encoder = SAEManager.get_instance().get_sae(f"{layer_num}-{source_set}")
@@ -414,10 +413,10 @@ class ActivationProcessor:
 
     def _calculate_table_counts(
         self,
-        source_activations: List[Dict[str, Any]],
-        str_tokens: List[str],
+        source_activations: list[dict[str, Any]],
+        str_tokens: list[str],
         source_set: str,
-    ) -> Int[torch.Tensor, "layer token"]:
+    ) -> torch.Tensor:
         """Calculate table counts for activating features."""
         table_max_layer = max(
             self._get_layer_num(s)

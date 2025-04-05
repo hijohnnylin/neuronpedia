@@ -214,3 +214,27 @@ curl -X POST http://127.0.0.1:5002/v1/steer/completion \
      "normalize_steering": false
    }'
 ```
+
+## Testing, Linting, and Formatting
+
+This project uses [pytest](https://docs.pytest.org/en/stable/) for testing, [pyright](https://github.com/microsoft/pyright) for type-checking, and [Ruff](https://docs.astral.sh/ruff/) for formatting and linting.
+
+If you add new code, it would be greatly appreciated if you could add tests in the `tests` directory. You can run the tests with:
+
+```bash
+make test
+```
+
+Before commiting, make sure you format the code with:
+
+```bash
+make format
+```
+
+Finally, run all CI checks locally with:
+
+```bash
+make check-ci
+```
+
+If these pass, you're good to go! Open a pull request with your changes.

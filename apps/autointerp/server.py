@@ -1,12 +1,13 @@
 # ruff: noqa: T201
 
 import os
+from collections.abc import Awaitable, Callable
 
 import sentry_sdk
 import torch
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from neuronpedia_autointerp_client.models.explain_default_post_request import (
     ExplainDefaultPostRequest,
@@ -57,7 +58,8 @@ def initialize_globals():
     global model
     if torch.cuda.is_available():
         model = SentenceTransformer(
-            "dunzhang/stella_en_400M_v5", trust_remote_code=True
+            "dunzhang/stella_en_400M_v5",
+            trust_remote_code=True,  # type: ignore[call-arg]
         ).cuda()
         print("initialized embedding model")
     else:
@@ -88,13 +90,15 @@ app = FastAPI()
 app.include_router(router)
 
 
-@app.on_event("startup")
+@app.on_event("startup")  # type: ignore[deprecated]
 async def startup_event():
     initialize_globals()
 
 
 @app.middleware("http")
-async def check_secret_key(request: Request, call_next):
+async def check_secret_key(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
     secret_key = request.headers.get("X-SECRET-KEY")
     if not secret_key or secret_key != SECRET:
         return JSONResponse(
