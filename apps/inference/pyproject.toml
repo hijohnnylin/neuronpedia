@@ -12,13 +12,10 @@ python = ">=3.10,<4.0"
 python-dotenv = "^1.0.1"
 numpy = "^1.24"
 psutil = "^5.9.8"
-# copied from transformer-lens
-torch = [
-  { platform = "linux", version = ">=1.10" }, # We can use any torch version on Linux (e.g colab)
-  { platform = "!=linux", version = ">=1.10,!=2.0,!=2.1.0" }, # Pin >=2.1.1 on Apple devices due to known MPS errors on 2.1.0
-]
-transformer-lens = {git = "https://github.com/hijohnnylin/TransformerLens.git", branch = "temp_branch_version"}
-transformers = "^4.45.0"
+torch = ">=2.2"
+transformer-lens = "^2.15.0"
+transformers = ">=4.43"
+transformers-stream-generator = "^0.0.5"
 einops = "^0.7.0"
 pytest = "^8.1.1"
 huggingface-hub = "^0.26.1"
