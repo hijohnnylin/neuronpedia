@@ -29,6 +29,7 @@ from neuronpedia_inference.inference_utils.steering import (
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import (
     Model,
+    generate_stream,
     with_request_lock,
 )
 
@@ -220,7 +221,8 @@ async def run_batched_generate(
 
                 with model.hooks(fwd_hooks=editing_hooks):
                     for i, result in enumerate(
-                        model.generate_stream(
+                        generate_stream(
+                            model,
                             stop_at_eos=(model.cfg.device != "mps"),
                             input=tokenized.unsqueeze(0),
                             do_sample=True,
@@ -263,7 +265,8 @@ async def run_batched_generate(
             with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
                 partial_result = ""
                 for i, result in enumerate(
-                    model.generate_stream(
+                    generate_stream(
+                        model,
                         stop_at_eos=(model.cfg.device != "mps"),
                         input=tokenized.unsqueeze(0),
                         do_sample=True,

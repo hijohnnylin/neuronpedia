@@ -4922,18 +4922,20 @@ test = ["argcomplete (>=3.0.3)", "mypy (>=1.7.0)", "pre-commit", "pytest (>=7.0,
 
 [[package]]
 name = "transformer-lens"
-version = "2.13.0"
+version = "2.15.0"
 description = "An implementation of transformers tailored for mechanistic interpretability."
 optional = false
-python-versions = ">=3.8,<4.0"
+python-versions = "<4.0,>=3.8"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "transformer_lens-2.15.0-py3-none-any.whl", hash = "sha256:5ce5033b0e8f25cf0133cb2133600f86f78a6ca2fdd97160f5ae1d6f9fb11b86"},
+    {file = "transformer_lens-2.15.0.tar.gz", hash = "sha256:fdf9edd423bee1756426e868ed9fec3a420f070ec9931c19d55d4c83b5bc492f"},
+]
 
 [package.dependencies]
 accelerate = ">=0.23.0"
-beartype = "^0.14.1"
-better-abc = "^0.0.3"
+beartype = ">=0.14.1,<0.15.0"
+better-abc = ">=0.0.3,<0.0.4"
 datasets = ">=2.7.1"
 einops = ">=0.6.0"
 fancy-einsum = ">=0.0.3"
@@ -4945,21 +4947,13 @@ numpy = [
 pandas = ">=1.1.5"
 rich = ">=12.6.0"
 sentencepiece = "*"
-torch = [
-    {version = ">=1.10", markers = "sys_platform == \"linux\""},
-    {version = ">=1.10,<2.0 || >2.0,<2.1.0 || >2.1.0", markers = "sys_platform != \"linux\""},
-]
+torch = ">=2.2"
 tqdm = ">=4.64.1"
-transformers = ">=4.37.2"
-typeguard = "^4.2"
+transformers = ">=4.43"
+transformers-stream-generator = ">=0.0.5,<0.0.6"
+typeguard = ">=4.2,<5.0"
 typing-extensions = "*"
 wandb = ">=0.13.5"
-
-[package.source]
-type = "git"
-url = "https://github.com/hijohnnylin/TransformerLens.git"
-reference = "temp_branch_version"
-resolved_reference = "7846b7ddfe7324f485c966684646dcd3045f5ac3"
 
 [[package]]
 name = "transformers"
@@ -5032,6 +5026,20 @@ torch-vision = ["Pillow (>=10.0.1,<=15.0)", "torchvision"]
 torchhub = ["filelock", "huggingface-hub (>=0.26.0,<1.0)", "importlib-metadata", "numpy (>=1.17)", "packaging (>=20.0)", "protobuf", "regex (!=2019.12.17)", "requests", "sentencepiece (>=0.1.91,!=0.1.92)", "tokenizers (>=0.21,<0.22)", "torch (>=2.0)", "tqdm (>=4.27)"]
 video = ["av"]
 vision = ["Pillow (>=10.0.1,<=15.0)"]
+
+[[package]]
+name = "transformers-stream-generator"
+version = "0.0.5"
+description = "This is a text generation method which returns a generator, streaming out each token in real-time during inference, based on Huggingface/Transformers."
+optional = false
+python-versions = ">=3.5"
+groups = ["main"]
+files = [
+    {file = "transformers-stream-generator-0.0.5.tar.gz", hash = "sha256:271deace0abf9c0f83b36db472c8ba61fdc7b04d1bf89d845644acac2795ed57"},
+]
+
+[package.dependencies]
+transformers = ">=4.26.1"
 
 [[package]]
 name = "triton"
