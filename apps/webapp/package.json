@@ -31,7 +31,8 @@
     "test:playwright": "playwright test",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
-    "knip": "knip"
+    "knip": "knip",
+    "test:coverage": "vitest run --coverage"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -179,6 +180,7 @@
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-react": "^4.0.0",
+    "@vitest/coverage-v8": "^3.1.1",
     "autoprefixer": "^10.4.14",
     "concurrently": "^7.6.0",
     "encoding": "^0.1.13",

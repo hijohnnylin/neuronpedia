@@ -7,7 +7,7 @@ PYTEST_ARGS = -v -s
 RUFF = $(POETRY) run ruff
 
 unit-test:
-	$(PYTEST) $(PYTEST_ARGS) tests/unit
+	$(POETRY) run $(PYTEST) -v --cov=neuronpedia_autointerp/ --cov-report=term-missing --cov-branch tests/unit
 
 format:
 	$(RUFF) format .
