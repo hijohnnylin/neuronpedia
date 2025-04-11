@@ -18,7 +18,7 @@
     "no-await-in-loop": "warn",
     "import/no-extraneous-dependencies": [
       "error",
-      { "devDependencies": ["**/*.test.tsx", "**/*.spec.tsx", "**/*.test.ts", "**/*.spec.ts", "**/*.config.ts"] }
+      { "devDependencies": ["**/*.test.tsx", "**/*.spec.tsx", "**/*.test.ts", "**/*.spec.ts", "**/*.config.ts","**/fixtures.ts"] }
     ],
     "jsx-a11y/label-has-associated-control": [
       "error",

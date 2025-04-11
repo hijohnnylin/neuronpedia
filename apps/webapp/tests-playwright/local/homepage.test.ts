@@ -1,14 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from '../fixtures';
 
-const baseUrl = 'http://localhost:3000';
-const mainUrl = 'https://neuronpedia.org';
-
-test('homepage has expected title', async ({ page }) => {
+test('homepage has expected title', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
   await expect(page).toHaveTitle(/Neuronpedia/);
 });
 
-test('API navigation link', async ({ page }) => {
+test('API navigation link', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   // Find and click the API link
@@ -18,10 +16,10 @@ test('API navigation link', async ({ page }) => {
 
   // Wait for navigation and check exact URL
   await page.waitForLoadState('networkidle');
-  await expect(page).toHaveURL(baseUrl + '/api-doc');
+  await expect(page).toHaveURL(`${baseUrl}/api-doc`);
 });
 
-test('SAE Evals link', async ({ page }) => {
+test('SAE Evals link', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   // Find and click the SAE Evals link
@@ -31,10 +29,10 @@ test('SAE Evals link', async ({ page }) => {
 
   // Wait for navigation and check exact URL
   await page.waitForLoadState('networkidle');
-  await expect(page).toHaveURL(baseUrl + '/sae-bench');
+  await expect(page).toHaveURL(`${baseUrl}/sae-bench`);
 });
 
-test('Steer', async ({ page }) => {
+test('Steer', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   // Find and click the Steer link
@@ -75,7 +73,7 @@ test('Steer', async ({ page }) => {
 //   await expect(newPage).toHaveURL('https://docs.neuronpedia.org/');
 // });
 
-test('MIT Technology Review link', async ({ page }) => {
+test('MIT Technology Review link', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -86,7 +84,7 @@ test('MIT Technology Review link', async ({ page }) => {
   await expect(newPage).toHaveURL(/.*technologyreview\.com/);
 });
 
-test('Google Deepmind', async ({ page }) => {
+test('Google Deepmind', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -97,7 +95,7 @@ test('Google Deepmind', async ({ page }) => {
   await expect(newPage).toHaveURL(/.*gemma-scope/);
 });
 
-test('Fudan University', async ({ page }) => {
+test('Fudan University', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -108,7 +106,7 @@ test('Fudan University', async ({ page }) => {
   await expect(newPage).toHaveURL(/.*llama-scope/);
 });
 
-test('Apollo Research', async ({ page }) => {
+test('Apollo Research', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -131,7 +129,7 @@ test('Apollo Research', async ({ page }) => {
 //   await expect(newPage).toHaveURL('#mats');
 // });
 
-test('EleutherAI', async ({ page }) => {
+test('EleutherAI', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -154,7 +152,7 @@ test('EleutherAI', async ({ page }) => {
 //   await expect(newPage).toHaveURL('https://docs.neuronpedia.org/features');
 // });
 
-test('concepts', async ({ page }) => {
+test('concepts', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -162,25 +160,25 @@ test('concepts', async ({ page }) => {
     page.getByRole('link', { name: 'concepts', exact: true }).click(),
   ]);
 
-  await expect(newPage).toHaveURL(baseUrl + '/axbench');
+  await expect(newPage).toHaveURL(`${baseUrl}/axbench`);
 });
 
-test('releases display', async ({ page }) => {
+test('releases display', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
   await expect(page.getByText('Llama Scope R1: SAEs for DeepSeek-R1-Distill-Llama-8B')).toBeVisible();
 });
 
-test('models display', async ({ page }) => {
+test('models display', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
   await expect(page.getByText('DeepSeek-R1-Llama-8B')).toBeVisible();
 });
 
-test('jump to display', async ({ page }) => {
+test('jump to display', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
   await expect(page.getByText('jump to source/sae')).toBeVisible();
 });
 
-test('cat steering', async ({ page }) => {
+test('cat steering', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -188,10 +186,10 @@ test('cat steering', async ({ page }) => {
     page.getByRole('link', { name: 'Try It: Gemma 2 - Cat Steering', exact: true }).click(),
   ]);
 
-  await expect(newPage).toHaveURL(baseUrl + '/gemma-2-9b-it/steer?saved=cm7cp63af00jx1q952neqg6e5');
+  await expect(newPage).toHaveURL(`${baseUrl}/gemma-2-9b-it/steer?saved=cm7cp63af00jx1q952neqg6e5`);
 });
 
-test('search by explanation', async ({ page }) => {
+test('search by explanation', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -199,7 +197,7 @@ test('search by explanation', async ({ page }) => {
     page.getByRole('link', { name: 'Try It: Search by Explanation', exact: true }).click(),
   ]);
 
-  await expect(newPage).toHaveURL( baseUrl + '/search-explanations');
+  await expect(newPage).toHaveURL( `${baseUrl}/search-explanations`);
 });
 
 // no local docs
@@ -214,7 +212,7 @@ test('search by explanation', async ({ page }) => {
 //   await expect(newPage).toHaveURL('https://docs.neuronpedia.org/search');
 // });
 
-test('api + libraries', async ({ page }) => {
+test('api + libraries', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -222,15 +220,15 @@ test('api + libraries', async ({ page }) => {
     page.getByRole('link', { name: 'API Playground', exact: true }).click(),
   ]);
 
-  await expect(newPage).toHaveURL( baseUrl + '/api-doc');
+  await expect(newPage).toHaveURL(`${baseUrl}/api-doc`);
 });
 
-test('searcher is embedded in the page', async ({ page }) => {
+test('searcher is embedded in the page', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
   await page.locator('textarea[name="searchQuery"]').isVisible();
 });
 
-test('searcher example', async ({ page }) => {
+test('searcher example', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
   await page.locator('textarea[name="Test activation with custom text./"]').isVisible();
 });
@@ -258,7 +256,7 @@ test('searcher example', async ({ page }) => {
 //   await expect(newPage).toHaveURL('https://docs.neuronpedia.org/embed-iframe');
 // });
 
-test('Slack', async ({ page }) => {
+test('Slack', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -269,7 +267,7 @@ test('Slack', async ({ page }) => {
   await expect(newPage).toHaveURL(/.*slack\.com*/);
 });
 
-test('Donate', async ({ page }) => {
+test('Donate', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([
@@ -280,7 +278,7 @@ test('Donate', async ({ page }) => {
   await expect(newPage).toHaveURL(/.*every\.org*/);
 });
 
-test('Upskill', async ({ page }) => {
+test('Upskill', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
   const [newPage] = await Promise.all([

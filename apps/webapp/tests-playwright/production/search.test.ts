@@ -1,5 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from '../fixtures';
 
+// http:localhost:3000/search
 test('search models', async ({ page }) => {
   await page.goto('https://neuronpedia.org/search');
 
