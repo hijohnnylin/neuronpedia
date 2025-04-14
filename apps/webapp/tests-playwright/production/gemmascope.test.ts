@@ -9,91 +9,91 @@ test('main page', async ({ page, gemmaUrl }) => {
   await page.locator('textarea[name="The inner workings"]').isVisible();
 });
 
-test('microscope button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#main');
+test('microscope button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#main`);
 
   await page.getByText("scan Gemma 2's brain to see what it's thinking").click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#microscope');
+  await expect(page).toHaveURL(`${gemmaUrl}#micropscope`);
 });
 
-test('analyze features button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#main');
+test('analyze features button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#main`);
 
   await page.getByText('Make features fire and figure out what they do').click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#analyze');
+  await expect(page).toHaveURL(`${gemmaUrl}#analyze`);
 });
 
-test('steer gemma button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#main');
+test('steer gemma button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#main`);
 
   await page.getByText("Change Gemma's behavior by manipulating features").click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#steer');
+  await expect(page).toHaveURL(`${gemmaUrl}#steer`);
 });
 
-test('do more button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#main');
+test('do more button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#main`);
 
   await page.getByText('Dive deeper into the exciting world of AI interpretability').click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#learn');
+  await expect(page).toHaveURL(`${gemmaUrl}#learn`);
 });
 
-test('browse & search saes button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#main');
+test('browse & search saes button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#main`);
 
   await page.getByText('Directly explore the SAEs in Gemma Scope').click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#browse');
+  await expect(page).toHaveURL(`${gemmaUrl}#browse`);
 });
 
-test('microscope page', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('microscope page', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   await page.locator('textarea[name="To understand what AI is thinking"]').isVisible();
 });
 
-test('demo button feeling lucky', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('demo button feeling lucky', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   await page.getByText("I'm Feeling Lucky").click();
   await expect(page.getByText('Click a preset above to send a text to Gemma')).not.toBeVisible({ timeout: 30000 });
 });
 
-test('demo button food', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('demo button food', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   await page.getByText('Food').click();
   await expect(page.getByText('Click a preset above to send a text to Gemma')).not.toBeVisible({ timeout: 30000 });
 });
 
-test('demo button News', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('demo button News', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   await page.getByText('News').click();
   await expect(page.getByText('Click a preset above to send a text to Gemma')).not.toBeVisible({ timeout: 30000 });
 });
 
-test('demo button Literary', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('demo button Literary', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   await page.getByText('Literary').click();
   await expect(page.getByText('Click a preset above to send a text to Gemma')).not.toBeVisible({ timeout: 30000 });
 });
 
-test('demo button Personal', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('demo button Personal', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   await page.getByText('Personal').click();
   await expect(page.getByText('Click a preset above to send a text to Gemma')).not.toBeVisible({ timeout: 30000 });
 });
 
-test('demo button Programming', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('demo button Programming', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   await page.getByText('Programming').click();
   await expect(page.getByText('Click a preset above to send a text to Gemma')).not.toBeVisible({ timeout: 30000 });
 });
 
-test('challenge gemma', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('challenge gemma', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   // challenge is unlocked after doing the demo, or pressing skip demo
   await page.getByText('skip demo').first().click();
@@ -104,47 +104,47 @@ test('challenge gemma', async ({ page, gemmaUrl  }) => {
   await expect(page.getByText('Click a preset above to send a text to Gemma')).not.toBeVisible({ timeout: 30000 });
 });
 
-test('next analyze features button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#microscope');
+test('next analyze features button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#microscope`);
 
   // next is unlocked after doing the demo, or pressing skip demo
   await page.getByText('skip demo').nth(1).click();
   await page.getByText(' Next - Analyze Features').click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#analyze');
+  await expect(page).toHaveURL(`${gemmaUrl}#analyze`);
 });
 
-test('analyze features page', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('analyze features page', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
 
   await page.locator('textarea[name="The features in Gemma Scope have labels"]').isVisible();
 });
 
-test('olympic sports button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('olympic sports button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
   await page.getByText('Olympic sports').click();
   await expect(page.getByText('What do these activations (in green) have in common?')).toBeVisible();
 });
 
-test('famous cities button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('famous cities button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
   await page.getByText('famous cities').click();
   await expect(page.getByText('What do these activations (in green) have in common?')).toBeVisible();
 });
 
-test('reference to animals button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('reference to animals button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
   await page.getByText('references to animals').click();
   await expect(page.getByText('Nice! This was tricky, because there are two possibly correct answers.')).toBeVisible();
 });
 
-test('none of these button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('none of these button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
   await page.getByText('none of these').click();
   await expect(page.getByText('Nice! This was tricky, because there are two possibly correct answers.')).toBeVisible();
 });
 
-test('analyze steer', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('analyze steer', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
 
   // unlocked after doing the demo, or pressing skip demo
   await page.getByText('skip example').first().click();
@@ -155,8 +155,8 @@ test('analyze steer', async ({ page, gemmaUrl  }) => {
   await expect(page.getByText('0.00')).toBeVisible();
 });
 
-test('puzzles labels', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('puzzles labels', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
 
   // unlocked after doing analyze steer, or pressing skip analyze
   await page.getByText('skip analyze').first().click();
@@ -164,9 +164,9 @@ test('puzzles labels', async ({ page, gemmaUrl  }) => {
   // test all 3 buttons
   const labelButtons = await page.getByRole('button', { name: 'Reveal Our Label' }).all();
   // click each button
-  for (const button of labelButtons) {
-    await button.click();
-  }
+  await Promise.all(
+    labelButtons.map(button => button.click())
+  );
 
   // check labels
   await expect(page.getByText('Lies and falsehoods')).toBeVisible();
@@ -174,13 +174,13 @@ test('puzzles labels', async ({ page, gemmaUrl  }) => {
   await expect(page.getByText('Bad/cringe stories')).toBeVisible();
 });
 
-test('next steer gemma button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#analyze');
+test('next steer gemma button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#analyze`);
 
   // unlocked after puzzles, or pressing skip analyze
   await page.getByText('skip analyze').nth(1).click();
   await page.getByText(' Next - Steer Gemma').click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#steer');
+  await expect(page).toHaveURL(`${gemmaUrl}#steer`);
 });
 
 // test('steer page', async ({ page }) => {
@@ -203,31 +203,31 @@ test('next steer gemma button', async ({ page, gemmaUrl  }) => {
 //   await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#learn');
 // });
 
-test('do more page', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('do more page', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   await page.locator('textarea[name="This demo of Gemma Scope"]').isVisible();
 });
 
-test('advanced steer button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('advanced steer button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([
     page.waitForEvent('popup'),
-    await page.locator('a[target="_blank"][href*="https://www.neuronpedia.org/steer"]').click(),
+    await page.locator('a[target="_blank"][href*="http://localhost:3000/steer"]').click(),
   ]);
-  await expect(newPage).toHaveURL(/https:\/\/www\.neuronpedia\.org\/.*\/steer/);
+  await expect(newPage).toHaveURL(/\/steer$/);
 });
 
-test('browse saes button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('browse saes button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   await page.getByText('Browse SAEs').click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#browse');
+  await expect(page).toHaveURL(`${gemmaUrl}#browse`);
 });
 
 // test('Contact Us', async({ page }) => {
-//   await page.goto('https://neuronpedia.org/gemma-scope#learn');
+//   await page.goto(`${gemmaUrl}#learn`);
 
 //   const [newPage] = await Promise.all([
 //     page.waitForEvent('popup'),
@@ -237,8 +237,8 @@ test('browse saes button', async ({ page, gemmaUrl  }) => {
 //   await expect(newPage).toHaveURL(/mailto:johnny@neuronpedia\.org*/);
 // });
 
-test('deepmind blog post button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('deepmind blog post button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('DeepMind Blog Post').click()]);
 
@@ -247,8 +247,8 @@ test('deepmind blog post button', async ({ page, gemmaUrl  }) => {
   );
 });
 
-test('coding tutorial button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('coding tutorial button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('Coding Tutorial').click()]);
 
@@ -259,24 +259,24 @@ test('coding tutorial button', async ({ page, gemmaUrl  }) => {
 
 // testing it the default method with expect().toHaveURL doesnt work, url ends up being blank
 // only tests for the correct link being on the page
-test('technical report button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('technical report button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const href = await page.getByText('Technical Report').getAttribute('href');
 
   expect(href).toContain('storage.googleapis.com/gemma-scope/gemma-scope-report.pdf');
 });
 
-test('huggingface button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('huggingface button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('HuggingFace').click()]);
 
   await expect(newPage).toHaveURL('https://huggingface.co/google/gemma-scope');
 });
 
-test('get started with mech interp button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('get started with mech interp button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([
     page.waitForEvent('popup'),
@@ -286,8 +286,8 @@ test('get started with mech interp button', async ({ page, gemmaUrl  }) => {
   await expect(newPage).toHaveURL('https://www.neelnanda.io/mechanistic-interpretability/getting-started');
 });
 
-test('favourite mech interp papers button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('favourite mech interp papers button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([
     page.waitForEvent('popup'),
@@ -299,8 +299,8 @@ test('favourite mech interp papers button', async ({ page, gemmaUrl  }) => {
   );
 });
 
-test('toward monosemanticity button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('toward monosemanticity button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([
     page.waitForEvent('popup'),
@@ -310,48 +310,48 @@ test('toward monosemanticity button', async ({ page, gemmaUrl  }) => {
   await expect(newPage).toHaveURL('https://transformer-circuits.pub/2023/monosemantic-features');
 });
 
-test('saelens button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('saelens button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('SAELens').click()]);
 
   await expect(newPage).toHaveURL('https://github.com/jbloomAus/SAELens');
 });
 
-test('transformerlens button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('transformerlens button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('TransformerLens').click()]);
 
   await expect(newPage).toHaveURL('https://github.com/TransformerLensOrg/TransformerLens');
 });
 
-test('nnsight button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('nnsight button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('NNsight').click()]);
 
   await expect(newPage).toHaveURL('https://github.com/ndif-team/nnsight');
 });
 
-test('mats program button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('mats program button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('MATS Program').click()]);
 
   await expect(newPage).toHaveURL('https://www.matsprogram.org/');
 });
 
-test('arena education button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('arena education button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('ARENA Education').click()]);
 
   await expect(newPage).toHaveURL('https://www.arena.education/');
 });
 
-test('twitter button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('twitter button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), await page.getByText('Twitter').first().click()]);
 
@@ -360,7 +360,7 @@ test('twitter button', async ({ page, gemmaUrl  }) => {
 
 // second contact us button on same page
 // test('Contact Us', async({ page }) => {
-//   await page.goto('https://neuronpedia.org/gemma-scope#learn');
+//   await page.goto(`${gemmaUrl}#learn`);
 
 //   const [newPage] = await Promise.all([
 //     page.waitForEvent('popup'),
@@ -370,28 +370,28 @@ test('twitter button', async ({ page, gemmaUrl  }) => {
 //   await expect(newPage).toHaveURL(/mailto:johnny@neuronpedia\.org*/);
 // });
 
-test('open problems button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('open problems button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   await page.getByRole('button', { name: 'Open Problems' }).click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#openproblems');
+  await expect(page).toHaveURL(`${gemmaUrl}#openproblems`);
 });
 
-test('playground button', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#learn');
+test('playground button', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#learn`);
 
   await page.getByRole('button', { name: 'Playground' }).click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#playground');
+  await expect(page).toHaveURL(`${gemmaUrl}#playground`);
 });
 
-test('open problems page', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+test('open problems page', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   await page.locator('textarea[name="Interpretability has many unsolved problems"]').isVisible();
 });
 
-test('slack link', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+test('slack link', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Slack').click()]);
 
@@ -401,7 +401,7 @@ test('slack link', async ({ page, gemmaUrl  }) => {
 });
 
 // test('lesswrong link', async ({ page }) => {
-//     await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+//     await page.goto(`${gemmaUrl}#openproblems`);
 
 //     const [newPage] = await Promise.all([
 //         page.waitForEvent('popup'),
@@ -411,32 +411,32 @@ test('slack link', async ({ page, gemmaUrl  }) => {
 //     await expect(newPage).toHaveURL('https://www.lesswrong.com');
 // });
 
-test('wattenberg link', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+test('wattenberg link', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Wattenberg et al').click()]);
 
   await expect(newPage).toHaveURL('https://arxiv.org/abs/2407.14662');
 });
 
-test('Ziegler link', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+test('Ziegler link', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Ziegler et al').click()]);
 
   await expect(newPage).toHaveURL('https://arxiv.org/abs/2205.01663');
 });
 
-test('Steering Vectors link', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+test('Steering Vectors link', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('steering vectors').click()]);
 
   await expect(newPage).toHaveURL('https://arxiv.org/abs/2308.10248');
 });
 
-test('SAE feature steering link', async ({ page, gemmaUrl  }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+test('SAE feature steering link', async ({ page, gemmaUrl }) => {
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('SAE feature steering').click()]);
 
@@ -446,7 +446,7 @@ test('SAE feature steering link', async ({ page, gemmaUrl  }) => {
 });
 
 test('clamping link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('clamping').click()]);
 
@@ -454,7 +454,7 @@ test('clamping link', async ({ page, gemmaUrl }) => {
 });
 
 test('huang et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Huang et al').click()]);
 
@@ -462,7 +462,7 @@ test('huang et al link', async ({ page, gemmaUrl }) => {
 });
 
 test('bills et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Bills et al').click()]);
 
@@ -471,7 +471,7 @@ test('bills et al link', async ({ page, gemmaUrl }) => {
 
 // same link appears twice
 test('engels et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [firstPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Engels et al').first().click()]);
 
@@ -486,7 +486,7 @@ test('engels et al link', async ({ page, gemmaUrl }) => {
 });
 
 test('toy models link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([
     page.waitForEvent('popup'),
@@ -499,7 +499,7 @@ test('toy models link', async ({ page, gemmaUrl }) => {
 });
 
 test('stolfo et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Stolfo et al').click()]);
 
@@ -507,7 +507,7 @@ test('stolfo et al link', async ({ page, gemmaUrl }) => {
 });
 
 test('marks et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Marks et al').click()]);
 
@@ -515,7 +515,7 @@ test('marks et al link', async ({ page, gemmaUrl }) => {
 });
 
 test('mlp transcoders link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('MLP transcoders').click()]);
 
@@ -523,7 +523,7 @@ test('mlp transcoders link', async ({ page, gemmaUrl }) => {
 });
 
 test('jain et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Jain et al').click()]);
 
@@ -531,7 +531,7 @@ test('jain et al link', async ({ page, gemmaUrl }) => {
 });
 
 test('hendel et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Hendel et al').click()]);
 
@@ -539,7 +539,7 @@ test('hendel et al link', async ({ page, gemmaUrl }) => {
 });
 
 test('Todd et al link', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Todd et al').click()]);
 
@@ -547,27 +547,27 @@ test('Todd et al link', async ({ page, gemmaUrl }) => {
 });
 
 test('do more button open problems', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   await page.getByRole('button', { name: 'Do More' }).click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#learn');
+  await expect(page).toHaveURL(`${gemmaUrl}#learn`);
 });
 
 test('home button open problems', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#openproblems');
+  await page.goto(`${gemmaUrl}#openproblems`);
 
   await page.getByRole('button', { name: 'Home' }).click();
-  await expect(page).toHaveURL('https://www.neuronpedia.org/gemma-scope#main');
+  await expect(page).toHaveURL(`${gemmaUrl}#main`);
 });
 
 test('playground page', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#playground');
+  await page.goto(`${gemmaUrl}#playground`);
 
   await page.locator('textarea[name="Enter something below to see"]').isVisible();
 });
 
 test('im feeling lucky button', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#playground');
+  await page.goto(`${gemmaUrl}#playground`);
 
   await page.getByRole('button', { name: "I'm Feeling Lucky" }).click();
   await expect(
@@ -576,29 +576,33 @@ test('im feeling lucky button', async ({ page, gemmaUrl }) => {
 });
 
 test('model selector', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#playground');
+  await page.goto(`${gemmaUrl}#playground`);
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').click();
 
   const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
 test('source set selector', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#playground');
+  await page.goto(`${gemmaUrl}#playground`);
   await page.locator('[data-state="closed"][data-sentry-source-file="sourceset-selector.tsx"]').click();
 
   const modelNames = ['gemmascope-att-16k', 'gemmascope-res-16k', 'gemmascope-res-65k'];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
 test('playground steering', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#playground');
+  await page.goto(`${gemmaUrl}#playground`);
 
   const gemmaSearch = page.getByPlaceholder('Make gemma-2-2b think about');
   await gemmaSearch.fill('testing inputs');
@@ -607,13 +611,13 @@ test('playground steering', async ({ page, gemmaUrl }) => {
 });
 
 test('browse & search page', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   await page.locator('textarea[name="Search 50,000,000+ features"]').isVisible();
 });
 
 test('jump to appears', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   // Look for the h3 element with the specific classes and text
   const jumpToHeading = page.locator(
@@ -625,19 +629,21 @@ test('jump to appears', async ({ page, gemmaUrl }) => {
 });
 
 test('jump to sae/source models', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   // 3 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').first().click();
   const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
 test('jump to sae/source source/sae', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   // 2 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="source-selector.tsx"]').first().click();
@@ -654,25 +660,29 @@ test('jump to sae/source source/sae', async ({ page, gemmaUrl }) => {
     'gemmascope-res-65k',
   ];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
 test('jump to feature models', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   // 3 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').nth(1).click();
   const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
 test('jump to feature source/sae', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   // 2 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="source-selector.tsx"]').nth(1).click();
@@ -689,13 +699,15 @@ test('jump to feature source/sae', async ({ page, gemmaUrl }) => {
     'gemmascope-res-65k',
   ];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
 test('search explanations appears', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   // Look for the h3 element with the specific classes and text
   const jumpToHeading = page.locator(
@@ -707,7 +719,7 @@ test('search explanations appears', async ({ page, gemmaUrl }) => {
 });
 
 test('search via interference appears', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   const jumpToHeading = page.locator(
     'h3.cursor-default.select-none.text-xl.font-semibold.leading-none.tracking-tight[data-sentry-element="CardTitle"][data-sentry-source-file="search-inference-release-pane.tsx"]',
@@ -718,19 +730,21 @@ test('search via interference appears', async ({ page, gemmaUrl }) => {
 });
 
 test('search via inference models', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   // 3 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').nth(2).click();
   const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
 test('search via inference source/sae', async ({ page, gemmaUrl }) => {
-  await page.goto('https://neuronpedia.org/gemma-scope#browse');
+  await page.goto(`${gemmaUrl}#browse`);
 
   await page.locator('[data-state="closed"][data-sentry-source-file="sourceset-selector.tsx"]').first().click();
   const modelNames = [
@@ -738,7 +752,9 @@ test('search via inference source/sae', async ({ page, gemmaUrl }) => {
     'gemmascope-res-16k',
   ];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
