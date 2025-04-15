@@ -3,30 +3,33 @@ import { test } from '../fixtures';
 
 // http://localhost:3000/steer defaults to localhost:3000/gemma-2-2b-it/steer
 
-test('steer page loads', async ({ page }) => {
-  await page.goto('https://neuronpedia.org/steer');
+test('steer page loads', async ({ page, steerUrl }) => {
+  await page.goto(steerUrl);
   await expect(page.locator('text="Steer Models"')).toBeVisible();
 });
 
-test('model selector', async ({ page }) => {
-  await page.goto('https://neuronpedia.org/steer');
+test('model selector', async ({ page, steerUrl }) => {
+  await page.goto(steerUrl);
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').click();
 
   const modelNames = [
     'DEEPSEEK-R1-LLAMA-8B',
     'GEMMA-2-2B',
     'GEMMA-2-2B-IT',
-    //'GEMMA-2-9B',
-    //'GEMMA-2-9B-IT',
-    'GPT2-SM',
-    //'LLAMA3.1-8B',
+    // 'GEMMA-2-9B',
+    // 'GEMMA-2-9B-IT',
+    'GPT2-SMALL',
+    // 'LLAMA3.1-8B',
   ];
 
-  for (const model of modelNames) {
-    await expect(page.getByText(model, { exact: true }).first()).toBeVisible();
-  }
+  await Promise.all(
+    modelNames.map(model =>
+      expect(page.getByText(model, { exact: true }).first()).toBeVisible()
+    )
+  );
 });
 
+// tests designed for production
 // test('deepseek-r1-llama-8b steer', async ({ page }) => {
 //   await page.goto('https://neuronpedia.org/deepseek-r1-distill-llama-8b/steer');
 
