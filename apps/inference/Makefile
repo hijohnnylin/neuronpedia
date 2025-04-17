@@ -4,20 +4,15 @@
 PYTHON = python
 POETRY = poetry
 PYTEST = $(POETRY) run pytest
-PYTEST_ARGS = -v -s
 COVERAGE = $(POETRY) run coverage
 RUFF = $(POETRY) run ruff
 
 # Targets
 unit-test:
-	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) tests/unit
+	$(POETRY) run $(PYTEST) -v --cov=neuronpedia_inference/ --cov-report=term-missing --cov-branch tests/unit
 
 test-verbose:
-	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) -vv
-
-coverage:
-	$(COVERAGE) run -m pytest
-	$(COVERAGE) report -m
+	$(POETRY) run $(PYTEST) -vv --no-header
 
 format:
 	$(RUFF) format .
