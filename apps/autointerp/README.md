@@ -33,9 +33,6 @@ as much as possible we try to use classes/types from the `packages/python/neuron
    poetry run uvicorn server:app --host 0.0.0.0 --port 5003 --workers 1 --reload
    ```
 
-3. if you are making changes to the openapi spec (new/updated endpoints) and want to test those changes locally, generate your client and use the following command to point to the local autointerp client:
-   `poetry add --editable ../../packages/python/neuronpedia-autointerp-client`
-
 ## some docker commands for reference (outdated, needs fixing)
 
 likely we will just have these instructions in the root directory `readme` instead, and manual builds should happen the same way as we do it for `inference`.
