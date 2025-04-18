@@ -1,6 +1,7 @@
 import asyncio
 from functools import wraps
 
+import time 
 import torch
 from transformer_lens import HookedTransformer
 
@@ -12,8 +13,10 @@ def with_request_lock():
         @wraps(func)
         async def wrapper(*args, **kwargs):  # type: ignore
             async with request_lock:
-                return await func(*args, **kwargs)
-
+                print(f"Lock acquired by request at {time.time()}")
+                result = await func(*args, **kwargs)
+                print(f"Lock released by request at {time.time()}")
+                return result 
         return wrapper
 
     return decorator

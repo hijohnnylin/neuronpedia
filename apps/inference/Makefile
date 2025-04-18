@@ -43,4 +43,7 @@ install-dev:
 all: install-dev format check-format test coverage
 
 run-server:
-	$(POETRY) run python server.py
+	$(POETRY) run python server.py --reload
+
+run-server-dev:
+	$(POETRY) run python start.py --reload --reload-dir neuronpedia_inference --include_sae 7-res-jb --max_loaded_saes 1

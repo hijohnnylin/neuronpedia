@@ -191,6 +191,7 @@ dog feature
 ```bash
 curl -X POST http://127.0.0.1:5002/v1/steer/completion \
   -H "Content-Type: application/json" \
+  -H "x-secret-key: cat" \
   -d '{
      "prompt": "I often think about",
      "model": "gpt2-small",
