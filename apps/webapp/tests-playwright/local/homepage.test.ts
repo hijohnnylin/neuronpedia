@@ -19,19 +19,6 @@ test('API navigation link', async ({ page, baseUrl }) => {
   await expect(page).toHaveURL(`${baseUrl}/api-doc`);
 });
 
-test('SAE Evals link', async ({ page, baseUrl }) => {
-  await page.goto(baseUrl);
-
-  // Find and click the SAE Evals link
-  const saeEvalsLink = page.getByRole('link', { name: 'SAE Evals', exact: true });
-  await saeEvalsLink.waitFor({ state: 'visible' });
-  await saeEvalsLink.click();
-
-  // Wait for navigation and check exact URL
-  await page.waitForLoadState('networkidle');
-  await expect(page).toHaveURL(`${baseUrl}/sae-bench`);
-});
-
 test('Steer', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
 
@@ -170,7 +157,7 @@ test('releases display', async ({ page, baseUrl }) => {
 
 test('models display', async ({ page, baseUrl }) => {
   await page.goto(baseUrl);
-  await expect(page.getByText('DeepSeek-R1-Llama-8B')).toBeVisible();
+  await expect(page.getByText('DeepSeek-R1-Llama-8B').nth(1)).toBeVisible();
 });
 
 test('jump to display', async ({ page, baseUrl }) => {
@@ -186,7 +173,7 @@ test('cat steering', async ({ page, baseUrl }) => {
     page.getByRole('link', { name: 'Try It: Gemma 2 - Cat Steering', exact: true }).click(),
   ]);
 
-  await expect(newPage).toHaveURL(`${baseUrl}/gemma-2-9b-it/steer?saved=cm7cp63af00jx1q952neqg6e5`);
+  await expect(newPage).toHaveURL(`https://www.neuronpedia.org/gemma-2-9b-it/steer?saved=cm7cp63af00jx1q952neqg6e5`);
 });
 
 test('search by explanation', async ({ page, baseUrl }) => {

@@ -13,12 +13,12 @@ test('model selector', async ({ page, steerUrl }) => {
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').click();
 
   const modelNames = [
-    'DEEPSEEK-R1-LLAMA-8B',
+    'DeepSeek-R1-Llama-8B',
     'GEMMA-2-2B',
     'GEMMA-2-2B-IT',
     // 'GEMMA-2-9B',
     // 'GEMMA-2-9B-IT',
-    'GPT2-SMALL',
+    'GPT2-SM',
     // 'LLAMA3.1-8B',
   ];
 

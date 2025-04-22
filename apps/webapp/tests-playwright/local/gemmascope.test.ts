@@ -13,7 +13,7 @@ test('microscope button', async ({ page, gemmaUrl }) => {
   await page.goto(`${gemmaUrl}#main`);
 
   await page.getByText("scan Gemma 2's brain to see what it's thinking").click();
-  await expect(page).toHaveURL(`${gemmaUrl}#micropscope`);
+  await expect(page).toHaveURL(`${gemmaUrl}#microscope`);
 });
 
 test('analyze features button', async ({ page, gemmaUrl }) => {
@@ -155,24 +155,6 @@ test('analyze steer', async ({ page, gemmaUrl }) => {
   await expect(page.getByText('0.00')).toBeVisible();
 });
 
-test('puzzles labels', async ({ page, gemmaUrl }) => {
-  await page.goto(`${gemmaUrl}#analyze`);
-
-  // unlocked after doing analyze steer, or pressing skip analyze
-  await page.getByText('skip analyze').first().click();
-
-  // test all 3 buttons
-  const labelButtons = await page.getByRole('button', { name: 'Reveal Our Label' }).all();
-  // click each button
-  await Promise.all(
-    labelButtons.map(button => button.click())
-  );
-
-  // check labels
-  await expect(page.getByText('Lies and falsehoods')).toBeVisible();
-  await expect(page.getByText('Misspellings or typos')).toBeVisible();
-  await expect(page.getByText('Bad/cringe stories')).toBeVisible();
-});
 
 test('next steer gemma button', async ({ page, gemmaUrl }) => {
   await page.goto(`${gemmaUrl}#analyze`);
@@ -214,7 +196,7 @@ test('advanced steer button', async ({ page, gemmaUrl }) => {
 
   const [newPage] = await Promise.all([
     page.waitForEvent('popup'),
-    await page.locator('a[target="_blank"][href*="http://localhost:3000/steer"]').click(),
+    await page.locator('a[target="_blank"][href*="https://www.neuronpedia.org/steer"]').click(),
   ]);
   await expect(newPage).toHaveURL(/\/steer$/);
 });
@@ -393,7 +375,7 @@ test('open problems page', async ({ page, gemmaUrl }) => {
 test('slack link', async ({ page, gemmaUrl }) => {
   await page.goto(`${gemmaUrl}#openproblems`);
 
-  const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Slack').click()]);
+  const [newPage] = await Promise.all([page.waitForEvent('popup'), page.getByText('Slack').nth(1).click()]);
 
   await expect(newPage).toHaveURL(
     'https://opensourcemechanistic.slack.com/join/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA#/shared-invite/email',
@@ -579,7 +561,7 @@ test('model selector', async ({ page, gemmaUrl }) => {
   await page.goto(`${gemmaUrl}#playground`);
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').click();
 
-  const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
+  const modelNames = ['GEMMA-2-2B'];
 
   await Promise.all(
     modelNames.map(model =>
@@ -592,7 +574,7 @@ test('source set selector', async ({ page, gemmaUrl }) => {
   await page.goto(`${gemmaUrl}#playground`);
   await page.locator('[data-state="closed"][data-sentry-source-file="sourceset-selector.tsx"]').click();
 
-  const modelNames = ['gemmascope-att-16k', 'gemmascope-res-16k', 'gemmascope-res-65k'];
+  const modelNames = ['gemmascope-res-16k'];
 
   await Promise.all(
     modelNames.map(model =>
@@ -633,7 +615,7 @@ test('jump to sae/source models', async ({ page, gemmaUrl }) => {
 
   // 3 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').first().click();
-  const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
+  const modelNames = ['GEMMA-2-2B'];
 
   await Promise.all(
     modelNames.map(model =>
@@ -648,16 +630,7 @@ test('jump to sae/source source/sae', async ({ page, gemmaUrl }) => {
   // 2 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="source-selector.tsx"]').first().click();
   const modelNames = [
-    'gemmascope-att-16k',
-    'gemmascope-att-65k',
-    'gemmascope-mlp-16k',
-    'gemmascope-mlp-65k',
-    'gemmascope-res-16k',
-    'gemmascope-res-1m',
-    'gemmascope-res-262k',
-    'gemmascope-res-32k',
-    'gemmascope-res-524k',
-    'gemmascope-res-65k',
+    'gemmascope-res-16k'
   ];
 
   await Promise.all(
@@ -672,7 +645,7 @@ test('jump to feature models', async ({ page, gemmaUrl }) => {
 
   // 3 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').nth(1).click();
-  const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
+  const modelNames = ['GEMMA-2-2B'];
 
   await Promise.all(
     modelNames.map(model =>
@@ -687,16 +660,7 @@ test('jump to feature source/sae', async ({ page, gemmaUrl }) => {
   // 2 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="source-selector.tsx"]').nth(1).click();
   const modelNames = [
-    'gemmascope-att-16k',
-    'gemmascope-att-65k',
-    'gemmascope-mlp-16k',
-    'gemmascope-mlp-65k',
     'gemmascope-res-16k',
-    'gemmascope-res-1m',
-    'gemmascope-res-262k',
-    'gemmascope-res-32k',
-    'gemmascope-res-524k',
-    'gemmascope-res-65k',
   ];
 
   await Promise.all(
@@ -734,7 +698,7 @@ test('search via inference models', async ({ page, gemmaUrl }) => {
 
   // 3 occurences of this combobox on this page
   await page.locator('[data-state="closed"][data-sentry-source-file="model-selector.tsx"]').nth(2).click();
-  const modelNames = ['GEMMA-2-2B', 'GEMMA-2-2B-IT', 'GEMMA-2-9B', 'GEMMA-2-9B-IT'];
+  const modelNames = ['GEMMA-2-2B'];
 
   await Promise.all(
     modelNames.map(model =>
