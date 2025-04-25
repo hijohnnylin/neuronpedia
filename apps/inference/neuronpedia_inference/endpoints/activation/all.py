@@ -21,6 +21,7 @@ from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import (
     Model,
     calculate_per_source_dfa,
+    get_activations_by_index,
     get_layer_num_from_sae_id,
     safe_cast,
     with_request_lock,
@@ -173,7 +174,7 @@ class ActivationProcessor:
             hook_name = sae_manager.get_sae_hook(selected_source)
             sae_type = sae_manager.get_sae_type(selected_source)
 
-            activations_by_index = self._get_activations_by_index(
+            activations_by_index = get_activations_by_index(
                 sae_type, selected_source, cache, hook_name
             )
 
@@ -194,24 +195,6 @@ class ActivationProcessor:
             )
 
         return source_activations
-
-    def _get_activations_by_index(
-        self,
-        sae_type: str,
-        selected_source: str,
-        cache: ActivationCache,
-        hook_name: str,
-    ) -> torch.Tensor:
-        """Get activations by index for a specific layer and SAE type."""
-        if sae_type == "neurons":
-            mlp_activation_data = cache[hook_name].to(Config.get_instance().device)
-            return torch.transpose(mlp_activation_data[0], 0, 1)
-
-        activation_data = cache[hook_name].to(Config.get_instance().device)
-        feature_activation_data = (
-            SAEManager.get_instance().get_sae(selected_source).encode(activation_data)
-        )
-        return torch.transpose(feature_activation_data.squeeze(0), 0, 1)
 
     def _process_source_activations(
         self,
