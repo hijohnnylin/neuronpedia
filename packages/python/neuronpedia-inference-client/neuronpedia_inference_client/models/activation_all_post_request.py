@@ -35,7 +35,8 @@ class ActivationAllPostRequest(BaseModel):
     ignore_bos: StrictBool = Field(description="Whether or not to include features whose highest activation value is the BOS token.")
     feature_filter: Optional[List[StrictInt]] = Field(default=None, description="Optional. If specified, will only return features that match the indexes specified. Can only be used if we're testing just one SAE (\"selected_sources\" length = 1).")
     num_results: Optional[StrictInt] = Field(default=25, description="Optional. The number of top features to return.")
-    __properties: ClassVar[List[str]] = ["prompt", "model", "source_set", "selected_sources", "sort_by_token_indexes", "ignore_bos", "feature_filter", "num_results"]
+    offset: Optional[StrictInt] = Field(default=0, description="Skip this many top-ranked results before returning the next page.")
+    __properties: ClassVar[List[str]] = ["prompt", "model", "source_set", "selected_sources", "sort_by_token_indexes", "ignore_bos", "feature_filter", "num_results", "offset"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -95,7 +96,8 @@ class ActivationAllPostRequest(BaseModel):
             "sort_by_token_indexes": obj.get("sort_by_token_indexes"),
             "ignore_bos": obj.get("ignore_bos") if obj.get("ignore_bos") is not None else True,
             "feature_filter": obj.get("feature_filter"),
-            "num_results": obj.get("num_results") if obj.get("num_results") is not None else 25
+            "num_results": obj.get("num_results") if obj.get("num_results") is not None else 25,
+            "offset": obj.get("offset") if obj.get("offset") is not None else 0
         })
         return _obj
 

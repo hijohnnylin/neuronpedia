@@ -49,6 +49,10 @@ post:
               type: integer
               default: 25
               description: Optional. The number of top features to return.
+            offset:
+              type: integer
+              default: 0
+              description: Skip this many top-ranked results before returning the next page.
   responses:
     "200":
       description: Successfully retrieved results
