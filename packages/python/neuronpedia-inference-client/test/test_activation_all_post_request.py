@@ -49,7 +49,8 @@ class TestActivationAllPostRequest(unittest.TestCase):
                 feature_filter = [
                     56
                     ],
-                num_results = 56
+                num_results = 56,
+                offset = 56
             )
         else:
             return ActivationAllPostRequest(

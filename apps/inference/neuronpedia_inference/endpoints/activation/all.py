@@ -3,7 +3,7 @@ import re
 from typing import Any
 
 import torch
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from neuronpedia_inference_client.models.activation_all_post200_response import (
     ActivationAllPost200Response,
@@ -87,6 +87,9 @@ async def activation_all(
         logger.info("Activations result processed successfully")
 
         return result
+    except HTTPException:
+        # Let FastAPI handle client errors we raise explicitly
+        raise
     except Exception as e:
         logger.error(f"Error processing activations: {str(e)}")
         import traceback
@@ -117,16 +120,28 @@ class ActivationProcessor:
             request.prompt, prepend_bos, max_layer
         )
         # ensure sort_by_token_indexes doesn't have any out of range indexes
-        # TODO: return a better error for this (currently returns a 500 error)
         for token_index in request.sort_by_token_indexes:
             if token_index >= len(str_tokens) or token_index < 0:
-                raise ValueError(
-                    f"Sort by token index {token_index} is out of range for the given prompt, which only has {len(str_tokens)} tokens."
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Sort by token index {token_index} is out of range for the "
+                        f"given prompt, which only has {len(str_tokens)} tokens."
+                    ),
                 )
 
         source_activations = self._process_sources(request, cache)
 
         sorted_activations = self._sort_and_filter_results(source_activations, request)
+
+        # get pyright checks to pass
+        assert request.num_results is not None
+        assert request.offset is not None
+
+        start = request.offset
+        end = start + request.num_results
+        sorted_activations = sorted_activations[start:end]
+
         feature_activations = self._format_result_and_calculate_dfa(
             sorted_activations, cache, request
         )
@@ -262,7 +277,7 @@ class ActivationProcessor:
         if request.ignore_bos and Model.get_instance().cfg.default_prepend_bos:
             sorted_activations = sorted_activations[sorted_activations[:, 3] != 0]
 
-        return sorted_activations[: request.num_results].tolist()
+        return sorted_activations.tolist()
 
     def _format_result_and_calculate_dfa(
         self,
