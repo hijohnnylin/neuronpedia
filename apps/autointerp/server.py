@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
 
 import sentry_sdk
 import torch
@@ -86,13 +87,15 @@ async def score_fuzz_detection_endpoint(request: ScoreFuzzDetectionPostRequest):
     return await generate_score_fuzz_detection(request)
 
 
-app = FastAPI()
-app.include_router(router)
-
-
-@app.on_event("startup")  # type: ignore[deprecated]
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     initialize_globals()
+    yield
+    print("shutting down")
+
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(router)
 
 
 @app.middleware("http")
