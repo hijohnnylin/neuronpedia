@@ -37,7 +37,10 @@ export default function UmapSelectedItem({
   isHovered?: boolean;
 }) {
   const session = useSession();
-  const { addAnnotationForExp, setSelectedFeatures } = useUmapContext();
+  const {
+    // addAnnotationForExp,
+    setSelectedFeatures,
+  } = useUmapContext();
   const { showToastMessage } = useGlobalContext();
   const { neuron } = listItem;
 
@@ -72,15 +75,15 @@ export default function UmapSelectedItem({
             layer: feature.layer,
             index: feature.index,
           };
-          addAnnotationForExp(toSet);
+          // addAnnotationForExp(toSet);
         }
       }}
       key={`${neuron?.modelId || ''}-${neuron?.layer || ''}-${neuron?.index || ''}`}
     >
       <a
-        className={`mb-1 mt-0 flex w-full shrink-0  cursor-pointer flex-row items-start gap-x-1 overflow-x-scroll whitespace-nowrap rounded-t bg-slate-200 py-[6px] text-center font-mono text-[9px] font-medium leading-none text-slate-700 group-hover:bg-sky-200 group-hover:text-sky-700 ${
+        className={`mb-1 mt-0 flex w-full shrink-0 cursor-pointer flex-row items-start gap-x-1 overflow-x-scroll whitespace-nowrap rounded-t bg-slate-200 py-[6px] text-center font-mono text-[9px] font-medium leading-none text-slate-700 group-hover:bg-sky-200 group-hover:text-sky-700 ${
           isHovered && 'bg-sky-200 text-sky-700'
-        } sm:py-2 sm:text-[10px] `}
+        } sm:py-2 sm:text-[10px]`}
         href={`${NEXT_PUBLIC_URL}/${neuron?.modelId}/${neuron?.layer}/${neuron?.index}`}
         target="_blank"
         rel="noreferrer"
@@ -298,7 +301,7 @@ export default function UmapSelectedItem({
         </div>
       </div> */}
 
-      <div className="flex w-full flex-col  px-3 py-1">
+      <div className="flex w-full flex-col px-3 py-1">
         {neuron?.pos_str && neuron?.pos_str.length > 0 && (
           <div className="pointer-events-none mb-0 mt-1.5 w-full pt-1 sm:flex">
             <FeatureStats currentNeuron={neuron as NeuronWithPartialRelations} vertical smallText />

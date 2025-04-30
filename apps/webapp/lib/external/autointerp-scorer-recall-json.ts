@@ -2,9 +2,11 @@ import { prisma } from '@/lib/db';
 import { ActivationPartial } from '@/prisma/generated/zod';
 import { Activation, Explanation, ExplanationScoreModel, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { OPENROUTER_BASE_URL } from '../utils/autointerp';
+import { ERROR_RECALL_ALT_FAILED, OPENROUTER_BASE_URL } from '../utils/autointerp';
 import { AuthenticatedUser } from '../with-user';
 import { makeOaiMessage } from './autointerp-shared';
+
+const ERROR_ON_RECALL_REQUEST = 'Error';
 
 type ScoreMatchAndRawQuery = {
   match: boolean;
@@ -225,7 +227,7 @@ Only respond with in JSON with the format {"match": true, "reason": [reason why 
     console.log(e);
     return {
       match: false,
-      reason: 'Error',
+      reason: ERROR_ON_RECALL_REQUEST,
       messages: rawMessages,
     };
   }
@@ -259,6 +261,19 @@ export const generateScoreRecallAlt = async (
     topActPromises.push(matchPromise);
   });
   const topActResults = await Promise.all(topActPromises);
+  // check if all are "Error" -
+  const allErrors = topActResults.every(
+    (result) =>
+      typeof result === 'object' &&
+      result !== null &&
+      result.match === false &&
+      result.reason === ERROR_ON_RECALL_REQUEST,
+  );
+
+  if (allErrors) {
+    throw new Error(ERROR_RECALL_ALT_FAILED);
+  }
+
   totalCorrectAnswers += topActResults.filter((res) => res.match).length;
 
   // do all zero and decoy activations. these should all return "no"

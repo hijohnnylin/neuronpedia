@@ -4,16 +4,26 @@ import InferenceActivationAllProvider from '@/components/provider/inference-acti
 import RandomFeatureLink from '@/components/random-feature-link';
 import { Button } from '@/components/shadcn/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
-import { DEFAULT_MODELID, DEFAULT_SOURCE, DEMO_MODE, IS_LOCALHOST, NEXT_PUBLIC_URL } from '@/lib/env';
+import {
+  DEFAULT_MODELID,
+  DEFAULT_SOURCE,
+  DEMO_MODE,
+  IS_LOCALHOST,
+  NEXT_PUBLIC_URL,
+  SITE_NAME_VERCEL_DEPLOY,
+} from '@/lib/env';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
   BadgeDollarSign,
   Blocks,
   BookOpenText,
+  CloudDownload,
   Computer,
+  Github,
   PictureInPicture,
   Rocket,
+  Rss,
   School,
   Search,
   Slack,
@@ -78,14 +88,14 @@ export default function Page() {
         </div>
       )}
 
-      {/* <div className="relative my-3 mb-0 flex max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 overflow-hidden rounded-lg border bg-white px-2 py-10 shadow-sm sm:mb-8 sm:mt-4 sm:gap-y-0 sm:px-16 sm:py-5">
+      <div className="relative my-3 mb-0 flex max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 overflow-hidden rounded-lg border bg-white px-2 py-10 shadow-sm sm:mb-8 sm:mt-4 sm:gap-y-0 sm:px-16 sm:py-5">
         <div className="mb-2 mt-0 flex flex-col items-center justify-center text-center text-sm sm:text-base">
           <div className="px-20 py-1 text-xs font-bold text-sky-600 sm:absolute sm:-left-20 sm:top-4 sm:rotate-[-36deg] sm:bg-yellow-400 sm:text-[9px] sm:text-slate-700">
             New: March 2025
           </div>
           <div className="mt-1 text-base font-bold text-slate-800 sm:text-base">Neuronpedia is Now Open Source</div>
           <div className="mt-1 text-sm font-normal text-slate-700 sm:text-[13px]">
-            Read the post, check out the code, and download 4TB of interpretability data.
+            Check out the code and download 4TB of interpretability data.
           </div>
         </div>
         <div className="mb-2 mt-2 flex flex-col items-center justify-center gap-x-2.5 gap-y-2 sm:flex-row">
@@ -94,9 +104,9 @@ export default function Page() {
             className="flex w-[165px] max-w-[165px] flex-row items-center justify-center gap-x-2 rounded-md bg-sky-600 px-0 py-2.5 text-sm font-medium text-white shadow transition-all hover:scale-105 hover:bg-sky-700"
           >
             <Rss className="h-5 w-5" />
-            <span>Blog Post</span>
+            <span>Learn More</span>
           </Link>
-          <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
+          <Link href="https://github.com/hijohnnylin/neuronpedia#readme" target="_blank" rel="noreferrer">
             <Button
               variant="default"
               size="lg"
@@ -121,43 +131,60 @@ export default function Page() {
             </Button>
           </Link>
         </div>
-      </div> */}
+      </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 bg-slate-100 px-0 py-8 sm:mb-10 sm:mt-0 sm:flex-col sm:gap-y-1.5 sm:px-3 sm:py-6 sm:pt-5">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 bg-slate-100 px-0 py-8 sm:mb-10 sm:mt-0 sm:flex-col sm:gap-y-1.5 sm:px-3 sm:py-6 sm:pt-2">
         <div className="mb-2 mt-0 flex flex-col items-center justify-center text-center text-sm sm:text-base">
           <div className="text-lg font-medium text-slate-800 sm:text-xl">
-            Neuronpedia is an{' '}
-            {/* <a
-              href="https://github.com/hijohnnylin/neuronpedia"
-              className="transition-all hover:text-slate-900/70 hover:underline"
-              target="_blank"
-              rel="noreferrer"
-            > */}
-            open {/* open source */}
-            {/* </a>{' '} */}
-            <CustomTooltip
-              trigger={
-                <span className="font-bold text-sky-700 transition-all hover:cursor-pointer hover:text-sky-600">
-                  interpretability
-                </span>
-              }
-            >
-              The inner workings of modern AIs are a mystery. This is because AIs are language models that are grown,
-              not designed. The science of understanding what happens inside AI is called interpretability.
-            </CustomTooltip>{' '}
-            platform.
+            {SITE_NAME_VERCEL_DEPLOY ? (
+              <div className="pb-1 text-4xl font-semibold text-[#7B3F00]">{SITE_NAME_VERCEL_DEPLOY}</div>
+            ) : (
+              <>
+                Neuronpedia is an{' '}
+                <a
+                  href="https://github.com/hijohnnylin/neuronpedia#readme"
+                  className="transition-all hover:text-slate-900/70 hover:underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  open source
+                </a>{' '}
+                <CustomTooltip
+                  trigger={
+                    <span className="font-bold text-sky-700 transition-all hover:cursor-pointer hover:text-sky-600">
+                      interpretability
+                    </span>
+                  }
+                >
+                  The inner workings of modern AIs are a mystery. This is because AIs are language models that are
+                  grown, not designed. The science of understanding what happens inside AI is called interpretability.
+                </CustomTooltip>{' '}
+                platform.
+              </>
+            )}
           </div>
           <div className="mt-1 text-sm font-normal text-slate-600 sm:text-base">
-            Explore, steer, and experiment on AI models.
+            {SITE_NAME_VERCEL_DEPLOY ? (
+              <div className="leading-relaxed">
+                Welcome to your very own Neuronpedia instance.
+                <br />
+                Check out the{' '}
+                <a
+                  target="_blank"
+                  rel="noreferrer"
+                  href="https://github.com/hijohnnylin/neuronpedia#readme"
+                  className="font-semibold text-sky-700 underline"
+                >
+                  README
+                </a>{' '}
+                to start building and customizing Neuronpedia.
+              </div>
+            ) : (
+              'Explore, steer, and experiment on AI models.'
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-x-2.5 gap-y-2 sm:flex-row">
-          {/* <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
-            <Button variant="default" size="lg" className="gap-x-2 bg-slate-900 text-white hover:bg-slate-800">
-              <Github className="h-5 w-5" />
-              <span>GitHub</span>
-            </Button>
-          </Link> */}
           <Link href="https://docs.neuronpedia.org" target="_blank" rel="noreferrer">
             <Button variant="default" size="lg" className="w-[220px] gap-x-2 bg-sky-600 text-white hover:bg-sky-700">
               <BookOpenText className="h-5 w-5" />

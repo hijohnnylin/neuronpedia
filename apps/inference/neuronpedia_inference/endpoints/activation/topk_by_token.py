@@ -15,13 +15,11 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post200_respon
 from neuronpedia_inference_client.models.activation_topk_by_token_post_request import (
     ActivationTopkByTokenPostRequest,
 )
+from transformer_lens import ActivationCache
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import (
-    Model,
-    with_request_lock,
-)
+from neuronpedia_inference.shared import Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +42,16 @@ async def activation_topk_by_token(
 
     ignore_bos = request.ignore_bos
 
+    sae = sae_manager.get_sae(source)
+
+    prepend_bos = sae.cfg.prepend_bos or model.cfg.tokenizer_prepends_bos
+
     tokens = model.to_tokens(
         prompt,
-        prepend_bos=model.cfg.tokenizer_prepends_bos,
+        prepend_bos=prepend_bos,
         truncate=False,
     )[0]
+
     if len(tokens) > config.TOKEN_LIMIT:
         logger.error(
             "Text too long: %s tokens, max is %s",
@@ -62,9 +65,7 @@ async def activation_topk_by_token(
             status_code=400,
         )
 
-    str_tokens = model.to_str_tokens(
-        prompt, prepend_bos=model.cfg.tokenizer_prepends_bos
-    )
+    str_tokens = model.to_str_tokens(prompt, prepend_bos=prepend_bos)
     _, cache = model.run_with_cache(tokens)
 
     hook_name = sae_manager.get_sae_hook(source)
@@ -80,8 +81,8 @@ async def activation_topk_by_token(
     # Get top k activations for each token
     top_k_values, top_k_indices = torch.topk(activations_by_index.T, k=top_k)
 
-    # if we are ignoring BOS, we shift everything over by one
-    if ignore_bos and model.cfg.tokenizer_prepends_bos:
+    # if we are ignoring BOS and the model prepends BOS, we shift everything over by one
+    if ignore_bos and prepend_bos:
         str_tokens = str_tokens[1:]
         top_k_values = top_k_values[1:]
         top_k_indices = top_k_indices[1:]
@@ -112,7 +113,12 @@ async def activation_topk_by_token(
 
 
 # Keep the get_activations_by_index function from the original code
-def get_activations_by_index(sae_type, selected_layer, cache, hook_name):
+def get_activations_by_index(
+    sae_type: str,
+    selected_layer: str,
+    cache: ActivationCache | dict[str, torch.Tensor],
+    hook_name: str,
+) -> torch.Tensor:
     if sae_type == "neurons":
         mlp_activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
         return torch.transpose(mlp_activation_data[0], 0, 1)

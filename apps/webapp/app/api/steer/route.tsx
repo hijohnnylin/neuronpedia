@@ -172,21 +172,21 @@ async function saveSteerOutput(
           type === SteerOutputType.DEFAULT
             ? {}
             : type === SteerOutputType.STEERED
-            ? {
-                create: body.features.map((neuron) => ({
-                  neuron: {
-                    connect: {
-                      modelId_layer_index: {
-                        modelId: neuron.modelId,
-                        layer: neuron.layer,
-                        index: neuron.index.toString(),
+              ? {
+                  create: body.features.map((neuron) => ({
+                    neuron: {
+                      connect: {
+                        modelId_layer_index: {
+                          modelId: neuron.modelId,
+                          layer: neuron.layer,
+                          index: neuron.index.toString(),
+                        },
                       },
                     },
-                  },
-                  strength: neuron.strength,
-                })),
-              }
-            : {},
+                    strength: neuron.strength,
+                  })),
+                }
+              : {},
       },
     }),
   );

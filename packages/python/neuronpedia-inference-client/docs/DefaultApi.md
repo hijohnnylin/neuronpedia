@@ -9,6 +9,7 @@ Method | HTTP request | Description
 [**activation_topk_by_token_post**](DefaultApi.md#activation_topk_by_token_post) | **POST** /activation/topk-by-token | For a given prompt, get the top activating features at each token position for a single SAE.
 [**steer_completion_chat_post**](DefaultApi.md#steer_completion_chat_post) | **POST** /steer/completion-chat | For a given prompt, complete it by steering with the given feature or vector
 [**steer_completion_post**](DefaultApi.md#steer_completion_post) | **POST** /steer/completion | For a given prompt, complete it by steering with the given feature or vector
+[**tokenize_post**](DefaultApi.md#tokenize_post) | **POST** /tokenize | Tokenize input text for a given model
 [**util_sae_topk_by_decoder_cossim_post**](DefaultApi.md#util_sae_topk_by_decoder_cossim_post) | **POST** /util/sae-topk-by-decoder-cossim | Given a specific vector or SAE feature, return the top features by cosine similarity in the same SAE
 [**util_sae_vector_post**](DefaultApi.md#util_sae_vector_post) | **POST** /util/sae-vector | Get the raw vector for an SAE feature
 
@@ -404,6 +405,85 @@ Name | Type | Description  | Notes
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 **200** | Successfully retrieved results |  -  |
+**401** | X-SECRET-KEY header is missing or invalid |  * WWW_Authenticate -  <br>  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **tokenize_post**
+> TokenizePost200Response tokenize_post(tokenize_post_request)
+
+Tokenize input text for a given model
+
+### Example
+
+* Api Key Authentication (SimpleSecretAuth):
+
+```python
+import neuronpedia_inference_client
+from neuronpedia_inference_client.models.tokenize_post200_response import TokenizePost200Response
+from neuronpedia_inference_client.models.tokenize_post_request import TokenizePostRequest
+from neuronpedia_inference_client.rest import ApiException
+from pprint import pprint
+
+# Defining the host is optional and defaults to /v1
+# See configuration.py for a list of all supported configuration parameters.
+configuration = neuronpedia_inference_client.Configuration(
+    host = "/v1"
+)
+
+# The client must configure the authentication and authorization parameters
+# in accordance with the API server security policy.
+# Examples for each auth method are provided below, use the example that
+# satisfies your auth use case.
+
+# Configure API key authorization: SimpleSecretAuth
+configuration.api_key['SimpleSecretAuth'] = os.environ["API_KEY"]
+
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['SimpleSecretAuth'] = 'Bearer'
+
+# Enter a context with an instance of the API client
+with neuronpedia_inference_client.ApiClient(configuration) as api_client:
+    # Create an instance of the API class
+    api_instance = neuronpedia_inference_client.DefaultApi(api_client)
+    tokenize_post_request = neuronpedia_inference_client.TokenizePostRequest() # TokenizePostRequest | 
+
+    try:
+        # Tokenize input text for a given model
+        api_response = api_instance.tokenize_post(tokenize_post_request)
+        print("The response of DefaultApi->tokenize_post:\n")
+        pprint(api_response)
+    except Exception as e:
+        print("Exception when calling DefaultApi->tokenize_post: %s\n" % e)
+```
+
+
+
+### Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **tokenize_post_request** | [**TokenizePostRequest**](TokenizePostRequest.md)|  | 
+
+### Return type
+
+[**TokenizePost200Response**](TokenizePost200Response.md)
+
+### Authorization
+
+[SimpleSecretAuth](../README.md#SimpleSecretAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+### HTTP response details
+
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+**200** | Successful tokenization |  -  |
 **401** | X-SECRET-KEY header is missing or invalid |  * WWW_Authenticate -  <br>  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

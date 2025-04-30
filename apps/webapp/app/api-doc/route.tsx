@@ -6,6 +6,8 @@ const spec = await getApiDocs();
 export const GET = ApiReference({
   spec: { content: spec },
   theme: 'alternate',
+  tagsSorter: 'alpha',
+  operationsSorter: 'alpha',
   hideDownloadButton: true,
   metaData: {
     title: 'Neuronpedia API Reference',

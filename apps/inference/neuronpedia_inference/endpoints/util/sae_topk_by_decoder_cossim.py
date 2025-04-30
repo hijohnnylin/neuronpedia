@@ -80,7 +80,7 @@ async def sae_topk_by_decoder_cossim(
 
 
 def get_top_k_by_decoder_cosine_similarity(
-    source, model, feature_vector, num_results=5
+    source: str, model: str, feature_vector: torch.Tensor, num_results: int = 5
 ):
     sae_manager = SAEManager.get_instance()
     sae_data = sae_manager.sae_data.get(source)

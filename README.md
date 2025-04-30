@@ -3,7 +3,7 @@
     <img src="https://github.com/user-attachments/assets/9bcea0bf-4fa9-401d-bb7a-d031a4d12636" alt="Splash GIF"/>
   </a>
 
-<h3 align="center"><a href="https://neuronpedia.org">neuronpedia 🧠🔍</a></h3>
+<h3 align="center"><a href="https://neuronpedia.org">neuronpedia.org 🧠🔍</a></h3>
 
   <p align="center">
     open source interpretability platform
@@ -15,16 +15,18 @@
 </p>
 
 <p align="center" style="color: #cccccc;">
-  <a href="https://github.com/hijohnnylin/neuronpedia/blob/main/LICENSE"><img height="20px" src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT"></a>
+  <a href="https://github.com/hijohnnylin/neuronpedia/blob/main/LICENSE"><img height="20px" src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT"></a>
   <a href="https://status.neuronpedia.org"><img height="20px" src="https://uptime.betterstack.com/status-badges/v2/monitor/1roih.svg" alt="Uptime"></a>
-  <a href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA"><img height="20px" src="https://img.shields.io/badge/Slack-purple?logo=slack&logoColor=white" alt="Slack"></a>
+  <a href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA"><img height="20px" src="https://img.shields.io/badge/slack-purple?logo=slack&logoColor=white" alt="Slack"></a>
   <a href="mailto:johnny@neuronpedia.org"><img height="20px" src="https://img.shields.io/badge/contact-blue.svg?logo=data:image/svg%2bxml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9IlNWR1JlcG9fYmdDYXJyaWVyIiBzdHJva2Utd2lkdGg9IjAiPjwvZz48ZyBpZD0iU1ZHUmVwb190cmFjZXJDYXJyaWVyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjwvZz48ZyBpZD0iU1ZHUmVwb19pY29uQ2FycmllciI+IDxwYXRoIGQ9Ik00IDcuMDAwMDVMMTAuMiAxMS42NUMxMS4yNjY3IDEyLjQ1IDEyLjczMzMgMTIuNDUgMTMuOCAxMS42NUwyMCA3IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L3BhdGg+IDxyZWN0IHg9IjMiIHk9IjUiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxNCIgcng9IjIiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiPjwvcmVjdD4gPC9nPjwvc3ZnPg==" alt="Email"></a>
   <a href="https://neuronpedia.org/blog"><img height="20px" src="https://img.shields.io/badge/blog-10b981.svg" alt="blog"></a>
   <a href="https://neuronpedia.org"><img height="20px" src="https://img.shields.io/badge/website-gray.svg" alt="website"></a>
+  <a href="https://www.every.org/decode-research"><img height="20px" src="https://img.shields.io/badge/sponsor-green.svg" alt="Sponsor"></a>
 
 </p>
 
 - [about neuronpedia](#about-neuronpedia)
+- [instant start - vercel deploy](#instant-start---vercel-deploy)
 - [quick start - local webapp + demo environment](#quick-start---local-webapp--demo-environment)
 - [setting up your local environment](#setting-up-your-local-environment)
   - ["i want to use a local database / import more neuronpedia data"](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
@@ -32,8 +34,7 @@
   - ["i want to run/develop inference locally"](#i-want-to-rundevelop-inference-locally)
   - ['i want to run/develop autointerp locally\`](#i-want-to-rundevelop-autointerp-locally)
   - ['i want to do high volume autointerp explanations'](#i-want-to-do-high-volume-autointerp-explanations)
-  - ['i want to generate my own dashboards'](#i-want-to-generate-my-own-dashboards)
-  - ['i want to add my dashboards/data to neuronpedia\`](#i-want-to-add-my-dashboardsdata-to-neuronpedia)
+  - ['i want to generate my own dashboards/data and add it to neuronpedia'](#i-want-to-generate-my-own-dashboardsdata-and-add-it-to-neuronpedia)
 - [architecture](#architecture)
   - [requirements](#requirements)
   - [services](#services)
@@ -45,31 +46,35 @@
 - [contact / support](#contact--support)
 - [contributing](#contributing)
 - [appendix](#appendix)
-  - ['make' commands reference](#make-commands-reference)
-  - [import data into your local database](#import-data-into-your-local-database)
-  - [why an openai api key is needed for search explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
+    - ['make' commands reference](#make-commands-reference)
+    - [import data into your local database](#import-data-into-your-local-database)
+    - [why an openai api key is needed for search explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
 
 <!-- # ultra-quick start: one-click deploy on vercel
 TODO, after making repo public -->
 
 # about neuronpedia
 
-check out our [blog post](https://www.neuronpedia.org/blog/neuronpedia-is-now-open-source) about Neuronpedia, why we're open sourcing it, and other details.
+check out our [blog post](https://www.neuronpedia.org/blog/neuronpedia-is-now-open-source) about Neuronpedia, why we're open sourcing it, and other details. there's also a [tweet thread](https://x.com/neuronpedia/status/1906793456879775745) with quick demos.
 
 **feature overview**
 
 a diagram showing the main features of neuronpedia as of march 2025.
 ![neuronpedia-features](https://github.com/user-attachments/assets/13e07a93-e046-4e1c-b670-2d26d251d55d)
 
-**gifs of neuronpedia in action**
+# instant start - vercel deploy
 
-<p align="center">
-    <img src="https://github.com/user-attachments/assets/af25509c-3531-4fbf-8346-fdad31843b15" alt="demo of activation testing" width="32%"/>
-    &nbsp;
-    <img src="https://github.com/user-attachments/assets/f8fe432f-fc6c-484f-a262-c79c4ac524af" alt="demo of inference search" width="32%"/>
-    &nbsp;
-    <img src="https://github.com/user-attachments/assets/4a6c9cbc-fd40-4fd7-b05a-67f2eff128fd" alt="demo of umap" width="32%"/>
+click the `Deploy` button to instantly deploy a custom neuronpedia. a [free vercel account](https://vercel.com/signup) is required.
+
+<p align="left">
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org">
+    <img src="https://vercel.com/button" width="160" alt="Deploy with Vercel"/>
+  </a>
 </p>
+
+here's how easy it is to deploy a "PuppyNeurons" fork of Neuronpedia:
+
+https://github.com/user-attachments/assets/707deaed-02b4-442b-8c1f-bf44d193b9fa
 
 # quick start - local webapp + demo environment
 
@@ -132,11 +137,17 @@ ideally, you will probably eventually want to do all of the sub-sections below, 
 1. if you want to jump into developing webapp frontend or api with the demo environment, follow [webapp dev](#i-want-to-do-webapp-frontend--api-development)
 2. if you want to start loading more sources/data and relying on your own local database, follow [local database](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
 
+> 🔥 **pro-tip:** neuronpedia is configured for AI agent development. here's an example using a [single prompt](https://github.com/hijohnnylin/neuronpedia/blob/main/apps/experiments/steerify/README.md#claude-code-prompt) to build a custom app (Steerify) using Neuronpedia's inference server as a backend:
+
+https://github.com/user-attachments/assets/bc82f88b-8155-4c1d-948a-ea5d987ae0f8
+
 ## "i want to use a local database / import more neuronpedia data"
 
 #### what this does + what you'll get
 
-relying on the demo environment means you are limited to read-only access to a specific set of SAEs. these steps show you how to configure and connect to your own local database. you can then download sources/SAEs of your choosing.
+relying on the demo environment means you are limited to read-only access to a specific set of SAEs. these steps show you how to configure and connect to your own local database. you can then download sources/SAEs of your choosing:
+
+https://github.com/user-attachments/assets/d7fbb46e-8522-4f98-aa08-21c6529424af
 
 > ⚠️ **warning:** your database will start out empty. you will need to use the admin panel to [import sources/data](#import-data-into-your-local-database) (activations, explanations, etc).
 
@@ -293,21 +304,106 @@ look at the `.env.inference.deepseek-r1-distill-llama-8b.llamascope-slimpj-res-3
 
 ## 'i want to run/develop autointerp locally`
 
-- [TODO #5](https://github.com/hijohnnylin/neuronpedia/issues/5) instructions for setting up autointerp server locally
-- TODO - look at the `autointerp` service in [docker-compose.yaml](docker-compose.yaml) and the [autointerp readme](apps/autointerp/README.md)
+this section is under construction.
+
+- check out the [autointerp readme](apps/autointerp/README.md)
+- [TODO](https://github.com/hijohnnylin/neuronpedia/issues/5) instructions for setting up autointerp server locally
+- TODO - look at the `autointerp` service in [docker-compose.yaml](docker-compose.yaml)
 - schema-driven development: [openapi readme: making changes to the autointerp server](schemas/README.md#making-changes-to-the-autointerp-server)
 
 ## 'i want to do high volume autointerp explanations'
 
-TODO - use [utils/neuronpedia_utils/batch-autointerp.py](utils/neuronpedia_utils/batch-autointerp.py)
+this section is under construction.
 
-## 'i want to generate my own dashboards'
+- use EleutherAI's [Delphi library](https://github.com/EleutherAI/delphi)
+- for OpenAI's autointerp, use [utils/neuronpedia_utils/batch-autointerp.py](utils/neuronpedia_utils/batch-autointerp.py)
 
-TODO - use `utils/neuronpedia_utils/generate-dashboards-as-[saelens/vectors].py`, or use the [saedashboard example](https://github.com/jbloomAus/SAEDashboard/blob/main/sae_dashboard/neuronpedia/generating_neuronpedia_outputs.ipynb) and then convert it using [this script](`utils/neuronpedia_utils/convert-saedashboard-to-neuronpedia-export.py).
+## 'i want to generate my own dashboards/data and add it to neuronpedia'
 
-## 'i want to add my dashboards/data to neuronpedia`
+this section is under construction.
 
-TODO - use [utils/neuronpedia_utils/export-data.py](utils/neuronpedia_utils/export-data.py) once you've added your data to your local database.
+[TODO: simplify generation + upload of data to neuronpedia](https://github.com/hijohnnylin/neuronpedia/issues/46)
+
+[TODO: neuronpedia-utils should use poetry](https://github.com/hijohnnylin/neuronpedia/issues/43)
+
+in this example, we will generate dashboards/data for an [SAELens](https://github.com/jbloomAus/SAELens)-compatible SAE, and upload it to our own Neuronpedia instance.
+
+1. ensure you have [Poetry installed](https://python-poetry.org/docs/)
+2. [upload](https://github.com/jbloomAus/SAELens/blob/main/tutorials/uploading_saes_to_huggingface.ipynb) your SAELens-compatible source/SAE to HuggingFace.
+   > Example
+   > ➡️ [https://huggingface.co/chanind/gemma-2-2b-batch-topk-matryoshka-saes-w-32k-l0-40](https://huggingface.co/chanind/gemma-2-2b-batch-topk-matryoshka-saes-w-32k-l0-40)
+3. clone SAELens locally.
+   ```
+   git clone https://github.com/jbloomAus/SAELens.git
+   ```
+4. open your cloned SAELens and edit the file `sae_lens/pretrained_saes.yaml`. add a new entry at the bottom, based on the template below (see comments for how to fill it out):
+   > Example
+   > ➡️ [https://github.com/jbloomAus/SAELens/pull/455/files](https://github.com/jbloomAus/SAELens/pull/455/files)
+   ```
+   gemma-2-2b-res-matryoshka-dc:                 # a unique ID for your set of SAEs
+     conversion_func: null                       # null if your SAE config is already compatible with SAELens
+     links:                                      # optional links
+       model: https://huggingface.co/google/gemma-2-2b
+     model: gemma-2-2b                           # transformerlens model id - https://transformerlensorg.github.io/TransformerLens/generated/model_properties_table.html
+     repo_id: chanind/gemma-2-2b-batch-topk-matryoshka-saes-w-32k-l0-40  # the huggingface repo path
+     saes:
+     - id: blocks.0.hook_resid_post                 # an id for this SAE
+       path: standard/blocks.0.hook_resid_post      # the path in the repo_id to the SAE
+       l0: 40.0
+       neuronpedia: gemma-2-2b/0-matryoshka-res-dc  # what you expect the neuronpedia URI to be - neuronpedia.org/[this_slug]. should be [model_id]/[layer]-[identical_slug_for_this_sae_set]
+     - id: blocks.1.hook_resid_post                 # more SAEs in this SAE set
+       path: standard/blocks.1.hook_resid_post
+       l0: 40.0
+       neuronpedia: gemma-2-2b/1-matryoshka-res-dc  # note that this is identical to the entry above, except 1 instead of 0 for the layer
+     - [...]
+   ```
+5. clone [SAEDashboard](https://github.com/jbloomAus/SAEDashboard.git) locally.
+   ```
+   git clone https://github.com/jbloomAus/SAEDashboard.git
+   ```
+6. configure your cloned `SAEDashboard` to use your cloned modified `SAELens`, instead of the one in production
+   ```
+   cd SAEDashboard                    # set directory
+   poetry lock && poetry install      # install dependencies
+   poetry remove sae-lens             # remove production dependency
+   poetry add PATH/TO/CLONED/SAELENS  # set local dependency
+   ```
+7. generate dashboards for the SAE. this will take from 30 min to a few hours, depending on your hardware and size of model.
+
+   ```
+   cd SAEDashboard                    # set directory
+   rm -rf cached_activations          # clear old cached data
+
+   # start the generation. details for each argument (full details: https://github.com/jbloomAus/SAEDashboard/blob/main/sae_dashboard/neuronpedia/neuronpedia_runner_config.py)
+   #     - sae-set = should match the unique ID for the set from pretrained_saes.yaml
+   #     - sae-path = should match the id for the sae in from pretrained_saes.yaml
+   #     - np-set-name = should match the [identical_slug_for_this_sae_set] for the sae.neuronpedia from pretrained_saes.yaml
+   #     - dataset-path = the huggingface dataset to use for generating activations. usually you want to use the same dataset the model was trained on.
+   #     - output-dir = the output directory of the dashboard data
+   #     - n-prompts = number of activation texts to test from the dataset
+   #     - n-tokens-in-prompt, n-features-per-batch, n-prompts-in-forward-pass = keep these at 128
+   poetry run neuronpedia-runner \
+        --sae-set="gemma-2-2b-res-matryoshka-dc" \
+        --sae-path="blocks.12.hook_resid_post" \
+        --np-set-name="matryoshka-res-dc" \
+        --dataset-path="monology/pile-uncopyrighted" \
+        --output-dir="neuronpedia_outputs/" \
+        --sae_dtype="float32" \
+        --model_dtype="bfloat16" \
+        --sparsity-threshold=1 \
+        --n-prompts=24576 \
+        --n-tokens-in-prompt=128 \
+        --n-features-per-batch=128 \
+        --n-prompts-in-forward-pass=128
+   ```
+
+8. convert these dashboards for import into neuronpedia
+   ```
+   cd neuronpedia/utils/neuronpedia-utils          # get into this current repository's util directory
+   python convert-saedashboard-to-neuronpedia.py   # start guided conversion script. follow the steps.
+   ```
+9. once dashboard files are generated for neuronpedia, upload these to the global Neuronpedia S3 bucket - currently you need to [contact us](mailto:johnny@neuronpedia.org) to do this.
+10. from a localhost instance, [import your data](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
 
 # architecture
 

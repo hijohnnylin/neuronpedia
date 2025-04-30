@@ -1,0 +1,116 @@
+name: Codecov Coverage
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  autointerp-coverage:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/autointerp
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.create true
+          poetry install --with dev
+      - name: Run tests with coverage
+        run: poetry run pytest --cov=neuronpedia_autointerp --cov-report=term-missing --cov-branch tests/unit --cov-report=xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./apps/autointerp/coverage.xml
+          flags: autointerp
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  inference-coverage:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/inference
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+      - name: Install dependencies
+        run: |
+          poetry config virtualenvs.create true
+          poetry install --with dev
+      - name: Run tests with coverage
+        run: poetry run pytest --cov=neuronpedia_inference --cov-report=term-missing --cov-branch tests/unit --cov-report=xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./apps/inference/coverage.xml
+          flags: inference
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  webapp-coverage:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/webapp
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - run: psql -h localhost -U postgres -c 'CREATE EXTENSION vector'
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22.x
+          cache: "npm"
+      - name: Install dependencies
+        run: npm install
+      - name: Set up database
+        run: npx prisma db push
+        env:
+          POSTGRES_PRISMA_URL: "postgres://postgres:postgres@localhost:5432/postgres?pgbouncer=true&connect_timeout=15"
+          POSTGRES_URL_NON_POOLING: "postgres://postgres:postgres@localhost:5432/postgres"
+      - name: Run vitest with coverage
+        run: npm run test:coverage
+        env:
+          NEXT_PUBLIC_URL: "https://neuronpedia.org"
+          NEXTAUTH_URL: "http://localhost:3000"
+          NEXTAUTH_SECRET: "88888888888888888888888888888888"
+          POSTGRES_PRISMA_URL: "postgres://postgres:postgres@localhost:5432/postgres?pgbouncer=true&connect_timeout=15"
+          POSTGRES_URL_NON_POOLING: "postgres://postgres:postgres@localhost:5432/postgres"
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./apps/webapp/coverage/coverage-final.json
+          flags: webapp
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

@@ -13,7 +13,8 @@ import {
 import { getAuthedAdminUser, RequestAuthedAdminUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
-export const maxDuration = 300;
+// Hobby plans don't support > 60 seconds
+// export const maxDuration = 300;
 
 function enqueueProgress(controller: ReadableStreamDefaultController, progress: number, progressText: string) {
   const encoder = new TextEncoder();

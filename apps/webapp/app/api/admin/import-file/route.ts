@@ -7,7 +7,8 @@ import { downloadAndDecompressFile } from '@/lib/utils/s3';
 import { getAuthedAdminUser, RequestAuthedAdminUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
-export const maxDuration = 300;
+// Hobby plans don't support > 60 seconds
+// export const maxDuration = 300;
 
 export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   const body = await request.json();

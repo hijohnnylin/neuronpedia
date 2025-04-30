@@ -7,8 +7,14 @@ import { CheckIcon } from 'lucide-react';
 import { ExplanationWithPartialRelations } from 'prisma/generated/zod';
 
 export default function UmapListRow({ modelId, exp }: { modelId: string; exp: ExplanationWithPartialRelations }) {
-  const { searchText, loadingFeature, selectedFeatures, setSelectedFeatures, setGraphRanges, addAnnotationForExp } =
-    useUmapContext();
+  const {
+    searchText,
+    loadingFeature,
+    selectedFeatures,
+    setSelectedFeatures,
+    setGraphRanges,
+    // , addAnnotationForExp
+  } = useUmapContext();
 
   function findSelectedFeature(feature: NeuronIdentifier) {
     const selectedFeature = [...selectedFeatures.keys()].find((feat) => feat.equals(feature));
@@ -47,10 +53,10 @@ export default function UmapListRow({ modelId, exp }: { modelId: string; exp: Ex
       type="button"
       className={`${
         loadingFeature && loadingFeature.equals(getExplanationNeuronIdentifier(exp))
-          ? ' bg-slate-300'
+          ? 'bg-slate-300'
           : findSelectedFeature(getExplanationNeuronIdentifier(exp))
-          ? ' bg-emerald-200'
-          : 'hover:bg-emerald-50'
+            ? 'bg-emerald-200'
+            : 'hover:bg-emerald-50'
       } group mr-0.5 flex flex-1 flex-row rounded border border-transparent px-1 py-[3px] text-left hover:border-emerald-600`}
       onClick={() => {
         setSelectedFeatures(() => {
@@ -70,7 +76,7 @@ export default function UmapListRow({ modelId, exp }: { modelId: string; exp: Ex
         });
       }}
       onMouseEnter={() => {
-        addAnnotationForExp(exp as ExplanationWithPartialRelations);
+        // addAnnotationForExp(exp as ExplanationWithPartialRelations);
       }}
     >
       <div className="flex w-20 flex-row items-start gap-x-1.5">

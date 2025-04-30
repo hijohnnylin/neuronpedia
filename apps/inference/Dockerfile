@@ -31,6 +31,11 @@ WORKDIR /app
 
 ENV HOST=0.0.0.0
 
+# Ignore hash sum mismatch for apt-get
+RUN echo "Acquire::http::Pipeline-Depth 0;" > /etc/apt/apt.conf.d/99custom && \
+    echo "Acquire::http::No-Cache true;" >> /etc/apt/apt.conf.d/99custom && \
+    echo "Acquire::BrokenProxy    true;" >> /etc/apt/apt.conf.d/99custom
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \

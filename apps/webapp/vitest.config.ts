@@ -1,5 +1,4 @@
 /* eslint-disable import/no-extraneous-dependencies */
-
 import { loadEnvConfig } from '@next/env';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
@@ -22,6 +21,11 @@ export default defineConfig({
       jsdom: {
         resources: 'usable',
       },
+    },
+    coverage: {
+      provider: 'v8',
+      include: ['components/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.{ts,tsx}', '**/__tests__/**'],
     },
   },
 });

@@ -1,39 +1,55 @@
-[build-system]
-requires = ["setuptools>=64.0"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "neuronpedia_autointerp"
 version = "1.0.0"
-description = "Neuronpedia's AutoInterp Server - Based on EleutherAI's sae-auto-interp. Not using Poetry due to issue with xformers library."
+description = "Neuronpedia's AutoInterp Server - Based on EleutherAI's sae-auto-interp."
+authors = ["Johnny Lin <johnny@neuronpedia.org>"]
+license = "MIT"
 readme = "README.md"
-license = { text = "MIT" }
-requires-python = ">=3.10"
 keywords = ["interpretability", "explainable-ai"]
-authors = [
-    {name = "Johnny Lin", email = "johnny@neuronpedia.org"},
-]
-dependencies = [
-    "sae-auto-interp@git+https://github.com/hijohnnylin/sae-auto-interp",
-    "fastapi",
-    "pydantic",
-    "uvicorn",
-    "sentry-sdk[fastapi]",
-    "python-dotenv",
-    "neuronpedia-autointerp-client"
-]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.3.1",
-    "coverage>=7.6.0",
-    "ruff>=0.7.4",
-]
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+fastapi = "^0.115.0"
+pydantic = "^2.0.0"
+uvicorn = "^0.34.0"
+python-dotenv = "^1.1.0"
+neuronpedia-autointerp-client = "^1.0.0"
+sentry-sdk = { extras = ["fastapi"], version = "^2.20.0" }
+sae-auto-interp = { git = "https://github.com/hijohnnylin/sae-auto-interp" }
+bitsandbytes = "==0.42.0"
+torchtyping = "^0.1.5"
 
-[tool.setuptools.packages.find]
-include = ["neuronpedia_autointerp*"]
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.1"
+coverage = "^7.6.0"
+ruff = "^0.7.4"
+pyright = "^1.1.351"
+pytest-cov = "^6.0.0"
 
-[tool.ruff.lint]
-exclude = ["*.ipynb"]
-ignore = ["E203", "E501", "E731", "F722", "E741", "F821", "F403", "ARG002"]
-select = ["UP", "TID", "I", "F", "E", "ARG", "SIM", "RET", "LOG", "T20"]
+[build-system]
+requires = ["poetry-core>=1.4.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Union".msg = "Use '|' instead"
+"typing.Optional".msg = "Use '| None' instead"
+"typing.Dict".msg = "Use 'dict' instead"
+"typing.List".msg = "Use 'list' instead"
+
+[tool.pyright]
+include = ["neuronpedia_autointerp"]
+exclude = ["dist", "*.venv"]
+# Add this line to ignore import errors for missing libraries
+reportMissingImports = "none"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUntypedFunctionDecorator = "none"
+reportUnnecessaryIsInstance = "none"
+reportUnnecessaryComparison = "none"
+reportConstantRedefinition = "none"
+reportUnknownLambdaType = "none"
+reportUnknownParameterType = "none"
+reportPrivateUsage = "none"

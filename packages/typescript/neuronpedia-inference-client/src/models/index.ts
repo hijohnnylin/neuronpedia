@@ -22,6 +22,8 @@ export * from './SteerCompletionChatPost200Response';
 export * from './SteerCompletionChatPostRequest';
 export * from './SteerCompletionPost200Response';
 export * from './SteerCompletionRequest';
+export * from './TokenizePost200Response';
+export * from './TokenizePostRequest';
 export * from './UtilSaeTopkByDecoderCossimPost200Response';
 export * from './UtilSaeTopkByDecoderCossimPost200ResponseTopkDecoderCossimFeaturesInner';
 export * from './UtilSaeTopkByDecoderCossimPostRequest';

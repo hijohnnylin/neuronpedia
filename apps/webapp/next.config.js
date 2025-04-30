@@ -8,10 +8,10 @@ const nextConfig = {
   reactStrictMode: false,
   swcMinify: true,
   compress: true,
-  compiler: {
-    // Remove console logs only in production
-    removeConsole: process.env.NODE_ENV === 'production',
-  },
+  // compiler: {
+  //   // Remove console logs only in production
+  //   removeConsole: process.env.NODE_ENV === 'production',
+  // },
   images: {
     remotePatterns: [
       {

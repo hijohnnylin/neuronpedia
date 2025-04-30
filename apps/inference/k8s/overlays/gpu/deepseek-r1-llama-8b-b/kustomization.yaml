@@ -1,0 +1,20 @@
+resources:
+  - ../base-lite
+namePrefix: deepseek-r1-llama-8b-b-
+commonLabels:
+  instance: deepseek-r1-llama-8b-b
+configMapGenerator:
+  - name: inference-config
+    literals:
+      - MODEL_ID=meta-llama/Llama-3.1-8B
+      - OVERRIDE_MODEL_ID=meta-llama/Llama-3.1-8B
+      - CUSTOM_HF_MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+      - DEVICE=cuda
+      - MODEL_DTYPE=bfloat16
+      - SAE_DTYPE=bfloat16
+      - HOST=0.0.0.0
+      - TOKEN_LIMIT=4096
+      - PORT=5002
+      - MAX_LOADED_SAES=1
+      - SAE_SETS=["llamascope-slimpj-res-32k"]
+      - INCLUDE_SAE=["^15-llamascope-slimpj-res-32k$"]

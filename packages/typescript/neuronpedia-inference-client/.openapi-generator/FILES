@@ -28,6 +28,8 @@ src/models/SteerCompletionChatPost200Response.ts
 src/models/SteerCompletionChatPostRequest.ts
 src/models/SteerCompletionPost200Response.ts
 src/models/SteerCompletionRequest.ts
+src/models/TokenizePost200Response.ts
+src/models/TokenizePostRequest.ts
 src/models/UtilSaeTopkByDecoderCossimPost200Response.ts
 src/models/UtilSaeTopkByDecoderCossimPost200ResponseTopkDecoderCossimFeaturesInner.ts
 src/models/UtilSaeTopkByDecoderCossimPostRequest.ts

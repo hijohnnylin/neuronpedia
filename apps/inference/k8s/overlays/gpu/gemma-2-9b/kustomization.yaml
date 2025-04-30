@@ -15,4 +15,4 @@ configMapGenerator:
       - TOKEN_LIMIT=400
       - PORT=5002
       - MAX_LOADED_SAES=500
-      - SAE_SETS=["gemmascope-res-16k"]
+      - SAE_SETS=["gemmascope-res-16k", "res-matryoshka-dc"]

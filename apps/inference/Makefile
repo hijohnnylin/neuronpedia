@@ -1,28 +1,21 @@
-.PHONY: test test-verbose coverage format unit-test integration-test check-format check-ci install install-dev all run-server
+.PHONY: test-verbose coverage format unit-test check-format check-ci install install-dev all run-server
 
 # Variables
 PYTHON = python
 POETRY = poetry
 PYTEST = $(POETRY) run pytest
-PYTEST_ARGS = -v -s
 COVERAGE = $(POETRY) run coverage
 RUFF = $(POETRY) run ruff
 
 # Targets
-test: unit-test integration-test
-
 unit-test:
-	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) tests/unit
+	$(POETRY) run $(PYTEST) -v --cov=neuronpedia_inference/ --cov-report=term-missing --cov-branch tests/unit
 
 integration-test:
 	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) tests/integration
 
 test-verbose:
-	$(POETRY) run $(PYTEST) $(PYTEST_ARGS) -vv
-
-coverage:
-	$(COVERAGE) run -m pytest
-	$(COVERAGE) report -m
+	$(POETRY) run $(PYTEST) -vv --no-header
 
 format:
 	$(RUFF) format .
@@ -32,7 +25,10 @@ check-format:
 	$(RUFF) check .
 	$(RUFF) format --check .
 
-check-ci: check-format unit-test
+check-type:
+	$(POETRY) run pyright .
+
+check-ci: check-format check-type unit-test
 
 install:
 	$(POETRY) config virtualenvs.create true

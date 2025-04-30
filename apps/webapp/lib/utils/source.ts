@@ -170,6 +170,7 @@ export function getFirstSourceSetForModel(
   visibility?: Visibility,
   onlyInferenceEnabled?: boolean,
   includeNoDashboards?: boolean,
+  onlyInferenceSearchEnabled?: boolean,
 ) {
   return (
     model.sourceSets
@@ -186,6 +187,13 @@ export function getFirstSourceSetForModel(
         if (onlyInferenceEnabled) {
           // at least once of its sources needs to allow activation testing
           return ss.sources?.some((s) => s.inferenceEnabled);
+        }
+        return true;
+      })
+      .filter((ss) => {
+        // axbench allows inference but not inference search
+        if (onlyInferenceSearchEnabled) {
+          return ss.allowInferenceSearch;
         }
         return true;
       })

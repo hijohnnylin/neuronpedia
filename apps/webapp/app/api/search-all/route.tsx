@@ -18,7 +18,8 @@ import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { ActivationAllPost200Response } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 
-export const maxDuration = 120;
+// Hobby plans don't support > 60 seconds
+// export const maxDuration = 120;
 
 const NUMBER_TOP_RESULTS = 50;
 const DEFAULT_DENSITY_THRESHOLD = -1;
@@ -27,10 +28,10 @@ const DEFAULT_DENSITY_THRESHOLD = -1;
  * @swagger
  * /api/search-all:
  *   post:
- *     summary: Top Features for Text
+ *     summary: Top Features for Entire Text
  *     description: Returns the top features for a given text input. Equivalent to the https://neuronpedia.org/search functionality. Contact us to increase your rate limit for free if you hit it.
  *     tags:
- *       - Search
+ *       - Search via Inference
  *     security:
  *       - apiKey: []
  *     requestBody:

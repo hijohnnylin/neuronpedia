@@ -75,11 +75,11 @@ export type SearchTopKResult = {
   }[];
 };
 
-function convertSteerFeatureVectorsToInferenceVectors(steerFeatures: SteerFeature[], stream: boolean) {
+function convertSteerFeatureVectorsToInferenceVectors(steerFeatures: SteerFeature[]) {
   return steerFeatures.map((feature) => ({
     hook: feature.neuron?.hookName || '',
-    steering_vector: stream ? feature.neuron?.vector : undefined,
-    steeringVector: stream ? undefined : feature.neuron?.vector,
+    steering_vector: feature.neuron?.vector,
+    steeringVector: feature.neuron?.vector,
     strength: feature.strength,
   }));
 }
@@ -275,7 +275,7 @@ export const steerCompletion = async (
             index: feature.index,
             strength: feature.strength,
           })),
-      vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures, stream) : undefined,
+      vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
       strength_multiplier: strengthMultiplier,
       n_completion_tokens: n_tokens,
       temperature,
@@ -361,7 +361,7 @@ export const steerCompletionChat = async (
                   index: feature.index,
                   strength: feature.strength,
                 })),
-            vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures, true) : undefined,
+            vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
             strength_multiplier: strengthMultiplier,
             n_completion_tokens: nTokens,
             temperature,
@@ -400,7 +400,7 @@ export const steerCompletionChat = async (
                 strength: feature.strength,
               })),
           vectors: hasVector
-            ? (convertSteerFeatureVectorsToInferenceVectors(steerFeatures, false) as NPSteerVector[])
+            ? (convertSteerFeatureVectorsToInferenceVectors(steerFeatures) as NPSteerVector[])
             : undefined,
           strengthMultiplier,
           nCompletionTokens: nTokens,
@@ -429,7 +429,7 @@ export const steerCompletionChat = async (
                 strength: feature.strength,
               })),
           vectors: hasVector
-            ? (convertSteerFeatureVectorsToInferenceVectors(steerFeatures, false) as NPSteerVector[])
+            ? (convertSteerFeatureVectorsToInferenceVectors(steerFeatures) as NPSteerVector[])
             : undefined,
           strengthMultiplier,
           nCompletionTokens: nTokens,

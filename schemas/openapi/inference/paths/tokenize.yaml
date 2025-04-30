@@ -1,0 +1,52 @@
+post:
+  summary: Tokenize input text for a given model
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          description: Tokenize input text for a given model
+          required:
+            - model
+            - text
+          properties:
+            model:
+              type: string
+              description: ID of the model to use for tokenization
+              example: "gpt2-small"
+            text:
+              type: string
+              description: The text to tokenize
+              example: "tokenize me! :D"
+            prepend_bos:
+              type: boolean
+              description: Whether to prepend beginning-of-sequence token. If not specified, uses the model's default setting.
+              nullable: true
+  responses:
+    "200":
+      description: Successful tokenization
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - tokens
+              - token_strings
+              - prepend_bos
+            properties:
+              tokens:
+                type: array
+                description: Token IDs for the input text
+                items:
+                  type: integer
+              token_strings:
+                type: array
+                description: String representation of each token
+                items:
+                  type: string
+              prepend_bos:
+                type: boolean
+                description: Whether beginning-of-sequence token was prepended
+    401:
+      $ref: "../../shared.yaml#/components/responses/UnauthorizedError"

@@ -56,7 +56,7 @@ services:
     ports:
       - "5002:5002"
     env_file:
-      - ${ENV_FILE:-.env.inference.$(MODEL_SOURCESET)}
+      - ${ENV_FILE:-${MODEL_SOURCESET:+.env.inference.${MODEL_SOURCESET}}.env}
     environment:
       - HF_TOKEN=${HF_TOKEN}
       - SECRET=${INFERENCE_SERVER_SECRET}

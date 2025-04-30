@@ -20,27 +20,18 @@ as much as possible we try to use classes/types from the `packages/python/neuron
 
 > ⚠️ **warning:** the eleuther embedding scorer uses an embedding model only supported on CUDA (it won't work on mac mps or cpu)
 
-> ⚠️ **warning:** this doesn't use poetry because there is some conflict with using poetry and the `xformers` library that we have yet to resolve [#9](https://github.com/hijohnnylin/neuronpedia/issues/9)
-
 ## simple non-docker setup
 
-1. `python -m venv .venv`
+1. `poetry lock && poetry install`
 
-2. `source .venv/bin/activate`
-
-3. `pip install -e ".[dev]"`
-
-4. launch local server
+2. launch local server
 
    ```
    # no auto-reload
-   uvicorn server:app --host 0.0.0.0 --port 5003 --workers 1
+   poetry run uvicorn server:app --host 0.0.0.0 --port 5003 --workers 1
    # with auto-reload
-   uvicorn server:app --host 0.0.0.0 --port 5003 --workers 1 --reload
+   poetry run uvicorn server:app --host 0.0.0.0 --port 5003 --workers 1 --reload
    ```
-
-5. if you are making changes to the openapi spec (new/updated endpoints) and want to test those changes locally, generate your client and use the following command to point to the local autointerp client:
-   `pip install -e ../../packages/python/neuronpedia-autointerp-client`
 
 ## some docker commands for reference (outdated, needs fixing)
 
@@ -79,3 +70,27 @@ docker run -p 5003:5003 -e SECRET=[SECRET] neuronpedia-autointerp:cpu poetry run
 # gpu
 docker run --gpus all -p 5003:5003 -e SECRET=[SECRET] neuronpedia-autointerp:gpu poetry run autointerp
 ```
+
+## Testing, Linting, and Formatting
+
+This project uses [pytest](https://docs.pytest.org/en/stable/) for testing, [pyright](https://github.com/microsoft/pyright) for type-checking, and [Ruff](https://docs.astral.sh/ruff/) for formatting and linting.
+
+If you add new code, it would be greatly appreciated if you could add tests in the `tests` directory. You can run the tests with:
+
+```bash
+make test
+```
+
+Before commiting, make sure you format the code with:
+
+```bash
+make format
+```
+
+Finally, run all CI checks locally with:
+
+```bash
+make check-ci
+```
+
+If these pass, you're good to go! Open a pull request with your changes.

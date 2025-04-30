@@ -42,7 +42,7 @@ export default function UmapPlotActive({ modelId, showLists }: { modelId: string
     plotActiveRef,
     visibleUmapExplanations,
     loadFeature,
-    addAnnotationForExp,
+    // addAnnotationForExp,
     showLogSparsity,
     layerToInitialColor,
   } = useUmapContext();
@@ -108,9 +108,9 @@ export default function UmapPlotActive({ modelId, showLists }: { modelId: string
           new NeuronIdentifier(modelId, visibleUmapExplanations[pn].layer, visibleUmapExplanations[pn].index),
         );
       }}
-      onHover={(event) => {
-        const pn = event.points[0].pointNumber;
-        addAnnotationForExp(visibleUmapExplanations[pn]);
+      onHover={() => {
+        // const pn = event.points[0].pointNumber;
+        // addAnnotationForExp(visibleUmapExplanations[pn]);
       }}
       onUpdate={(figure) => {
         const { layout } = figure;
