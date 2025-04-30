@@ -7,7 +7,7 @@ export default async function Page({
   searchParams,
 }: {
   // params: {};
-  searchParams: { clickedId?: string; logitDiff?: string; modelId: string; slug: string };
+  searchParams: { clickedId?: string; logitDiff?: string; model?: string; slug?: string };
 }) {
   // TODO: update this to use modelid from url
   // const { modelId } = params;
@@ -54,11 +54,11 @@ export default async function Page({
 
   console.log(searchParams);
 
-  const metadataGraph = searchParams.modelId
-    ? metadata[searchParams.modelId]?.find((graph) => graph.slug === searchParams.slug)
+  const metadataGraph = searchParams.model
+    ? metadata[searchParams.model]?.find((graph) => graph.slug === searchParams.slug)
     : undefined;
 
-  console.log(searchParams.modelId, searchParams.slug);
+  console.log(searchParams.model, searchParams.slug);
   console.log(metadataGraph);
 
   return (
@@ -67,7 +67,7 @@ export default async function Page({
       initialModelToBaseUrl={modelToBaseUrl}
       initialClickedId={searchParams.clickedId}
       initialLogitDiff={searchParams.logitDiff}
-      initialModel={searchParams.modelId}
+      initialModel={searchParams.model}
       initialMetadataGraph={metadataGraph}
     >
       <CLTWrapper />
