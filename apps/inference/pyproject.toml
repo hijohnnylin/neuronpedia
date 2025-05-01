@@ -24,18 +24,20 @@ pytest = "^8.1.1"
 huggingface-hub = "^0.26.1"
 huggingface = "^0.0.1"
 pandas = "^2.2.2"
-sae-lens = "^5.5.2"
+sae-lens = "^5.8.1"
 fastapi = "^0.115.6"
 uvicorn = "^0.34.0"
 sentry-sdk = {extras = ["fastapi"], version = "^2.20.0"}
-neuronpedia-inference-client = {path = "../../packages/python/neuronpedia-inference-client"}
 nnsight = "^0.4.3"
+neuronpedia-inference-client = {path = "../../packages/python/neuronpedia-inference-client"}
 
 [tool.poetry.group.dev.dependencies]
 # line-profiler = "^4.1.3"
 pytest = "^8.3.1"
 coverage = "^7.6.0"
 ruff = "^0.7.4"
+pyright = "^1.1.351"
+pytest-cov = "^6.0.0"
 
 [tool.ruff.lint]
 exclude = ["*.ipynb"]
@@ -45,6 +47,28 @@ select = ["UP", "TID", "I", "F", "E", "ARG", "SIM", "RET", "LOG", "T20"]
 [tool.ruff.lint.per-file-ignores]
 "neuronpedia_inference/sae_manager.py" = ["T20"]
 "neuronpedia_inference/args.py" = ["T20"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Union".msg = "Use `|` instead"
+"typing.Optional".msg = "Use `| None` instead"
+"typing.Dict".msg = "Use `dict` instead"
+"typing.List".msg = "Use `list` instead"
+
+[tool.pyright]
+include = ["sae_vis"]
+exclude = ["sae_vis/css", "sae_vis/js", "sae_vis/html", "dist"]
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUntypedFunctionDecorator = "none"
+reportUnnecessaryIsInstance = "none"
+reportUnnecessaryComparison = "none"
+reportConstantRedefinition = "none"
+reportUnknownLambdaType = "none"
+reportUnknownParameterType = "none"
+reportPrivateUsage = "none"
 
 [build-system]
 requires = ["poetry-core"]

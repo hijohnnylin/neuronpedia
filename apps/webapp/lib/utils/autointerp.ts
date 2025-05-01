@@ -42,8 +42,9 @@ export const isReasoningModel = (modelId: string) =>
   modelId.startsWith('deepseek-r1') ||
   modelId.indexOf('-thinking') !== -1;
 
+// TODO: this should be in the database
 export const getAutoInterpModelTypeFromModelId = (modelId: string) => {
-  if (modelId.startsWith('gpt') || modelId.startsWith('o1-') || modelId.startsWith('o3-')) {
+  if (modelId.startsWith('gpt') || modelId.startsWith('o1') || modelId.startsWith('o3') || modelId.startsWith('o4')) {
     return AutoInterpModelType.OPENAI;
   }
   if (modelId.startsWith('claude')) {
@@ -56,6 +57,8 @@ export const getAutoInterpModelTypeFromModelId = (modelId: string) => {
 };
 export const ERROR_NO_AUTOINTERP_KEY = 'No auto-interp key found for user.';
 export const ERROR_REQUIRES_OPENROUTER = 'This autointerp type requires an OpenRouter key.';
+export const ERROR_RECALL_ALT_FAILED =
+  'All scoring requests failed. Check that you have enough credits in your API key (Either OpenRouter or others), and that your key has not been revoked.';
 export function getKeyTypeForAutoInterpModelType(modelType: AutoInterpModelType) {
   if (modelType === AutoInterpModelType.OPENAI) {
     return UserSecretType.OPENAI;

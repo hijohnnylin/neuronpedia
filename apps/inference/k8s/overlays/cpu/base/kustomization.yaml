@@ -12,7 +12,7 @@ patches:
           spec:
             containers:
             - name: neuronpedia-inference
-              image: gcr.io/$(PROJECT_ID)/neuronpedia-inference:cpu
+              image: gcr.io/tokyo-griffin-401620/neuronpedia-inference:cpu
               imagePullPolicy: Always
               resources:
                 requests:

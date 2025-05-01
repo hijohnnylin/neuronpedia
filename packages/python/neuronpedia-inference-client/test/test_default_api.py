@@ -62,6 +62,13 @@ class TestDefaultApi(unittest.TestCase):
         """
         pass
 
+    def test_tokenize_post(self) -> None:
+        """Test case for tokenize_post
+
+        Tokenize input text for a given model
+        """
+        pass
+
     def test_util_sae_topk_by_decoder_cossim_post(self) -> None:
         """Test case for util_sae_topk_by_decoder_cossim_post
 

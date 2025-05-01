@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import Any
 
 import torch
 from fastapi import APIRouter
@@ -134,25 +134,28 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
 
     if request.stream:
         return StreamingResponse(generator, media_type="text/event-stream")
+    last_item = None
     async for item in generator:
-        pass
-    results = remove_sse_formatting(item)
+        last_item = item
+    if last_item is None:
+        raise ValueError("No response generated")
+    results = remove_sse_formatting(last_item)
     return SteerCompletionChatPost200Response.from_json(results)
 
 
 async def run_batched_generate(
     promptTokenized: torch.Tensor,
-    inputPrompt: List[NPSteerChatMessage],
-    features: List[NPSteerFeature] | List[NPSteerVector],
-    steer_types: List[NPSteerType],
+    inputPrompt: list[NPSteerChatMessage],
+    features: list[NPSteerFeature] | list[NPSteerVector],
+    steer_types: list[NPSteerType],
     strength_multiplier: float,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     steer_method: NPSteerMethod = NPSteerMethod.SIMPLE_ADDITIVE,
-    normalize_steering=False,
-    steer_special_tokens=False,
+    normalize_steering: bool = False,
+    steer_special_tokens: bool = False,
     use_stream_lock: bool = False,
-    custom_hf_model_id: Optional[str] = None,
-    **kwargs,
+    custom_hf_model_id: str | None = None,
+    **kwargs: Any,
 ):
     async with await stream_lock(use_stream_lock):
         model = Model.get_instance()
@@ -165,8 +168,8 @@ async def run_batched_generate(
         if seed is not None:
             torch.manual_seed(seed)
 
-        def steering_hook(activations, hook):  # noqa: ARG001
-            # Log activation device
+        def steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
+            # log activation device
             # logger.info(f"Activations device: {activations.device}")
 
             for i, flag in enumerate(steer_types):
@@ -190,9 +193,10 @@ async def run_batched_generate(
                         )
 
                         # Find indices of special tokens
+
                         bos_indices = (
                             current_tokens == model.tokenizer.bos_token_id
-                        ).nonzero(as_tuple=True)[0]
+                        ).nonzero(as_tuple=True)[0]  # type: ignore
                         start_of_turn_indices = (
                             current_tokens
                             == model.tokenizer.encode("<start_of_turn>")[0]
@@ -317,7 +321,7 @@ async def run_batched_generate(
             ]
             logger.info("steer_type: %s", steer_type)
 
-            with model.hooks(fwd_hooks=editing_hooks):
+            with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
                 partial_result = ""
                 for result in model.generate_stream(
                     max_tokens_per_yield=TOKENS_PER_YIELD,
@@ -341,13 +345,13 @@ async def run_batched_generate(
 
 
 def make_steer_completion_chat_response(
-    steer_types: List[NPSteerType],
+    steer_types: list[NPSteerType],
     steered_result: str,
     default_result: str,
     model: HookedTransformer,
     promptTokenized: torch.Tensor,
-    promptChat: List[NPSteerChatMessage],
-    custom_hf_model_id: Optional[str] = None,
+    promptChat: list[NPSteerChatMessage],
+    custom_hf_model_id: str | None = None,
 ) -> SteerCompletionChatPost200Response:
     # Add tensor device logging
     steerChatResults = []

@@ -15,4 +15,4 @@ configMapGenerator:
       - HOST=0.0.0.0
       - PORT=5002
       - MAX_LOADED_SAES=500
-      - SAE_SETS=["gemmascope-res-16k", "gemmascope-att-16k", "gemmascope-res-65k"]
+      - SAE_SETS=["gemmascope-res-16k", "gemmascope-att-16k", "gemmascope-res-65k", "res-matryoshka-dc"]

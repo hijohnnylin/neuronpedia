@@ -6,19 +6,21 @@ import { replaceHtmlAnomalies } from '@/lib/utils/activations';
 import { getLayerNumFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle } from 'lucide-react';
-import Plotly from 'plotly.js-dist-min';
+// import Plotly from 'plotly.js-dist-min';
 import { NeuronWithPartialRelations } from 'prisma/generated/zod';
 import { useEffect, useState } from 'react';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
 // // https://github.com/plotly/react-plotly.js/issues/273
-// const Plot = dynamic(
-//   () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
-//   {
-//     ssr: false,
-//   },
-// );
-const Plot = createPlotlyComponent(Plotly);
+import dynamic from 'next/dynamic';
+
+const Plot = dynamic(
+  () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
+  {
+    ssr: false,
+  },
+);
+// const Plot = createPlotlyComponent(Plotly);
 const MAX_EMBED_TOP_LOGITS = 5;
 
 export default function FeatureStats({
@@ -78,7 +80,7 @@ export default function FeatureStats({
   return (
     <div className="w-full flex-row pt-0 text-[11px] text-slate-900 sm:flex">
       <div
-        className={`mb-0 flex w-full flex-row gap-x-3 gap-y-2.5 px-0 pb-0 sm:gap-x-5 ${vertical ? '' : 'sm:flex-row '}`}
+        className={`mb-0 flex w-full flex-row gap-x-3 gap-y-2.5 px-0 pb-0 sm:gap-x-5 ${vertical ? '' : 'sm:flex-row'}`}
       >
         {getSourceSet(currentNeuron?.modelId, currentNeuron?.sourceSetName || '')?.showCorrelated && !vertical && (
           <div className="hidden basis-1/4 flex-col gap-y-3">

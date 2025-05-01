@@ -37,10 +37,12 @@ export default function SteererSimple({
   initialModelId,
   cappedHeight,
   showOptionsButton = true,
+  excludedPresetNames = [],
 }: {
   initialModelId: string;
   cappedHeight?: boolean;
   showOptionsButton?: boolean;
+  excludedPresetNames?: string[];
 }) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [modelId, setModelId] = useState(initialModelId);
@@ -57,7 +59,15 @@ export default function SteererSimple({
       .then((response) => response.json())
       .then((data: SteerPreset) => {
         // Filter out any feature presets that have isUserVector set to true
-        const filteredPresets = data.featurePresets.filter((preset) => !preset.isUserVector);
+        const filteredPresets = data.featurePresets.filter((preset) => {
+          if (preset.isUserVector) {
+            return false;
+          }
+          if (excludedPresetNames.includes(preset.name)) {
+            return false;
+          }
+          return true;
+        });
         setFeaturePresets(filteredPresets);
       })
       .catch((error) => {
@@ -286,7 +296,7 @@ export default function SteererSimple({
                 cappedHeight ? `h-[400px] max-h-[400px] min-h-[400px]` : 'h-full max-h-[calc(100vh-111px)]'
               }`}
             >
-              <div className="sticky top-1 mt-0 flex flex-row items-center justify-center uppercase text-sky-700  sm:top-0">
+              <div className="sticky top-1 mt-0 flex flex-row items-center justify-center uppercase text-sky-700 sm:top-0">
                 <div className="rounded-full bg-sky-100 px-3 py-1 text-center text-[11px] font-bold shadow">
                   Normal Gemma
                 </div>
@@ -313,7 +323,7 @@ export default function SteererSimple({
                 cappedHeight ? `h-[400px] max-h-[400px] min-h-[400px]` : 'h-full max-h-[calc(100vh-111px)]'
               }`}
             >
-              <div className="sticky top-1 mt-0 flex flex-row items-center justify-center uppercase text-green-600  sm:top-0">
+              <div className="sticky top-1 mt-0 flex flex-row items-center justify-center uppercase text-green-600 sm:top-0">
                 <div className="rounded-full bg-green-100 px-3 py-1 text-center text-[11px] font-bold shadow">
                   Steered Gemma
                 </div>
@@ -360,7 +370,7 @@ export default function SteererSimple({
                   placeholder="Ask Gemma something..."
                   className="mt-0 w-full flex-1 resize-none rounded-full border border-slate-300 px-5 py-3.5 pr-10 text-left text-xs font-medium text-slate-800 placeholder-slate-400 shadow transition-all focus:border-slate-300 focus:shadow focus:outline-none focus:ring-0 disabled:bg-slate-200 sm:text-[13px]"
                 />
-                <div className={`absolute right-2 flex h-full cursor-pointer items-center justify-center `}>
+                <div className="absolute right-2 flex h-full cursor-pointer items-center justify-center">
                   <ArrowUp
                     onClick={() => {
                       if (!isTuning) {
@@ -383,7 +393,7 @@ export default function SteererSimple({
                   }
                   reset();
                 }}
-                className="flex aspect-square h-10 cursor-pointer flex-row items-center justify-center gap-x-1.5 rounded-full  bg-slate-200 px-5 text-sm text-slate-600 hover:bg-slate-300"
+                className="flex aspect-square h-10 cursor-pointer flex-row items-center justify-center gap-x-1.5 rounded-full bg-slate-200 px-5 text-sm text-slate-600 hover:bg-slate-300"
               >
                 <RotateCcw className="h-4 w-4" />
                 Reset
@@ -395,7 +405,7 @@ export default function SteererSimple({
                 onClick={() => {
                   sendChat('Tell me about yourself.');
                 }}
-                className="mt-0 cursor-pointer rounded-full bg-slate-200  px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
+                className="mt-0 cursor-pointer rounded-full bg-slate-200 px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
               >
                 Tell me about yourself.
               </button>
@@ -404,7 +414,7 @@ export default function SteererSimple({
                 onClick={() => {
                   sendChat('Tell me a one line story.');
                 }}
-                className="mt-0 cursor-pointer rounded-full  bg-slate-200 px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
+                className="mt-0 cursor-pointer rounded-full bg-slate-200 px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
               >
                 Tell me a one line story.
               </button>
@@ -413,7 +423,7 @@ export default function SteererSimple({
                 onClick={() => {
                   sendChat('Write a haiku.');
                 }}
-                className="mt-0 cursor-pointer rounded-full  bg-slate-200 px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
+                className="mt-0 cursor-pointer rounded-full bg-slate-200 px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
               >
                 Write a haiku.
               </button>
@@ -422,7 +432,7 @@ export default function SteererSimple({
                 onClick={() => {
                   sendChat('Complete this: I wish...');
                 }}
-                className="mt-0 cursor-pointer rounded-full  bg-slate-200 px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
+                className="mt-0 cursor-pointer rounded-full bg-slate-200 px-2 py-1 text-center text-[11px] font-medium leading-tight text-slate-600 transition-all hover:scale-105 hover:bg-gBlue/80 hover:text-white sm:px-3.5 sm:py-1.5 sm:text-[11px]"
               >
                 <span className="hidden sm:inline-block">Complete this:</span> I wish...
               </button>
@@ -455,7 +465,7 @@ export default function SteererSimple({
                   setSelectedFeatures(feat?.features || []);
                 }}
               >
-                <Select.Trigger className="relative flex h-10 flex-1 select-none flex-row items-center justify-center gap-x-1.5 whitespace-pre rounded-xl border-2 border-green-700 bg-green-600 py-2  pl-4 pr-3 text-sm font-bold text-white hover:bg-green-700/50 focus:outline-none sm:min-w-[100px] sm:pl-6 sm:pr-4 sm:text-sm">
+                <Select.Trigger className="relative flex h-10 flex-1 select-none flex-row items-center justify-center gap-x-1.5 whitespace-pre rounded-xl border-2 border-green-700 bg-green-600 py-2 pl-4 pr-3 text-sm font-bold text-white hover:bg-green-700/50 focus:outline-none sm:min-w-[100px] sm:pl-6 sm:pr-4 sm:text-sm">
                   <Select.Value />
                   <Select.Icon>
                     <ChevronDown className="absolute right-2 top-0 ml-0 h-full w-5 leading-none text-green-800" />

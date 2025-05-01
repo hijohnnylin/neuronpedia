@@ -62,7 +62,7 @@ export default function TabMicroscope({
       body: JSON.stringify({
         modelId,
         text: overrideText || formRef.current?.values.searchQuery,
-        layer,
+        source: layer,
       }),
     });
     if (result.status === 429 || result.status === 405) {
@@ -180,12 +180,12 @@ export default function TabMicroscope({
   return (
     <div className="mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center pb-24 pt-1">
       <div ref={ref} className="pt-20 sm:pt-0" />
-      <div className="mb-10 mt-5 flex w-full flex-row items-center justify-start px-2 sm:mb-3 sm:px-5 sm:pt-0 ">
+      <div className="mb-10 mt-5 flex w-full flex-row items-center justify-start px-2 sm:mb-3 sm:px-5 sm:pt-0">
         <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-1 sm:flex-row">
           <span className="w-[105px] min-w-[105px] max-w-[105px] whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-center text-[10px] font-bold uppercase text-slate-600">
             💡 GOAL
           </span>
-          <div className="text-sm font-medium leading-normal  text-slate-500">
+          <div className="text-sm font-medium leading-normal text-slate-500">
             <span>
               To understand what AI is thinking, Gemma Scope breaks down {`Gemma's`} brain into millions of parts called{' '}
               <strong>features</strong>.
@@ -193,12 +193,12 @@ export default function TabMicroscope({
           </div>
         </div>
       </div>
-      <div className="mb-10 flex w-full flex-row items-center justify-start px-2 sm:mb-4 sm:px-5 ">
+      <div className="mb-10 flex w-full flex-row items-center justify-start px-2 sm:mb-4 sm:px-5">
         <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-1 sm:flex-row">
           <span className="w-[105px] min-w-[105px] max-w-[105px] whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-center text-[10px] font-bold uppercase text-slate-600">
             ❗️ Key Term
           </span>
-          <div className="text-sm font-medium leading-normal  text-slate-500">
+          <div className="text-sm font-medium leading-normal text-slate-500">
             <span>
               A <FeatureTooltip s={false} /> is something that activates in the {`AI's brain`} when it see a specific
               concept or idea, like
@@ -210,8 +210,8 @@ export default function TabMicroscope({
         </div>
       </div>
 
-      <div className="mb-10 flex w-full flex-row items-center justify-start px-2 sm:mb-5 sm:px-5 ">
-        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded  px-2 py-1 sm:flex-row">
+      <div className="mb-10 flex w-full flex-row items-center justify-start px-2 sm:mb-5 sm:px-5">
+        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-1 sm:flex-row">
           <div className="mb-2 flex w-full flex-row items-center justify-between gap-x-2 sm:mb-0 sm:w-auto sm:flex-col sm:justify-start">
             <span className="w-[105px] min-w-[105px] max-w-[105px] whitespace-nowrap rounded-full bg-slate-100 px-0 py-1 text-center text-[10px] font-bold uppercase text-slate-600">
               🎨 Demo
@@ -248,7 +248,7 @@ export default function TabMicroscope({
             </div>
           </div>
           <div className="flex w-full flex-col">
-            <div className="text-sm font-medium leading-normal  text-slate-500">
+            <div className="text-sm font-medium leading-normal text-slate-500">
               <span>
                 What{`'`}s Gemma thinking? Click a button below to send Gemma a sentence and see what features it
                 activates. 👇
@@ -264,7 +264,7 @@ export default function TabMicroscope({
                     INFERENCE_EXAMPLE_TEXTS[Math.floor(Math.random() * INFERENCE_EXAMPLE_TEXTS.length)];
                   await searchClicked(randomSentence);
                 }}
-                className="flex flex-row items-center justify-center gap-x-1.5 rounded-full border bg-white px-0 py-2 text-[10px] font-medium text-slate-600 shadow transition-all enabled:border-[#ea4335] enabled:hover:bg-[#ea4335] enabled:hover:text-white  disabled:opacity-50 sm:text-[14px]"
+                className="flex flex-row items-center justify-center gap-x-1.5 rounded-full border bg-white px-0 py-2 text-[10px] font-medium text-slate-600 shadow transition-all enabled:border-[#ea4335] enabled:hover:bg-[#ea4335] enabled:hover:text-white disabled:opacity-50 sm:text-[14px]"
               >
                 {`🎲 I'm Feeling Lucky`}
               </button>
@@ -283,7 +283,7 @@ export default function TabMicroscope({
                       await searchClicked(randomSentence);
                     }
                   }}
-                  className={`flex flex-row items-center justify-center gap-x-2 rounded-full bg-white px-0 py-2 text-[10px]  font-medium text-slate-600 shadow transition-all enabled:hover:text-white sm:text-[14px] ${
+                  className={`flex flex-row items-center justify-center gap-x-2 rounded-full bg-white px-0 py-2 text-[10px] font-medium text-slate-600 shadow transition-all enabled:hover:text-white sm:text-[14px] ${
                     hoverGbgColors[i % hoverGbgColors.length]
                   } border ${gBorderColors[i % gBorderColors.length]} text-[10px] disabled:opacity-50`}
                 >
@@ -387,10 +387,9 @@ export default function TabMicroscope({
                                 lockedTokenPosition === result.position
                                   ? 'bg-emerald-600 text-white'
                                   : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
-                                  ? 'bg-emerald-200'
-                                  : 'bg-slate-100 hover:bg-emerald-200 hover:text-emerald-700'
-                              }  ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} 
-                        ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
+                                    ? 'bg-emerald-200'
+                                    : 'bg-slate-100 hover:bg-emerald-200 hover:text-emerald-700'
+                              } ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
                             >
                               {result.token.trim().length === 0 ? ' ' : result.token}
                             </button>
@@ -419,7 +418,7 @@ export default function TabMicroscope({
                                 TRY THIS{' '}
                               </span>
                               <div className="flex flex-col items-start justify-start gap-y-0.5 text-left leading-none">
-                                <div className=" block text-left">
+                                <div className="block text-left">
                                   <strong>Hover over a feature</strong> to see which tokens it activated on.
                                 </div>
                                 {/* <div>
@@ -444,7 +443,7 @@ export default function TabMicroscope({
                             >
                               <div className="h-2 w-2 rounded-full bg-emerald-700" />
                               {f.index === DOGS_INDEX && (
-                                <div className="flex cursor-default flex-col items-center justify-center  py-1.5">
+                                <div className="flex cursor-default flex-col items-center justify-center py-1.5">
                                   <div className="mb-1 animate-bounce text-[18px]">🐶</div>
                                   <div className="text-center font-mono text-[7px] uppercase leading-none">
                                     Challenge
@@ -531,14 +530,12 @@ export default function TabMicroscope({
                           ].topFeatures.map((f, i) => (
                             <div
                               key={i}
-                              className={`group relative flex w-full cursor-default flex-row items-center justify-center gap-x-3 rounded-xl 
-                                bg-emerald-100 py-1 pl-5 pr-3 
-                                  text-emerald-800 transition-all   hover:bg-emerald-200 `}
+                              className="group relative flex w-full cursor-default flex-row items-center justify-center gap-x-3 rounded-xl bg-emerald-100 py-1 pl-5 pr-3 text-emerald-800 transition-all hover:bg-emerald-200"
                             >
                               <div className="h-2 w-2 rounded-full bg-emerald-700" />
                               {f.featureIndex === DOGS_INDEX && (
                                 <div className="flex cursor-default flex-col items-center justify-center py-1.5">
-                                  <div className="mb-1 animate-bounce  text-[18px]">🐶</div>
+                                  <div className="mb-1 animate-bounce text-[18px]">🐶</div>
                                   <div className="text-center font-mono text-[7px] uppercase leading-none">
                                     Challenge
                                     <br />
@@ -604,7 +601,7 @@ export default function TabMicroscope({
           !(topkResult && !isSearching) && !forceExtraCredit ? 'opacity-40' : ''
         }`}
       >
-        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded  px-2 py-1 sm:flex-row">
+        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-1 sm:flex-row">
           <span className="w-[105px] min-w-[105px] max-w-[105px] whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-center text-[10px] font-bold uppercase text-slate-600">
             ⭐️ Challenge
           </span>
@@ -661,7 +658,7 @@ export default function TabMicroscope({
           !(topkResult && !isSearching) && !forceWhatsNext ? 'opacity-40' : ''
         }`}
       >
-        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded  px-2 py-1 sm:flex-row">
+        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-1 sm:flex-row">
           <span className="w-[105px] min-w-[105px] max-w-[105px] whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-center text-[10px] font-bold uppercase text-slate-600">
             🎁 Next
           </span>

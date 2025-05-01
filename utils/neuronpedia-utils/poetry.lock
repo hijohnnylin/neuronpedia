@@ -240,15 +240,15 @@ tests-mypy = ["mypy (>=1.11.1)", "pytest-mypy-plugins"]
 
 [[package]]
 name = "automated-interpretability"
-version = "0.0.7"
+version = "0.0.9"
 description = "OpenAI's implementation of automated-interpretability, with some updates. Not officially affiliated with OpenAI."
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "automated_interpretability-0.0.7-py3-none-any.whl", hash = "sha256:66d88eb3f81beea5b997e7dab11acef02970d3e615e33f764feede8b4655541a"},
-    {file = "automated_interpretability-0.0.7.tar.gz", hash = "sha256:2b4d41a7e080e9d02ee882eb51d834be1f2c21cfdff68fc29dc6350bf2f56c27"},
+    {file = "automated_interpretability-0.0.9-py3-none-any.whl", hash = "sha256:da5f726d81bef48861642ecbb457f8cd3250f653eb1db5e3204beab70b180184"},
+    {file = "automated_interpretability-0.0.9.tar.gz", hash = "sha256:f17cc9738ddcd3979542541e461fddc8bb64fc4317bd1b35af44c281b1d79faf"},
 ]
 
 [package.dependencies]
@@ -258,7 +258,7 @@ httpx = ">=0.27.0,<0.28.0"
 numpy = ">=1.24.0,<2.0.0"
 orjson = ">=3.10.1,<4.0.0"
 scikit-learn = ">=1.2.0,<2.0.0"
-tiktoken = ">=0.6.0,<0.7.0"
+tiktoken = ">=0.6.0"
 
 [[package]]
 name = "babe"
@@ -5238,4 +5238,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "a3dd49ee60e0f499fb7a76c876e8d023f1bcbe682554639073107a97ea6c4b48"
+content-hash = "615bd6ebd8fcee0fd29e8a7c0c6af2bd173e76404bbaae4c5629320504cb53cc"

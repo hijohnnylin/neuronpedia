@@ -15,7 +15,7 @@
 """  # noqa: E501
 
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 # import apis into sdk package
 from neuronpedia_inference_client.api.default_api import DefaultApi
@@ -54,6 +54,8 @@ from neuronpedia_inference_client.models.steer_completion_chat_post200_response 
 from neuronpedia_inference_client.models.steer_completion_chat_post_request import SteerCompletionChatPostRequest
 from neuronpedia_inference_client.models.steer_completion_post200_response import SteerCompletionPost200Response
 from neuronpedia_inference_client.models.steer_completion_request import SteerCompletionRequest
+from neuronpedia_inference_client.models.tokenize_post200_response import TokenizePost200Response
+from neuronpedia_inference_client.models.tokenize_post_request import TokenizePostRequest
 from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post200_response import UtilSaeTopkByDecoderCossimPost200Response
 from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post200_response_topk_decoder_cossim_features_inner import UtilSaeTopkByDecoderCossimPost200ResponseTopkDecoderCossimFeaturesInner
 from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post_request import UtilSaeTopkByDecoderCossimPostRequest

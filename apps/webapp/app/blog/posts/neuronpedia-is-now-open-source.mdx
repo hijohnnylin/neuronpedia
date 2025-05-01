@@ -1,7 +1,7 @@
 ---
 title: Neuronpedia is Now Open Source
-description: "The World's First Interpretability API and Four Terabytes of Datasets are Now MIT Licensed"
-date: 2025-03-26
+description: 'Interpretability tools for absolutely everyone, for free. Plus 4TB of datasets.'
+date: 2025-03-31
 author: Johnny Lin
 image: /images/blog/neuronpedia-is-now-open-source.gif
 imagePreview: /images/blog/neuronpedia-is-now-open-source-preview.gif
@@ -9,11 +9,13 @@ imagePreview: /images/blog/neuronpedia-is-now-open-source-preview.gif
 
 # TL;DR
 
-- Interpretability tools for absolutely everyone, for free. 🥳
-- Get started on running Neuronpedia: [GitHub](https://github.com/hijohnnylin/neuronpedia)
+Podcast Summary by NotebookLM - [[Apple]](https://podcasts.apple.com/us/podcast/the-babble-a-residual-stream-podcast/id1809283401?i=1000703948045) [[Spotify]](https://creators.spotify.com/pod/show/neuronpedia/episodes/Ep--2-A-Bunch-of-Updates-e31nm2b)
+
+- Get started on running Neuronpedia: [GitHub](https://github.com/hijohnnylin/neuronpedia) or [Instant Deploy](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org)
 - Download 4+ terabytes of interpretability data: [Public Datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/)
 - Review [a summary](#current-capabilities) of Neuronpedia's features and submit [feature requests](https://github.com/hijohnnylin/neuronpedia/issues).
 - Reach out to us via [Slack #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA), [email](mailto:johnny@neuronpedia.org), or [GitHub Issues](https://github.com/hijohnnylin/neuronpedia/issues)
+- Check out the [tweet thread](https://x.com/neuronpedia/status/1906793456879775745) with demos
 
 <figure className="pb-5 pt-4">
   <img
@@ -75,7 +77,23 @@ Two months ago, we decided that the longer-term benefits of open sourcing outwei
 
 ## New: Host Neuronpedia Yourself
 
-Want to make not-neuronpedia.org? It's as simple as a few clicks. And you can `git pull` new changes when we deploy them, to stay updated with the latest fixes/features.
+For the impatient, you can instantly deploy a custom Neuronpedia by clicking `Deploy`:
+
+<p align="left">
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org">
+    <img src="https://vercel.com/button" width="120" alt="Deploy with Vercel" />
+  </a>
+</p>
+
+<video controls muted>
+  <source
+    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/puppyneurons-shrink.mp4"
+    alt="video of using instant deploy"
+    type="video/mp4"
+  />
+</video>
+
+Custom Neuronpedias are as simple as a few clicks. And you can `git pull` new changes when we deploy them, to stay updated with the latest fixes/features.
 
 You can now host Neuronpedia yourself, with your own model and data, on your own cloud or hardware. And you can choose to make it public or private. For example - did you train new sparse coders on a particular dataset? You can load that into a local database and access all of Neuronpedia's features, like an API, steering, dashboards, search, lists, and more.
 
@@ -83,11 +101,21 @@ You can now host Neuronpedia yourself, with your own model and data, on your own
 
 We're grateful for the people and organizations that came before us to make Neuronpedia possible, and we're happy to have lit the fire to inspire various projects, both public and private. Now, you can customize Neuronpedia to your heart's content - changing everything from updating colors to adding new features.
 
+For example, with a [single prompt](https://github.com/hijohnnylin/neuronpedia/blob/main/apps/experiments/steerify/README.md#claude-code-prompt) to Claude Code, it builds a new app "Steerify" using Neuronpedia components, with no intervention or fixes:
+
+<video controls muted>
+  <source
+    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/steerify-shrink.mp4"
+    alt="video of building steerify"
+    type="video/mp4"
+  />
+</video>
+
 Neuronpedia is comprised of multiple services that can run independently, so you can also just fork parts of Neuronpedia that you want and replace other parts entirely. For example, if you want just the frontend of Neuronpedia but plug in a different system for inference, just replace the Neuronpedia inference server, ensuring that your new inference server matches the defined OpenAPI spec.
 
 **Subpoint: Applied Interpretability**
 
-It's important to highlight that this opens up many possibilites for applied interpretability projects, both safety-related and not. For example, we have previously experimented with building "Safety Dashboards" for specific models - with just a few tweaks to the steering interface, we built a prototype red-teaming "Safety Dashboard", which could have been easily extended to specific topics like deception and violence.
+This opens up many possibilites for applied interpretability projects, both safety-related and not. For example, we experimented with building "Safety Dashboards" for specific models - with just a few tweaks to the steering interface, we built a red-teaming prototype, which could have been easily extended to specific topics like deception and violence.
 
 ## New: Contributing Code to the Global Neuronpedia
 
@@ -99,17 +127,25 @@ But collaborations like that don't scale well because they're bottlenecked on ou
 
 We're optimistic about using AI coding agents to accelerate the development of new features for Neuronpedia, and encourage you to try it. We've added some [Cursor Rules](https://docs.cursor.com/context/rules-for-ai) files to give AI the proper context, and have done some early experiments to gauge AI capability in adding new functionality to Neuronpedia.
 
-For example, the "Orthogonal Projection" steering type (an alternative to "Simple Additive") was created with a few prompts, with minimal human fixes. It's likely adding more READMEs, Cursor Rules, and a bit more refactoring will help improve AI agent development significantly.
-
 ## New: Roadmap (WIP) + Public Feature Requests
 
 You can submit feature requests, bug reports, and questions on [GitHub issues](https://github.com/hijohnnylin/neuronpedia/issues).
 
 We're currently working on porting our TODOs and roadmap from our private task management lists, to our GitHub issues and [discussions](https://github.com/hijohnnylin/neuronpedia/discussions). GitHub is also the place where we'll list known issues and workarounds.
 
-## New: Add Data to the Global Datasets (WIP)
+## New: Global Datasets - Export and Import (WIP)
 
 Let's say you came up with a new type of sparse coder, called the Sparse PuppyEncoder (SPE), and you want to not only [host it yourself](#new-host-neuronpedia-yourself), but also to let others load Sparse PuppyEncoders (and your generated data) into _their own_ local Neuronpedia and tinker with it? You can do that, too - just use the `neuronpedia-utils` export tools to export your activations, explanations, and metadata. Then, we upload your data to the public [neuronpedia-datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/), so that anyone running a local instance can import it.
+
+Here's importing datasets from the global Neuronpedia bucket to a localhost instance:
+
+<video controls muted>
+  <source
+    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/import-shrink.mp4"
+    alt="video of importing data"
+    type="video/mp4"
+  />
+</video>
 
 # What Does Open Sourcing _Not_ Change?
 
@@ -126,6 +162,8 @@ By open sourcing Neuronpedia, we make it easier for researchers to get a head st
 # How to Get Started
 
 All documention for getting started is in the READMEs in our public repository. All methods have been tested, but some details are a work-in-progress. Feel free to [contact us](#support-and-contact).
+
+## Github and Datasets
 
 - [GitHub](https://github.com/hijohnnylin/neuronpedia)
   - Neuronpedia is a monorepo with multiple services and packages

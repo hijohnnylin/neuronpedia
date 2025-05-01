@@ -49,9 +49,3 @@ def get_device():
         device_count = torch.cuda.device_count()
 
     return device, device_count
-
-
-def get_layer_num_from_sae_id(sae_id: str) -> int:
-    if sae_id.isdigit():
-        return int(sae_id)
-    return int(sae_id.split("-")[0])

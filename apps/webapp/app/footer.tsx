@@ -35,20 +35,36 @@ export default function Footer() {
         >
           Privacy & Terms
         </Link>
-        {/* <Link
+        <Link
           href="/blog"
           className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 transition-all hover:text-sky-700 hover:underline sm:px-0 sm:py-0"
         >
-          Blog/RSS
-        </Link> */}
-        {/* <Link
+          Blog/Podcast
+        </Link>
+        <Link
+          href="https://github.com/hijohnnylin/neuronpedia#readme"
+          target="_blank"
+          rel="noreferrer"
+          className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 transition-all hover:text-sky-700 hover:underline sm:px-0 sm:py-0"
+        >
+          GitHub
+        </Link>
+        <Link
+          href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA"
+          target="_blank"
+          rel="noreferrer"
+          className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 transition-all hover:text-sky-700 hover:underline sm:px-0 sm:py-0"
+        >
+          Slack
+        </Link>
+        <Link
           href="https://twitter.com/neuronpedia"
           target="_blank"
           rel="noreferrer"
           className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 transition-all hover:text-sky-700 hover:underline sm:px-0 sm:py-0"
         >
           Twitter
-        </Link> */}
+        </Link>
         <Link
           href="/contact"
           className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 transition-all hover:text-sky-700 hover:underline sm:px-0 sm:py-0"

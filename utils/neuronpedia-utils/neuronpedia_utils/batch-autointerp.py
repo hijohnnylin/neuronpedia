@@ -1,20 +1,21 @@
-import typer
-import os
 import asyncio
-import json
-import time
-import dotenv
+import datetime
 import glob
 import gzip
-import datetime
-import openai
-from cuid2 import Cuid
+import json
+import os
 import shutil
-from typing import List, Dict
-from tqdm import tqdm
-from dataclasses import dataclass, asdict
+import time
+from dataclasses import asdict, dataclass
+from typing import Dict, List
+
+import dotenv
+import openai
+import typer
+from cuid2 import Cuid
 from neuronpedia_utils.db_models.activation import Activation
 from neuronpedia_utils.db_models.explanation import Explanation
+from tqdm import tqdm
 
 # openai requires us to set the openai api key before the neuron_explainer imports
 dotenv.load_dotenv()
@@ -22,15 +23,17 @@ if not os.getenv("OPENAI_API_KEY"):
     raise ValueError(
         "OPENAI_API_KEY is not set. Please set it in the .env file or export it as an environment variable."
     )
+from neuron_explainer.activations.activation_records import calculate_max_activation
+
 # ruff: noqa: E402
 # flake8: noqa: E402
 from neuron_explainer.activations.activations import ActivationRecord
-from neuron_explainer.activations.activation_records import calculate_max_activation
-from neuron_explainer.explanations.prompt_builder import PromptFormat
+from neuron_explainer.api_client import ApiClient
 from neuron_explainer.explanations.explainer import (
-    TokenActivationPairExplainer,
     AttentionHeadExplainer,
+    TokenActivationPairExplainer,
 )
+from neuron_explainer.explanations.prompt_builder import PromptFormat
 
 SAVE_DIR_BASE = "./export-autointerp"
 UPLOAD_EXPLANATION_AUTHORID = os.getenv("DEFAULT_CREATOR_ID")
@@ -45,7 +48,19 @@ DEFAULT_EMBEDDING_DIMENSIONS = 256
 VALID_EXPLAINER_TYPE_NAMES = ["oai_token-act-pair", "oai_attention-head"]
 
 # you can change this yourself if you want to experiment with other models
-VALID_EXPLAINER_MODEL_NAMES = ["gpt-4o-mini"]
+VALID_EXPLAINER_MODEL_NAMES = ["gpt-4o-mini", "gpt-4.1-nano", "gemini-2.0-flash"]
+
+# GEMINI SUPPORT
+GEMINI_MODEL_NAMES = ["gemini-2.0-flash"]
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# we should use this one (ai studio, simpler) but we're super rate limited
+# GEMINI_BASE_API_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+# so we use vertex instead. when we are not rate limited on AI studio, remove the following 4 properties
+GEMINI_PROJECT_ID = os.getenv("GEMINI_PROJECT_ID")
+GEMINI_LOCATION = os.getenv("GEMINI_LOCATION")
+GEMINI_BASE_API_URL = f"https://{GEMINI_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/{GEMINI_PROJECT_ID}/locations/{GEMINI_LOCATION}/endpoints/openapi"
+GEMINI_VERTEX = True
 
 # the number of parallel autointerps to do
 # this is two bottlenecks:
@@ -102,7 +117,6 @@ def replace_html_anomalies_and_special_chars(texts: list[str]) -> list[str]:
 async def call_autointerp_openai_for_activations(
     activations_sorted_by_max_value: List[Activation],
 ):
-
     if len(activations_sorted_by_max_value) == 0:
         return
 
@@ -113,6 +127,22 @@ async def call_autointerp_openai_for_activations(
         return
 
     feature_index = top_activation.index
+
+    # only needed for vertex
+    if GEMINI_VERTEX:
+        model_name = (
+            "google/" + EXPLAINER_MODEL_NAME
+            if is_gemini_model(EXPLAINER_MODEL_NAME)
+            else EXPLAINER_MODEL_NAME
+        )
+    else:
+        model_name = EXPLAINER_MODEL_NAME
+    base_api_url = (
+        GEMINI_BASE_API_URL
+        if is_gemini_model(EXPLAINER_MODEL_NAME)
+        else ApiClient.BASE_API_URL
+    )
+    override_api_key = GEMINI_API_KEY if is_gemini_model(EXPLAINER_MODEL_NAME) else None
 
     try:
         activationRecords = []
@@ -127,9 +157,11 @@ async def call_autointerp_openai_for_activations(
                 )
                 activationRecords.append(activationRecord)
             explainer = AttentionHeadExplainer(
-                model_name=EXPLAINER_MODEL_NAME,
+                model_name=model_name,
                 prompt_format=PromptFormat.HARMONY_V4,
                 max_concurrent=1,
+                base_api_url=base_api_url,
+                override_api_key=override_api_key,
             )
             explanations = await asyncio.wait_for(
                 explainer.generate_explanations(
@@ -146,9 +178,11 @@ async def call_autointerp_openai_for_activations(
                 )
                 activationRecords.append(activationRecord)
             explainer = TokenActivationPairExplainer(
-                model_name=EXPLAINER_MODEL_NAME,
+                model_name=model_name,
                 prompt_format=PromptFormat.HARMONY_V4,
                 max_concurrent=1,
+                base_api_url=base_api_url,
+                override_api_key=override_api_key,
             )
             explanations = await asyncio.wait_for(
                 explainer.generate_explanations(
@@ -166,7 +200,6 @@ async def call_autointerp_openai_for_activations(
         else:
             print("Explain Error, skipping index " + str(feature_index))
             print(e)
-            raise e
 
         # print this at the end
         global FAILED_FEATURE_INDEXES_OUTPUT
@@ -203,11 +236,18 @@ async def enqueue_autointerp_openai_task_with_activations(activations):
 
 
 async def start(activations_dir: str):
-
     autointerp_tasks = []
 
-    # get all .gz files in the activations directory, sorted by name
-    activations_files = sorted(glob.glob(os.path.join(activations_dir, "*.gz")))
+    def get_batch_number(filename):
+        # Extract batch number from filename like "batch-123.jsonl.gz"
+        try:
+            return int(os.path.basename(filename).split("-")[1].split(".")[0])
+        except (IndexError, ValueError):
+            return 0  # Default value if parsing fails
+
+    activations_files = sorted(
+        glob.glob(os.path.join(activations_dir, "*.gz")), key=get_batch_number
+    )
 
     print(f"got activations files: {len(activations_files)} files")
 
@@ -283,6 +323,10 @@ class AutoInterpConfig:
     gzip_output: bool
 
 
+def is_gemini_model(model_name: str) -> bool:
+    return model_name in GEMINI_MODEL_NAMES
+
+
 def main(
     input_dir_with_source_exports: str = typer.Option(
         ...,
@@ -299,7 +343,7 @@ def main(
         prompt_required=False,
     ),
     explainer_model_name: str = typer.Option(
-        "gpt-4o-mini",
+        "gpt-4.1-nano",
         help="The name of the explainer model eg gpt-4o-mini",
         prompt=True,
     ),
@@ -332,7 +376,22 @@ def main(
     if explainer_model_name not in VALID_EXPLAINER_MODEL_NAMES:
         raise ValueError(f"Invalid explainer model name: {explainer_model_name}")
 
-    global FAILED_FEATURE_INDEXES_QUEUED, INPUT_DIR_WITH_SOURCE_EXPORTS, START_INDEX, END_INDEX, EXPLAINER_MODEL_NAME, EXPLAINER_TYPE_NAME, MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE, AUTOINTERP_BATCH_SIZE, EXPLANATIONS_OUTPUT_DIR, GZIP_OUTPUT
+    if is_gemini_model(explainer_model_name) and GEMINI_API_KEY is None:
+        raise ValueError(
+            "GEMINI_API_KEY is not set even though you're using a Gemini model"
+        )
+
+    global \
+        FAILED_FEATURE_INDEXES_QUEUED, \
+        INPUT_DIR_WITH_SOURCE_EXPORTS, \
+        START_INDEX, \
+        END_INDEX, \
+        EXPLAINER_MODEL_NAME, \
+        EXPLAINER_TYPE_NAME, \
+        MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE, \
+        AUTOINTERP_BATCH_SIZE, \
+        EXPLANATIONS_OUTPUT_DIR, \
+        GZIP_OUTPUT
     INPUT_DIR_WITH_SOURCE_EXPORTS = input_dir_with_source_exports
     if not os.path.exists(INPUT_DIR_WITH_SOURCE_EXPORTS):
         raise ValueError(
@@ -453,7 +512,7 @@ def generate_embeddings_and_flush_explanations_to_file(explanations: List[Explan
     if len(embeddings.data) != len(explanations):
         raise Exception("Number of embeddings doesn't match number of explanations")
     for exp, emb in zip(explanations, embeddings.data):
-        exp.embedding = emb.embedding
+        exp.embedding = [round(value, 9) for value in emb.embedding]
     # print(f"Generated {len(embeddings.data)} embeddings")
 
     batch_number = get_next_batch_number()

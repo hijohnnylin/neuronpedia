@@ -6,7 +6,7 @@ import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { number, object, string, ValidationError } from 'yup';
 
-export const maxDuration = 10;
+export const maxDuration = 20;
 
 const explanationSearchReleaseRequestSchema = object({
   releaseName: string().required(),

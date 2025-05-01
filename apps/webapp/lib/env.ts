@@ -1,3 +1,16 @@
+import { config } from 'dotenv';
+
+// If it's not undefined, then it's a one click deploy. It doesn't matter what the value itself is.
+// Also, if it's one-click-deploy on Vercel, we always use the demo environment variables.
+export const SITE_NAME_VERCEL_DEPLOY = process.env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY;
+export const IS_ONE_CLICK_VERCEL_DEPLOY = SITE_NAME_VERCEL_DEPLOY !== undefined;
+if (SITE_NAME_VERCEL_DEPLOY) {
+  // @ts-ignore
+  if (typeof EdgeRuntime !== 'string') {
+    config({ path: '.env.demo', override: true });
+  }
+}
+
 // Domain of your main site
 export const NEXT_PUBLIC_URL = process.env.NEXT_PUBLIC_URL || '';
 
@@ -14,7 +27,8 @@ export const NEXTAUTH_URL = process.env.NEXTAUTH_URL || '';
 // Feature Flags
 export const ENABLE_RATE_LIMITER = process.env.ENABLE_RATE_LIMITER === 'true';
 export const ENABLE_VERCEL_ANALYTICS = process.env.ENABLE_VERCEL_ANALYTICS === 'true';
-export const NEXT_PUBLIC_ENABLE_SIGNIN = process.env.NEXT_PUBLIC_ENABLE_SIGNIN === 'true';
+export const NEXT_PUBLIC_ENABLE_SIGNIN =
+  process.env.NEXT_PUBLIC_ENABLE_SIGNIN === 'true' && !IS_ONE_CLICK_VERCEL_DEPLOY;
 
 // Default Values
 export const NEURONPEDIA_EMAIL_ADDRESS = 'johnny@neuronpedia.org';
@@ -73,6 +87,10 @@ export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 export const USE_LOCALHOST_INFERENCE = process.env.USE_LOCALHOST_INFERENCE === 'true';
 export const INFERENCE_SERVER_SECRET = process.env.INFERENCE_SERVER_SECRET || '';
 
+export const NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH = process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH
+  ? parseInt(process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH, 10)
+  : 1024;
+
 // Autointerp Server
 export const USE_LOCALHOST_AUTOINTERP = process.env.USE_LOCALHOST_AUTOINTERP === 'true';
 export const AUTOINTERP_SERVER = process.env.AUTOINTERP_SERVER || '';
@@ -104,4 +122,4 @@ export const IS_ACTUALLY_NEURONPEDIA_ORG =
 // Misc
 export const NODE_ENV = process.env.NODE_ENV || '';
 export const IS_DOCKER_COMPOSE = process.env.IS_DOCKER_COMPOSE === 'true';
-export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || IS_ONE_CLICK_VERCEL_DEPLOY;

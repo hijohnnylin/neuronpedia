@@ -32,6 +32,9 @@ paths:
   /util/sae-topk-by-decoder-cossim:
     $ref: "inference/paths/util/sae-topk-by-decoder-cossim.yaml"
 
+  /tokenize:
+    $ref: "inference/paths/tokenize.yaml"
+
 components:
   securitySchemes:
     SimpleSecretAuth:

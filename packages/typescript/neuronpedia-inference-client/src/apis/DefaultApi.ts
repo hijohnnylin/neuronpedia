@@ -25,6 +25,8 @@ import type {
   SteerCompletionChatPostRequest,
   SteerCompletionPost200Response,
   SteerCompletionRequest,
+  TokenizePost200Response,
+  TokenizePostRequest,
   UtilSaeTopkByDecoderCossimPost200Response,
   UtilSaeTopkByDecoderCossimPostRequest,
   UtilSaeVectorPost200Response,
@@ -51,6 +53,10 @@ import {
     SteerCompletionPost200ResponseToJSON,
     SteerCompletionRequestFromJSON,
     SteerCompletionRequestToJSON,
+    TokenizePost200ResponseFromJSON,
+    TokenizePost200ResponseToJSON,
+    TokenizePostRequestFromJSON,
+    TokenizePostRequestToJSON,
     UtilSaeTopkByDecoderCossimPost200ResponseFromJSON,
     UtilSaeTopkByDecoderCossimPost200ResponseToJSON,
     UtilSaeTopkByDecoderCossimPostRequestFromJSON,
@@ -79,6 +85,10 @@ export interface SteerCompletionChatPostOperationRequest {
 
 export interface SteerCompletionPostRequest {
     steerCompletionRequest: SteerCompletionRequest;
+}
+
+export interface TokenizePostOperationRequest {
+    tokenizePostRequest: TokenizePostRequest;
 }
 
 export interface UtilSaeTopkByDecoderCossimPostOperationRequest {
@@ -291,6 +301,46 @@ export class DefaultApi extends runtime.BaseAPI {
      */
     async steerCompletionPost(requestParameters: SteerCompletionPostRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<SteerCompletionPost200Response> {
         const response = await this.steerCompletionPostRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Tokenize input text for a given model
+     */
+    async tokenizePostRaw(requestParameters: TokenizePostOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TokenizePost200Response>> {
+        if (requestParameters['tokenizePostRequest'] == null) {
+            throw new runtime.RequiredError(
+                'tokenizePostRequest',
+                'Required parameter "tokenizePostRequest" was null or undefined when calling tokenizePost().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        headerParameters['Content-Type'] = 'application/json';
+
+        if (this.configuration && this.configuration.apiKey) {
+            headerParameters["X-SECRET-KEY"] = await this.configuration.apiKey("X-SECRET-KEY"); // SimpleSecretAuth authentication
+        }
+
+        const response = await this.request({
+            path: `/tokenize`,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+            body: TokenizePostRequestToJSON(requestParameters['tokenizePostRequest']),
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TokenizePost200ResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Tokenize input text for a given model
+     */
+    async tokenizePost(requestParameters: TokenizePostOperationRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TokenizePost200Response> {
+        const response = await this.tokenizePostRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

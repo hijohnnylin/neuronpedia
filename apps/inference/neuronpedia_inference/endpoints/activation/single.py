@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Any
 
 import einops
 import torch
@@ -14,13 +14,11 @@ from neuronpedia_inference_client.models.activation_single_post200_response_acti
 from neuronpedia_inference_client.models.activation_single_post_request import (
     ActivationSinglePostRequest,
 )
+from transformer_lens import ActivationCache, HookedTransformer
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import (
-    Model,
-    with_request_lock,
-)
+from neuronpedia_inference.shared import Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +55,17 @@ async def activation_single(
         index = int(request.index)
 
         sae = sae_manager.get_sae(source)
-        prepend_bos = model.cfg.tokenizer_prepends_bos
+
+        # TODO: we assume that if either SAE or model prepends bos, then we should prepend bos
+        # this is not exactly correct, but sometimes the SAE doesn't have the prepend_bos flag set
+        prepend_bos = sae.cfg.prepend_bos or model.cfg.tokenizer_prepends_bos
 
         tokens = model.to_tokens(
             prompt,
             prepend_bos=prepend_bos,
             truncate=False,
         )[0]
+
         if len(tokens) > config.TOKEN_LIMIT:
             logger.error(
                 "Text too long: %s tokens, max is %s",
@@ -77,7 +79,7 @@ async def activation_single(
                 status_code=400,
             )
 
-        str_tokens: List[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
+        str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
         result = process_activations(model, source, index, tokens)
 
         # Calculate DFA if enabled
@@ -90,9 +92,9 @@ async def activation_single(
                 result.max_value_index,
                 tokens,
             )
-            result.dfa_values = dfa_result["dfa_values"]
-            result.dfa_target_index = dfa_result["dfa_target_index"]
-            result.dfa_max_value = dfa_result["dfa_max_value"]
+            result.dfa_values = dfa_result["dfa_values"]  # type: ignore
+            result.dfa_target_index = dfa_result["dfa_target_index"]  # type: ignore
+            result.dfa_max_value = dfa_result["dfa_max_value"]  # type: ignore
 
     else:
         vector = request.vector
@@ -116,23 +118,23 @@ async def activation_single(
                 status_code=400,
             )
 
-        str_tokens: List[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
+        str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
         _, cache = model.run_with_cache(tokens)
-        result = process_vector_activations(vector, cache, hook, sae_manager.device)
+        result = process_vector_activations(vector, cache, hook, sae_manager.device)  # type: ignore
 
     logger.info("Returning result: %s", result)
 
     return ActivationSinglePost200Response(activation=result, tokens=str_tokens)
 
 
-def _get_safe_dtype(dtype):
+def _get_safe_dtype(dtype: torch.dtype) -> torch.dtype:
     """
     Convert float16 to float32, leave other dtypes unchanged.
     """
     return torch.float32 if dtype == torch.float16 else dtype
 
 
-def _safe_cast(tensor, target_dtype):
+def _safe_cast(tensor: torch.Tensor, target_dtype: torch.dtype) -> torch.Tensor:
     """
     Safely cast a tensor to the target dtype, creating a copy if needed.
     Convert float16 to float32, leave other dtypes unchanged.
@@ -148,7 +150,7 @@ def get_layer_num_from_sae_id(sae_id: str) -> int:
 
 
 def process_activations(
-    model, layer, index, tokens
+    model: HookedTransformer, layer: str, index: int, tokens: torch.Tensor
 ) -> ActivationSinglePost200ResponseActivation:
     sae_manager = SAEManager.get_instance()
     _, cache = model.run_with_cache(tokens)
@@ -169,7 +171,10 @@ def process_activations(
 
 
 def process_neuron_activations(
-    cache, hook_name, index, device
+    cache: ActivationCache | dict[str, torch.Tensor],
+    hook_name: str,
+    index: int,
+    device: str,
 ) -> ActivationSinglePost200ResponseActivation:
     mlp_activation_data = cache[hook_name].to(device)
     values = torch.transpose(mlp_activation_data[0], 0, 1)[index].detach().tolist()
@@ -181,14 +186,23 @@ def process_neuron_activations(
     )
 
 
-def process_feature_activations(sae, sae_type, cache, hook_name, index):
+def process_feature_activations(
+    sae: Any,
+    sae_type: str,
+    cache: ActivationCache | dict[str, torch.Tensor],
+    hook_name: str,
+    index: int,
+) -> ActivationSinglePost200ResponseActivation:
     if sae_type == "saelens-1":
         return process_saelens_activations(sae, cache, hook_name, index)
     raise ValueError(f"Unsupported SAE type: {sae_type}")
 
 
 def process_saelens_activations(
-    sae, cache, hook_name, index
+    sae: Any,
+    cache: ActivationCache | dict[str, torch.Tensor],
+    hook_name: str,
+    index: int,
 ) -> ActivationSinglePost200ResponseActivation:
     feature_acts = sae.encode(cache[hook_name])
     values = torch.transpose(feature_acts.squeeze(0), 0, 1)[index].detach().tolist()
@@ -201,7 +215,10 @@ def process_saelens_activations(
 
 
 def process_vector_activations(
-    vector, cache, hook_name, device
+    vector: torch.Tensor | list[float],
+    cache: ActivationCache | dict[str, torch.Tensor],
+    hook_name: str,
+    device: torch.device,
 ) -> ActivationSinglePost200ResponseActivation:
     if not isinstance(vector, torch.Tensor):
         vector = torch.tensor(vector, device=device)
@@ -220,7 +237,14 @@ def process_vector_activations(
     )
 
 
-def calculate_dfa(model, sae, layer_num, index, max_value_index, tokens):
+def calculate_dfa(
+    model: HookedTransformer,
+    sae: Any,
+    layer_num: int,
+    index: int,
+    max_value_index: int,
+    tokens: torch.Tensor,
+) -> dict[str, list[float] | int | float]:
     _, cache = model.run_with_cache(tokens)
     v = cache["v", layer_num]  # [batch, src_pos, n_heads, d_head]
     attn_weights = cache["pattern", layer_num]  # [batch, n_heads, dest_pos, src_pos]

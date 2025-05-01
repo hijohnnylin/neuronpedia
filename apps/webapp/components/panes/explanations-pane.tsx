@@ -2,7 +2,12 @@ import CustomTooltip from '@/components/custom-tooltip';
 import { useExplanationScoreDetailContext } from '@/components/provider/explanation-score-detail-provider';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
-import { ERROR_NO_AUTOINTERP_KEY, ERROR_REQUIRES_OPENROUTER, EXPLANATIONTYPE_HUMAN } from '@/lib/utils/autointerp';
+import {
+  ERROR_NO_AUTOINTERP_KEY,
+  ERROR_RECALL_ALT_FAILED,
+  ERROR_REQUIRES_OPENROUTER,
+  EXPLANATIONTYPE_HUMAN,
+} from '@/lib/utils/autointerp';
 import {
   ExplanationScoreWithPartialRelations,
   ExplanationWithPartialRelations,
@@ -17,7 +22,8 @@ import {
   ExplanationType,
 } from '@prisma/client';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { ChevronDownIcon, HelpCircle, Info, Link, X } from 'lucide-react';
+import { ChevronDownIcon, HelpCircle, Info, X } from 'lucide-react';
+import Link from 'next/link';
 import router from 'next/router';
 import { useEffect, useState } from 'react';
 import { LoadingSpinner } from '../svg/loading-spinner';
@@ -140,8 +146,7 @@ export default function ExplanationsPane({
                   <div className="h-fill flex-1">
                     <div className="flex-inline relative flex items-center">
                       <h1
-                        className={`cursor-text select-text py-0 text-xs font-medium
-                                               leading-snug text-slate-700`}
+                        className="cursor-text select-text py-0 text-xs font-medium leading-snug text-slate-700"
                         title={explanation.description}
                       >
                         {explanation.description}
@@ -237,7 +242,7 @@ export default function ExplanationsPane({
                             >
                               <div className="flex h-full flex-col items-stretch">
                                 {explanation.scores && explanation.scores.length > 0 && (
-                                  <div className="flex flex-col  pb-0.5">
+                                  <div className="flex flex-col pb-0.5">
                                     <div className="flex items-center justify-center pt-2 text-center text-[10px] uppercase text-slate-400">
                                       Current Scores
                                     </div>
@@ -302,6 +307,52 @@ export default function ExplanationsPane({
                                                 Details
                                               </Button>
                                             </div>
+
+                                            {score.initiatedByUserId === user?.id && user && (
+                                              <button
+                                                type="button"
+                                                onClick={async (e) => {
+                                                  e.preventDefault();
+                                                  if (window.confirm('Delete this score?')) {
+                                                    const result = await fetch(
+                                                      `/api/explanation/score/${score.id}/delete`,
+                                                      {
+                                                        method: 'POST',
+                                                        headers: {
+                                                          'Content-Type': 'application/json',
+                                                        },
+                                                      },
+                                                    );
+                                                    if (result.status !== 200) {
+                                                      showToastServerError();
+                                                    } else {
+                                                      const newExplanationScores = explanation.scores?.filter(
+                                                        (curExpScore) => curExpScore.id !== score.id,
+                                                      );
+                                                      const newExplanations = currentNeuron?.explanations?.map(
+                                                        (curExp) => {
+                                                          if (curExp.id === explanation.id) {
+                                                            return {
+                                                              ...curExp,
+                                                              scores: newExplanationScores,
+                                                            };
+                                                          }
+                                                          return curExp;
+                                                        },
+                                                      );
+                                                      const newCurrentNeuron = {
+                                                        ...currentNeuron,
+                                                      };
+                                                      newCurrentNeuron.explanations = newExplanations;
+                                                      setCurrentNeuron(newCurrentNeuron);
+                                                    }
+                                                  }
+                                                }}
+                                                className="rounded bg-red-400 p-0.5 hover:bg-red-600"
+                                              >
+                                                <X className="h-2.5 w-2.5 text-[5px] font-bold uppercase text-white" />
+                                              </button>
+                                            )}
                                           </div>
                                         ))}
                                     </div>
@@ -501,6 +552,28 @@ export default function ExplanationsPane({
                                                 </div>,
                                               );
                                               setIsScoringId(undefined);
+                                            } else if (res.message === ERROR_RECALL_ALT_FAILED) {
+                                              showToastMessage(
+                                                <div className="flex flex-col items-center justify-center text-xs">
+                                                  <div>Error: API Key</div>
+                                                  <div>
+                                                    Your API key was valid, but we received errors when using it.
+                                                    <br />
+                                                    Check that your OpenRouter/other account has sufficient funds and
+                                                    that it has not been revoked.
+                                                  </div>
+                                                  <Link
+                                                    href="/account"
+                                                    className="mt-2 rounded-md bg-sky-600 px-2.5 py-1.5 text-xs font-semibold uppercase text-sky-100"
+                                                  >
+                                                    OPEN SETTINGS
+                                                  </Link>
+                                                </div>,
+                                              );
+                                              setIsScoringId(undefined);
+                                            } else {
+                                              showToastServerError();
+                                              setIsScoringId(undefined);
                                             }
                                           } catch (err) {
                                             showToastServerError();
@@ -557,7 +630,7 @@ export default function ExplanationsPane({
                       )}
                     </div>
                   </div>
-                  {explanation.triggeredByUser?.id === user?.id && (
+                  {explanation.triggeredByUser?.id === user?.id && user && (
                     <button
                       type="button"
                       onClick={async (e) => {
@@ -596,7 +669,7 @@ export default function ExplanationsPane({
           ))}
         </div>
       )}
-      <div className="flex w-full flex-col rounded-b-md border-t border-slate-200 px-3  py-3 pt-3 ">
+      <div className="flex w-full flex-col rounded-b-md border-t border-slate-200 px-3 py-3 pt-3">
         <div className="mb-1.5 w-full text-center text-[10px] font-normal uppercase leading-none text-slate-400">
           New Auto-Interp
         </div>

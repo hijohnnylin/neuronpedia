@@ -230,7 +230,7 @@ where, $A_{abl}$ is the probe accuracy after ablation, $A_{base}$ is the baselin
 This score represents the proportion of improvement achieved through ablation relative to the maximum possible improvement, allowing fair comparison across different classes and models.
 
 <iframe
-  src="/sae-bench?modelId=gemma-2-2b&dSae=65536&layer=12&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=scr%7C%7Cscr_metrics%7C%7Cscr_metric_threshold_50&groupBy=saeClass&embed=true"
+  src="/sae-bench?modelId=gemma-2-2b&dSae=65536&layer=12&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=scr%7C%7Cscr_metrics%7C%7Cscr_metric_threshold_20&groupBy=saeClass&embed=true"
   className="h-[400px] max-h-[400px] border-0 w-full mt-3 mb-5"
   loading="lazy"
 ></iframe>
@@ -257,7 +257,7 @@ $$
 represents the effectiveness of causally isolating a single probe. Ablating a disentangled set of latents should only show a significant accuracy decrease if $i = j$, namely if the latents selected for class $i$ are ablated in the classifier of the same class $i$, and remain constant if $i \neq j$.
 
 <iframe
-  src="/sae-bench?modelId=gemma-2-2b&dSae=65536&layer=12&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=tpp%7C%7Ctpp_metrics%7C%7Ctpp_threshold_50_total_metric&groupBy=saeClass&embed=true"
+  src="/sae-bench?modelId=gemma-2-2b&dSae=65536&layer=12&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=tpp%7C%7Ctpp_metrics%7C%7Ctpp_threshold_20_total_metric&groupBy=saeClass&embed=true"
   className="h-[400px] max-h-[400px] border-0 w-full mt-3 mb-5"
   loading="lazy"
 ></iframe>
@@ -540,12 +540,12 @@ Better for Lower L0:
 
 Non-Linear Relationship with L0:
 
-- [SCR: SAE Bench Gemma-2-2B 65K Width Series Layer 12 - L0 vs SCR Top 50 Metric](/sae-bench?modelId=gemma-2-2b&layer=12&dSae=65536&release=gemmascope%2Csae_bench&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=scr%7C%7Cscr_metrics%7C%7Cscr_metric_threshold_50&groupBy=saeClass)
+- [SCR: SAE Bench Gemma-2-2B 65K Width Series Layer 12 - L0 vs SCR Top 20 Metric](/sae-bench?modelId=gemma-2-2b&layer=12&dSae=65536&release=gemmascope%2Csae_bench&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=scr%7C%7Cscr_metrics%7C%7Cscr_metric_threshold_20&groupBy=saeClass)
 
 Better for Higher L0:
 
 - [Feature Absorption: SAE Bench Gemma-2-2B 65K Width Series Layer 12 - L0 vs Mean Absorption Score](/sae-bench?modelId=gemma-2-2b&layer=12&dSae=65536&release=gemmascope%2Csae_bench&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=absorption_first_letter%7C%7Cmean%7C%7Cmean_full_absorption_score&groupBy=saeClass)
-- [TPP and Recon Accuracy: SAE Bench Gemma-2-2B 65K Width Series Layer 12 - L0 vs TPP Top 50 Metric](/sae-bench?modelId=gemma-2-2b&layer=12&dSae=65536&release=gemmascope%2Csae_bench&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=tpp%7C%7Ctpp_metrics%7C%7Ctpp_threshold_50_total_metric&groupBy=saeClass)
+- [TPP and Recon Accuracy: SAE Bench Gemma-2-2B 65K Width Series Layer 12 - L0 vs TPP Top 20 Metric](/sae-bench?modelId=gemma-2-2b&layer=12&dSae=65536&release=gemmascope%2Csae_bench&metricX=core%7C%7Csparsity%7C%7Cl0&metricY=tpp%7C%7Ctpp_metrics%7C%7Ctpp_threshold_20_total_metric&groupBy=saeClass)
 
 **We would love to hear your feedback. Get in touch with us via [email](mailto:adam.karvonen@gmail.com,canrager@gmail.com).**
 

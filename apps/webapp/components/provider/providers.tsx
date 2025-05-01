@@ -18,6 +18,8 @@ import FeatureProvider from './feature-provider';
 import GlobalProvider from './global-provider';
 import { ImportProvider } from './import-provider';
 import UmapProvider from './umap-provider';
+// Note: We don't include CircuitCLTProvider here as it needs to be initialized with metadata
+// and is used specifically in the CLT page, not globally
 
 const queryClient = new QueryClient();
 

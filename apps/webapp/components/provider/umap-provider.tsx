@@ -1,17 +1,20 @@
 'use client';
 
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
-import Plotly from 'plotly.js-dist-min';
+// import Plotly from 'plotly.js-dist-min';
 import {
   ExplanationWithPartialRelations,
   ListWithPartialRelations,
   NeuronWithPartialRelations,
 } from 'prisma/generated/zod';
 import React, { Dispatch, RefObject, SetStateAction, useMemo, useRef, useState } from 'react';
-import createPlotlyComponent from 'react-plotly.js/factory';
+
+import dynamic from 'next/dynamic';
 import createContextWrapper from './provider-util';
 
-const Plot = createPlotlyComponent(Plotly);
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+
+// const Plot = createPlotlyComponent(Plotly);
 
 type GraphRange = {
   minX: number;
@@ -66,13 +69,13 @@ export const [UmapContext, useUmapContext] = createContextWrapper<{
       [layer: string]: string;
     }>
   >;
-  addAnnotationForExp: (exp: ExplanationWithPartialRelations) => void;
+  // addAnnotationForExp: (exp: ExplanationWithPartialRelations) => void;
 }>('UmapContext');
 
 export const UMAP_HEIGHT = 300;
 export const ZOOM_PADDING_Y = 0.1;
 export const ZOOM_PADDING_X = 0.04;
-const ANNOTATION_BG_COLOR = '#404040';
+// const ANNOTATION_BG_COLOR = '#404040';
 export const UMAP_INITIAL_COLORS = ['#40B0A6', '#FFBE6A', '#dc2626'];
 export const SPARSITY_COLOR_MAX = -1.5;
 export const SPARSITY_COLOR_MIN = -4;
@@ -116,56 +119,56 @@ export default function UmapProvider({ children }: { children: React.ReactNode }
   const [showLogSparsity, setShowLogSparsity] = useState<boolean>(true);
   const [highlightedUmapExplanations, setHighlightedUmapExplanations] = useState<ExplanationWithPartialRelations[]>([]);
 
-  const formatStringWithLineBreaks = (inputString: string): string => {
-    const maxLineLength = 25;
-    let resultString = '';
-    let currentLineLength = 0;
+  // const formatStringWithLineBreaks = (inputString: string): string => {
+  //   const maxLineLength = 25;
+  //   let resultString = '';
+  //   let currentLineLength = 0;
 
-    inputString.split(' ').forEach((word) => {
-      if (currentLineLength + word.length > maxLineLength) {
-        resultString += '<br>';
-        currentLineLength = 0;
-      }
-      resultString += `${word} `;
-      currentLineLength += word.length + 1; // +1 for the space
-    });
+  //   inputString.split(' ').forEach((word) => {
+  //     if (currentLineLength + word.length > maxLineLength) {
+  //       resultString += '<br>';
+  //       currentLineLength = 0;
+  //     }
+  //     resultString += `${word} `;
+  //     currentLineLength += word.length + 1; // +1 for the space
+  //   });
 
-    return resultString.trim();
-  };
+  //   return resultString.trim();
+  // };
 
-  async function addAnnotationForExp(exp: ExplanationWithPartialRelations) {
-    if (plotInactiveRef.current) {
-      await Plotly.relayout((plotInactiveRef.current as any)?.el, {
-        annotations: [],
-      });
-      Plotly.relayout((plotInactiveRef.current as any)?.el, {
-        annotations: [
-          {
-            x: exp?.umap_x || 0,
-            y: exp?.umap_y || 0,
-            text: `${exp?.layer?.toUpperCase()}:${exp?.index}<br>${formatStringWithLineBreaks(exp?.description)}${
-              exp?.umap_log_feature_sparsity
-                ? `<br>Feature Sparsity: ${exp?.umap_log_feature_sparsity?.toFixed(3)}`
-                : ''
-            }`,
-            showarrow: true,
-            arrowcolor: ANNOTATION_BG_COLOR,
-            arrowhead: 1,
-            arrowsize: 1,
-            yanchor: 'bottom',
-            xanchor: 'center',
-            align: 'left',
-            ay: -5,
-            ax: 0,
-            bgcolor: ANNOTATION_BG_COLOR,
-            font: {
-              color: '#ffffff',
-            },
-          },
-        ],
-      });
-    }
-  }
+  // async function addAnnotationForExp(exp: ExplanationWithPartialRelations) {
+  //   if (plotInactiveRef.current) {
+  //     await Plotly.relayout((plotInactiveRef.current as any)?.el, {
+  //       annotations: [],
+  //     });
+  //     Plotly.relayout((plotInactiveRef.current as any)?.el, {
+  //       annotations: [
+  //         {
+  //           x: exp?.umap_x || 0,
+  //           y: exp?.umap_y || 0,
+  //           text: `${exp?.layer?.toUpperCase()}:${exp?.index}<br>${formatStringWithLineBreaks(exp?.description)}${
+  //             exp?.umap_log_feature_sparsity
+  //               ? `<br>Feature Sparsity: ${exp?.umap_log_feature_sparsity?.toFixed(3)}`
+  //               : ''
+  //           }`,
+  //           showarrow: true,
+  //           arrowcolor: ANNOTATION_BG_COLOR,
+  //           arrowhead: 1,
+  //           arrowsize: 1,
+  //           yanchor: 'bottom',
+  //           xanchor: 'center',
+  //           align: 'left',
+  //           ay: -5,
+  //           ax: 0,
+  //           bgcolor: ANNOTATION_BG_COLOR,
+  //           font: {
+  //             color: '#ffffff',
+  //           },
+  //         },
+  //       ],
+  //     });
+  //   }
+  // }
 
   function getFeatureFromSelectedFeatures(feature: NeuronIdentifier) {
     return [...selectedFeatures.keys()].find((selectedFeature) => selectedFeature.equals(feature));
@@ -241,7 +244,7 @@ export default function UmapProvider({ children }: { children: React.ReactNode }
       setShowLogSparsity,
       layerToInitialColor,
       setLayerToInitialColor,
-      addAnnotationForExp,
+      // addAnnotationForExp,
     }),
     [
       searchText,
@@ -255,7 +258,7 @@ export default function UmapProvider({ children }: { children: React.ReactNode }
       highlightedUmapExplanations,
       showLogSparsity,
       layerToInitialColor,
-      addAnnotationForExp,
+      // addAnnotationForExp,
     ],
   );
 

@@ -7,8 +7,6 @@ import { notFound } from 'next/navigation';
 import PageSource from './page-source';
 import PageSourceSet from './page-sourceset';
 
-export const maxDuration = 120;
-
 export async function generateMetadata({ params }: { params: { modelId: string; layer: string } }): Promise<Metadata> {
   let title = `${params.modelId.toUpperCase()} · ${params.layer.toUpperCase()}`;
   let description = '';

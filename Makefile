@@ -13,9 +13,11 @@ init-env: ## Initialize the environment
 			echo "Aborted."; \
 			exit 1; \
 		fi; \
-		echo "" > .env; \
-		echo "Cleared existing .env file."; \
-	fi
+		echo "Clearing existing .env file."; \
+	else \
+		echo "Creating new .env file."; \
+	fi; \
+	echo "" > .env 
 	@read -p "Enter your OpenAI API key - this is optional, but it is required for Search Explanations to work (press Enter to skip): " api_key; \
 	if [ ! -z "$$api_key" ]; then \
 		echo "OPENAI_API_KEY=$$api_key" >> .env; \
@@ -34,7 +36,7 @@ init-env: ## Initialize the environment
 
 webapp-demo-build: ## Webapp: Public Demo Environment - Build
 	@echo "Building the webapp for connecting to the public demo database and servers..."
-	@if ! command -v docker &> /dev/null; then \
+	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
@@ -78,7 +80,7 @@ install-nodejs: # Install Node.js for Webapp
 webapp-localhost-install: ## Webapp: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the webapp dependencies for development in the localhost environment..."
 	# check if npm exists
-	if ! command -v npm &> /dev/null; then \
+	if ! which npm > /dev/null 2>&1; then \
 		echo "Error: npm is not installed. Please install nodejs first with 'make install-nodejs'."; \
 		exit 1; \
 	fi
@@ -87,7 +89,7 @@ webapp-localhost-install: ## Webapp: Localhost Environment - Install Dependencie
 	
 webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
 	@echo "Bringing up the webapp for development and connecting to the localhost database..."
-	@if ! command -v docker &> /dev/null; then \
+	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
@@ -100,7 +102,7 @@ webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
 
 webapp-localhost-test: ## Webapp: Localhost Environment - Run (Playwright)
 	@echo "Bringing up the webapp for development and connecting to the localhost database..."
-	@if ! command -v docker &> /dev/null; then \
+	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
@@ -115,7 +117,9 @@ webapp-localhost-test: ## Webapp: Localhost Environment - Run (Playwright)
 inference-localhost-install: ## Inference: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the inference dependencies for development in the localhost environment..."
 	cd apps/inference && \
-	poetry install
+	poetry remove neuronpedia-inference-client || true && \
+	poetry add ../../packages/python/neuronpedia-inference-client && \
+	poetry lock && poetry install
 
 inference-localhost-build: ## Inference: Localhost Environment - Build
 	@echo "Building the inference server for the localhost environment..."

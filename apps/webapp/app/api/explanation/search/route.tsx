@@ -6,7 +6,7 @@ import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { array, number, object, string, ValidationError } from 'yup';
 
-export const maxDuration = 10;
+export const maxDuration = 20;
 
 const explanationSearchRequestSchema = object({
   modelId: string().required(),

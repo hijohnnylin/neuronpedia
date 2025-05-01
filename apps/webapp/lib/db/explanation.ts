@@ -216,6 +216,27 @@ export const deleteExplanationById = async (id: string, user: AuthenticatedUser)
   }
 };
 
+export const deleteExplanationScoreById = async (id: string, user: AuthenticatedUser) => {
+  const explanationScore = await prisma.explanationScore.findUnique({
+    where: {
+      id,
+    },
+  });
+  if (explanationScore) {
+    if (explanationScore.initiatedByUserId !== user.id) {
+      throw new Error('You can only delete explanations you created.');
+    } else {
+      return prisma.explanationScore.delete({
+        where: {
+          id,
+        },
+      });
+    }
+  } else {
+    return null;
+  }
+};
+
 export const getExplanationById = async (id: string, user: AuthenticatedUser | null = null) => {
   const explanation = await prisma.explanation.findUnique({
     where: {

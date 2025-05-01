@@ -1,22 +1,22 @@
 # Converts a SAEDashboard NeuronpediaRunner to a Neuronpedia export so it can be imported into Neuronpedia by anyone.
 # You don't need to run this if you generated dashboards using the generate-dashboards script in this directory.
 
-import json
-from typing import List, Any
-from datetime import datetime
-from cuid2 import Cuid
-import os
 import gzip
+import json
+import os
+from datetime import datetime
+from enum import Enum
+from typing import Annotated, Any, List
+
+import dotenv
 import typer
-from typing import Annotated
-from neuronpedia_utils.db_models.source_release import SourceRelease
-from neuronpedia_utils.db_models.model import Model
-from neuronpedia_utils.db_models.source_set import SourceSet
-from neuronpedia_utils.db_models.source import Source
+from cuid2 import Cuid
 from neuronpedia_utils.db_models.activation import Activation
 from neuronpedia_utils.db_models.feature import Feature
-import dotenv
-from enum import Enum
+from neuronpedia_utils.db_models.model import Model
+from neuronpedia_utils.db_models.source import Source
+from neuronpedia_utils.db_models.source_release import SourceRelease
+from neuronpedia_utils.db_models.source_set import SourceSet
 
 dotenv.load_dotenv(".env.default")
 dotenv.load_dotenv()
@@ -25,6 +25,7 @@ OUTPUT_DIR = "./exports"
 
 creator_id = os.getenv("DEFAULT_CREATOR_ID")
 if creator_id is None or creator_id == "":
+    creator_id = "clkht01d40000jv08hvalcvly"
     raise ValueError("DEFAULT_CREATOR_ID is not set")
 
 DEFAULT_CREATOR_ID = creator_id
@@ -32,8 +33,6 @@ DEFAULT_CREATOR_ID = creator_id
 CUID_GENERATOR: Cuid = Cuid(length=25)
 
 created_at = datetime.now()
-
-CACHED_ACTIVATIONS_DIR = "./cached_activations"
 
 
 class HOOK_POINT_TYPE_CHOICES(str, Enum):

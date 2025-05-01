@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from typing import Optional
+from typing import Any
 
 import pandas as pd
 from sae_lens.toolkit.pretrained_saes_directory import (
@@ -23,25 +23,25 @@ class Config:
 
     def __init__(
         self,
-        model_id="gpt2-small",
-        custom_hf_model_id=None,
+        model_id: str = "gpt2-small",
+        custom_hf_model_id: str | None = None,
         sae_sets: list[str] = ["res-jb"],
-        model_dtype="float32",
-        sae_dtype="float32",
-        secret: Optional[str] = None,
-        port=5000,
-        token_limit=100,
-        saes_path=None,
-        valid_completion_types=["default", "steered"],
-        num_layers=None,
-        device=None,
-        override_model_id=None,
-        include_sae=None,
-        exclude_sae=None,
-        model_from_pretrained_kwargs="{}",
-        max_loaded_saes=100,
-        steer_special_token_ids=None,
-        nnsight=False,
+        model_dtype: str = "float32",
+        sae_dtype: str = "float32",
+        secret: str | None = None,
+        port: int = 5000,
+        token_limit: int = 100,
+        saes_path: str | None = None,
+        valid_completion_types: list[str] = ["default", "steered"],
+        num_layers: int | None = None,
+        device: str | None = None,
+        override_model_id: str | None = None,
+        include_sae: list[str] | None = None,
+        exclude_sae: list[str] | None = None,
+        model_from_pretrained_kwargs: str = "{}",
+        max_loaded_saes: int = 100,
+        steer_special_token_ids: list[int] | None = None,
+        nnsight: bool = False,
     ):
         self.MODEL_ID = model_id
         self.CUSTOM_HF_MODEL_ID = custom_hf_model_id
@@ -82,13 +82,15 @@ class Config:
             f"  NNSIGHT: {self.NNSIGHT}\n"
         )
 
-    def set_num_layers(self, num_layers):
+    def set_num_layers(self, num_layers: int) -> None:
         self.NUM_LAYERS = num_layers
 
-    def set_steer_special_token_ids(self, steer_special_token_ids):
+    def set_steer_special_token_ids(
+        self, steer_special_token_ids: list[int] | set[int]
+    ) -> None:
         self.STEER_SPECIAL_TOKEN_IDS = steer_special_token_ids
 
-    def are_models_compatible(self, model_id_1, model_id_2):
+    def are_models_compatible(self, model_id_1: str, model_id_2: str) -> bool:
         if model_id_1.endswith("-it"):
             model_id_1 = model_id_1[:-3]
         elif model_id_2.endswith("-it"):
@@ -109,17 +111,22 @@ class Config:
         )
         return config_json  # noqa: RET504
 
-    def _filter_sae_config(self, sae_config):
+    def _filter_sae_config(
+        self, sae_config: list[dict[str, str | list[str]]]
+    ) -> list[dict[str, str | list[str]]]:
         filtered_config = []
         for sae_set in sae_config:
-            filtered_saes = self._filter_saes(sae_set["saes"])
+            sae_ids = sae_set["saes"]
+            if isinstance(sae_ids, str):
+                sae_ids = [sae_ids]
+            filtered_saes = self._filter_saes(sae_ids)
             if filtered_saes:
                 sae_set = sae_set.copy()
                 sae_set["saes"] = filtered_saes
                 filtered_config.append(sae_set)
         return filtered_config
 
-    def _filter_saes(self, sae_ids):
+    def _filter_saes(self, sae_ids: list[str]) -> list[str]:
         return [
             sae_id
             for sae_id in sae_ids
@@ -128,7 +135,12 @@ class Config:
             )
         ]
 
-    def _match_patterns(self, sae_id, include_patterns, exclude_patterns):
+    def _match_patterns(
+        self,
+        sae_id: str,
+        include_patterns: list[str] | None,
+        exclude_patterns: list[str] | None,
+    ) -> bool:
         if include_patterns and not any(
             re.search(pattern, sae_id) for pattern in include_patterns
         ):
@@ -169,46 +181,48 @@ def get_saelens_neuronpedia_directory_df():
 
 def config_to_json(
     directory_df: pd.DataFrame,
-    selected_sets_sae_lens: Optional[list[str]] = None,
-    selected_sets_neuronpedia: Optional[list[str]] = None,
-    selected_model: Optional[str] = None,
-) -> str:
+    selected_sets_sae_lens: list[str] | None = None,
+    selected_sets_neuronpedia: list[str] | None = None,
+    selected_model: str | None = None,
+) -> list[dict[str, Any]]:
     if selected_model:
-        directory_df = directory_df[directory_df["model"] == selected_model]
+        directory_df = directory_df.loc[directory_df["model"] == selected_model]
     if selected_sets_neuronpedia and selected_sets_sae_lens:
-        directory_df = directory_df[
+        directory_df = directory_df.loc[
             (directory_df["neuronpedia_set"].isin(selected_sets_neuronpedia))
             | (directory_df["release"].isin(selected_sets_sae_lens))
         ]
     elif selected_sets_sae_lens:
-        directory_df = directory_df[
+        directory_df = directory_df.loc[
             directory_df["release"].isin(selected_sets_sae_lens)
         ]
     elif selected_sets_neuronpedia:
-        directory_df = directory_df[
-            (directory_df["neuronpedia_set"].isin(selected_sets_neuronpedia))
+        directory_df = directory_df.loc[
+            directory_df["neuronpedia_set"].isin(selected_sets_neuronpedia)
         ]
     grouped = directory_df.groupby("model")
-    sets_to_include = directory_df.neuronpedia_set.unique()
     config_json = []
     for model, group in grouped:
-        sets_to_include = directory_df.neuronpedia_set.unique()
+        # Get unique sets within the group (you can also use directory_df if that's intended)
+        sets_to_include = group["neuronpedia_set"].unique()
         for set_name in sets_to_include:
-            set_data = group[group["neuronpedia_set"] == set_name]
+            set_data = group.loc[group["neuronpedia_set"] == set_name]
             set_entry = {
                 "model": model,
                 "set": set_name,
                 "type": "saelens-1",
                 "local": False,
                 "saes": [
-                    sae.split("/")[-1] for sae in set_data["neuronpedia_id"].values
+                    sae.split("/")[-1] for sae in set_data["neuronpedia_id"].tolist()
                 ],
             }
             config_json.append(set_entry)
     return config_json
 
 
-def get_sae_lens_ids_from_neuronpedia_id(model_id, neuronpedia_id, df_exploded):
+def get_sae_lens_ids_from_neuronpedia_id(
+    model_id: str, neuronpedia_id: str, df_exploded: pd.DataFrame
+):
     # find where neuronpedia_id ends in /neuronpedia_id and df_exploded["model"] = model_id
     tmp_df = df_exploded[
         (df_exploded["model"] == model_id)

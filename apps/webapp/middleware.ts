@@ -12,8 +12,8 @@ const endpointToRateLimitPerWindow = [
   { endpoint: '/api/activation/new', limit: 1000 },
   { endpoint: '/api/explanation/search', limit: 200 },
   { endpoint: '/api/steer', limit: 300 },
-  { endpoint: '/api/search-topk-by-token', limit: 100 },
-  { endpoint: '/api/search-all', limit: 800 },
+  { endpoint: '/api/search-topk-by-token', limit: 500 },
+  { endpoint: '/api/search-all', limit: 1600 },
 ];
 
 const rateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
@@ -39,11 +39,17 @@ export default async function middleware(request: NextRequest) {
   requestHeaders.set('x-is-embed', isEmbed ? 'true' : 'false');
 
   if (!ENABLE_RATE_LIMITER) {
-    return NextResponse.next({
+    const res = NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     });
+    if (pathname.startsWith('/api')) {
+      res.headers.append('Access-Control-Allow-Origin', '*');
+      res.headers.append('Access-Control-Allow-Methods', 'GET, POST');
+      res.headers.append('Access-Control-Allow-Headers', 'Content-Type');
+    }
+    return res;
   }
   let wasRateLimited = false;
   let foundEndpoint = '';
@@ -76,9 +82,16 @@ export default async function middleware(request: NextRequest) {
       { status: 429 },
     );
   }
-  return NextResponse.next({
+
+  const res = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
+  if (pathname.startsWith('/api')) {
+    res.headers.append('Access-Control-Allow-Origin', '*');
+    res.headers.append('Access-Control-Allow-Methods', 'GET, POST');
+    res.headers.append('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  return res;
 }

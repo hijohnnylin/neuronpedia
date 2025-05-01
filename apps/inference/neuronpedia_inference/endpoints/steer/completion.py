@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import Any
 
 import torch
 from fastapi import APIRouter
@@ -123,22 +123,25 @@ async def completion(request: SteerCompletionRequest):
         return StreamingResponse(generator, media_type="text/event-stream")
     logger.info("Non-streaming response")
     # Get the last item from the generator
+    item = None
     async for item in generator:
         pass
+    if item is None:
+        raise ValueError("Generator yielded no items")
     results = remove_sse_formatting(item)
     return SteerCompletionPost200Response.from_json(results)
 
 
 async def run_batched_generate(
     prompt: str,
-    features: List[NPSteerFeature] | List[NPSteerVector],
-    steer_types: List[NPSteerType],
+    features: list[NPSteerFeature] | list[NPSteerVector],
+    steer_types: list[NPSteerType],
     strength_multiplier: float,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     steer_method: NPSteerMethod = NPSteerMethod.SIMPLE_ADDITIVE,
     normalize_steering: bool = False,
     use_stream_lock: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ):
     async with await stream_lock(use_stream_lock):
         model = Model.get_instance()
@@ -150,7 +153,7 @@ async def run_batched_generate(
         if seed is not None:
             torch.manual_seed(seed)
 
-        def steering_hook(activations, hook):  # noqa: ARG001
+        def steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
             # Log activation device
             logger.info(f"Activations device: {activations.device}")
 
@@ -257,7 +260,7 @@ async def run_batched_generate(
                 for feature in features
             ]
 
-            with model.hooks(fwd_hooks=editing_hooks):
+            with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
                 partial_result = ""
                 for i, result in enumerate(
                     model.generate_stream(
@@ -274,14 +277,14 @@ async def run_batched_generate(
                         partial_result += model.to_string(result[0])  # type: ignore
                     to_return = make_steer_completion_response(
                         [steer_type],
-                        partial_result,
+                        partial_result,  # type: ignore
                         partial_result,  # type: ignore
                     )
                     yield format_sse_message(to_return.to_json())
 
 
 def make_steer_completion_response(
-    steer_types: List[NPSteerType],
+    steer_types: list[NPSteerType],
     steered_result: str,
     default_result: str,
 ) -> SteerCompletionPost200Response:

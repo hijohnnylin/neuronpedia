@@ -12,7 +12,7 @@ export async function GET() {
     description: "Neuronpedia's official blog.",
     site_url: siteUrl,
     feed_url: `${siteUrl}/feed.xml`,
-    image_url: `${siteUrl}/images/blog/the-residual-stream-logo.jpg`,
+    image_url: `${siteUrl}/images/blog/the-residual-stream.jpg`,
     pubDate: new Date().toUTCString(),
     copyright: `All rights reserved - ${new Date().getFullYear()}`,
   };

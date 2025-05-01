@@ -140,3 +140,5 @@ dist
 .pnp.*
 
 .secrets*
+
+CLAUDE.local.md

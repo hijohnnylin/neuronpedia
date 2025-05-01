@@ -66,7 +66,7 @@ export default function SearchTopkByTokenSimple({
       body: JSON.stringify({
         modelId,
         text: overrideText || formRef.current?.values.searchQuery,
-        layer,
+        source: layer,
       }),
     });
     if (result.status === 429 || result.status === 405) {
@@ -210,7 +210,7 @@ export default function SearchTopkByTokenSimple({
           !topkResult && !isSearching ? '' : ''
         }`}
       >
-        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2  py-0 sm:mt-0 sm:flex-row">
+        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-0 sm:mt-0 sm:flex-row">
           <div className="flex w-full flex-col items-center justify-start text-sm font-medium text-slate-500">
             <div id="searchfield" className="order-3 my-3 mt-4 flex w-full flex-row items-center justify-center">
               <Formik
@@ -275,14 +275,14 @@ export default function SearchTopkByTokenSimple({
                   searchClicked();
                 }}
                 disabled={isSearching}
-                className="flex min-w-[140px] flex-row items-center justify-center gap-x-1.5 rounded-full bg-gBlue px-5 py-2 text-[12px] font-medium text-white shadow transition-all enabled:hover:bg-gBlue/80  enabled:hover:text-white disabled:opacity-50"
+                className="flex min-w-[140px] flex-row items-center justify-center gap-x-1.5 rounded-full bg-gBlue px-5 py-2 text-[12px] font-medium text-white shadow transition-all enabled:hover:bg-gBlue/80 enabled:hover:text-white disabled:opacity-50"
               >
                 <PlayIcon className="h-5 w-5 text-white" /> Go
               </button>
             </div>
             <div
               id="tokens"
-              className="order-2 flex h-[28vh] max-h-[28vh] min-h-[28vh] max-w-[480px] flex-1 flex-col  overflow-y-scroll pt-3"
+              className="order-2 flex h-[28vh] max-h-[28vh] min-h-[28vh] max-w-[480px] flex-1 flex-col overflow-y-scroll pt-3"
             >
               <div className={`flex w-full flex-col justify-center ${isSearching ? 'flex-1' : ''}`}>
                 {isSearching && (
@@ -323,28 +323,26 @@ export default function SearchTopkByTokenSimple({
                                 lockedTokenPosition === result.position
                                   ? 'rgba(66,133,244,1)'
                                   : hoveredTokenPosition === result.position
-                                  ? 'rgba(66,133,244, 0.5)'
-                                  : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
-                                  ? 'rgba(66,133,244, 0.5)'
-                                  : lockedTokenPosition === -1 &&
-                                    hoveredTokenPosition === -1 &&
-                                    hoveredNeuronIndex === -1
-                                  ? `rgba(66,133,244,${
-                                      result.topFeatures && result.topFeatures.length > 0
-                                        ? Math.min((result.topFeatures[0].activationValue / maxAct) ** 2, 0.8)
-                                        : '0'
-                                    })`
-                                  : 'rgba(0,0,0,0)',
+                                    ? 'rgba(66,133,244, 0.5)'
+                                    : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
+                                      ? 'rgba(66,133,244, 0.5)'
+                                      : lockedTokenPosition === -1 &&
+                                          hoveredTokenPosition === -1 &&
+                                          hoveredNeuronIndex === -1
+                                        ? `rgba(66,133,244,${
+                                            result.topFeatures && result.topFeatures.length > 0
+                                              ? Math.min((result.topFeatures[0].activationValue / maxAct) ** 2, 0.8)
+                                              : '0'
+                                          })`
+                                        : 'rgba(0,0,0,0)',
                             }}
-                            className={`mb-0.5 inline-block cursor-pointer select-none rounded px-[5px] py-[5px] text-sm font-normal text-slate-800 transition-all sm:mb-2 sm:text-[20px]
-                              ${
-                                lockedTokenPosition === result.position
-                                  ? ' text-white'
-                                  : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
+                            className={`mb-0.5 inline-block cursor-pointer select-none rounded px-[5px] py-[5px] text-sm font-normal text-slate-800 transition-all sm:mb-2 sm:text-[20px] ${
+                              lockedTokenPosition === result.position
+                                ? 'text-white'
+                                : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
                                   ? ''
-                                  : ' hover:text-gBlue'
-                              } ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} 
-                              ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
+                                  : 'hover:text-gBlue'
+                            } ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
                           >
                             {result.token.trim().length === 0 ? ' ' : result.token}
                           </button>
@@ -393,7 +391,7 @@ export default function SearchTopkByTokenSimple({
                             </div>
                             <div className="ml-1 flex max-w-7 flex-col items-center justify-center gap-y-1 overflow-visible py-2">
                               <ExternalLink
-                                className="h-7 w-7 cursor-pointer rounded  bg-white/50 p-1.5 hover:bg-white/90"
+                                className="h-7 w-7 cursor-pointer rounded bg-white/50 p-1.5 hover:bg-white/90"
                                 onClick={() => {
                                   setFeatureModalFeature(f.feature as NeuronWithPartialRelations);
                                   setFeatureModalOpen(true);
@@ -412,9 +410,7 @@ export default function SearchTopkByTokenSimple({
                         ].topFeatures.map((f, i) => (
                           <div
                             key={i}
-                            className={`group relative flex w-full cursor-default flex-row items-center justify-center gap-x-3 rounded-xl 
-                                bg-gBlue/5 py-0 pl-5 pr-5 text-gBlue 
-                                  transition-all hover:bg-gBlue/20   sm:py-2.5 `}
+                            className="group relative flex w-full cursor-default flex-row items-center justify-center gap-x-3 rounded-xl bg-gBlue/5 py-0 pl-5 pr-5 text-gBlue transition-all hover:bg-gBlue/20 sm:py-2.5"
                           >
                             <div className="flex flex-1 flex-col">
                               <div className="w-full cursor-default py-2 text-[13px] transition-all group-hover:text-gBlue sm:text-[15px]">
@@ -426,7 +422,7 @@ export default function SearchTopkByTokenSimple({
                             </div>
                             <div className="ml-1 flex max-w-7 flex-col items-center justify-center gap-y-1 overflow-visible py-2">
                               <ExternalLink
-                                className="h-7 w-7 cursor-pointer rounded  bg-white/50 p-1.5 hover:bg-white/90"
+                                className="h-7 w-7 cursor-pointer rounded bg-white/50 p-1.5 hover:bg-white/90"
                                 onClick={() => {
                                   setFeatureModalFeature(f.feature as NeuronWithPartialRelations);
                                   setFeatureModalOpen(true);

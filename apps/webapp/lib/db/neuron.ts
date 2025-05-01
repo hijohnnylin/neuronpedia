@@ -407,6 +407,8 @@ export const getNeuronsForTopkSearcherExplanationOnly = async (
         where: {
           typeName: { not: EXPLANATIONTYPE_HUMAN },
         },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
       },
     },
   });

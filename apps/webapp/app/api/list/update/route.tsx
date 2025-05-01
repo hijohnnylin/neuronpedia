@@ -2,7 +2,8 @@ import { updateListMetadata } from '@/lib/db/list';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
-export const maxDuration = 120;
+// Hobby plans don't support > 60 seconds
+// export const maxDuration = 120;
 
 /**
  * @swagger
