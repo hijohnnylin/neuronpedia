@@ -149,10 +149,11 @@
     "zod-prisma-types": "^2.7.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.42.1",
     "@aws-sdk/types": "^3.425.0",
     "@next/bundle-analyzer": "^14.1.3",
     "@next/env": "^15.1.6",
+    "@playwright/test": "^1.42.1",
+    "@tailwindcss/forms": "^0.5.10",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.2.0",
     "@types/d3": "^7.4.3",
