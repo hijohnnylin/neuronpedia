@@ -9,7 +9,7 @@ A simple NextJS frontend for searching and steering language models using Neuron
 1. Make sure the inference server is running:
 
    ```bash
-   cd apps/inference && poetry install && poetry run python start.py
+   cd apps/inference && poetry install && make run-server
    ```
 
 2. In another terminal, start the Steerify app:
