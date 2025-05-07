@@ -14,6 +14,7 @@ Name | Type | Description | Notes
 **ignore_bos** | **bool** | Whether or not to include features whose highest activation value is the BOS token. | [default to True]
 **feature_filter** | **List[int]** | Optional. If specified, will only return features that match the indexes specified. Can only be used if we&#39;re testing just one SAE (\&quot;selected_sources\&quot; length &#x3D; 1). | [optional] 
 **num_results** | **int** | Optional. The number of top features to return. | [optional] [default to 25]
+**offset** | **int** | Skip this many top-ranked results before returning the next page. | [optional] [default to 0]
 
 ## Example
 
