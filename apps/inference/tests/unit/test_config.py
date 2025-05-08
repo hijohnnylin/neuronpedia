@@ -1,5 +1,3 @@
-import os
-import sys
 from unittest.mock import patch
 
 import pytest
@@ -59,13 +57,6 @@ def test_config_initialization(mock_config: Config):
         "type": "saelens-1",
         "saes": [f"{i}-res-jb" for i in range(13)],
     }
-
-
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-
-OUTPUT_FOLDER = "server_files"
-if not os.path.exists(OUTPUT_FOLDER):
-    os.makedirs(OUTPUT_FOLDER)
 
 
 def test_get_saelens_neuronpedia_directory_df():

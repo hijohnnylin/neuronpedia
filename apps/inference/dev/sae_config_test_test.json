@@ -1,1 +1,0 @@
-[{"model": "gemma-2-2b", "set": "gemmascope-mlp-16k", "type": "saelens-1", "local": false, "saes": ["0-gemmascope-mlp-65k", "1-gemmascope-mlp-65k"]}]
