@@ -37,8 +37,6 @@ build-backend = "poetry.core.masonry.api"
 "typing.List".msg = "Use 'list' instead"
 
 [tool.pyright]
-include = ["neuronpedia_autointerp"]
-exclude = ["dist", "*.venv"]
 # Add this line to ignore import errors for missing libraries
 reportMissingImports = "none"
 typeCheckingMode = "strict"

@@ -55,8 +55,6 @@ select = ["UP", "TID", "I", "F", "E", "ARG", "SIM", "RET", "LOG", "T20"]
 "typing.List".msg = "Use `list` instead"
 
 [tool.pyright]
-include = ["sae_vis"]
-exclude = ["sae_vis/css", "sae_vis/js", "sae_vis/html", "dist"]
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"
 reportUnknownMemberType = "none"
