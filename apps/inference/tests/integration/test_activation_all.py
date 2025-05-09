@@ -8,7 +8,7 @@ from neuronpedia_inference_client.models.activation_all_post_request import (
     ActivationAllPostRequest,
 )
 
-from tests.conftest import BOS_TOKEN_STR, TEST_PROMPT, X_SECRET_KEY
+from tests.conftest import BOS_TOKEN_STR, TEST_PROMPT, X_SECRET_KEY, ACTIVATION_ALL_ENDPOINT
 
 
 def test_activation_all(client: TestClient):
@@ -25,7 +25,7 @@ def test_activation_all(client: TestClient):
     )
 
     response = client.post(
-        "/v1/activation/all",
+        ACTIVATION_ALL_ENDPOINT,
         json=request.model_dump(),
         headers={"X-SECRET-KEY": X_SECRET_KEY},
     )

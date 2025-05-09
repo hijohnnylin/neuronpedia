@@ -18,6 +18,9 @@ BOS_TOKEN_STR = "<|endoftext|>"
 TEST_PROMPT = "Hello, world!"
 X_SECRET_KEY = "cat"
 
+TOPK_BY_TOKEN_ENDPOINT = "/v1/activation/topk-by-token"
+ACTIVATION_ALL_ENDPOINT = "/v1/activation/all"
+
 
 @pytest.fixture(scope="session")
 def initialize_models():
