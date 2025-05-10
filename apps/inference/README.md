@@ -37,7 +37,7 @@ this loads the `gpt2-small` model and the `res-jb` saes through saelens:
 
 ```
 poetry lock && poetry install
-poetry run python start.py
+make run-server
 ```
 
 ### customizing the inference server (different models, SAEs, etc)
