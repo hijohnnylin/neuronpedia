@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- disabling this to match existing pattern */
 // this is a radically simplified version of the steerer component
 // it's for the gemma-scope demo and the explorables demo
 // it has a lot of duplicate code with the steer component
@@ -44,9 +45,19 @@ export default function SteererSimple({
   showOptionsButton?: boolean;
   excludedPresetNames?: string[];
 }) {
+
+  const [isInitialPageLoad, setInitialPageLoad] = useState(true); // track this
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [modelId, setModelId] = useState(initialModelId);
   const [featurePresets, setFeaturePresets] = useState<FeaturePreset[]>([]);
+
+  // INFO: on pageLoad, will crash if no initial model
+  if (isInitialPageLoad && !initialModelId) {
+    setModelId('gemma-2-2b-it')
+    setInitialPageLoad(false)
+  }
+
 
   function loadPresets() {
     fetch('/api/steer/presets', {
@@ -117,8 +128,9 @@ export default function SteererSimple({
     })
       .then((response) => {
         if (response.status !== 200) {
-          alert('Sorry, your message could not be sent at this time. Please try again later.');
-          console.log(response);
+          // INFO: DO NOT alert to user; this error only indicates that the
+          // hardcoded savedSteerOutput did not exist. Messages still work!
+          console.error("Error loading saved steer output!");
           return null;
         }
         return response.json();
@@ -292,9 +304,8 @@ export default function SteererSimple({
           <div className="flex w-full flex-1 flex-col gap-x-0 px-0 pt-0 sm:flex-row sm:gap-x-2">
             <div
               ref={normalEndRef}
-              className={`hidden flex-1 flex-col overflow-y-scroll rounded-xl bg-sky-100 px-5 py-2 text-left text-xs text-slate-400 shadow-md sm:flex ${
-                cappedHeight ? `h-[400px] max-h-[400px] min-h-[400px]` : 'h-full max-h-[calc(100vh-111px)]'
-              }`}
+              className={`hidden flex-1 flex-col overflow-y-scroll rounded-xl bg-sky-100 px-5 py-2 text-left text-xs text-slate-400 shadow-md sm:flex ${cappedHeight ? `h-[400px] max-h-[400px] min-h-[400px]` : 'h-full max-h-[calc(100vh-111px)]'
+                }`}
             >
               <div className="sticky top-1 mt-0 flex flex-row items-center justify-center uppercase text-sky-700 sm:top-0">
                 <div className="rounded-full bg-sky-100 px-3 py-1 text-center text-[11px] font-bold shadow">
@@ -319,9 +330,8 @@ export default function SteererSimple({
             </div>
             <div
               ref={steeredEndRef}
-              className={`flex flex-1 flex-col overflow-y-scroll rounded-xl bg-green-100 px-3 py-2 text-left text-xs text-slate-400 shadow-md sm:px-5 ${
-                cappedHeight ? `h-[400px] max-h-[400px] min-h-[400px]` : 'h-full max-h-[calc(100vh-111px)]'
-              }`}
+              className={`flex flex-1 flex-col overflow-y-scroll rounded-xl bg-green-100 px-3 py-2 text-left text-xs text-slate-400 shadow-md sm:px-5 ${cappedHeight ? `h-[400px] max-h-[400px] min-h-[400px]` : 'h-full max-h-[calc(100vh-111px)]'
+                }`}
             >
               <div className="sticky top-1 mt-0 flex flex-row items-center justify-center uppercase text-green-600 sm:top-0">
                 <div className="rounded-full bg-green-100 px-3 py-1 text-center text-[11px] font-bold shadow">
@@ -377,9 +387,8 @@ export default function SteererSimple({
                         sendChat();
                       }
                     }}
-                    className={`h-8 w-8 rounded-full ${
-                      isTuning ? 'bg-slate-400' : 'bg-gBlue hover:bg-gBlue/80'
-                    } p-1.5 text-white`}
+                    className={`h-8 w-8 rounded-full ${isTuning ? 'bg-slate-400' : 'bg-gBlue hover:bg-gBlue/80'
+                      } p-1.5 text-white`}
                   />
                 </div>
               </div>
