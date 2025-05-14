@@ -90,13 +90,6 @@ class Config:
     ) -> None:
         self.STEER_SPECIAL_TOKEN_IDS = steer_special_token_ids
 
-    def are_models_compatible(self, model_id_1: str, model_id_2: str) -> bool:
-        if model_id_1.endswith("-it"):
-            model_id_1 = model_id_1[:-3]
-        elif model_id_2.endswith("-it"):
-            model_id_2 = model_id_2[:-3]
-        return model_id_1 == model_id_2
-
     def get_valid_model_ids(self):
         return set([sae_set["model"] for sae_set in self.SAE_CONFIG])
 
