@@ -1,4 +1,4 @@
-.PHONY: unit-test format check-format
+.PHONY: test format check-format
 
 # Variables
 POETRY = poetry
@@ -6,8 +6,8 @@ PYTEST = $(POETRY) run pytest
 PYTEST_ARGS = -v -s
 RUFF = $(POETRY) run ruff
 
-unit-test:
-	$(POETRY) run $(PYTEST) -v --cov=neuronpedia_autointerp/ --cov-report=term-missing --cov-branch tests/unit
+test:
+	$(POETRY) run $(PYTEST) -v --cov=neuronpedia_autointerp/ --cov-report=term-missing --cov-branch tests
 
 format:
 	$(RUFF) format .
@@ -20,4 +20,4 @@ check-format:
 check-type:
 	$(POETRY) run pyright .
 
-check-ci: check-format check-type unit-test
+check-ci: check-format check-type test
