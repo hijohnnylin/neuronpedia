@@ -1,4 +1,5 @@
 import { GetObjectCommand, ListObjectsV2Command, S3 } from '@aws-sdk/client-s3';
+import fs from 'fs/promises';
 import { ungzip } from 'node-gzip';
 import { getLayerNumFromSource, getSourceSetNameFromSource } from './source';
 
@@ -14,14 +15,42 @@ export const anonymousS3Client = new S3({
   signer: { sign: async (req) => req },
 });
 
-async function downloadFile(path: string) {
-  const response = await anonymousS3Client.send(
-    new GetObjectCommand({
-      Bucket: DATASET_BUCKET,
-      Key: path,
-    }),
-  );
-  return response.Body;
+async function downloadFile(path: string, s3: boolean = true) {
+  if (s3) {
+    const response = await anonymousS3Client.send(
+      new GetObjectCommand({
+        Bucket: DATASET_BUCKET,
+        Key: path,
+      }),
+    );
+    return response.Body;
+  }
+
+  if (typeof window === 'undefined' && (path.startsWith('/') || path.startsWith('file:///'))) {
+    try {
+      const filePath = path.startsWith('file:///') ? path.slice(8) : path;
+      const data = await fs.readFile(filePath, 'utf8');
+      return {
+        transformToString: () => data,
+        transformToByteArray: () => Buffer.from(data),
+      };
+    } catch (error) {
+      console.error('Error reading local file:', error);
+      throw error;
+    }
+  }
+
+  // Make fetch result compatible with the same interface
+  return fetch(path).then((res) => {
+    const text = res.text();
+    return {
+      transformToString: async () => text,
+      transformToByteArray: async () => {
+        const content = await text;
+        return Buffer.from(content);
+      },
+    };
+  });
 }
 
 export async function listBucketAtPath(path: string, delimiter?: string) {
@@ -95,9 +124,9 @@ export async function getFilesInPath(path: string, filterByFileSuffix?: string):
   return files;
 }
 
-export async function downloadAndDecompressFile(path: string): Promise<string> {
+export async function downloadAndDecompressFile(path: string, s3: boolean = true): Promise<string> {
   console.log('Downloading and decompressing file', path);
-  const file = await downloadFile(path);
+  const file = await downloadFile(path, s3);
   const arrayBuffer = await file?.transformToByteArray();
   return arrayBuffer ? (await ungzip(Buffer.from(arrayBuffer))).toString() : '';
 }
