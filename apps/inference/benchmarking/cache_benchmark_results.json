@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-05-24 11:28:37",
+  "model": "gpt2-small",
+  "results": {
+    "activation/all": [
+      0.21723127365112305,
+      0.005615949630737305,
+      0.0050351619720458984,
+      0.005330324172973633,
+      0.004954814910888672
+    ],
+    "activation/single": [],
+    "mixed_pattern": []
+  },
+  "cache_stats": {
+    "size": 1,
+    "max_size": 5,
+    "hits": 4,
+    "misses": 1,
+    "hit_rate": 0.8,
+    "evictions": 0,
+    "entries": {
+      "30481df93746ff55_L0_stop9": {
+        "access_count": 4,
+        "age": 0.11500811576843262,
+        "last_access": 0.05427122116088867
+      }
+    }
+  },
+  "summary": {
+    "activation/all": {
+      "first_run_ms": 217.23127365112305,
+      "avg_cached_ms": 5.234062671661377,
+      "improvement_percent": 97.59055748111693,
+      "sample_size": 5
+    }
+  }
+}

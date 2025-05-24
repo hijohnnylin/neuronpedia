@@ -18,6 +18,7 @@ from neuronpedia_inference_client.models.activation_all_post_request import (
 from transformer_lens import ActivationCache
 
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.layer_activation_cache import LayerActivationCache
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import (
     Model,
@@ -161,6 +162,8 @@ class ActivationProcessor:
         """Process input text and return tokens, string tokens, and cache."""
         model = Model.get_instance()
         config = Config.get_instance()
+        layer_cache = LayerActivationCache.get_instance()
+
         tokens = model.to_tokens(text, prepend_bos=prepend_bos, truncate=False)[0]
         if len(tokens) > config.TOKEN_LIMIT:
             raise ValueError(
@@ -169,11 +172,29 @@ class ActivationProcessor:
 
         str_tokens = model.to_str_tokens(text, prepend_bos=prepend_bos)
 
-        with torch.no_grad():
-            if max_layer:
-                _, cache = model.run_with_cache(tokens, stop_at_layer=max_layer)
-            else:
-                _, cache = model.run_with_cache(tokens)
+        # Check if we have a cached entry for any requested layer
+        # We use layer 0 as the cache key since we cache the entire forward pass
+        cached_entry = layer_cache.get(tokens, layer_num=0, stop_at_layer=max_layer)
+
+        if cached_entry:
+            logger.info(f"Using cached activations (stop_at_layer={max_layer})")
+            cache = cached_entry.activation_cache
+        else:
+            logger.info(f"Computing new activations (stop_at_layer={max_layer})")
+            with torch.no_grad():
+                if max_layer:
+                    _, cache = model.run_with_cache(tokens, stop_at_layer=max_layer)
+                else:
+                    _, cache = model.run_with_cache(tokens)
+
+            # Store in cache
+            layer_cache.put(
+                tokens=tokens,
+                layer_num=0,  # Use layer 0 as key for full forward pass
+                activation_cache=cache,
+                stop_at_layer=max_layer,
+            )
+
         return tokens, str_tokens, cache  # type: ignore
 
     def _process_sources(
@@ -223,7 +244,16 @@ class ActivationProcessor:
             mlp_activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
             return torch.transpose(mlp_activation_data[0], 0, 1)
 
+        # Check if we have cached SAE features
+        layer_cache = LayerActivationCache.get_instance()
+        layer_num = self._get_layer_num(selected_source)
+
+        # Try to get from the tokens used to create this cache
+        # Note: This is a simplified approach - in production you'd want to track tokens properly
         activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
+
+        # For now, just encode directly - we'd need to track tokens through the call chain
+        # to properly use the SAE feature cache
         feature_activation_data = (
             SAEManager.get_instance().get_sae(selected_source).encode(activation_data)
         )
