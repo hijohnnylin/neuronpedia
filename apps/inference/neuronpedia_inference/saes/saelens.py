@@ -25,7 +25,7 @@ The `load` method therefore now returns **three** values:
 truthiness check to detect Transcoder-like artifacts.
 """
 
-from neuronpedia_searcher.saes.base import BaseSAE
+from neuronpedia_inference.saes.base import BaseSAE
 from sae_lens.toolkit.pretrained_sae_loaders import (  # type: ignore
     load_artifact_from_pretrained,
 )
