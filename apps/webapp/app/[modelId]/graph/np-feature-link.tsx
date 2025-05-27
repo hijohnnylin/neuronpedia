@@ -7,7 +7,7 @@ import {
   CLTGraphNode,
   getIndexFromAnthropicFeatureId,
   getLayerFromAnthropicFeatureId,
-  MODEL_HAS_NEURONPEDIA_DASHBOARDS,
+  graphModelHasNpDashboards,
 } from './utils';
 
 export default function GraphFeatureLink({
@@ -22,9 +22,7 @@ export default function GraphFeatureLink({
   if (!selectedGraph) {
     return null;
   }
-  return selectedGraph?.metadata.scan &&
-    MODEL_HAS_NEURONPEDIA_DASHBOARDS.has(selectedGraph?.metadata.scan) &&
-    node.featureDetailNP ? (
+  return selectedGraph?.metadata.scan && graphModelHasNpDashboards(selectedGraph) && node.featureDetailNP ? (
     <div className="ml-1 flex flex-col gap-x-1 pl-0">
       <Button
         onClick={() => {

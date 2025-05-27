@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "neuronpedia"
-version = "1.0.18"
+version = "1.0.19"
 description = "Neuronpedia"
 authors = ["johnny <johnny@neuronpedia.org>"]
 readme = "README.md"

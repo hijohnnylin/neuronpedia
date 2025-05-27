@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generated schema for Root",
+  "type": "object",
+  "properties": {
+    "index": {
+      "type": "number"
+    },
+    "examples_quantiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "quantile_name": {
+            "type": "string"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tokens_acts_list": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "tokens": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": ["tokens_acts_list", "tokens"]
+            }
+          }
+        },
+        "required": ["quantile_name", "examples"]
+      }
+    },
+    "top_logits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "bottom_logits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["index", "examples_quantiles"]
+}

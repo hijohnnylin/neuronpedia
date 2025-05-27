@@ -37,7 +37,7 @@
           "properties": {
             "feature_json_base_url": {
               "type": "string",
-              "description": "The base URL for the feature JSON files (Anthropic feature format), if you want the frontend to download your features details from your server. IMPORTANT: The feature detail JSON files should be in the format [layer_number]-[feature_index].json, for example, 15-2324.json would be layer 15, index 2324. If a base url is https://my-cloudfront.s3.amazonaws.com/my_model/features, then the feature JSON would be at https://my-cloudfront.s3.amazonaws.com/my_model/features/15-2324.json. Remember to enable public access, CORS from all origins, and https.",
+              "description": "The base URL for the feature JSON files (Anthropic feature format), if you want the frontend to download your features details from your server. If a base url is https://my-cloudfront.s3.amazonaws.com/my_model/features, then the feature JSON would be at https://my-cloudfront.s3.amazonaws.com/my_model/features/781859.json. Remember to enable public access, CORS from all origins, and https.",
               "examples": ["https://my-cloudfront.s3.amazonaws.com/my_model/features"]
             },
             "neuronpedia_source_set": {
@@ -56,13 +56,9 @@
           "type": "object",
           "description": "[Optional] Additional information that may be displayed to the user. All fields are optional.",
           "properties": {
-            "title": {
-              "type": "string",
-              "description": "The title of the graph."
-            },
             "description": {
               "type": "string",
-              "description": "A description of the graph. A good place to describe the purpose of this graph."
+              "description": "An optional longer description of the graph, if you want to add more context or notes."
             },
             "creator_name": {
               "type": "string",
@@ -72,21 +68,9 @@
               "type": "string",
               "description": "The url of the person/group that triggered the generation of this specific graph. Not necessarily the creator of the graph generation code."
             },
-            "create_time_ms": {
-              "type": "number",
-              "description": "The timestamp of when the graph was created, in milliseconds since epoch."
-            },
-            "notes": {
-              "type": "string",
-              "description": "Any additional notes about the graph."
-            },
             "source_urls": {
               "type": "array",
               "description": "An array of urls to the transcoders, CLTs, etc that were used to generate this graph."
-            },
-            "output_hook": {
-              "type": "string",
-              "description": "The output hook used."
             },
             "generator": {
               "type": "object",
@@ -109,6 +93,10 @@
                   "description": "The email of the person/group that triggered the generation of this specific graph."
                 }
               }
+            },
+            "create_time_ms": {
+              "type": "number",
+              "description": "The timestamp of when the graph was created, in milliseconds since epoch."
             }
           }
         },

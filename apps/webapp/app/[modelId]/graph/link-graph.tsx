@@ -13,9 +13,11 @@ import {
   CLTGraphNode,
   cltModelToNumLayers,
   featureTypeToText,
+  graphModelHasNpDashboards,
   hideTooltip,
   isHideLayer,
-  MODEL_HAS_NEURONPEDIA_DASHBOARDS,
+  shouldShowNodeForDensityThreshold,
+  shouldShowNodeForInfluenceThreshold,
   showTooltip,
 } from './utils';
 
@@ -399,31 +401,13 @@ export default function LinkGraph() {
 
     // if metadata shows node_threshold, then we do pruning
     if (data.metadata.node_threshold !== undefined && data.metadata.node_threshold > 0) {
-      nodes = nodes.filter(
-        (d) =>
-          d.feature_type === 'embedding' ||
-          d.feature_type === 'logit' ||
-          (d.influence !== undefined &&
-            visState.pruningThreshold !== undefined &&
-            d.influence <= visState.pruningThreshold) ||
-          (d.nodeId !== undefined && visState.pinnedIds.includes(d.nodeId)) ||
-          (d.nodeId !== undefined && visState.clickedId === d.nodeId),
-      );
+      nodes = nodes.filter((d) => shouldShowNodeForInfluenceThreshold(d, visState));
     }
 
     // if we have neuronpedia dashboards, then we use density threshold
-    if (MODEL_HAS_NEURONPEDIA_DASHBOARDS.has(selectedGraph?.metadata.scan)) {
-      nodes = nodes.filter(
-        (d) =>
-          d.feature_type === 'embedding' ||
-          d.feature_type === 'logit' ||
-          (d.featureDetailNP?.frac_nonzero !== undefined &&
-            visState.densityThreshold !== undefined &&
-            d.featureDetailNP?.frac_nonzero <= visState.densityThreshold) ||
-          (d.nodeId !== undefined && visState.pinnedIds.includes(d.nodeId)) ||
-          (d.nodeId !== undefined && visState.clickedId === d.nodeId),
-      );
-    }
+    nodes = nodes.filter((d) =>
+      shouldShowNodeForDensityThreshold(graphModelHasNpDashboards(selectedGraph), d, visState),
+    );
 
     // Set up the base SVG container
     const svgContainer = d3.select(svgRef.current);
@@ -1046,7 +1030,7 @@ export default function LinkGraph() {
             </RadixSlider.Root>
           </div>
         )}
-        {selectedGraph?.metadata.scan && MODEL_HAS_NEURONPEDIA_DASHBOARDS.has(selectedGraph?.metadata.scan) && (
+        {selectedGraph?.metadata.scan && graphModelHasNpDashboards(selectedGraph) && (
           <div className="flex flex-row items-center">
             <Label htmlFor="pruningThreshold" className="mr-1 text-center text-[9px] leading-none text-slate-600">
               Filter Nodes by

@@ -17,6 +17,9 @@ import {
   GRAPH_GENERATION_ENABLED_MODELS,
   GRAPH_MAX_PROMPT_LENGTH_CHARS,
   GRAPH_MAX_TOKENS,
+  GRAPH_MAXFEATURENODES_DEFAULT,
+  GRAPH_MAXFEATURENODES_MAX,
+  GRAPH_MAXFEATURENODES_MIN,
   GRAPH_MAXNLOGITS_DEFAULT,
   GRAPH_MAXNLOGITS_MAX,
   GRAPH_MAXNLOGITS_MIN,
@@ -42,6 +45,7 @@ interface FormValues {
   desiredLogitProb: number;
   nodeThreshold: number;
   edgeThreshold: number;
+  maxFeatureNodes: number;
   slug: string;
 }
 
@@ -110,6 +114,7 @@ export default function GenerateGraphModal() {
     desiredLogitProb: GRAPH_DESIREDLOGITPROB_DEFAULT,
     nodeThreshold: GRAPH_NODETHRESHOLD_DEFAULT,
     edgeThreshold: GRAPH_EDGETHRESHOLD_DEFAULT,
+    maxFeatureNodes: GRAPH_MAXFEATURENODES_DEFAULT,
     slug: '',
   };
 
@@ -353,6 +358,29 @@ export default function GenerateGraphModal() {
                     )}
                   </div>
 
+                  <div className="flex-1">
+                    <Label htmlFor="slug" className="text-xs text-slate-600">
+                      Name Your Graph (Slug/ID)
+                    </Label>
+                    <Input
+                      id="slug"
+                      name="slug"
+                      value={values.slug}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                        setFieldValue('slug', val);
+                      }}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onBlur={handleBlur}
+                      disabled={isGenerating}
+                      placeholder="my-graph"
+                      className="mt-1 w-full border-slate-300 text-xs placeholder-slate-400"
+                      maxLength={50}
+                    />
+                    {errors.slug && touched.slug && <p className="mt-1 text-xs text-red-500">{errors.slug}</p>}
+                  </div>
                   <div className="flex flex-row gap-x-3">
                     <div className="flex-1">
                       <Label htmlFor="modelId" className="text-xs text-slate-600">
@@ -398,29 +426,7 @@ export default function GenerateGraphModal() {
                         <p className="mt-1 text-xs text-red-500">{errors.modelId}</p>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <Label htmlFor="slug" className="text-xs text-slate-600">
-                        Name Your Graph (Slug/ID)
-                      </Label>
-                      <Input
-                        id="slug"
-                        name="slug"
-                        value={values.slug}
-                        onChange={(e) => {
-                          const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                          setFieldValue('slug', val);
-                        }}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                        }}
-                        onBlur={handleBlur}
-                        disabled={isGenerating}
-                        placeholder="my-graph"
-                        className="mt-1 w-full border-slate-300 text-xs placeholder-slate-400"
-                        maxLength={50}
-                      />
-                      {errors.slug && touched.slug && <p className="mt-1 text-xs text-red-500">{errors.slug}</p>}
-                    </div>
+
                     <div>
                       <Label htmlFor="maxNLogits" className="text-xs text-slate-600">
                         Max # Logits
@@ -444,80 +450,180 @@ export default function GenerateGraphModal() {
                     </div>
                   </div>
 
-                  {[
-                    {
-                      name: 'desiredLogitProb',
-                      label: 'Desired Logit Probability',
-                      min: GRAPH_DESIREDLOGITPROB_MIN,
-                      max: GRAPH_DESIREDLOGITPROB_MAX,
-                      step: 0.01,
-                      defaultValue: GRAPH_DESIREDLOGITPROB_DEFAULT,
-                      hint: `Target cumulative probability for top N logits. Higher means more logits included. Min: ${GRAPH_DESIREDLOGITPROB_MIN}, Max: ${GRAPH_DESIREDLOGITPROB_MAX}.`,
-                    },
-                    {
-                      name: 'nodeThreshold',
-                      label: 'Node Threshold',
-                      min: GRAPH_NODETHRESHOLD_MIN,
-                      max: GRAPH_NODETHRESHOLD_MAX,
-                      step: 0.01,
-                      defaultValue: GRAPH_NODETHRESHOLD_DEFAULT,
-                      hint: `Minimum activation value for a node to be included. Min: ${GRAPH_NODETHRESHOLD_MIN}, Max: ${GRAPH_NODETHRESHOLD_MAX}.`,
-                    },
-                    {
-                      name: 'edgeThreshold',
-                      label: 'Edge Threshold',
-                      min: GRAPH_EDGETHRESHOLD_MIN,
-                      max: GRAPH_EDGETHRESHOLD_MAX,
-                      step: 0.01,
-                      defaultValue: GRAPH_EDGETHRESHOLD_DEFAULT,
-                      hint: `Minimum attention weight for an edge to be included. Min: ${GRAPH_EDGETHRESHOLD_MIN}, Max: ${GRAPH_EDGETHRESHOLD_MAX}.`,
-                    },
-                  ].map((field) => (
-                    <div key={field.name}>
-                      <Label htmlFor={field.name} className="flex items-center text-xs text-slate-600">
-                        {field.label}
-                      </Label>
-                      <div className="mt-1 flex items-center space-x-2">
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          type="number"
-                          value={values[field.name as keyof FormValues]}
-                          onChange={handleChange}
-                          onBlur={handleBlur}
-                          disabled={isGenerating}
-                          className="h-7 w-20 border-slate-300 text-xs"
-                          min={field.min}
-                          max={field.max}
-                          step={field.step}
-                        />
-                        <RadixSlider.Root
-                          name={field.name}
-                          value={[Number(values[field.name as keyof FormValues])]}
-                          onValueChange={(newVal: number[]) => setFieldValue(field.name, newVal[0])}
-                          min={field.min}
-                          max={field.max}
-                          disabled={isGenerating}
-                          step={field.step}
-                          className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
-                        >
-                          <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
-                            <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
-                          </RadixSlider.Track>
-                          <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
-                        </RadixSlider.Root>
+                  {/* Attribution Settings Group */}
+                  <div className="space-y-0 pt-2">
+                    <h4 className="text-center text-[10px] font-bold uppercase text-slate-400">Attribution Settings</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="desiredLogitProb" className="text-xs text-slate-600">
+                          Desired Logit Probability
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="desiredLogitProb"
+                            name="desiredLogitProb"
+                            type="number"
+                            value={values.desiredLogitProb}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-7 w-20 border-slate-300 text-xs"
+                            min={GRAPH_DESIREDLOGITPROB_MIN}
+                            max={GRAPH_DESIREDLOGITPROB_MAX}
+                            step={0.01}
+                          />
+                          <RadixSlider.Root
+                            name="desiredLogitProb"
+                            value={[values.desiredLogitProb]}
+                            onValueChange={(newVal: number[]) => setFieldValue('desiredLogitProb', newVal[0])}
+                            min={GRAPH_DESIREDLOGITPROB_MIN}
+                            max={GRAPH_DESIREDLOGITPROB_MAX}
+                            disabled={isGenerating}
+                            step={0.01}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.desiredLogitProb && touched.desiredLogitProb && (
+                          <p className="mt-1 text-xs text-red-500">{errors.desiredLogitProb}</p>
+                        )}
                       </div>
-                      {errors[field.name as keyof FormValues] && touched[field.name as keyof FormValues] && (
-                        <p className="mt-1 text-xs text-red-500">{errors[field.name as keyof FormValues]}</p>
-                      )}
+
+                      {/* Max # Nodes */}
+                      <div>
+                        <Label htmlFor="maxFeatureNodes" className="text-xs text-slate-600">
+                          Max # Nodes
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="maxFeatureNodes"
+                            name="maxFeatureNodes"
+                            type="number"
+                            value={values.maxFeatureNodes}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-7 w-20 border-slate-300 text-xs"
+                            min={GRAPH_MAXFEATURENODES_MIN}
+                            max={GRAPH_MAXFEATURENODES_MAX}
+                            step={1}
+                          />
+                          <RadixSlider.Root
+                            name="maxFeatureNodes"
+                            value={[values.maxFeatureNodes]}
+                            onValueChange={(newVal: number[]) => setFieldValue('maxFeatureNodes', newVal[0])}
+                            min={GRAPH_MAXFEATURENODES_MIN}
+                            max={GRAPH_MAXFEATURENODES_MAX}
+                            disabled={isGenerating}
+                            step={500}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.maxFeatureNodes && touched.maxFeatureNodes && (
+                          <p className="mt-1 text-xs text-red-500">{errors.maxFeatureNodes}</p>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Pruning Settings Group */}
+                  <div className="space-y-0 pt-3">
+                    <h4 className="text-center text-[10px] font-bold uppercase text-slate-400">Pruning Settings</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Node Threshold and Edge Threshold on same line */}
+                      <div>
+                        <Label htmlFor="nodeThreshold" className="text-xs text-slate-600">
+                          Node Threshold
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="nodeThreshold"
+                            name="nodeThreshold"
+                            type="number"
+                            value={values.nodeThreshold}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-7 w-20 border-slate-300 text-xs"
+                            min={GRAPH_NODETHRESHOLD_MIN}
+                            max={GRAPH_NODETHRESHOLD_MAX}
+                            step={0.01}
+                          />
+                          <RadixSlider.Root
+                            name="nodeThreshold"
+                            value={[values.nodeThreshold]}
+                            onValueChange={(newVal: number[]) => setFieldValue('nodeThreshold', newVal[0])}
+                            min={GRAPH_NODETHRESHOLD_MIN}
+                            max={GRAPH_NODETHRESHOLD_MAX}
+                            disabled={isGenerating}
+                            step={0.01}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.nodeThreshold && touched.nodeThreshold && (
+                          <p className="mt-1 text-xs text-red-500">{errors.nodeThreshold}</p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="edgeThreshold" className="text-xs text-slate-600">
+                          Edge Threshold
+                        </Label>
+                        <div className="mt-0.5 flex items-center space-x-2">
+                          <Input
+                            id="edgeThreshold"
+                            name="edgeThreshold"
+                            type="number"
+                            value={values.edgeThreshold}
+                            onChange={handleChange}
+                            onBlur={handleBlur}
+                            disabled={isGenerating}
+                            className="h-7 w-20 border-slate-300 text-xs"
+                            min={GRAPH_EDGETHRESHOLD_MIN}
+                            max={GRAPH_EDGETHRESHOLD_MAX}
+                            step={0.01}
+                          />
+                          <RadixSlider.Root
+                            name="edgeThreshold"
+                            value={[values.edgeThreshold]}
+                            onValueChange={(newVal: number[]) => setFieldValue('edgeThreshold', newVal[0])}
+                            min={GRAPH_EDGETHRESHOLD_MIN}
+                            max={GRAPH_EDGETHRESHOLD_MAX}
+                            disabled={isGenerating}
+                            step={0.01}
+                            className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                          >
+                            <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                              <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                            </RadixSlider.Track>
+                            <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                          </RadixSlider.Root>
+                        </div>
+                        {errors.edgeThreshold && touched.edgeThreshold && (
+                          <p className="mt-1 text-xs text-red-500">{errors.edgeThreshold}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   {error && <p className="mt-4 rounded-md bg-red-100 p-3 text-sm text-red-600">{error}</p>}
 
                   <div className="flex items-center justify-between pt-3">
                     {isGenerating ? (
-                      countdownTime !== null && countdownTime > 0 ? (
+                      countdownTime !== null ? (
                         <div className="flex flex-row items-center justify-start gap-x-1.5 text-sm text-slate-600">
                           <LoadingSquare className="h-4 w-4" size={12} />
                           Remaining time: {formatCountdown(countdownTime)}
@@ -568,7 +674,6 @@ export default function GenerateGraphModal() {
                           isGenerating ||
                           !dirty ||
                           Object.keys(errors).length > 0 ||
-                          isTokenizing ||
                           (tokenizedPrompt !== null && tokenizedPrompt.tokens.length > GRAPH_MAX_TOKENS)
                         }
                         className="w-full sm:w-auto"

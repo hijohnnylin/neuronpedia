@@ -4,7 +4,7 @@ import * as yup from 'yup';
 export const GRAPH_MAX_PROMPT_LENGTH_CHARS = 10000;
 export const GRAPH_BATCH_SIZE = 48;
 // this time estimate comes from testing different prompt lengths with batch size 48, and is only valid for gemma-2-2b, for a40
-export const getEstimatedTimeFromNumTokens = (numTokens: number) => 11.2 * Math.log2(Math.max(numTokens, 4)) - 12; // add a few seconds buffer
+export const getEstimatedTimeFromNumTokens = (numTokens: number) => 11.2 * Math.log2(Math.max(numTokens, 4)) + 3; // add a few seconds buffer
 export const GRAPH_MAX_TOKENS = 64;
 export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b'];
 export const GRAPH_MODEL_MAP = { 'gemma-2-2b': 'google/gemma-2-2b' };
@@ -23,6 +23,9 @@ export const GRAPH_NODETHRESHOLD_DEFAULT = 0.8;
 export const GRAPH_EDGETHRESHOLD_MIN = 0.8;
 export const GRAPH_EDGETHRESHOLD_MAX = 1.0;
 export const GRAPH_EDGETHRESHOLD_DEFAULT = 0.98;
+export const GRAPH_MAXFEATURENODES_MIN = 3000;
+export const GRAPH_MAXFEATURENODES_MAX = 10000;
+export const GRAPH_MAXFEATURENODES_DEFAULT = 5000;
 export const GRAPH_SLUG_MIN = 2;
 
 export const GRAPH_ANONYMOUS_USER_ID = 'anonymous';
@@ -59,6 +62,13 @@ export const graphGenerateSchemaClient = yup.object({
     .max(GRAPH_EDGETHRESHOLD_MAX, `Must be at most ${GRAPH_EDGETHRESHOLD_MAX}.`)
     .default(GRAPH_EDGETHRESHOLD_DEFAULT)
     .required('This field is required.'),
+  maxFeatureNodes: yup
+    .number()
+    .integer('Must be an integer.')
+    .min(GRAPH_MAXFEATURENODES_MIN, `Must be at least ${GRAPH_MAXFEATURENODES_MIN}.`)
+    .max(GRAPH_MAXFEATURENODES_MAX, `Must be at most ${GRAPH_MAXFEATURENODES_MAX}.`)
+    .default(GRAPH_MAXFEATURENODES_DEFAULT)
+    .required('This field is required.'),
   slug: yup
     .string()
     .min(GRAPH_SLUG_MIN, `Must be at least ${GRAPH_SLUG_MIN} characters.`)
@@ -74,6 +84,7 @@ export const generateGraph = async (
   nodeThreshold: number,
   edgeThreshold: number,
   slugIdentifier: string,
+  maxFeatureNodes: number,
 ) => {
   const response = await fetch(`${USE_LOCALHOST_GRAPH ? 'http://localhost:5004' : GRAPH_SERVER}/generate-graph`, {
     method: 'POST',
@@ -91,6 +102,7 @@ export const generateGraph = async (
       node_threshold: nodeThreshold,
       edge_threshold: edgeThreshold,
       slug_identifier: slugIdentifier,
+      max_feature_nodes: maxFeatureNodes,
     }),
   });
 

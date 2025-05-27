@@ -53,10 +53,10 @@ function CopyModal() {
     <Dialog open={isCopyModalOpen} onOpenChange={setIsCopyModalOpen}>
       <DialogContent className="bg-white sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Share Graph</DialogTitle>
-          <DialogDescription>{`Choose how you'd like to copy this graph for sharing`}</DialogDescription>
+          <DialogTitle>Share Graph & Subgraph</DialogTitle>
+          <DialogDescription>{`Choose how you'd like to copy this graph for sharing. This will share the graph, your current subgraph, and any custom labels you have created.`}</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3 py-4">
+        <div className="py-22 flex flex-col gap-3">
           <Button
             variant="outline"
             className="h-auto justify-start gap-3 py-3"
@@ -118,7 +118,7 @@ export default function GraphWrapper() {
           <GraphToolbar />
         </div>
 
-        <div className="w-full flex-1 overflow-hidden">
+        <div className="w-full flex-1 overflow-hidden pt-1">
           {isLoadingGraphData ? (
             <div className="flex h-full w-full flex-col items-center justify-center gap-y-3">
               <LoadingSquare className="h-6 w-6" />

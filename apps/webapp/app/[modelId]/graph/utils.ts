@@ -13,7 +13,11 @@ export const MAX_GRAPH_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024;
 
 // TODO: make this a DB column
 // models not in this list can only get FeatureDetails from the bucket
-export const MODEL_HAS_NEURONPEDIA_DASHBOARDS = new Set(['gemma-2-2b']);
+export const MODEL_WITH_NP_DASHBOARDS_NOT_YET_CANTOR = new Set(['gemma-2-2b']);
+// TODO: remove the MODEL_WITH_NP_DASHBOARDS_NOT_YET_CANTOR once fellows graph gets on cantor
+export const graphModelHasNpDashboards = (graph: CLTGraph) =>
+  MODEL_WITH_NP_DASHBOARDS_NOT_YET_CANTOR.has(graph.metadata.scan) ||
+  graph.metadata.feature_details?.neuronpedia_source_set !== undefined;
 
 // has dashboards in the bucket
 export const MODEL_HAS_S3_DASHBOARDS = new Set([
@@ -44,6 +48,8 @@ export const ANT_MODEL_ID_TO_NEURONPEDIA_MODEL_ID = {
   'gemma-2-2b': 'gemma-2-2b',
   'llama-3-131k-relu': 'llama-3.2-1b',
 };
+
+export const ERROR_MODEL_DOES_NOT_EXIST = 'ERR_MODEL_DOES_NOT_EXIST';
 
 // ============ End of Neuronpedia Specific =============
 
@@ -250,24 +256,22 @@ export type CLTGraphInnerMetadata = {
   node_threshold?: number;
 
   // add the extra metadata from graph-schema.json
-  neuronpedia?: {
+  feature_details?: {
     feature_json_base_url?: string;
-    source_set?: string;
+    neuronpedia_source_set?: string;
   };
   info?: {
-    title?: string;
     description?: string;
     creator_name?: string;
-    create_time_ms?: number;
-    notes?: string;
+    creator_url?: string;
     source_urls?: string[];
-    output_hook?: string;
     generator?: {
       name?: string;
       version?: string;
       url?: string;
       email?: string;
     };
+    create_time_ms?: number;
   };
   generation_settings?: {
     max_n_logits?: number;
@@ -717,3 +721,77 @@ export type AnthropicFeatureDetail = {
 };
 
 export { ATTRIBUTION_GRAPH_SCHEMA };
+
+// filtering utils for influence and density
+
+export function shouldShowNodeForInfluenceThreshold(node: CLTGraphNode, visState: CltVisState): boolean {
+  // always show embeddings and logits
+  if (node.feature_type === 'embedding' || node.feature_type === 'logit') {
+    return true;
+  }
+
+  // always show pinned nodes
+  if (node.nodeId !== undefined && visState.pinnedIds.includes(node.nodeId)) {
+    return true;
+  }
+
+  // always show clicked nodes
+  if (node.nodeId !== undefined && visState.clickedId === node.nodeId) {
+    return true;
+  }
+
+  // if we have influence and pruning threshold, show if influence is less than pruning threshold
+  if (
+    node.influence !== undefined &&
+    node.influence !== null &&
+    visState.pruningThreshold !== undefined &&
+    visState.pruningThreshold !== null
+  ) {
+    if (node.influence <= visState.pruningThreshold) {
+      return true;
+    }
+    return false;
+  }
+  // no influence and pruning threshold. show all.
+  return true;
+}
+
+export function shouldShowNodeForDensityThreshold(
+  isNPDashboard: boolean,
+  d: CLTGraphNode,
+  visState: CltVisState,
+): boolean {
+  if (!isNPDashboard) {
+    return true;
+  }
+
+  // always show embeddings and logits
+  if (d.feature_type === 'embedding' || d.feature_type === 'logit') {
+    return true;
+  }
+
+  // always show pinned nodes
+  if (d.nodeId !== undefined && visState.pinnedIds.includes(d.nodeId)) {
+    return true;
+  }
+
+  // always show clicked nodes
+  if (d.nodeId !== undefined && visState.clickedId === d.nodeId) {
+    return true;
+  }
+
+  // show if density threshold is met
+  if (
+    d.featureDetailNP?.frac_nonzero !== undefined &&
+    d.featureDetailNP?.frac_nonzero !== null &&
+    visState.densityThreshold !== undefined &&
+    visState.densityThreshold !== null
+  ) {
+    if (d.featureDetailNP?.frac_nonzero <= visState.densityThreshold) {
+      return true;
+    }
+    return false;
+  }
+  // no density threshold. show all.
+  return true;
+}

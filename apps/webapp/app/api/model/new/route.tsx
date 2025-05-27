@@ -5,6 +5,84 @@ import { NextResponse } from 'next/server';
 
 import * as yup from 'yup';
 
+/**
+ * @swagger
+ * /api/model/new:
+ *   post:
+ *     summary: Create a new model
+ *     description: Creates a new model with the specified parameters. Requires authentication.
+ *     tags:
+ *       - Models
+ *     security:
+ *       - apiKey: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - id
+ *               - layers
+ *             properties:
+ *               id:
+ *                 type: string
+ *                 minLength: 2
+ *                 maxLength: 32
+ *                 pattern: '^[a-z][a-z0-9.-]*[a-z0-9]$|^[a-z]$'
+ *                 description: Unique model identifier. Must start with lowercase letter, contain only lowercase letters, digits, hyphens, and periods, and not end with hyphen or period.
+ *                 example: "gpt2-new"
+ *               layers:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 127
+ *                 description: Number of layers in the model
+ *                 example: 12
+ *               displayName:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 64
+ *                 description: Human-readable display name for the model
+ *                 example: "GPT-2 New"
+ *               url:
+ *                 type: string
+ *                 format: uri
+ *                 nullable: true
+ *                 description: Optional URL for the model's website or documentation
+ *                 example: "https://huggingface.co/gpt2"
+ *     responses:
+ *       200:
+ *         description: Model created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   description: The created model's ID
+ *                 message:
+ *                   type: string
+ *                   description: Success message
+ *       400:
+ *         description: Bad request - validation error or model already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   description: Error message
+ *                 path:
+ *                   type: string
+ *                   description: Field path that caused the validation error (if applicable)
+ *       401:
+ *         description: Unauthorized - authentication required
+ *       500:
+ *         description: Internal server error
+ */
+
 const NewModelRequestSchema = yup.object({
   id: yup
     .string()

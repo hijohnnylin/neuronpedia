@@ -1,8 +1,14 @@
-import { CLTGraph, makeGraphPublicAccessGraphUrl, NP_GRAPH_BUCKET } from '@/app/[modelId]/graph/utils';
+import {
+  ATTRIBUTION_GRAPH_SCHEMA,
+  CLTGraph,
+  makeGraphPublicAccessGraphUrl,
+  NP_GRAPH_BUCKET,
+} from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
 import {
   generateGraph,
   GRAPH_ANONYMOUS_USER_ID,
+  GRAPH_BATCH_SIZE,
   GRAPH_MAX_TOKENS,
   GRAPH_S3_USER_GRAPHS_DIR,
   graphGenerateSchemaClient,
@@ -10,8 +16,16 @@ import {
 import { tokenizeText } from '@/lib/utils/inference';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import Ajv from 'ajv';
 import { NextResponse } from 'next/server';
 import * as yup from 'yup';
+
+const SCAN_TO_SOURCE_URLS = {
+  'gemma-2-2b': [
+    'https://neuronpedia.org/gemma-2-2b/gemmascope-transcoder-16k',
+    'https://huggingface.co/google/gemma-scope-2b-pt-transcoders',
+  ],
+};
 
 /**
  * @swagger
@@ -70,6 +84,12 @@ import * as yup from 'yup';
  *                 minimum: 0.8
  *                 maximum: 1.0
  *                 default: 0.98
+ *               maxFeatureNodes:
+ *                 type: number
+ *                 description: Maximum number of feature nodes to include in the graph
+ *                 minimum: 3000
+ *                 maximum: 10000
+ *                 default: 5000
  *     responses:
  *       200:
  *         description: Graph generated successfully
@@ -191,16 +211,53 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       validatedData.nodeThreshold,
       validatedData.edgeThreshold,
       validatedData.slug,
+      validatedData.maxFeatureNodes,
     );
 
     console.log('data generated');
 
-    // simple check TODO: do better check
-    if (data.links.length === 0 || data.nodes.length === 0) {
+    // Validate the graph against the JSON schema
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    const validate = ajv.compile(ATTRIBUTION_GRAPH_SCHEMA);
+
+    // Create a deep copy of the data to avoid mutation during validation
+    const dataCopy = JSON.parse(JSON.stringify(data));
+    const isValid = validate(dataCopy);
+
+    if (!isValid) {
       return NextResponse.json({
         error: 'Invalid Graph Generated',
+        message: validate.errors,
       });
     }
+
+    // data is valid - parse it as as json string to CLTGraph and add our metadata to it
+    const graph = data as CLTGraph;
+    graph.metadata = {
+      ...graph.metadata,
+      info: {
+        creator_name: `${request.user?.name || 'Anonymous'} (OSCF)`,
+        creator_url: 'https://neuronpedia.org',
+        // TODO: other sources when they become available
+        source_urls: SCAN_TO_SOURCE_URLS[data.metadata.scan as keyof typeof SCAN_TO_SOURCE_URLS] || [],
+        generator: {
+          name: 'Open Source Circuit Finding by Piotrowski & Hanna',
+          version: '0.1.0 | 042bf4df20be61890110ed22b6024c72337719cf',
+          url: 'https://github.com/safety-research/open-source-circuit-finding',
+        },
+        create_time_ms: Date.now(),
+      },
+      generation_settings: {
+        max_n_logits: validatedData.maxNLogits,
+        desired_logit_prob: validatedData.desiredLogitProb,
+        batch_size: GRAPH_BATCH_SIZE,
+        max_feature_nodes: validatedData.maxFeatureNodes,
+      },
+      pruning_settings: {
+        node_threshold: validatedData.nodeThreshold,
+        edge_threshold: validatedData.edgeThreshold,
+      },
+    };
 
     // once we have the data, upload it to S3
     const key = `${GRAPH_S3_USER_GRAPHS_DIR}/${request.user?.id || GRAPH_ANONYMOUS_USER_ID}/${validatedData.slug}.json`;
@@ -226,8 +283,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const cleanUrl = `https://${NP_GRAPH_BUCKET}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${key}`;
 
     console.log('S3 file upload complete');
-
-    const graph = data as CLTGraph;
 
     // save it to the database
     await prisma.graphMetadata.upsert({

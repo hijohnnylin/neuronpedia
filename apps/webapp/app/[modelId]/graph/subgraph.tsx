@@ -301,10 +301,10 @@ export default function Subgraph() {
 
     // Set up margins and container dimensions
     const margin = {
-      top: 26,
-      bottom: 5,
-      left: visState.isHideLayer ? 0 : 30,
-      right: 5,
+      top: 30,
+      bottom: 50,
+      left: 35,
+      right: 35,
     };
 
     const svgBBox = svgRef.current.getBoundingClientRect();
