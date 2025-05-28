@@ -21,7 +21,7 @@ post:
               type: string
               description: Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with "index", or not at all.
             index:
-              type: string
+              type: integer
               description: Index of the SAE. Must be specified with "source", or not at all.
             vector:
               type: array
