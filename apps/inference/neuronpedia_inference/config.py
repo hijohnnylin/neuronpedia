@@ -42,62 +42,62 @@ class Config:
         steer_special_token_ids: list[int] | None = None,
         nnsight: bool = False,
     ):
-        self.MODEL_ID = model_id
-        self.CUSTOM_HF_MODEL_ID = custom_hf_model_id
-        self.OVERRIDE_MODEL_ID = override_model_id or model_id
-        self.MODEL_DTYPE = model_dtype
-        self.SAE_DTYPE = sae_dtype
-        self.SECRET = secret
-        self.PORT = port
-        self.TOKEN_LIMIT = token_limit
-        self.VALID_COMPLETION_TYPES = valid_completion_types
-        self.NUM_LAYERS = num_layers
-        self.DEVICE = device
-        self.SAE_SETS = sae_sets
+        self.model_id = model_id
+        self.custom_hf_model_id = custom_hf_model_id
+        self.override_model_id = override_model_id or model_id
+        self.model_dtype = model_dtype
+        self.sae_dtype = sae_dtype
+        self.secret = secret
+        self.port = port
+        self.token_limit = token_limit
+        self.valid_completion_types = valid_completion_types
+        self.num_layers = num_layers
+        self.device = device
+        self.sae_sets = sae_sets
         self.include_sae_patterns = include_sae
         self.exclude_sae_patterns = exclude_sae
-        self.SAE_CONFIG = self._filter_sae_config(self._generate_sae_config())
-        self.MODEL_KWARGS = json.loads(model_from_pretrained_kwargs)
-        self.MAX_LOADED_SAES = max_loaded_saes
-        self.STEER_SPECIAL_TOKEN_IDS = steer_special_token_ids
-        self.NNSIGHT = nnsight
+        self.sae_config = self._filter_sae_config(self._generate_sae_config())
+        self.model_kwargs = json.loads(model_from_pretrained_kwargs)
+        self.max_loaded_saes = max_loaded_saes
+        self.steer_special_token_ids = steer_special_token_ids
+        self.nnsight = nnsight
 
         # Log configuration details after initialization
         logger.info(
             f"Initialized Config with:\n"
-            f"  MODEL_ID: {self.MODEL_ID}\n"
-            f"  CUSTOM_HF_MODEL_ID: {self.CUSTOM_HF_MODEL_ID}\n"
-            f"  OVERRIDE_MODEL_ID: {self.OVERRIDE_MODEL_ID}\n"
-            f"  MODEL_DTYPE: {self.MODEL_DTYPE}\n"
-            f"  SAE_DTYPE: {self.SAE_DTYPE}\n"
-            f"  PORT: {self.PORT}\n"
-            f"  TOKEN_LIMIT: {self.TOKEN_LIMIT}\n"
-            f"  DEVICE: {self.DEVICE}\n"
-            f"  SAE_SETS: {self.SAE_SETS}\n"
-            f"  MAX_LOADED_SAES: {self.MAX_LOADED_SAES}\n"
-            f"  INCLUDE_SAE_PATTERNS: {self.include_sae_patterns}\n"
-            f"  EXCLUDE_SAE_PATTERNS: {self.exclude_sae_patterns}\n"
-            f"  NNSIGHT: {self.NNSIGHT}\n"
+            f"  model_id: {self.model_id}\n"
+            f"  custom_hf_model_id: {self.custom_hf_model_id}\n"
+            f"  override_model_id: {self.override_model_id}\n"
+            f"  model_dtype: {self.model_dtype}\n"
+            f"  sae_dtype: {self.sae_dtype}\n"
+            f"  port: {self.port}\n"
+            f"  token_limit: {self.token_limit}\n"
+            f"  device: {self.device}\n"
+            f"  sae_sets: {self.sae_sets}\n"
+            f"  max_loaded_saes: {self.max_loaded_saes}\n"
+            f"  include_sae_patterns: {self.include_sae_patterns}\n"
+            f"  exclude_sae_patterns: {self.exclude_sae_patterns}\n"
+            f"  nnsight: {self.nnsight}\n"
         )
 
     def set_num_layers(self, num_layers: int) -> None:
-        self.NUM_LAYERS = num_layers
+        self.num_layers = num_layers
 
     def set_steer_special_token_ids(
         self, steer_special_token_ids: list[int] | set[int]
     ) -> None:
-        self.STEER_SPECIAL_TOKEN_IDS = steer_special_token_ids
+        self.steer_special_token_ids = steer_special_token_ids
 
     def get_valid_model_ids(self):
-        return set([sae_set["model"] for sae_set in self.SAE_CONFIG])
+        return set([sae_set["model"] for sae_set in self.sae_config])
 
     def _generate_sae_config(self):
         directory_df = get_saelens_neuronpedia_directory_df()
         config_json = config_to_json(
             directory_df,
-            selected_sets_neuronpedia=self.SAE_SETS,
+            selected_sets_neuronpedia=self.sae_sets,
             selected_model=(
-                self.CUSTOM_HF_MODEL_ID if self.CUSTOM_HF_MODEL_ID else self.MODEL_ID
+                self.custom_hf_model_id if self.custom_hf_model_id else self.model_id
             ),
         )
         return config_json  # noqa: RET504

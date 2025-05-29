@@ -126,7 +126,7 @@ def convert_to_chat_array(
     # only other one right now is Gemma 2 Instruct
     else:
         # Get special token IDs directly from the tokenizer
-        special_token_ids = config.STEER_SPECIAL_TOKEN_IDS
+        special_token_ids = config.steer_special_token_ids
 
         if special_token_ids is None:
             special_token_ids = set()
