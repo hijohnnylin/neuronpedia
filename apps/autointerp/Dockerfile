@@ -23,12 +23,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && ln -s /usr/bin/python3.10 /usr/bin/python
 
-# Pick the correct base based on the BUILD_TYPE
+# Main build stage
 FROM base-${BUILD_TYPE:-nocuda} AS final
 
+# Set working directory
 WORKDIR /app
 
 ENV HOST=0.0.0.0
+
+# Ignore hash sum mismatch for apt-get
+RUN echo "Acquire::http::Pipeline-Depth 0;" > /etc/apt/apt.conf.d/99custom && \
+    echo "Acquire::http::No-Cache true;" >> /etc/apt/apt.conf.d/99custom && \
+    echo "Acquire::BrokenProxy    true;" >> /etc/apt/apt.conf.d/99custom
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -38,27 +44,26 @@ RUN apt-get update && apt-get install -y \
     make \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install --upgrade pip \
-    && pip install poetry
+# Install poetry
+RUN pip install poetry
 
-# Copy only pyproject.toml and poetry.lock first to leverage Docker cache
-COPY apps/autointerp/pyproject.toml apps/autointerp/poetry.lock* /app/
-
-# Configure poetry to not create a virtual environment
+ENV POETRY_VIRTUALENVS_CREATE=false
 RUN poetry config virtualenvs.create false
 
-# Install dependencies
-RUN poetry install --no-interaction --no-ansi --no-root
+# Copy the client package first
+COPY packages/python/neuronpedia-autointerp-client /app/packages/python/neuronpedia-autointerp-client/
 
-# Now copy the actual code
-COPY apps/autointerp /app/
+# Copy only poetry files
+COPY apps/autointerp/pyproject.toml apps/autointerp/poetry.lock* apps/autointerp/
+WORKDIR /app/apps/autointerp
 
-# Install the project itself
-RUN poetry install --no-interaction --no-ansi
+# Install only main dependencies
+ENV POETRY_REQUESTS_TIMEOUT=30
+RUN poetry install --only main
 
-# Expose the port the app runs on
+# Now copy the rest of the application code
+COPY apps/autointerp /app/apps/autointerp/
+
 EXPOSE 5003
 
-# Command to run the application
 CMD ["python", "-m", "uvicorn", "server:app", "--host", "0.0.0.0", "--port", "5003", "--workers", "1"]
