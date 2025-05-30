@@ -18,6 +18,7 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post_request i
 from transformer_lens import ActivationCache
 
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.layer_activation_cache import LayerActivationCache
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, with_request_lock
 
@@ -66,7 +67,27 @@ async def activation_topk_by_token(
         )
 
     str_tokens = model.to_str_tokens(prompt, prepend_bos=prepend_bos)
-    _, cache = model.run_with_cache(tokens)
+
+    # Use cache to avoid redundant forward passes
+    layer_cache = LayerActivationCache.get_instance()
+    layer_num = int(source.split("-")[0]) if not source.isdigit() else int(source)
+
+    # Check cache first
+    cached_entry = layer_cache.get(tokens, layer_num=0, stop_at_layer=layer_num + 1)
+
+    if cached_entry:
+        logger.info(f"Using cached activations for layer {source}")
+        cache = cached_entry.activation_cache
+    else:
+        logger.info(f"Computing new activations for layer {source}")
+        _, cache = model.run_with_cache(tokens, stop_at_layer=layer_num + 1)
+        # Store in cache
+        layer_cache.put(
+            tokens=tokens,
+            layer_num=0,
+            activation_cache=cache,
+            stop_at_layer=layer_num + 1,
+        )
 
     hook_name = sae_manager.get_sae_hook(source)
     sae_type = sae_manager.get_sae_type(source)
