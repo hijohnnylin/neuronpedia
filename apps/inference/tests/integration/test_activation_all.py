@@ -8,7 +8,16 @@ from neuronpedia_inference_client.models.activation_all_post_request import (
     ActivationAllPostRequest,
 )
 
-from tests.conftest import BOS_TOKEN_STR, TEST_PROMPT, X_SECRET_KEY
+from tests.conftest import (
+    BOS_TOKEN_STR,
+    MODEL_ID,
+    SAE_SELECTED_SOURCES,
+    SAE_SOURCE_SET,
+    TEST_PROMPT,
+    X_SECRET_KEY,
+)
+
+ENDPOINT = "/v1/activation/all"
 
 
 def test_activation_all(client: TestClient):
@@ -17,15 +26,15 @@ def test_activation_all(client: TestClient):
     """
     request = ActivationAllPostRequest(
         prompt=TEST_PROMPT,
-        model="gpt2-small",
-        source_set="res-jb",
-        selected_sources=["7-res-jb"],
+        model=MODEL_ID,
+        source_set=SAE_SOURCE_SET,
+        selected_sources=SAE_SELECTED_SOURCES,
         sort_by_token_indexes=[],
         ignore_bos=True,
     )
 
     response = client.post(
-        "/v1/activation/all",
+        ENDPOINT,
         json=request.model_dump(),
         headers={"X-SECRET-KEY": X_SECRET_KEY},
     )
