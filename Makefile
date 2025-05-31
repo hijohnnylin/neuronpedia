@@ -126,6 +126,7 @@ inference-localhost-build: ## Inference: Localhost Environment - Build
 	ENV_FILE=.env.localhost \
 		BUILD_TYPE=$(BUILD_TYPE) \
 		docker compose \
+		-f docker-compose.yaml \
 		$(if $(USE_LOCAL_HF_CACHE),-f docker-compose.hf-cache.yaml,) \
 		build inference
 
