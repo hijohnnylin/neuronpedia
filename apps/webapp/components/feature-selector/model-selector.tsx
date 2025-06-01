@@ -12,6 +12,7 @@ export default function ModelSelector({
   filterToRelease,
   showUnlisted = false,
   overrideModels,
+  id,
 }: {
   modelId: string;
   modelIdChangedCallback: (modelId: string) => void;
@@ -19,6 +20,7 @@ export default function ModelSelector({
   filterToRelease?: string | undefined;
   showUnlisted?: boolean;
   overrideModels?: string[];
+  id?: string;
 }) {
   const { globalModels, getSourceSetsForModelId, getInferenceEnabledForModel } = useGlobalContext();
 
@@ -33,7 +35,10 @@ export default function ModelSelector({
           modelIdChangedCallback(newVal);
         }}
       >
-        <Select.Trigger className="flex h-10 max-h-[40px] min-h-[40px] w-full flex-1 flex-row items-center justify-center gap-x-1 whitespace-pre rounded border border-slate-300 bg-white px-2 font-mono text-[10px] font-medium text-sky-700 hover:bg-slate-50 focus:outline-none sm:pl-4 sm:pr-2 sm:text-xs">
+        <Select.Trigger
+          id={id}
+          className="flex h-10 max-h-[40px] min-h-[40px] w-full flex-1 flex-row items-center justify-center gap-x-1 whitespace-pre rounded border border-slate-300 bg-white px-2 font-mono text-[10px] font-medium text-sky-700 hover:bg-slate-50 focus:outline-none sm:pl-4 sm:pr-2 sm:text-xs"
+        >
           <div className="flex flex-col gap-y-0">
             <Select.Value />
             <div className="mt-0.5 text-center text-[8px] font-medium leading-none text-slate-400">MODEL</div>
@@ -88,9 +93,8 @@ export default function ModelSelector({
                   <Select.Item
                     key={mId}
                     value={mId}
-                    className={`flex flex-col items-start gap-y-0.5 overflow-hidden border-b border-b-slate-100 px-3 py-2.5 text-xs ${
-                      mId === modelId ? 'bg-sky-100 text-sky-700' : 'text-slate-600'
-                    } hover:bg-slate-100 focus:outline-none`}
+                    className={`flex flex-col items-start gap-y-0.5 overflow-hidden border-b border-b-slate-100 px-3 py-2.5 text-xs ${mId === modelId ? 'bg-sky-100 text-sky-700' : 'text-slate-600'
+                      } hover:bg-slate-100 focus:outline-none`}
                   >
                     <div className="flex w-full flex-row items-center justify-between gap-x-3">
                       <Select.ItemText>
