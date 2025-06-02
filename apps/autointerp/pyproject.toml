@@ -13,7 +13,7 @@ fastapi = "^0.115.0"
 pydantic = "^2.0.0"
 uvicorn = "^0.34.0"
 python-dotenv = "^1.1.0"
-neuronpedia-autointerp-client = "^1.0.0"
+neuronpedia-autointerp-client = {path = "../../packages/python/neuronpedia-autointerp-client"}
 sentry-sdk = { extras = ["fastapi"], version = "^2.20.0" }
 sae-auto-interp = { git = "https://github.com/hijohnnylin/sae-auto-interp" }
 bitsandbytes = "==0.42.0"
