@@ -25,17 +25,16 @@ from typing_extensions import Self
 
 class ScoreFuzzDetectionPost200ResponseBreakdownInner(BaseModel):
     """
-    The \"scorer.__call__\" result's score breakdown. Type copied from https://github.com/EleutherAI/sae-auto-interp/blob/3659ff3bfefbe2628d37484e5bcc0087a5b10a27/sae_auto_interp/scorers/classifier/sample.py#L19
+    The \"scorer.__call__\" result's score breakdown. Type copied from https://github.com/EleutherAI/delphi/blob/10b855691891f39df96bbc6247ccc7cdfb243ede/delphi/scorers/classifier/sample.py#L18
     """ # noqa: E501
     str_tokens: Optional[List[StrictStr]] = Field(default=None, description="List of strings")
     activations: Optional[List[Union[StrictFloat, StrictInt]]] = Field(default=None, description="List of floats")
-    distance: Optional[StrictInt] = Field(default=None, description="Quantile or neighbor distance")
-    ground_truth: Optional[StrictBool] = Field(default=None, description="Whether the example is activating or not")
+    distance: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="Quantile or neighbor distance")
+    activating: Optional[StrictBool] = Field(default=None, description="Whether the example is activating or not")
     prediction: Optional[StrictBool] = Field(default=False, description="Whether the model predicted the example activating or not")
-    highlighted: Optional[StrictBool] = Field(default=False, description="Whether the sample is highlighted")
     probability: Optional[Union[StrictFloat, StrictInt]] = Field(default=0.0, description="The probability of the example activating")
     correct: Optional[StrictBool] = Field(default=False, description="Whether the prediction is correct")
-    __properties: ClassVar[List[str]] = ["str_tokens", "activations", "distance", "ground_truth", "prediction", "highlighted", "probability", "correct"]
+    __properties: ClassVar[List[str]] = ["str_tokens", "activations", "distance", "activating", "prediction", "probability", "correct"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -76,6 +75,21 @@ class ScoreFuzzDetectionPost200ResponseBreakdownInner(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # set to None if prediction (nullable) is None
+        # and model_fields_set contains the field
+        if self.prediction is None and "prediction" in self.model_fields_set:
+            _dict['prediction'] = None
+
+        # set to None if probability (nullable) is None
+        # and model_fields_set contains the field
+        if self.probability is None and "probability" in self.model_fields_set:
+            _dict['probability'] = None
+
+        # set to None if correct (nullable) is None
+        # and model_fields_set contains the field
+        if self.correct is None and "correct" in self.model_fields_set:
+            _dict['correct'] = None
+
         return _dict
 
     @classmethod
@@ -91,9 +105,8 @@ class ScoreFuzzDetectionPost200ResponseBreakdownInner(BaseModel):
             "str_tokens": obj.get("str_tokens"),
             "activations": obj.get("activations"),
             "distance": obj.get("distance"),
-            "ground_truth": obj.get("ground_truth"),
+            "activating": obj.get("activating"),
             "prediction": obj.get("prediction") if obj.get("prediction") is not None else False,
-            "highlighted": obj.get("highlighted") if obj.get("highlighted") is not None else False,
             "probability": obj.get("probability") if obj.get("probability") is not None else 0.0,
             "correct": obj.get("correct") if obj.get("correct") is not None else False
         })
