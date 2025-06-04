@@ -161,7 +161,7 @@ export const getActivationForFeature = async (
             prompt: defaultTestText,
             model: transformerLensModelId,
             source: feature.layer,
-            index: feature.index,
+            index: Number(feature.index),
           },
     })
     .then((result: ActivationSinglePost200Response) => {

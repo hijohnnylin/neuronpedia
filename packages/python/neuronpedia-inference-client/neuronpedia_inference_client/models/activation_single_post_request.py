@@ -30,7 +30,7 @@ class ActivationSinglePostRequest(BaseModel):
     prompt: StrictStr = Field(description="Input text prompt to get activations for")
     model: StrictStr = Field(description="Name of the model to test activations on")
     source: Optional[StrictStr] = Field(default=None, description="Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with \"index\", or not at all.")
-    index: Optional[StrictStr] = Field(default=None, description="Index of the SAE. Must be specified with \"source\", or not at all.")
+    index: Optional[StrictInt] = Field(default=None, description="Index of the SAE. Must be specified with \"source\", or not at all.")
     vector: Optional[List[Union[StrictFloat, StrictInt]]] = Field(default=None, description="Custom vector to test activations. Must be specified with \"hook\".")
     hook: Optional[StrictStr] = Field(default=None, description="Hook that the custom vector applies to. Must be specified with \"vector\".")
     __properties: ClassVar[List[str]] = ["prompt", "model", "source", "index", "vector", "hook"]

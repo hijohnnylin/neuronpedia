@@ -52,7 +52,7 @@ async def activation_single(
     if request.source is not None and request.index is not None:
         source = request.source
         layer_num = get_layer_num_from_sae_id(source)
-        index = int(request.index)
+        index = request.index
 
         sae = sae_manager.get_sae(source)
 

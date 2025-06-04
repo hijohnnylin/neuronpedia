@@ -39,10 +39,10 @@ export interface ActivationSinglePostRequest {
     source?: string;
     /**
      * Index of the SAE. Must be specified with "source", or not at all.
-     * @type {string}
+     * @type {number}
      * @memberof ActivationSinglePostRequest
      */
-    index?: string;
+    index?: number;
     /**
      * Custom vector to test activations. Must be specified with "hook".
      * @type {Array<number>}
