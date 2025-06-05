@@ -31,7 +31,6 @@ class Config:
         secret: str | None = None,
         port: int = 5000,
         token_limit: int = 100,
-        saes_path: str | None = None,
         valid_completion_types: list[str] = ["default", "steered"],
         num_layers: int | None = None,
         device: str | None = None,
@@ -51,7 +50,6 @@ class Config:
         self.SECRET = secret
         self.PORT = port
         self.TOKEN_LIMIT = token_limit
-        self.SAES_PATH = saes_path
         self.VALID_COMPLETION_TYPES = valid_completion_types
         self.NUM_LAYERS = num_layers
         self.DEVICE = device
@@ -89,13 +87,6 @@ class Config:
         self, steer_special_token_ids: list[int] | set[int]
     ) -> None:
         self.STEER_SPECIAL_TOKEN_IDS = steer_special_token_ids
-
-    def are_models_compatible(self, model_id_1: str, model_id_2: str) -> bool:
-        if model_id_1.endswith("-it"):
-            model_id_1 = model_id_1[:-3]
-        elif model_id_2.endswith("-it"):
-            model_id_2 = model_id_2[:-3]
-        return model_id_1 == model_id_2
 
     def get_valid_model_ids(self):
         return set([sae_set["model"] for sae_set in self.SAE_CONFIG])

@@ -44,7 +44,6 @@ def test_config_initialization(mock_config: Config):
     assert mock_config.SECRET == "test_secret"
     assert mock_config.PORT == 5000
     assert mock_config.TOKEN_LIMIT == 100
-    assert mock_config.SAES_PATH is None
     assert mock_config.VALID_COMPLETION_TYPES == ["DEFAULT", "STEERED"]
     assert mock_config.DEVICE == "cpu"
 
@@ -106,7 +105,6 @@ def test_config_no_filtering(mock_config: Config):
     assert mock_config.SECRET == "test_secret"
     assert mock_config.PORT == 5000
     assert mock_config.TOKEN_LIMIT == 100
-    assert mock_config.SAES_PATH is None
     assert mock_config.VALID_COMPLETION_TYPES == ["DEFAULT", "STEERED"]
     assert mock_config.DEVICE == "cpu"
 
