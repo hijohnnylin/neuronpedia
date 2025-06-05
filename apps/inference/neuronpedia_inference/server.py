@@ -110,11 +110,13 @@ async def initialize(
     def load_model_and_sae():
         # Validate inputs
         df = get_saelens_neuronpedia_directory_df()
+
         models = df["model"].unique()
         sae_sets = df["neuronpedia_set"].unique()
         if args.model_id not in models:
             logger.error(
-                f"Error: Invalid model_id '{args.model_id}'. Use --list_models to see available options."
+                f"Error: Invalid model_id '{args.model_id}'. "
+                "Use --list_models to see available options."
             )
             exit(1)
         # iterate through sae_sets and split them by spaces
@@ -126,7 +128,8 @@ async def initialize(
         invalid_sae_sets = set(args_sae_sets) - set(sae_sets)
         if invalid_sae_sets:
             logger.error(
-                f"Error: Invalid SAE set(s): {', '.join(invalid_sae_sets)}. Use --list_models to see available options."
+                f"Error: Invalid SAE set(s): {', '.join(invalid_sae_sets)}. "
+                "Use --list_models to see available options."
             )
             exit(1)
 
@@ -203,7 +206,8 @@ async def initialize(
             config.set_steer_special_token_ids(special_token_ids)  # type: ignore
 
         logger.info(
-            f"Loaded {config.CUSTOM_HF_MODEL_ID if config.CUSTOM_HF_MODEL_ID else config.OVERRIDE_MODEL_ID} on {args.device}"
+            f"Loaded {config.CUSTOM_HF_MODEL_ID or config.OVERRIDE_MODEL_ID} "
+            f"on {args.device}"
         )
         checkCudaError()
 
