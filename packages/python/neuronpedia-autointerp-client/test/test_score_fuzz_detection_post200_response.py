@@ -45,10 +45,9 @@ class TestScoreFuzzDetectionPost200Response(unittest.TestCase):
                         activations = [
                             1.337
                             ], 
-                        distance = 56, 
-                        ground_truth = True, 
+                        distance = 1.337, 
+                        activating = True, 
                         prediction = True, 
-                        highlighted = True, 
                         probability = 1.337, 
                         correct = True, )
                     ]
@@ -64,10 +63,9 @@ class TestScoreFuzzDetectionPost200Response(unittest.TestCase):
                         activations = [
                             1.337
                             ], 
-                        distance = 56, 
-                        ground_truth = True, 
+                        distance = 1.337, 
+                        activating = True, 
                         prediction = True, 
-                        highlighted = True, 
                         probability = 1.337, 
                         correct = True, )
                     ],

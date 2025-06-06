@@ -13,9 +13,9 @@ fastapi = "^0.115.0"
 pydantic = "^2.0.0"
 uvicorn = "^0.34.0"
 python-dotenv = "^1.1.0"
-neuronpedia-autointerp-client = "^1.0.0"
+neuronpedia-autointerp-client = {path = "../../packages/python/neuronpedia-autointerp-client"}
 sentry-sdk = { extras = ["fastapi"], version = "^2.20.0" }
-sae-auto-interp = { git = "https://github.com/hijohnnylin/sae-auto-interp" }
+eai-delphi = "0.0.2"
 bitsandbytes = "==0.42.0"
 torchtyping = "^0.1.5"
 
@@ -37,8 +37,6 @@ build-backend = "poetry.core.masonry.api"
 "typing.List".msg = "Use 'list' instead"
 
 [tool.pyright]
-# Add this line to ignore import errors for missing libraries
-reportMissingImports = "none"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"
 reportUnknownMemberType = "none"
