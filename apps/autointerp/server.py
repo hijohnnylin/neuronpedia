@@ -8,6 +8,7 @@ import torch
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from neuronpedia_autointerp_client.models.explain_default_post_request import (
     ExplainDefaultPostRequest,
@@ -87,6 +88,16 @@ async def score_fuzz_detection_endpoint(request: ScoreFuzzDetectionPostRequest):
 
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(router)
 
 
@@ -102,6 +113,10 @@ async def check_secret_key(
     # if we didn't specify a secret, then just allow the request through
     if SECRET is None:
         return await call_next(request)
+    # Allow OPTIONS requests (CORS preflight) to pass through
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     secret_key = request.headers.get("X-SECRET-KEY")
     if not secret_key or secret_key != SECRET:
         return JSONResponse(
