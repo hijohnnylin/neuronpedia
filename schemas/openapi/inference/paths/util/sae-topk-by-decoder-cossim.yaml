@@ -18,14 +18,18 @@ post:
               items:
                 type: number
               description: Custom vector to find the top features by cossim for.
+              example: [0.1, -0.2, 0.3, 0.5]
             model:
               type: string
               description: Model to compare the vector or feature against.
+              example: "gpt2-small"
             source:
               type: string
               description: Source/SAE ID to compare the vector or feature against.
+              example: "9-res-jb"
             num_results:
               type: integer
+              example: 10
 
   responses:
     "200":

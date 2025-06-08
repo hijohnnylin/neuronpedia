@@ -15,7 +15,7 @@ components:
           properties:
             strength:
               type: number
-              example: 5
+              example: 10
             steering_vector:
               type: array
               items:
@@ -150,25 +150,35 @@ components:
         prompt:
           type: string
           description: Text to pass the model for completion
+          example: "The most iconic structure on Earth is"
         model:
           type: string
           description: Name of the model
+          example: "gpt2-small"
         steer_method:
           $ref: "#/components/schemas/NPSteerMethod"
+          example: "SIMPLE_ADDITIVE"
         normalize_steering:
           type: boolean
           default: false
+          example: false
         types:
           type: array
           items:
             $ref: "#/components/schemas/NPSteerType"
           minItems: 1
           description: Array that specifies whether or not to generate STEERED output, DEFAULT (non-steered) output, or both.
+          example: ["STEERED", "DEFAULT"]
         features:
           type: array
           items:
             $ref: "#/components/schemas/NPSteerFeature"
           description: Features to steer towards or away from
+          example:
+            - model: "gpt2-small"
+              source: "9-res-jb"
+              index: 1124
+              strength: 48
         vectors:
           type: array
           items:
@@ -177,24 +187,31 @@ components:
           type: integer
           minimum: 1
           description: Number of completion tokens to generate
+          example: 50
         temperature:
           type: number
           minimum: 0
+          example: 0.8
         strength_multiplier:
           type: number
           description: The steering strength will be multiplied by this number
+          example: 1.0
         freq_penalty:
           type: number
+          example: 0.0
         seed:
           type: number
+          example: 42
         stream:
           type: boolean
           description: Whether or not to stream responses using Server Side Events (SSE). Note that the OpenAPI spec does not support SSE - you will receive multiple responses with the same format as non-streaming, except with the "output" field chunked.
           default: false
+          example: false
         n_logprobs:
           type: integer
           minimum: 0
           maximum: 10
           default: 0
           description: Number of logprobs to return per token. 0 means no logprobs.
+          example: 0
 paths: {}

@@ -21,6 +21,9 @@ post:
                   items:
                     $ref: "../../shared/steer.yaml#/components/schemas/NPSteerChatMessage"
                   description: Array of chat messages to pass to the model
+                  example:
+                    - content: "The most iconic structure on Earth is"
+                      role: "user"
   responses:
     "200":
       description: Successfully retrieved results

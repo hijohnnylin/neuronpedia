@@ -251,7 +251,12 @@ To interact with the inference server, you have a few options - note that this w
 1.  Load the webapp with the [local database setup](#i-want-to-use-a-local-database--import-more-neuronpedia-data), then using the model / selected source as you would normally do on Neuronpedia.
 2.  Use the pre-generated inference python client at `packages/python/neuronpedia-inference-client` (set environment variable `INFERENCE_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
 3.  Use the openapi spec, located at `schemas/openapi/inference-server.yaml` to make calls with any client of your choice.
-4.  [TODO #1](https://github.com/hijohnnylin/neuronpedia/issues/1): Use a documentation generator to make a simple tester-server that can be activated with `make doc-inference-localhost`
+4.  use Swagger UI to make calls in your browser:
+    ```
+    make doc-inference-localhost
+    ```
+
+    > ⚠️ **warning:** once you go to [localhost:8080](http://localhost:8080), you will need to click `Servers` and select `http://localhost:5002/v1`, and click `Authorize` and enter the value from `INFERENCE_SERVER_SECRET` in `.env.localhost` ( the first time).
 
 #### Pre-Loaded Inference Server Configurations
 

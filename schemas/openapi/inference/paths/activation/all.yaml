@@ -18,37 +18,45 @@ post:
             prompt:
               type: string
               description: Input text prompt to get activations for
+              example: "The most iconic structure on Earth is"
             model:
               type: string
               description: Name of the model to test activations on
+              example: "gpt2-small"
             source_set:
               type: string
               description: The source set name of the SAEs (eg gemmascope-res-16k)
+              example: "res-jb"
             selected_sources:
               type: array
               default: []
               items:
                 type: string
               description: List of specific SAEs to get activations for (eg ["0-gemmascope-res-65k", "5-gemmascope-res-65k"]). If not specified, will get activations for all SAEs in the source set.
+              example: []
             sort_by_token_indexes:
               type: array
               default: []
               items:
                 type: integer
               description: Sort the results by the sum of the activations at the specified token indexes.
+              example: []
             ignore_bos:
               type: boolean
               default: true
               description: Whether or not to include features whose highest activation value is the BOS token.
+              example: true
             feature_filter:
               type: array
               items:
                 type: integer
               description: Optional. If specified, will only return features that match the indexes specified. Can only be used if we're testing just one SAE ("selected_sources" length = 1).
+              example: []
             num_results:
               type: integer
               default: 25
               description: Optional. The number of top features to return.
+              example: 25
   responses:
     "200":
       description: Successfully retrieved results

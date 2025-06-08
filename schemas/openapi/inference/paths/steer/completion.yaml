@@ -6,6 +6,24 @@ post:
       application/json:
         schema:
           $ref: "../../shared/steer.yaml#/components/schemas/SteerCompletionRequest"
+        example:
+          prompt: "The most iconic structure on Earth is"
+          model: "gpt2-small"
+          steer_method: "SIMPLE_ADDITIVE"
+          normalize_steering: false
+          types: ["STEERED", "DEFAULT"]
+          features:
+            - model: "gpt2-small"
+              source: "9-res-jb"
+              index: 1124
+              strength: 48
+          n_completion_tokens: 50
+          temperature: 0.8
+          strength_multiplier: 1.0
+          freq_penalty: 0.0
+          seed: 42
+          stream: false
+          n_logprobs: 0
   responses:
     200:
       description: Successfully retrieved results

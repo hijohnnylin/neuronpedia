@@ -10,6 +10,9 @@ info:
 
 servers:
   - url: /v1
+    description: Relative URL (requires running on same host)
+  - url: http://localhost:5002/v1
+    description: Local inference server
 
 paths:
   # Activation

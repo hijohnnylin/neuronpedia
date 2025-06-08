@@ -26,10 +26,10 @@ components:
           example: gpt2-small
         source:
           type: string
-          example: 0-res-jb
+          example: "9-res-jb"
         index:
           type: integer
-          example: 14057
+          example: 1124
 
     NPActivation:
       type: object

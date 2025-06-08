@@ -178,6 +178,22 @@ inference-list-configs: ## Inference: List Configurations (possible values for M
 		echo ""; \
 	done
 
+doc-inference-localhost: ## Inference: Generate Interactive API Documentation
+	@echo "Generating interactive API documentation..."
+	@if ! command -v docker &> /dev/null; then \
+		echo "Error: Docker is required to generate API documentation"; \
+		exit 1; \
+	fi
+	@(sleep 2 && \
+		(command -v open > /dev/null && open http://localhost:8080) || \
+		(command -v xdg-open > /dev/null && xdg-open http://localhost:8080) || \
+		echo "Browser auto-open failed. Please manually open: http://localhost:8080") &
+	docker run --rm -p 8080:8080 \
+		-v $(PWD)/schemas/openapi:/tmp/openapi:ro \
+		-e SWAGGER_JSON=/tmp/openapi/inference-server.yaml \
+		-e PERSIST_AUTHORIZATION=true \
+		swaggerapi/swagger-ui
+
 autointerp-localhost-install: ## Autointerp: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the autointerp dependencies for development in the localhost environment..."
 	cd apps/autointerp && \

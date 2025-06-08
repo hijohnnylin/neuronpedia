@@ -16,19 +16,24 @@ post:
             prompt:
               type: string
               description: Input text prompt to get activations for
+              example: "The most iconic structure on Earth is"
             model:
               type: string
               description: Name of the model to test activations on
+              example: "gpt2-small"
             source:
               type: string
               description: Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with "index", or not at NPActivationAllRequest.
+              example: "9-res-jb"
             top_k:
               type: integer
               description: The number of features to include for each token position.
+              example: 10
             ignore_bos:
               type: boolean
               default: true
               description: Whether or not to include features whose highest activation value is the BOS token.
+              example: true
   responses:
     "200":
       description: Successfully retrieved results
