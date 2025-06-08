@@ -389,7 +389,12 @@ To interact with the autointerp server, you have a few options:
 
 1. Use the pre-generated autointerp python client at `packages/python/neuronpedia-autointerp-client` (set environment variable `AUTOINTERP_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
 2. Use the openapi spec, located at `schemas/openapi/autointerp-server.yaml` to make calls with any client of your choice.
-3. TODO: Use a documentation generator to make a simple tester-server that can be activated with `make doc-autointerp-localhost`
+3. use Swagger UI to make calls in your browser:
+    ```
+    make doc-autointerp-localhost
+    ```
+
+> ⚠️ **warning:** once you go to [localhost:8080](http://localhost:8080), you will need to click `Servers` and select `http://localhost:5003/v1`, and click `Authorize` and enter the value from `AUTOINTERP_SERVER_SECRET` in `.env.localhost` (the first time).
 
 #### Doing Local Autointerp Development
 

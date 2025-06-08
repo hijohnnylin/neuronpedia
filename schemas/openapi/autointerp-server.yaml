@@ -10,6 +10,9 @@ info:
 
 servers:
   - url: /v1
+    description: Relative URL (requires running on same host)
+  - url: http://localhost:5003/v1
+    description: Local autointerp server
 
 paths:
   # Explanations

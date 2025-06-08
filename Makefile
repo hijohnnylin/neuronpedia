@@ -213,6 +213,22 @@ autointerp-localhost-dev: ## Autointerp: Localhost Environment - Run (Developmen
 autointerp-localhost-dev-gpu: ## Autointerp: Localhost Environment - Run (Development Build with CUDA). Usage: make autointerp-localhost-dev-gpu [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
 	$(MAKE) autointerp-localhost-dev ENABLE_GPU=1 AUTORELOAD=$(AUTORELOAD)
 
+doc-autointerp-localhost: ## Doc: Generate Interactive API Documentation
+	@echo "Generating interactive API documentation..."
+	@if ! command -v docker &> /dev/null; then \
+		echo "Error: Docker is required to generate API documentation"; \
+		exit 1; \
+	fi
+	@(sleep 2 && \
+		(command -v open > /dev/null && open http://localhost:8080) || \
+		(command -v xdg-open > /dev/null && xdg-open http://localhost:8080) || \
+		echo "Browser auto-open failed. Please manually open: http://localhost:8080") &
+	docker run --rm -p 8080:8080 \
+		-v $(PWD)/schemas/openapi:/tmp/openapi:ro \
+		-e SWAGGER_JSON=/tmp/openapi/autointerp-server.yaml \
+		-e PERSIST_AUTHORIZATION=true \
+		swaggerapi/swagger-ui
+
 reset-docker-data: ## Reset Docker Data - this deletes your local database!
 	@echo "WARNING: This will delete all your local neuronpedia Docker data and databases!"
 	@read -p "Are you sure you want to continue? (y/N) " confirm; \
