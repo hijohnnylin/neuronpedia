@@ -222,7 +222,8 @@ async def initialize(
 async def check_secret_key(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    if request.url.path == "/health":
+    # Allow OPTIONS requests (CORS preflight) and health checks to pass through
+    if request.url.path == "/health" or request.method == "OPTIONS":
         return await call_next(request)
 
     config = Config.get_instance()
