@@ -3,10 +3,12 @@ RUN mkdir /app
 WORKDIR /app
 
 # Copy package files first
-COPY apps/webapp/package.json /app/apps/webapp/
+COPY apps/webapp/package.json apps/webapp/package-lock.json* /app/apps/webapp/
 
-# Install dependencies in a separate layer
-RUN cd apps/webapp && npm install
+
+# Install dependencies in a seperate layer
+RUN cd apps/webapp && npm install && \
+    npm install -g prisma # needed for prisma in build command
 
 # Copy application code after dependencies
 COPY apps/webapp apps/webapp
