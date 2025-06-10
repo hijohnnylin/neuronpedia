@@ -2,7 +2,6 @@ import logging
 import re
 from typing import Any
 
-import einops
 import torch
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -21,6 +20,9 @@ from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import (
     Model,
+    calculate_per_source_dfa,
+    get_layer_num_from_sae_id,
+    safe_cast,
     with_request_lock,
 )
 
@@ -93,24 +95,6 @@ async def activation_all(
             content={"error": "An error occurred while processing the request"},
             status_code=500,
         )
-
-
-def _get_safe_dtype(dtype: torch.dtype) -> torch.dtype:
-    """
-    Convert float16 to float32, leave other dtypes unchanged.
-    """
-    return torch.float32 if dtype == torch.float16 else dtype
-
-
-def _safe_cast(tensor: torch.Tensor, target_dtype: torch.dtype) -> torch.Tensor:
-    """
-    Safely cast a tensor to the target dtype, creating a copy if needed.
-    Convert float16 to float32, leave other dtypes unchanged.
-    """
-    safe_dtype = _get_safe_dtype(tensor.dtype)
-    if safe_dtype != tensor.dtype or safe_dtype != target_dtype:
-        return tensor.to(target_dtype)
-    return tensor
 
 
 class ActivationProcessor:
@@ -355,61 +339,17 @@ class ActivationProcessor:
         v = cache["v", layer_num]
         attn_weights = cache["pattern", layer_num]
 
-        # Determine the safe dtype for operations
-        v_dtype = _get_safe_dtype(v.dtype)
-        attn_weights_dtype = _get_safe_dtype(attn_weights.dtype)
-        encoder_dtype = _get_safe_dtype(encoder.W_enc.dtype)
-
-        # Use the highest precision dtype
-        op_dtype = max(
-            v_dtype,
-            attn_weights_dtype,
-            encoder_dtype,
-            key=lambda x: x.itemsize,
+        result = calculate_per_source_dfa(
+            model=model,
+            encoder=encoder,
+            v=v,
+            attn_weights=attn_weights,
+            feature_index=idx,
+            max_value_index=max_value_index,
         )
-
-        # Check if the model uses GQA
-        use_gqa = (
-            hasattr(model.cfg, "n_key_value_heads")
-            and model.cfg.n_key_value_heads is not None
-            and model.cfg.n_key_value_heads < model.cfg.n_heads
-        )
-
-        if use_gqa:
-            n_query_heads = attn_weights.shape[1]
-            n_kv_heads = v.shape[2]
-            expansion_factor = n_query_heads // n_kv_heads
-            v = v.repeat_interleave(expansion_factor, dim=2)
-
-        # Cast tensors to operation dtype
-        v = _safe_cast(v, op_dtype)
-        attn_weights = _safe_cast(attn_weights, op_dtype)
-
-        v_cat = einops.rearrange(
-            v, "batch src_pos n_heads d_head -> batch src_pos (n_heads d_head)"
-        )
-
-        attn_weights_bcast = einops.repeat(
-            attn_weights,
-            "batch n_heads dest_pos src_pos -> batch dest_pos src_pos (n_heads d_head)",
-            d_head=model.cfg.d_head,
-        )
-
-        decomposed_z_cat = attn_weights_bcast * v_cat.unsqueeze(1)
-
-        # Cast encoder weights to operation dtype
-        W_enc = _safe_cast(encoder.W_enc[:, idx], op_dtype)
-
-        per_src_pos_dfa = einops.einsum(
-            decomposed_z_cat,
-            W_enc,
-            "batch dest_pos src_pos d_model, d_model -> batch dest_pos src_pos",
-        )
-
-        result = per_src_pos_dfa[torch.arange(1), torch.tensor([max_value_index]), :]
 
         # Cast the result back to the original dtype of v
-        return _safe_cast(result, v.dtype)
+        return safe_cast(result, v.dtype)
 
     def _calculate_table_counts(
         self,
@@ -435,7 +375,7 @@ class ActivationProcessor:
     def _get_layer_num(sae_id: str) -> int:
         """Get layer number from SAE ID."""
         try:
-            return int(sae_id.split("-")[0]) if not sae_id.isdigit() else int(sae_id)
+            return get_layer_num_from_sae_id(sae_id)
 
         except ValueError:
             if "blocks" in sae_id:
