@@ -17,6 +17,9 @@ from neuronpedia_inference.shared import Model
 BOS_TOKEN_STR = "<|endoftext|>"
 TEST_PROMPT = "Hello, world!"
 X_SECRET_KEY = "cat"
+MODEL_ID = "gpt2-small"
+SAE_SOURCE_SET = "res-jb"
+SAE_SELECTED_SOURCES = ["7-res-jb"]
 
 
 @pytest.fixture(scope="session")
