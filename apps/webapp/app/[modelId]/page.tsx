@@ -4,10 +4,9 @@ import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import ModelsDropdown from '@/components/nav/models-dropdown';
 import SearchInferenceModelPane from '@/components/panes/search-inference-model-pane';
 import { BreadcrumbItem, BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
-import { getModelById, getModelByIdWithSourceSets } from '@/lib/db/model';
+import { getModelByIdWithSourceSets } from '@/lib/db/model';
 import { getSourceRelease } from '@/lib/db/source';
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
-import { getLayerNumAsStringFromSource } from '@/lib/utils/source';
 import { SourceReleaseWithRelations } from '@/prisma/generated/zod';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -45,7 +44,7 @@ export async function generateMetadata({
     };
   }
 
-  let title = `${params.modelId.toUpperCase()}`;
+  let title = `${params.modelId}`;
   let description = '';
 
   const model = await getModelById(params.modelId);
@@ -53,7 +52,7 @@ export async function generateMetadata({
     if (searchParams?.q) {
       title = `🔍 ${searchParams.q}`;
       description =
-        params.modelId.toUpperCase() +
+        params.modelId +
         (searchParams?.sourceSet ? ` · ${searchParams.sourceSet.toUpperCase()}` : '') +
         (searchParams?.selectedLayers && JSON.parse(searchParams?.selectedLayers).length > 0
           ? ` · Layer${JSON.parse(searchParams?.selectedLayers).length !== 1 ? 's' : ''}${JSON.parse(
