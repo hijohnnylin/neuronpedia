@@ -30,8 +30,8 @@ export function EditProfileFormAutointerpKeyField({
               ? key === ''
                 ? 'Loading...'
                 : key === NO_API_KEY_SET_VALUE
-                ? "No API key set. Click 'Edit' to set one."
-                : key
+                  ? "No API key set. Click 'Edit' to set one."
+                  : key
               : "Click 'Show' to Reveal Key"
           }
         />
@@ -95,7 +95,7 @@ export function EditProfileFormAutointerpKeyField({
                   }
                 })
                 .catch(() => {
-                  alert("Error setting API key. Please check that it's valid.");
+                  alert("Error setting API key. Please check that it's valid and that it has access to models.");
                 });
             }
           }}

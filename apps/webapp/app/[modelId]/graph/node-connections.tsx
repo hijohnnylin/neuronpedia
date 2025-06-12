@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import GraphFeatureLink from './np-feature-link';
 import {
+  clientCheckClaudeMode,
   clientCheckIsEmbed,
   CLTGraphNode,
   featureTypeToText,
@@ -45,6 +46,11 @@ function FeatureList({
     .filter((node) => {
       // no input = don't show
       if (node[linkProp]?.weight === null || node[linkProp]?.weight === undefined) {
+        return false;
+      }
+
+      // mlp reconstruction error = don't show
+      if (clientCheckClaudeMode() && node.feature_type === 'mlp reconstruction error') {
         return false;
       }
 

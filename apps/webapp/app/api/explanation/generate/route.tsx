@@ -4,6 +4,7 @@ import { getAutoInterpKeyToUse } from '@/lib/db/userSecret';
 import { generateExplanationOaiTokenActivationPair } from '@/lib/external/autointerp-explainer';
 import { generateExplanationOaiAttentionHead } from '@/lib/external/autointerp-explainer-att';
 import { generateExplanationEleutherActsTop20 } from '@/lib/external/autointerp-explainer-eleuther';
+import { generateExplanationNpMaxActLogits } from '@/lib/external/autointerp-explainer-logits';
 import { getExplanationEmbeddingSql } from '@/lib/external/embedding';
 import {
   ERROR_NO_AUTOINTERP_KEY,
@@ -243,6 +244,75 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
         throw new Error('Error getting result');
       }
 
+      const exp = await prisma.explanation.create({
+        data: {
+          modelId: body.modelId,
+          layer: body.layer,
+          index: body.index.toString(),
+          description: explainResult,
+          authorId: user.id,
+          triggeredByUserId: user.id,
+          typeName: explanationType.name,
+          explanationModelName: explanationModel.name,
+        },
+      });
+
+      const embeddingStr = await getExplanationEmbeddingSql(explainResult);
+      await prisma.$queryRaw`
+      UPDATE "Explanation"
+      SET embedding = ${embeddingStr}::vector
+      WHERE id = ${exp.id}
+    `;
+
+      return NextResponse.json({ explanation: exp });
+    }
+    if (explanationType.name === 'np_max-act-logits') {
+      let activations = await prisma.activation.findMany({
+        where: {
+          neuron: {
+            modelId: body.modelId,
+            layer: body.layer,
+            index: body.index.toString(),
+          },
+        },
+      });
+
+      // remove duplicates in activations where the tokens.join("") is the same
+      activations = [...new Map(activations.map((item) => [item.tokens.join(''), item])).values()];
+
+      // re-sort by maxvalue
+      activations.sort((a, b) => b.maxValue - a.maxValue);
+
+      // take the top 10
+      activations = activations.slice(0, ACTIVATIONS_TO_LOAD);
+      if (activations.length === 0) {
+        return NextResponse.json({ message: 'No activations found for this neuron' }, { status: 400 });
+      }
+      // get the feature itself
+      const feature = await prisma.neuron.findUnique({
+        where: {
+          modelId_layer_index: {
+            modelId: body.modelId,
+            layer: body.layer,
+            index: body.index.toString(),
+          },
+        },
+      });
+      if (!feature) {
+        return NextResponse.json({ message: 'Feature not found' }, { status: 400 });
+      }
+      const explainResult = await generateExplanationNpMaxActLogits(
+        activations,
+        feature,
+        explanationModel,
+        explanationModelOpenRouterId,
+        explainerModelType,
+        explainerKeyType,
+        explainerKey,
+      );
+      if (!explainResult) {
+        throw new Error('Error getting result');
+      }
       const exp = await prisma.explanation.create({
         data: {
           modelId: body.modelId,

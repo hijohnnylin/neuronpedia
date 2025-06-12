@@ -1,12 +1,11 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { kv } from '@vercel/kv';
 import { NextRequest, NextResponse } from 'next/server';
-import { CONTACT_EMAIL_ADDRESS, ENABLE_RATE_LIMITER } from './lib/env';
+import { API_KEY_HEADER_NAME, CONTACT_EMAIL_ADDRESS, ENABLE_RATE_LIMITER, HIGHER_LIMIT_API_TOKENS } from './lib/env';
 
 const RATE_LIMIT_WINDOW = '60 m';
 
-// This should always be ordered from broad path to narrow path
-const endpointToRateLimitPerWindow = [
+const NORMAL_RATE_LIMITS = [
   { endpoint: '/', limit: 25000 },
   { endpoint: '/api', limit: 25000 },
   { endpoint: '/api/activation/new', limit: 1000 },
@@ -21,14 +20,42 @@ const endpointToRateLimitPerWindow = [
   { endpoint: '/api/graph/tokenize', limit: 300 },
 ];
 
-const rateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
+const HIGHER_RATE_LIMITS = [
+  { endpoint: '/', limit: 25000 },
+  { endpoint: '/api', limit: 25000 },
+  { endpoint: '/api/activation/new', limit: 1200 }, // higher
+  { endpoint: '/api/explanation/search', limit: 200 },
+  { endpoint: '/api/steer', limit: 300 },
+  { endpoint: '/api/search-topk-by-token', limit: 1200 }, // higher
+  { endpoint: '/api/search-all', limit: 1600 },
+  { endpoint: '/api/graph/generate', limit: 30 },
+  { endpoint: '/api/features/upload-batch', limit: 1000 },
+  { endpoint: '/api/model/new', limit: 5 },
+  { endpoint: '/api/source-set/new', limit: 10 },
+  { endpoint: '/api/graph/tokenize', limit: 300 },
+];
+
+const normalRateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
 // eslint-disable-next-line no-restricted-syntax
-for (const { endpoint, limit } of endpointToRateLimitPerWindow) {
-  rateLimiters.push({
+for (const { endpoint, limit } of NORMAL_RATE_LIMITS) {
+  normalRateLimiters.push({
     endpoint,
     limiter: new Ratelimit({
       redis: kv,
       prefix: endpoint,
+      limiter: Ratelimit.slidingWindow(limit, RATE_LIMIT_WINDOW),
+    }),
+  });
+}
+
+const higherRateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
+// eslint-disable-next-line no-restricted-syntax
+for (const { endpoint, limit } of HIGHER_RATE_LIMITS) {
+  higherRateLimiters.push({
+    endpoint,
+    limiter: new Ratelimit({
+      redis: kv,
+      prefix: `higher-${endpoint}`,
       limiter: Ratelimit.slidingWindow(limit, RATE_LIMIT_WINDOW),
     }),
   });
@@ -60,8 +87,13 @@ export default async function middleware(request: NextRequest) {
   let foundEndpoint = '';
   let foundEndpointLimit = 0;
   const remaining = 0;
+
+  const apiKey = request.headers.get(API_KEY_HEADER_NAME);
+  const rateLimitersToUse =
+    apiKey && HIGHER_LIMIT_API_TOKENS.includes(apiKey) ? higherRateLimiters : normalRateLimiters;
+
   // eslint-disable-next-line no-restricted-syntax
-  for (const { endpoint, limiter } of rateLimiters) {
+  for (const { endpoint, limiter } of rateLimitersToUse) {
     if (pathname.startsWith(endpoint)) {
       // eslint-disable-next-line
       const { success, pending, limit, reset, remaining } = await limiter.limit(ip);

@@ -132,3 +132,8 @@ export const IS_DOCKER_COMPOSE = process.env.IS_DOCKER_COMPOSE === 'true';
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || IS_ONE_CLICK_VERCEL_DEPLOY;
 export const ASSET_BASE_URL = 'https://neuronpedia.s3.us-east-1.amazonaws.com/site-assets';
 export const GRAPH_ADMIN_BROWSE_KEY = process.env.GRAPH_ADMIN_BROWSE_KEY || '';
+
+export const API_KEY_HEADER_NAME = 'x-api-key';
+export const HIGHER_LIMIT_API_TOKENS = process.env.HIGHER_LIMIT_API_TOKENS
+  ? process.env.HIGHER_LIMIT_API_TOKENS.split(',').map((t) => t.trim())
+  : [];

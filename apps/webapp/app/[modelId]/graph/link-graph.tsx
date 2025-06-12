@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import d3 from './d3-jetpack';
 import GraphControls from './graph-controls';
 import {
+  clientCheckClaudeMode,
   CLTGraphExtended,
   CLTGraphLink,
   CLTGraphNode,
@@ -697,7 +698,10 @@ export default function LinkGraph() {
     d3.select(svgRef.current).selectAll('*').remove();
 
     const data = selectedGraph as CLTGraphExtended;
-    const nodes = filterNodes(data, data.nodes, selectedGraph, visState, clickedIdRef.current);
+    let nodes = filterNodes(data, data.nodes, selectedGraph, visState, clickedIdRef.current);
+    if (clientCheckClaudeMode()) {
+      nodes = nodes.filter((d) => d.feature_type !== 'mlp reconstruction error');
+    }
 
     // Set up the base SVG container
     const svgContainer = d3.select(svgRef.current);

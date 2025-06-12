@@ -817,6 +817,11 @@ export function clientCheckIsEmbed() {
   return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('embed') === 'true';
 }
 
+// various optimizations for Claude to get less confused. currently: hides MLP reconstruction errors
+export function clientCheckClaudeMode() {
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('claudeMode') === 'true';
+}
+
 const GraphSupernodesSchema = z.array(z.array(z.string()));
 const GraphClerpsSchema = z.array(z.array(z.string()));
 

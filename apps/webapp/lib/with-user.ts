@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 // eslint-disable-next-line import/no-cycle
-import {
-  API_KEY_HEADER_NAME,
-  getAuthenticatedUserFromApiKey,
-  getUserById,
-  makeAuthedUserFromSessionOrReturnNull,
-} from './db/user';
+import { getAuthenticatedUserFromApiKey, getUserById, makeAuthedUserFromSessionOrReturnNull } from './db/user';
+import { API_KEY_HEADER_NAME } from './env';
 
 export type AuthenticatedUser = {
   id: string;
