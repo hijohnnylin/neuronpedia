@@ -53,7 +53,7 @@ post:
                 type: array
                 items:
                   type: object
-                  description: The "scorer.__call__" result's score breakdown. Type copied from https://github.com/EleutherAI/sae-auto-interp/blob/3659ff3bfefbe2628d37484e5bcc0087a5b10a27/sae_auto_interp/scorers/classifier/sample.py#L19
+                  description: The "scorer.__call__" result's score breakdown. Type copied from https://github.com/EleutherAI/delphi/blob/10b855691891f39df96bbc6247ccc7cdfb243ede/delphi/scorers/classifier/sample.py#L18
                   properties:
                     str_tokens:
                       type: array
@@ -67,26 +67,25 @@ post:
                         format: float
                       description: List of floats
                     distance:
-                      type: integer
+                      type: number
                       description: Quantile or neighbor distance
-                    ground_truth:
+                    activating:
                       type: boolean
                       description: Whether the example is activating or not
                     prediction:
                       type: boolean
+                      nullable: true
                       default: false
                       description: Whether the model predicted the example activating or not
-                    highlighted:
-                      type: boolean
-                      default: false
-                      description: Whether the sample is highlighted
                     probability:
                       type: number
                       format: float
+                      nullable: true
                       default: 0.0
                       description: The probability of the example activating
                     correct:
                       type: boolean
+                      nullable: true
                       default: false
                       description: Whether the prediction is correct
           description: Detailed breakdown of the classification outputs

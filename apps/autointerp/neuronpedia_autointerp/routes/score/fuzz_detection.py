@@ -1,6 +1,15 @@
 import traceback
 
 import torch
+from delphi.clients import OpenRouter
+from delphi.latents.latents import (
+    ActivatingExample,
+    Latent,
+    LatentRecord,
+    NonActivatingExample,
+)
+from delphi.scorers import DetectionScorer, FuzzingScorer
+from delphi.scorers.scorer import ScorerResult
 from fastapi import HTTPException
 from neuronpedia_autointerp_client.models.np_score_fuzz_detection_type import (
     NPScoreFuzzDetectionType,
@@ -11,10 +20,6 @@ from neuronpedia_autointerp_client.models.score_fuzz_detection_post200_response 
 from neuronpedia_autointerp_client.models.score_fuzz_detection_post_request import (
     ScoreFuzzDetectionPostRequest,
 )
-from sae_auto_interp.clients import OpenRouter
-from sae_auto_interp.features import Example, Feature, FeatureRecord
-from sae_auto_interp.scorers import DetectionScorer, FuzzingScorer
-from sae_auto_interp.scorers.scorer import ScorerResult
 
 from neuronpedia_autointerp.utils import (
     convert_classifier_output_to_score_classifier_output,
@@ -39,29 +44,39 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
     We currently show 5 examples at a time (batch_size=5).
     """
     try:
-        feature = Feature("feature", 0)
+        feature = Latent("feature", 0)
         activating_examples = []
         non_activating_examples = []
 
         for activation in request.activations:
-            example = Example(activation.tokens, torch.tensor(activation.values))  # type: ignore
             if sum(activation.values) > 0:
+                example = ActivatingExample(
+                    tokens=activation.tokens,  # type: ignore
+                    activations=torch.tensor(activation.values),
+                    str_tokens=activation.tokens,
+                    quantile=1,
+                )
                 activating_examples.append(example)
             else:
+                example = NonActivatingExample(
+                    tokens=activation.tokens,  # type: ignore
+                    activations=torch.tensor(activation.values),
+                    str_tokens=activation.tokens,
+                    distance=-1,
+                )
                 non_activating_examples.append(example)
 
-        feature_record = FeatureRecord(feature)
-        feature_record.test = [activating_examples]
-        feature_record.extra_examples = non_activating_examples  # type: ignore
-        feature_record.random_examples = non_activating_examples  # type: ignore
-        feature_record.explanation = request.explanation  # type: ignore
+        feature_record = LatentRecord(feature)
+        feature_record.test = activating_examples
+        feature_record.not_active = non_activating_examples
+        feature_record.extra_examples = non_activating_examples
+        feature_record.explanation = request.explanation
 
         client = OpenRouter(api_key=request.openrouter_key, model=request.model)
 
         if request.type == NPScoreFuzzDetectionType.FUZZ:
             scorer = FuzzingScorer(
                 client,
-                tokenizer=None,  # type: ignore
                 batch_size=5,
                 verbose=False,
                 log_prob=False,
@@ -69,7 +84,6 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
         elif request.type == NPScoreFuzzDetectionType.DETECTION:
             scorer = DetectionScorer(
                 client,
-                tokenizer=None,  # type: ignore
                 batch_size=5,
                 verbose=False,
                 log_prob=False,
@@ -77,7 +91,7 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
         else:
             raise HTTPException(status_code=400, detail="Invalid scoring type")
 
-        result: ScorerResult = await scorer.__call__(feature_record)  # type: ignore
+        result: ScorerResult = await scorer.__call__(feature_record)
         score = per_feature_scores_fuzz_detection(result.score)
 
         breakdown = [

@@ -32,10 +32,10 @@ def test_per_feature_scores_embedding():
 def test_calculate_balanced_accuracy_positives_and_negatives():
     df = pd.DataFrame(
         [
-            {"ground_truth": True, "correct": True},  # TP
-            {"ground_truth": True, "correct": False},  # FN
-            {"ground_truth": False, "correct": True},  # TN
-            {"ground_truth": False, "correct": False},  # FP
+            {"activating": True, "correct": True},  # TP
+            {"activating": True, "correct": False},  # FN
+            {"activating": False, "correct": True},  # TN
+            {"activating": False, "correct": False},  # FP
         ]
     )
     balanced_accuracy = calculate_balanced_accuracy(df)
@@ -48,8 +48,8 @@ def test_calculate_balanced_accuracy_positives_and_negatives():
 def test_calculate_balanced_accuracy_no_positives():
     df = pd.DataFrame(
         [
-            {"ground_truth": False, "correct": True},  # TN
-            {"ground_truth": False, "correct": False},  # FP
+            {"activating": False, "correct": True},  # TN
+            {"activating": False, "correct": False},  # FP
         ]
     )
     balanced_accuracy = calculate_balanced_accuracy(df)
@@ -62,8 +62,8 @@ def test_calculate_balanced_accuracy_no_positives():
 def test_calculate_balanced_accuracy_no_negatives():
     df = pd.DataFrame(
         [
-            {"ground_truth": True, "correct": True},  # TP
-            {"ground_truth": True, "correct": False},  # FP
+            {"activating": True, "correct": True},  # TP
+            {"activating": True, "correct": False},  # FP
         ]
     )
     balanced_accuracy = calculate_balanced_accuracy(df)
@@ -82,12 +82,12 @@ def test_per_feature_scores_fuzz_detection(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(pd, "DataFrame", dataframe_wrapper)
 
     response_1 = ScoreFuzzDetectionPost200ResponseBreakdownInner(
-        ground_truth=True,
+        activating=True,
         prediction=True,
         correct=True,
     )
     response_2 = ScoreFuzzDetectionPost200ResponseBreakdownInner(
-        ground_truth=False,
+        activating=False,
         prediction=False,
         correct=True,
     )
@@ -96,7 +96,7 @@ def test_per_feature_scores_fuzz_detection(monkeypatch: pytest.MonkeyPatch) -> N
     # which is invalid according to the model, we can test how our function handles
     # this error state
     response_3 = ScoreFuzzDetectionPost200ResponseBreakdownInner.model_construct(
-        ground_truth=False,
+        activating=False,
         prediction=-1,
         correct=False,
     )
@@ -106,14 +106,13 @@ def test_per_feature_scores_fuzz_detection(monkeypatch: pytest.MonkeyPatch) -> N
     assert pytest.approx(balanced_accuracy) == 1.0
 
 
-def test_convert_classifier_output_negative_prediction():
+def test_convert_classifier_output_no_prediction():
     expected_response = ScoreFuzzDetectionPost200ResponseBreakdownInner.model_construct(
         str_tokens=["test"],
         activations=[0.1],
         distance=1,
-        ground_truth=True,
-        prediction=-1,
-        highlighted=False,
+        activating=True,
+        prediction=None,
         probability=0.7,
         correct=False,
     )
@@ -122,8 +121,7 @@ def test_convert_classifier_output_negative_prediction():
     assert response.str_tokens == expected_response.str_tokens
     assert response.activations == expected_response.activations
     assert response.distance == expected_response.distance
-    assert response.ground_truth == expected_response.ground_truth
-    assert response.highlighted == expected_response.highlighted
+    assert response.activating == expected_response.activating
     assert response.probability == expected_response.probability
     assert response.correct == expected_response.correct
 
@@ -133,9 +131,8 @@ def test_convert_classifier_output_true_prediction():
         str_tokens=["test2"],
         activations=[0.2],
         distance=2,
-        ground_truth=False,
+        activating=False,
         prediction=True,
-        highlighted=True,
         probability=0.8,
         correct=True,
     )

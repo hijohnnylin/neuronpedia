@@ -14,7 +14,7 @@
 
 import { mapValues } from '../runtime';
 /**
- * The "scorer.__call__" result's score breakdown. Type copied from https://github.com/EleutherAI/sae-auto-interp/blob/3659ff3bfefbe2628d37484e5bcc0087a5b10a27/sae_auto_interp/scorers/classifier/sample.py#L19
+ * The "scorer.__call__" result's score breakdown. Type copied from https://github.com/EleutherAI/delphi/blob/10b855691891f39df96bbc6247ccc7cdfb243ede/delphi/scorers/classifier/sample.py#L18
  * @export
  * @interface ScoreFuzzDetectionPost200ResponseBreakdownInner
  */
@@ -42,31 +42,25 @@ export interface ScoreFuzzDetectionPost200ResponseBreakdownInner {
      * @type {boolean}
      * @memberof ScoreFuzzDetectionPost200ResponseBreakdownInner
      */
-    groundTruth?: boolean;
+    activating?: boolean;
     /**
      * Whether the model predicted the example activating or not
      * @type {boolean}
      * @memberof ScoreFuzzDetectionPost200ResponseBreakdownInner
      */
-    prediction?: boolean;
-    /**
-     * Whether the sample is highlighted
-     * @type {boolean}
-     * @memberof ScoreFuzzDetectionPost200ResponseBreakdownInner
-     */
-    highlighted?: boolean;
+    prediction?: boolean | null;
     /**
      * The probability of the example activating
      * @type {number}
      * @memberof ScoreFuzzDetectionPost200ResponseBreakdownInner
      */
-    probability?: number;
+    probability?: number | null;
     /**
      * Whether the prediction is correct
      * @type {boolean}
      * @memberof ScoreFuzzDetectionPost200ResponseBreakdownInner
      */
-    correct?: boolean;
+    correct?: boolean | null;
 }
 
 /**
@@ -89,9 +83,8 @@ export function ScoreFuzzDetectionPost200ResponseBreakdownInnerFromJSONTyped(jso
         'strTokens': json['str_tokens'] == null ? undefined : json['str_tokens'],
         'activations': json['activations'] == null ? undefined : json['activations'],
         'distance': json['distance'] == null ? undefined : json['distance'],
-        'groundTruth': json['ground_truth'] == null ? undefined : json['ground_truth'],
+        'activating': json['activating'] == null ? undefined : json['activating'],
         'prediction': json['prediction'] == null ? undefined : json['prediction'],
-        'highlighted': json['highlighted'] == null ? undefined : json['highlighted'],
         'probability': json['probability'] == null ? undefined : json['probability'],
         'correct': json['correct'] == null ? undefined : json['correct'],
     };
@@ -111,9 +104,8 @@ export function ScoreFuzzDetectionPost200ResponseBreakdownInnerToJSONTyped(value
         'str_tokens': value['strTokens'],
         'activations': value['activations'],
         'distance': value['distance'],
-        'ground_truth': value['groundTruth'],
+        'activating': value['activating'],
         'prediction': value['prediction'],
-        'highlighted': value['highlighted'],
         'probability': value['probability'],
         'correct': value['correct'],
     };

@@ -1,6 +1,6 @@
 # ScoreFuzzDetectionPost200ResponseBreakdownInner
 
-The \"scorer.__call__\" result's score breakdown. Type copied from https://github.com/EleutherAI/sae-auto-interp/blob/3659ff3bfefbe2628d37484e5bcc0087a5b10a27/sae_auto_interp/scorers/classifier/sample.py#L19
+The \"scorer.__call__\" result's score breakdown. Type copied from https://github.com/EleutherAI/delphi/blob/10b855691891f39df96bbc6247ccc7cdfb243ede/delphi/scorers/classifier/sample.py#L18
 
 ## Properties
 
@@ -8,10 +8,9 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **str_tokens** | **List[str]** | List of strings | [optional] 
 **activations** | **List[float]** | List of floats | [optional] 
-**distance** | **int** | Quantile or neighbor distance | [optional] 
-**ground_truth** | **bool** | Whether the example is activating or not | [optional] 
+**distance** | **float** | Quantile or neighbor distance | [optional] 
+**activating** | **bool** | Whether the example is activating or not | [optional] 
 **prediction** | **bool** | Whether the model predicted the example activating or not | [optional] [default to False]
-**highlighted** | **bool** | Whether the sample is highlighted | [optional] [default to False]
 **probability** | **float** | The probability of the example activating | [optional] [default to 0.0]
 **correct** | **bool** | Whether the prediction is correct | [optional] [default to False]
 
