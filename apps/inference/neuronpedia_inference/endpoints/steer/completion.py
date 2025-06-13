@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import torch
 from fastapi import APIRouter
@@ -147,42 +147,6 @@ async def run_batched_generate(
         # Add device logging
         logger.info(f"Model device: {model.cfg.device}")
 
-        if seed is not None:
-            torch.manual_seed(seed)
-
-        def steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
-            # Log activation device
-            logger.info(f"Activations device: {activations.device}")
-
-            for i, flag in enumerate(steer_types):
-                if flag == NPSteerType.STEERED:
-                    for feature in features:
-                        steering_vector = torch.tensor(feature.steering_vector).to(
-                            activations.device
-                        )
-                        logger.info(f"Steering vector device: {steering_vector.device}")
-
-                        if not torch.isfinite(steering_vector).all():
-                            raise ValueError(
-                                "Steering vector contains inf or nan values"
-                            )
-
-                        if normalize_steering:
-                            norm = torch.norm(steering_vector)
-                            if norm == 0:
-                                raise ValueError("Zero norm steering vector")
-                            steering_vector = steering_vector / norm
-
-                        coeff = strength_multiplier * feature.strength
-
-                        if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
-                            activations[i] += coeff * steering_vector
-
-                        elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
-                            projector = OrthogonalProjector(steering_vector)
-                            activations[i] = projector.project(activations[i], coeff)
-            return activations
-
         # Check if we need to generate both STEERED and DEFAULT
         generate_both = (
             NPSteerType.STEERED in steer_types and NPSteerType.DEFAULT in steer_types
@@ -192,58 +156,41 @@ async def run_batched_generate(
         logger.info(f"Tokenized input device: {tokenized.device}")
 
         if generate_both:
-            steered_partial_result = ""
-            default_partial_result = ""
-            # Generate STEERED and DEFAULT separately
-            for flag in [NPSteerType.STEERED, NPSteerType.DEFAULT]:
-                if seed is not None:
-                    torch.manual_seed(seed)  # Reset seed for each generation
+            # Try batch generation with different steering for each batch item
+            logger.info("Attempting batch generation for steered and default")
 
-                model.reset_hooks()
-                if flag == NPSteerType.STEERED:
-                    editing_hooks = [
-                        (
-                            (
-                                sae_manager.get_sae_hook(feature.source)
-                                if isinstance(feature, NPSteerFeature)
-                                else feature.hook
-                            ),
-                            steering_hook,
-                        )
-                        for feature in features
-                    ]
-                else:
-                    editing_hooks = []
+            # Pre-process features and create steering vectors
+            processed_steering_vectors = []
+            for feature in features:
+                steering_vector = torch.tensor(feature.steering_vector).to(
+                    model.cfg.device
+                )
+                if normalize_steering:
+                    norm = torch.norm(steering_vector)
+                    if norm > 0:
+                        steering_vector = steering_vector / norm
+                processed_steering_vectors.append(
+                    (feature, steering_vector, strength_multiplier * feature.strength)
+                )
 
-                with model.hooks(fwd_hooks=editing_hooks):
-                    for i, result in enumerate(
-                        model.generate_stream(
-                            stop_at_eos=(model.cfg.device != "mps"),
-                            input=tokenized.unsqueeze(0),
-                            do_sample=True,
-                            max_tokens_per_yield=TOKENS_PER_YIELD,
-                            **kwargs,
-                        )
-                    ):
-                        to_append = ""
-                        if i == 0:
-                            to_append = model.to_string(result[0][1:])  # type: ignore
-                        else:
-                            to_append = model.to_string(result[0])  # type: ignore
-                        if flag == NPSteerType.STEERED:
-                            steered_partial_result += to_append  # type: ignore
-                        else:
-                            default_partial_result += to_append  # type: ignore
-                        to_return = make_steer_completion_response(
-                            steer_types, steered_partial_result, default_partial_result
-                        )  # type: ignore
-                        yield format_sse_message(to_return.to_json())
+            # Create batched input (2 copies of the same prompt)
+            batched_input = tokenized.unsqueeze(0).repeat(2, 1)  # Shape: [2, seq_len]
 
-        else:
-            steer_type = steer_types[0]
-            if seed is not None:
-                torch.manual_seed(seed)
+            def batched_steering_hook(
+                activations: torch.Tensor,
+                hook: Any,  # noqa: ARG001
+            ) -> torch.Tensor:
+                # Apply steering only to the first item in batch (index 0)
+                for _, steering_vector, coeff in processed_steering_vectors:
+                    if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
+                        activations[0] += coeff * steering_vector
+                    elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
+                        projector = OrthogonalProjector(steering_vector)
+                        activations[0] = projector.project(activations[0], coeff)
+                # Leave activations[1] unmodified for DEFAULT
+                return activations
 
+            # Set up hooks
             model.reset_hooks()
             editing_hooks = [
                 (
@@ -252,32 +199,197 @@ async def run_batched_generate(
                         if isinstance(feature, NPSteerFeature)
                         else feature.hook
                     ),
-                    steering_hook,
+                    batched_steering_hook,
                 )
                 for feature in features
             ]
 
-            with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
-                partial_result = ""
-                for i, result in enumerate(
-                    model.generate_stream(
-                        stop_at_eos=(model.cfg.device != "mps"),
-                        input=tokenized.unsqueeze(0),
-                        do_sample=True,
-                        max_tokens_per_yield=TOKENS_PER_YIELD,
-                        **kwargs,
-                    )
+            # Try batched generation
+            try:
+                steered_result = ""
+                default_result = ""
+
+                with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
+                    for i, result in enumerate(
+                        model.generate_stream(
+                            stop_at_eos=(model.cfg.device != "mps"),
+                            input=batched_input,
+                            do_sample=True,
+                            max_tokens_per_yield=TOKENS_PER_YIELD,
+                            **kwargs,
+                        )
+                    ):
+                        # Extract results for both batch items
+                        if i == 0:
+                            steered_append = model.to_string(result[0][1:])  # type: ignore
+                            default_append = model.to_string(result[1][1:])  # type: ignore
+                        else:
+                            steered_append = model.to_string(result[0])  # type: ignore
+                            default_append = model.to_string(result[1])  # type: ignore
+
+                        steered_result += str(steered_append)  # type: ignore
+                        default_result += str(default_append)  # type: ignore
+
+                        to_return = make_steer_completion_response(
+                            steer_types, steered_result, default_result
+                        )
+                        yield format_sse_message(to_return.to_json())
+
+            except Exception as e:
+                logger.warning(
+                    f"Batch generation failed, falling back to sequential: {e}"
+                )
+                # Fall back to sequential generation
+                async for item in sequential_generate(
+                    prompt,
+                    features,
+                    steer_types,
+                    strength_multiplier,
+                    seed,
+                    steer_method,
+                    normalize_steering,
+                    tokenized,
+                    **kwargs,
                 ):
-                    if i == 0:
-                        partial_result = model.to_string(result[0][1:])  # type: ignore
-                    else:
-                        partial_result += model.to_string(result[0])  # type: ignore
-                    to_return = make_steer_completion_response(
-                        [steer_type],
-                        partial_result,  # type: ignore
-                        partial_result,  # type: ignore
-                    )
-                    yield format_sse_message(to_return.to_json())
+                    yield item
+
+        else:
+            # Single generation case
+            steer_type = steer_types[0]
+            async for partial_result in generate_single_completion(
+                prompt=prompt,
+                features=features,
+                steer_type=steer_type,
+                strength_multiplier=strength_multiplier,
+                seed=seed,
+                steer_method=steer_method,
+                normalize_steering=normalize_steering,
+                tokenized=tokenized,
+                **kwargs,
+            ):
+                to_return = make_steer_completion_response(
+                    [steer_type],
+                    partial_result,
+                    partial_result,
+                )
+                yield format_sse_message(to_return.to_json())
+
+
+async def sequential_generate(
+    prompt: str,
+    features: list[NPSteerFeature] | list[NPSteerVector],
+    steer_types: list[NPSteerType],
+    strength_multiplier: float,
+    seed: int | None,
+    steer_method: NPSteerMethod,
+    normalize_steering: bool,
+    tokenized: torch.Tensor,
+    **kwargs: Any,
+):
+    """Fallback to sequential generation if batch generation fails."""
+    steered_partial_result = ""
+    default_partial_result = ""
+
+    # Generate STEERED and DEFAULT separately
+    for flag in [NPSteerType.STEERED, NPSteerType.DEFAULT]:
+        async for partial_result in generate_single_completion(
+            prompt=prompt,
+            features=features,
+            steer_type=flag,
+            strength_multiplier=strength_multiplier,
+            seed=seed,
+            steer_method=steer_method,
+            normalize_steering=normalize_steering,
+            tokenized=tokenized,
+            **kwargs,
+        ):
+            if flag == NPSteerType.STEERED:
+                steered_partial_result = partial_result
+            else:
+                default_partial_result = partial_result
+
+            to_return = make_steer_completion_response(
+                steer_types, steered_partial_result, default_partial_result
+            )
+            yield format_sse_message(to_return.to_json())
+
+
+async def generate_single_completion(
+    prompt: str,  # noqa: ARG001
+    features: list[NPSteerFeature] | list[NPSteerVector],
+    steer_type: NPSteerType,
+    strength_multiplier: float,
+    seed: int | None,
+    steer_method: NPSteerMethod,
+    normalize_steering: bool,
+    tokenized: torch.Tensor,
+    **kwargs: Any,
+) -> AsyncGenerator[str, None]:
+    """Generate a single completion (steered or default)."""
+    model = Model.get_instance()
+    sae_manager = SAEManager.get_instance()
+
+    if seed is not None:
+        torch.manual_seed(seed)
+
+    def steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
+        if steer_type == NPSteerType.STEERED:
+            for feature in features:
+                steering_vector = torch.tensor(feature.steering_vector).to(
+                    activations.device
+                )
+
+                if not torch.isfinite(steering_vector).all():
+                    raise ValueError("Steering vector contains inf or nan values")
+
+                if normalize_steering:
+                    norm = torch.norm(steering_vector)
+                    if norm == 0:
+                        raise ValueError("Zero norm steering vector")
+                    steering_vector = steering_vector / norm
+
+                coeff = strength_multiplier * feature.strength
+
+                if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
+                    activations[0] += coeff * steering_vector
+                elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
+                    projector = OrthogonalProjector(steering_vector)
+                    activations[0] = projector.project(activations[0], coeff)
+        return activations
+
+    model.reset_hooks()
+    editing_hooks = []
+
+    if steer_type == NPSteerType.STEERED:
+        editing_hooks = [
+            (
+                (
+                    sae_manager.get_sae_hook(feature.source)
+                    if isinstance(feature, NPSteerFeature)
+                    else feature.hook
+                ),
+                steering_hook,
+            )
+            for feature in features
+        ]
+
+    partial_result = ""
+    with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
+        for i, result in enumerate(
+            model.generate_stream(
+                stop_at_eos=(model.cfg.device != "mps"),
+                input=tokenized.unsqueeze(0),
+                do_sample=True,
+                max_tokens_per_yield=TOKENS_PER_YIELD,
+                **kwargs,
+            )
+        ):
+            if i == 0:
+                to_append = model.to_string(result[0][1:])  # type: ignore
+            else:
+                to_append = model.to_string(result[0])  # type: ignore
+            partial_result += to_append  # type: ignore
+            yield partial_result
 
 
 def make_steer_completion_response(
