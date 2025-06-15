@@ -17,6 +17,7 @@ from neuronpedia_inference_client.models.activation_single_post_request import (
 from transformer_lens import ActivationCache, HookedTransformer
 
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.layer_activation_cache import LayerActivationCache
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, with_request_lock
 
@@ -153,7 +154,28 @@ def process_activations(
     model: HookedTransformer, layer: str, index: int, tokens: torch.Tensor
 ) -> ActivationSinglePost200ResponseActivation:
     sae_manager = SAEManager.get_instance()
-    _, cache = model.run_with_cache(tokens)
+    layer_cache = LayerActivationCache.get_instance()
+
+    # Get layer number for caching
+    layer_num = get_layer_num_from_sae_id(layer)
+
+    # Check cache first
+    cached_entry = layer_cache.get(tokens, layer_num=0, stop_at_layer=layer_num + 1)
+
+    if cached_entry:
+        logger.info(f"Using cached activations for layer {layer}")
+        cache = cached_entry.activation_cache
+    else:
+        logger.info(f"Computing new activations for layer {layer}")
+        _, cache = model.run_with_cache(tokens, stop_at_layer=layer_num + 1)
+        # Store in cache
+        layer_cache.put(
+            tokens=tokens,
+            layer_num=0,
+            activation_cache=cache,
+            stop_at_layer=layer_num + 1,
+        )
+
     hook_name = sae_manager.get_sae_hook(layer)
     sae_type = sae_manager.get_sae_type(layer)
 
@@ -245,7 +267,28 @@ def calculate_dfa(
     max_value_index: int,
     tokens: torch.Tensor,
 ) -> dict[str, list[float] | int | float]:
-    _, cache = model.run_with_cache(tokens)
+    layer_cache = LayerActivationCache.get_instance()
+
+    # Check cache first
+    cached_entry = layer_cache.get(tokens, layer_num=0, stop_at_layer=layer_num + 1)
+
+    if cached_entry:
+        logger.info(
+            f"Using cached activations for DFA calculation at layer {layer_num}"
+        )
+        cache = cached_entry.activation_cache
+    else:
+        logger.info(
+            f"Computing new activations for DFA calculation at layer {layer_num}"
+        )
+        _, cache = model.run_with_cache(tokens, stop_at_layer=layer_num + 1)
+        # Store in cache
+        layer_cache.put(
+            tokens=tokens,
+            layer_num=0,
+            activation_cache=cache,
+            stop_at_layer=layer_num + 1,
+        )
     v = cache["v", layer_num]  # [batch, src_pos, n_heads, d_head]
     attn_weights = cache["pattern", layer_num]  # [batch, n_heads, dest_pos, src_pos]
 

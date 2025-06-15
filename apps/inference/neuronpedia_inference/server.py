@@ -97,7 +97,17 @@ app.include_router(v1_router)
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    from neuronpedia_inference.layer_activation_cache import LayerActivationCache
+
+    cache_stats = {}
+    try:
+        layer_cache = LayerActivationCache.get_instance()
+        cache_stats = layer_cache.get_stats()
+    except Exception:
+        # Cache might not be initialized yet
+        pass
+
+    return {"status": "healthy", "cache_stats": cache_stats}
 
 
 @app.post("/initialize")

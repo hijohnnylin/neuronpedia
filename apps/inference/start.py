@@ -5,7 +5,7 @@
 # python start.py --model_id gpt2-small --sae_sets res-jb --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 5-res-jb --include_sae 4-res-jb
 # export INCLUDE_SAE='["9-res-jb"]' && python start.py --reload --reload-dir neuronpedia_inference
 # deepseek example
-# python start.py --device mps --model_dtype bfloat16 --sae_dtype bfloat16 --model_id meta-llama/Llama-3.1-8B --custom_hf_model_id deepseek-ai/DeepSeek-R1-Distill-Llama-8B --sae_sets llamascope-r1-res-32k --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 15-llamascope-slimpj-res-32k
+# python start.py --device mps --model_dtype bfloat16 --sae_dtype bfloat16 --model_id meta-llama/Llama-3.1-8B --custom_hf_model_id deepseek-ai/DeepSeek-R1-Distill-Llama-8B --sae_sets llamascope-slimpj-res-32k --max_loaded_saes 200 --reload --reload-dir neuronpedia_inference --include_sae 15-llamascope-slimpj-res-32k
 # gemma 2 2b it example
 # python start.py --device mps --model_id gemma-2-2b --model_dtype bfloat16 --sae_dtype bfloat16 --override_model_id gemma-2-2b-it --sae_sets gemmascope-res-16k --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 5-gemmascope-res-16k
 

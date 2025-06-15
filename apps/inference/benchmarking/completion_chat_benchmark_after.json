@@ -1,0 +1,154 @@
+{
+  "timestamp": "2025-06-02 11:13:48",
+  "phase": "before",
+  "model": "gpt2-small",
+  "endpoint": "http://localhost:5002",
+  "results": {
+    "single_steered": {
+      "times_ms": [
+        531.4247608184814,
+        533.3750247955322,
+        505.6607723236084,
+        538.3265018463135,
+        501.5568733215332
+      ],
+      "count": 5
+    },
+    "single_default": {
+      "times_ms": [
+        503.4048557281494,
+        503.4792423248291,
+        484.236478805542,
+        519.4590091705322,
+        485.3208065032959
+      ],
+      "count": 5
+    },
+    "both_short_conversation": {
+      "times_ms": [
+        646.3611125946045,
+        631.4537525177002,
+        648.3616828918457,
+        614.0234470367432,
+        645.5214023590088
+      ],
+      "count": 5
+    },
+    "both_medium_conversation": {
+      "times_ms": [
+        1028.672695159912,
+        1040.7395362854004,
+        1070.5842971801758,
+        1057.2431087493896,
+        1146.569013595581
+      ],
+      "count": 5
+    },
+    "both_long_conversation": {
+      "times_ms": [
+        2142.0137882232666,
+        2120.6085681915283,
+        2131.755590438843,
+        2127.3374557495117,
+        2108.1621646881104
+      ],
+      "count": 5
+    },
+    "stress_test": {
+      "times_ms": [
+        7509.403228759766
+      ],
+      "count": 1
+    }
+  },
+  "token_counts": {
+    "single_steered": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "single_default": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "both_short_conversation": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "both_medium_conversation": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "both_long_conversation": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "stress_test": [
+      0
+    ]
+  },
+  "summary": {
+    "single_steered": {
+      "avg_time_ms": 522.0687866210938,
+      "std_dev_ms": 17.100000727915397,
+      "min_time_ms": 501.5568733215332,
+      "max_time_ms": 538.3265018463135,
+      "avg_tokens": 0,
+      "tokens_per_sec": 0.0
+    },
+    "single_default": {
+      "avg_time_ms": 499.1800785064697,
+      "std_dev_ms": 14.688066359014838,
+      "min_time_ms": 484.236478805542,
+      "max_time_ms": 519.4590091705322,
+      "avg_tokens": 0,
+      "tokens_per_sec": 0.0
+    },
+    "both_short_conversation": {
+      "avg_time_ms": 637.1442794799805,
+      "std_dev_ms": 14.559458520789748,
+      "min_time_ms": 614.0234470367432,
+      "max_time_ms": 648.3616828918457,
+      "avg_tokens": 0,
+      "tokens_per_sec": 0.0
+    },
+    "both_medium_conversation": {
+      "avg_time_ms": 1068.7617301940918,
+      "std_dev_ms": 46.32048095106734,
+      "min_time_ms": 1028.672695159912,
+      "max_time_ms": 1146.569013595581,
+      "avg_tokens": 0,
+      "tokens_per_sec": 0.0
+    },
+    "both_long_conversation": {
+      "avg_time_ms": 2125.975513458252,
+      "std_dev_ms": 12.63536633864543,
+      "min_time_ms": 2108.1621646881104,
+      "max_time_ms": 2142.0137882232666,
+      "avg_tokens": 0,
+      "tokens_per_sec": 0.0
+    },
+    "stress_test": {
+      "avg_time_ms": 7509.403228759766,
+      "std_dev_ms": 0,
+      "min_time_ms": 7509.403228759766,
+      "max_time_ms": 7509.403228759766,
+      "avg_tokens": 0,
+      "tokens_per_sec": 0.0
+    }
+  }
+}
