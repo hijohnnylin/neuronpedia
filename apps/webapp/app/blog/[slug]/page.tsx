@@ -62,7 +62,7 @@ export default async function Page({ params }: Props) {
       <BreadcrumbsComponent
         crumbsArray={[
           <BreadcrumbLink href="/blog" key={1}>
-            The Residual Stream - Neuronpedia&apos;s Blog
+            Residual Stream - Blog
           </BreadcrumbLink>,
           <BreadcrumbLink href={`/blog/${params.slug}`} key={2}>
             {/* @ts-ignore */}
@@ -78,9 +78,11 @@ export default async function Page({ params }: Props) {
         <Card className="mb-12 mt-2 w-full bg-white">
           <CardHeader className="flex flex-col px-3 pb-1 sm:px-8">
             <Image src={meta.image} alt={meta.title} width={800} height={400} className="w-full rounded-md" />
-            <CardTitle className="pb-0 pt-5 text-[28px] font-bold text-slate-800">{meta.title}</CardTitle>
+            <CardTitle className="pb-0 pt-5 text-[22px] font-bold text-slate-800 sm:text-[28px]">
+              {meta.title}
+            </CardTitle>
             <div className="mb-2 text-[15px] font-medium text-slate-800">{meta.description}</div>
-            <div className="font-mono text-[12px] font-medium text-slate-600">
+            <div className="font-mono text-[12px] font-medium text-slate-400">
               By {meta.author} · {getBlogDateString(meta.date)}
             </div>
           </CardHeader>

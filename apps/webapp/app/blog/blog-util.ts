@@ -57,5 +57,7 @@ export const getPostsMetaData = async () => {
     const { meta } = await getPostBySlug(fileName);
     posts.push(meta);
   }
+  // Sort posts by date in descending order (newest first)
+  posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   return posts;
 };

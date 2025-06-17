@@ -87,13 +87,13 @@ export default function Page() {
         </div>
       )}
 
-      <div className="relative my-3 mb-0 flex max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 overflow-hidden rounded-lg border bg-white px-2 py-10 shadow-sm sm:mb-8 sm:mt-4 sm:gap-y-0 sm:px-16 sm:py-5">
+      <div className="relative my-3 mb-0 flex max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 overflow-hidden rounded-lg border bg-white px-2 py-10 shadow-sm sm:mb-8 sm:mt-4 sm:gap-y-0 sm:px-16 sm:py-7">
         <div className="mb-2 mt-0 flex flex-col items-center justify-center text-center text-sm sm:text-base">
           <div className="px-20 py-1 text-xs font-bold text-sky-600 sm:absolute sm:-left-20 sm:top-4 sm:rotate-[-36deg] sm:bg-yellow-400 sm:text-[9px] sm:text-slate-700">
             New: May 2025
           </div>
           <div className="mt-1 text-base font-bold text-slate-800 sm:text-base">
-            Neuronpedia x Anthropic: Circuit Tracer
+            Neuronpedia × Anthropic: Circuit Tracer
           </div>
           <div className="mt-1 text-sm font-normal text-slate-700 sm:text-[13px]">
             Generate and share attribution graphs, based on Anthropic&apos;s{' '}
@@ -108,6 +108,15 @@ export default function Page() {
             .
           </div>
         </div>
+        <div className="my-1.5 mb-1">
+          <Link
+            href="/gemma-2-2b/graph"
+            className="flex w-[165px] max-w-[165px] flex-row items-center justify-center gap-x-2 rounded-md bg-emerald-600 px-0 py-2.5 text-sm font-medium text-white shadow transition-all hover:scale-105 hover:bg-emerald-700"
+          >
+            <RocketIcon className="h-5 w-5" />
+            <span>Launch</span>
+          </Link>
+        </div>
         <div className="mb-2 mt-2 flex flex-col items-center justify-center gap-x-2.5 gap-y-2 sm:flex-row">
           <Link href="https://github.com/safety-research/circuit-tracer" target="_blank" rel="noreferrer">
             <Button
@@ -120,6 +129,22 @@ export default function Page() {
                 <span className="text-[12px] leading-none">GitHub</span>
                 <div className="font-mono text-[8px] font-bold leading-none">CIRCUIT-TRACER</div>
               </div>
+            </Button>
+          </Link>
+          <Link href="/blog/circuit-tracer" target="_blank" rel="noreferrer">
+            <Button
+              variant="default"
+              size="lg"
+              className="w-[165px] max-w-[165px] gap-x-2 bg-sky-200 text-sky-700 transition-all hover:scale-105 hover:bg-sky-100"
+            >
+              <Image
+                src="/logo.png"
+                alt="Neuronpedia logo - a computer chip with a rounded viewfinder border around it"
+                width="20"
+                height="20"
+                className=""
+              />{' '}
+              <span>Blog Post</span>
             </Button>
           </Link>
           <Link href="https://www.anthropic.com/research/open-source-circuit-tracing" target="_blank" rel="noreferrer">
@@ -140,15 +165,8 @@ export default function Page() {
                 <title>Anthropic</title>
                 <path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z" />
               </svg>{' '}
-              <span>Blog Post</span>
+              <span>Press Release</span>
             </Button>
-          </Link>
-          <Link
-            href="/gemma-2-2b/graph"
-            className="flex w-[165px] max-w-[165px] flex-row items-center justify-center gap-x-2 rounded-md bg-emerald-600 px-0 py-2.5 text-sm font-medium text-white shadow transition-all hover:scale-105 hover:bg-emerald-700"
-          >
-            <RocketIcon className="h-5 w-5" />
-            <span>Launch</span>
           </Link>
         </div>
       </div>

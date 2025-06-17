@@ -37,11 +37,11 @@ export default function WelcomeModal({ hasSlug }: { hasSlug: boolean }) {
   // Array of images for each step
   const stepImages = [
     `${ASSET_BASE_URL}/graph/explainer-new.jpg`, // Getting Started
-    '/images/explainer-top.jpg', // Choose or Generate a Graph
-    '/images/tl.jpg', // Link/Attribution Graph
-    '/images/tr.jpg', // Connections
+    `${ASSET_BASE_URL}/graph/explainer-top.jpg`, // Choose or Generate a Graph
+    `${ASSET_BASE_URL}/graph/tl.jpg`, // Link/Attribution Graph
+    `${ASSET_BASE_URL}/graph/tr.jpg`, // Connections
     `${ASSET_BASE_URL}/graph/subgraph-demo.mp4`, // Subgraph
-    '/images/br.jpg', // Feature Details
+    `${ASSET_BASE_URL}/graph/br.jpg`, // Feature Details
   ];
 
   // Array of alt text for each step

@@ -4,7 +4,7 @@ import Image from 'next/image';
 export default function BlogSidebar() {
   return (
     <div className="flex w-full flex-col items-center justify-center gap-x-5 sm:h-full sm:w-auto sm:flex-col sm:items-center sm:justify-start sm:gap-y-5 sm:pt-6">
-      <a href="/blog" className="mb-4 h-32 w-32 sm:mb-0 sm:h-52 sm:min-h-52 sm:w-52 sm:min-w-52">
+      <a href="/blog" className="mb-4 hidden h-32 w-32 sm:mb-0 sm:block sm:h-52 sm:min-h-52 sm:w-52 sm:min-w-52">
         <Image
           src={`${ASSET_BASE_URL}/blog/the-residual-stream-logo.jpg`}
           alt="The Residual Stream"
@@ -14,14 +14,14 @@ export default function BlogSidebar() {
         />
       </a>
       <div className="flex w-full flex-col">
-        <div className="mb-3 flex flex-col items-center justify-center border-b pb-3 sm:mb-5 sm:pb-5">
+        <div className="mb-1.5 flex flex-col items-center justify-center pb-0 sm:mb-5 sm:border-b sm:pb-5">
           <a href="/blog">
             <h1 className="whitespace-pre text-sm font-bold hover:underline sm:pb-1.5 sm:text-[18px]">
               The Residual Stream
             </h1>
           </a>
           <h2 className="mt-0 text-xs font-medium text-slate-600 sm:text-[13px]">Neuronpedia&apos;s Blog</h2>{' '}
-          <a href="/feed.xml">
+          <a href="/feed.xml" className="hidden sm:block">
             <img
               src="https://img.shields.io/badge/rss-F88900?style=for-the-badge&logo=rss&logoColor=white"
               alt="RSS"
@@ -31,7 +31,7 @@ export default function BlogSidebar() {
             />
           </a>
         </div>
-        <div className="flex flex-col items-center justify-center pb-3">
+        <div className="hidden flex-col items-center justify-center pb-3 sm:flex">
           <h1 className="whitespace-pre text-sm font-bold sm:pb-1.5 sm:text-[18px]">The Babble</h1>
           <h2 className="mt-0 text-center text-xs font-medium text-slate-600 sm:text-[13px]">Podcast by NotebookLM</h2>
           <div className="flex flex-row items-center justify-center gap-x-2">
