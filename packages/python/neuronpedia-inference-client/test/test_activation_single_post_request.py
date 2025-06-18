@@ -39,7 +39,7 @@ class TestActivationSinglePostRequest(unittest.TestCase):
                 prompt = '',
                 model = '',
                 source = '',
-                index = '',
+                index = 56,
                 vector = [
                     1.337
                     ],

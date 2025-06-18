@@ -2189,7 +2189,7 @@ test = ["pytest (>=7.2)", "pytest-cov (>=4.0)"]
 
 [[package]]
 name = "neuronpedia-inference-client"
-version = "1.2.0"
+version = "2.0.0"
 description = "Neuronpedia - Inference Server"
 optional = false
 python-versions = "^3.8"
