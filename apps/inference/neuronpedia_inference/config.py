@@ -219,6 +219,7 @@ def get_sae_lens_ids_from_neuronpedia_id(
         (df_exploded["model"] == model_id)
         & (df_exploded["neuronpedia_id"].str.endswith(f"/{neuronpedia_id}"))
     ]
+
     assert (
         tmp_df.shape[0] == 1
     ), f"Found {tmp_df.shape[0]} entries when searching for {model_id}/{neuronpedia_id}"

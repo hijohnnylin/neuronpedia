@@ -204,7 +204,7 @@ async def run_batched_generate(
                     editing_hooks = [
                         (
                             (
-                                sae_manager.get_sae_hook(feature.source)
+                                sae_manager.get_decoder_hook(feature.source)
                                 if isinstance(feature, NPSteerFeature)
                                 else feature.hook
                             ),
@@ -248,7 +248,7 @@ async def run_batched_generate(
             editing_hooks = [
                 (
                     (
-                        sae_manager.get_sae_hook(feature.source)
+                        sae_manager.get_decoder_hook(feature.source)
                         if isinstance(feature, NPSteerFeature)
                         else feature.hook
                     ),

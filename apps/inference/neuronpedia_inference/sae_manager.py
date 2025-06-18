@@ -106,7 +106,7 @@ class SAEManager:
             df_exploded=get_saelens_neuronpedia_directory_df(),
         )
 
-        loaded_sae, hook_name = SaeLensSAE.load(
+        loaded_sae, hook_in, hook_out = SaeLensSAE.load(
             release=sae_lens_release,
             sae_id=sae_lens_id,
             device=self.device,
@@ -115,7 +115,8 @@ class SAEManager:
 
         self.sae_data[sae_id] = {
             "sae": loaded_sae,
-            "hook": hook_name,
+            "hook": hook_in,
+            "hook_out": hook_out,
             "neuronpedia_id": loaded_sae.cfg.neuronpedia_id,
             "type": SAE_TYPE.SAELENS,
             # TODO: this should be in SAELens
@@ -126,7 +127,7 @@ class SAEManager:
                     or DFA_ENABLED_NP_ID_SEGMENT_ALT in loaded_sae.cfg.neuronpedia_id
                 )
             ),
-            "transcoder": False,  # You might want to set this based on some condition
+            "transcoder": hook_out is not None
         }
 
         self.loaded_saes[sae_id] = None  # We're using OrderedDict as an OrderedSet
@@ -214,6 +215,10 @@ class SAEManager:
 
     def get_sae_hook(self, sae_id: str) -> str:
         return self.sae_data.get(sae_id, {}).get("hook")
+    
+    def get_decoder_hook(self, sae_id):
+        data = self.sae_data.get(sae_id, {})
+        return data.get("hook_out") or data.get("hook")
 
     def is_dfa_enabled(self, sae_id: str) -> bool:
         return self.sae_data.get(sae_id, {}).get("dfa_enabled", False)
