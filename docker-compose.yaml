@@ -73,13 +73,12 @@ services:
         UBUNTU_VERSION: "22.04"
     ports:
       - "5003:5003"
+    env_file:
+      - ${ENV_FILE:-.env}
     environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - SECRET=${AUTOINTERP_SERVER_SECRET}
       - SENTRY_DSN=${SENTRY_DSN_AUTOINTERP}
-    command: >
-      python -m uvicorn server:app
-      --host 0.0.0.0
-      --port 5003
-      --workers 1
 
 volumes:
   postgres_data:
