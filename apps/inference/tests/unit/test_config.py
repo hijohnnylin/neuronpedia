@@ -38,18 +38,18 @@ def mock_config():
 
 
 def test_config_initialization(mock_config: Config):
-    assert mock_config.MODEL_ID == "gpt2-small"
-    assert mock_config.MODEL_DTYPE == "float16"
-    assert mock_config.SAE_DTYPE == "float32"
-    assert mock_config.SECRET == "test_secret"
-    assert mock_config.PORT == 5000
-    assert mock_config.TOKEN_LIMIT == 100
-    assert mock_config.VALID_COMPLETION_TYPES == ["DEFAULT", "STEERED"]
-    assert mock_config.DEVICE == "cpu"
+    assert mock_config.model_id == "gpt2-small"
+    assert mock_config.model_dtype == "float16"
+    assert mock_config.sae_dtype == "float32"
+    assert mock_config.secret == "test_secret"
+    assert mock_config.port == 5000
+    assert mock_config.token_limit == 100
+    assert mock_config.valid_completion_types == ["DEFAULT", "STEERED"]
+    assert mock_config.device == "cpu"
 
     # Check SAE config
-    assert mock_config.SAE_CONFIG is not None
-    assert mock_config.SAE_CONFIG[0] == {
+    assert mock_config.sae_config is not None
+    assert mock_config.sae_config[0] == {
         "model": "gpt2-small",
         "local": False,
         "set": "res-jb",
@@ -99,18 +99,18 @@ def test_config_to_json():
 
 
 def test_config_no_filtering(mock_config: Config):
-    assert mock_config.MODEL_ID == "gpt2-small"
-    assert mock_config.MODEL_DTYPE == "float16"
-    assert mock_config.SAE_DTYPE == "float32"
-    assert mock_config.SECRET == "test_secret"
-    assert mock_config.PORT == 5000
-    assert mock_config.TOKEN_LIMIT == 100
-    assert mock_config.VALID_COMPLETION_TYPES == ["DEFAULT", "STEERED"]
-    assert mock_config.DEVICE == "cpu"
+    assert mock_config.model_id == "gpt2-small"
+    assert mock_config.model_dtype == "float16"
+    assert mock_config.sae_dtype == "float32"
+    assert mock_config.secret == "test_secret"
+    assert mock_config.port == 5000
+    assert mock_config.token_limit == 100
+    assert mock_config.valid_completion_types == ["DEFAULT", "STEERED"]
+    assert mock_config.device == "cpu"
 
     # Check SAE config
-    assert mock_config.SAE_CONFIG is not None
-    assert mock_config.SAE_CONFIG[0] == {
+    assert mock_config.sae_config is not None
+    assert mock_config.sae_config[0] == {
         "model": "gpt2-small",
         "local": False,
         "set": "res-jb",
@@ -143,11 +143,11 @@ def test_config_include_filtering():
             device="cpu",
         )
 
-        assert len(config.SAE_CONFIG) == 1
-        assert len(config.SAE_CONFIG[0]["saes"]) == 6
+        assert len(config.sae_config) == 1
+        assert len(config.sae_config[0]["saes"]) == 6
         assert all(
             sae.startswith(("0-", "1-", "2-", "3-", "4-", "5-"))
-            for sae in config.SAE_CONFIG[0]["saes"]
+            for sae in config.sae_config[0]["saes"]
         )
 
 
@@ -175,11 +175,11 @@ def test_config_exclude_filtering():
             device="cpu",
         )
 
-        assert len(config.SAE_CONFIG) == 1
-        assert len(config.SAE_CONFIG[0]["saes"]) == 7
+        assert len(config.sae_config) == 1
+        assert len(config.sae_config[0]["saes"]) == 7
         assert all(
             not sae.startswith(("0-", "1-", "2-", "3-", "4-", "5-"))
-            for sae in config.SAE_CONFIG[0]["saes"]
+            for sae in config.sae_config[0]["saes"]
         )
 
 
@@ -208,11 +208,11 @@ def test_config_include_exclude_filtering():
             device="cpu",
         )
 
-        assert len(config.SAE_CONFIG) == 1
-        assert len(config.SAE_CONFIG[0]["saes"]) == 5
+        assert len(config.sae_config) == 1
+        assert len(config.sae_config[0]["saes"]) == 5
         assert all(
             sae.startswith(("0-", "1-", "2-", "3-", "4-"))
-            for sae in config.SAE_CONFIG[0]["saes"]
+            for sae in config.sae_config[0]["saes"]
         )
 
 
@@ -248,16 +248,16 @@ def test_config_filtering_with_multiple_patterns():
             device="cpu",
         )
 
-        assert len(config.SAE_CONFIG) == 2
-        assert len(config.SAE_CONFIG[0]["saes"]) == 4
-        assert set(config.SAE_CONFIG[0]["saes"]) == {
+        assert len(config.sae_config) == 2
+        assert len(config.sae_config[0]["saes"]) == 4
+        assert set(config.sae_config[0]["saes"]) == {
             "0-res-jb",
             "1-res-jb",
             "3-res-jb",
             "8-res-jb",
         }
-        assert len(config.SAE_CONFIG[1]["saes"]) == 1
-        assert config.SAE_CONFIG[1]["saes"][0] == "8-res_fs768-jb"
+        assert len(config.sae_config[1]["saes"]) == 1
+        assert config.sae_config[1]["saes"][0] == "8-res_fs768-jb"
 
 
 def test_config_multiple_sae_sets():
@@ -297,25 +297,25 @@ def test_config_multiple_sae_sets():
             device="cpu",
         )
 
-        assert len(config.SAE_CONFIG) == 3
+        assert len(config.sae_config) == 3
 
         # Check the first set (res-jb)
-        assert config.SAE_CONFIG[0]["set"] == "res-jb"
-        assert len(config.SAE_CONFIG[0]["saes"]) == 13
-        assert all(sae.endswith("-res-jb") for sae in config.SAE_CONFIG[0]["saes"])
+        assert config.sae_config[0]["set"] == "res-jb"
+        assert len(config.sae_config[0]["saes"]) == 13
+        assert all(sae.endswith("-res-jb") for sae in config.sae_config[0]["saes"])
 
         # Check the second set (res_fs768-jb)
-        assert config.SAE_CONFIG[1]["set"] == "res_fs768-jb"
-        assert len(config.SAE_CONFIG[1]["saes"]) == 1
-        assert config.SAE_CONFIG[1]["saes"][0] == "8-res_fs768-jb"
+        assert config.sae_config[1]["set"] == "res_fs768-jb"
+        assert len(config.sae_config[1]["saes"]) == 1
+        assert config.sae_config[1]["saes"][0] == "8-res_fs768-jb"
 
         # Check the third set (res_fs1536-jb)
-        assert config.SAE_CONFIG[2]["set"] == "res_fs1536-jb"
-        assert len(config.SAE_CONFIG[2]["saes"]) == 1
-        assert config.SAE_CONFIG[2]["saes"][0] == "8-res_fs1536-jb"
+        assert config.sae_config[2]["set"] == "res_fs1536-jb"
+        assert len(config.sae_config[2]["saes"]) == 1
+        assert config.sae_config[2]["saes"][0] == "8-res_fs1536-jb"
 
         # Check common properties for all sets
-        for sae_config in config.SAE_CONFIG:
+        for sae_config in config.sae_config:
             assert sae_config["model"] == "gpt2-small"
             assert sae_config["local"] is False
             assert sae_config["type"] == "saelens-1"

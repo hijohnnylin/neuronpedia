@@ -169,19 +169,19 @@ async def initialize(
             logger.info("Loading custom HF model: %s", custom_hf_model_id)
             hf_model = AutoModelForCausalLM.from_pretrained(
                 custom_hf_model_id,
-                torch_dtype=STR_TO_DTYPE[config.MODEL_DTYPE],
+                torch_dtype=STR_TO_DTYPE[config.model_dtype],
             )
             hf_tokenizer = AutoTokenizer.from_pretrained(custom_hf_model_id)
 
         model = HookedTransformer.from_pretrained_no_processing(
-            (config.OVERRIDE_MODEL_ID if config.OVERRIDE_MODEL_ID else config.MODEL_ID),
+            (config.override_model_id if config.override_model_id else config.model_id),
             device=args.device,
-            dtype=STR_TO_DTYPE[config.MODEL_DTYPE],
+            dtype=STR_TO_DTYPE[config.model_dtype],
             n_devices=device_count,
             hf_model=hf_model,
             **({"hf_config": hf_model.config} if hf_model else {}),
             tokenizer=hf_tokenizer,
-            **config.MODEL_KWARGS,
+            **config.model_kwargs,
         )
         Model._instance = model
         config.set_num_layers(model.cfg.n_layers)
@@ -203,7 +203,7 @@ async def initialize(
             config.set_steer_special_token_ids(special_token_ids)  # type: ignore
 
         logger.info(
-            f"Loaded {config.CUSTOM_HF_MODEL_ID if config.CUSTOM_HF_MODEL_ID else config.OVERRIDE_MODEL_ID} on {args.device}"
+            f"Loaded {config.custom_hf_model_id if config.custom_hf_model_id else config.override_model_id} on {args.device}"
         )
         checkCudaError()
 
@@ -226,10 +226,10 @@ async def check_secret_key(
         return await call_next(request)
 
     config = Config.get_instance()
-    if config.SECRET is None:
+    if config.secret is None:
         return await call_next(request)
     secret_key = request.headers.get("X-SECRET-KEY")
-    if not secret_key or secret_key != config.SECRET:
+    if not secret_key or secret_key != config.secret:
         return JSONResponse(
             status_code=401,
             content={"error": "Invalid or missing X-SECRET-KEY header"},

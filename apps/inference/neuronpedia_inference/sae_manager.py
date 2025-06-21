@@ -43,7 +43,7 @@ class SAEManager:
         self.config = Config.get_instance()
         self.num_layers = num_layers
         self.device = device
-        self.max_loaded_saes = self.config.MAX_LOADED_SAES
+        self.max_loaded_saes = self.config.max_loaded_saes
 
         self.sae_data = {}  # New consolidated dictionary
         self.sae_set_to_saes = {}
@@ -52,7 +52,7 @@ class SAEManager:
         # self.load_saes()
 
     def load_saes(self):
-        server_cfg = Config.get_instance().SAE_CONFIG
+        server_cfg = Config.get_instance().sae_config
 
         self.setup_neuron_layers()
 
@@ -70,9 +70,9 @@ class SAEManager:
             if sae_id not in starting_saes:
                 self.load_sae(
                     (
-                        self.config.CUSTOM_HF_MODEL_ID
-                        if self.config.CUSTOM_HF_MODEL_ID
-                        else self.config.MODEL_ID
+                        self.config.custom_hf_model_id
+                        if self.config.custom_hf_model_id
+                        else self.config.model_id
                     ),
                     sae_id,
                 )
@@ -82,9 +82,9 @@ class SAEManager:
         for sae_id in starting_saes:
             self.load_sae(
                 (
-                    self.config.CUSTOM_HF_MODEL_ID
-                    if self.config.CUSTOM_HF_MODEL_ID
-                    else self.config.MODEL_ID
+                    self.config.custom_hf_model_id
+                    if self.config.custom_hf_model_id
+                    else self.config.model_id
                 ),
                 sae_id,
             )
@@ -110,7 +110,7 @@ class SAEManager:
             release=sae_lens_release,
             sae_id=sae_lens_id,
             device=self.device,
-            dtype=self.config.SAE_DTYPE,
+            dtype=self.config.sae_dtype,
         )
 
         self.sae_data[sae_id] = {
@@ -159,9 +159,9 @@ class SAEManager:
         if source not in self.loaded_saes:
             self.load_sae(
                 (
-                    self.config.CUSTOM_HF_MODEL_ID
-                    if self.config.CUSTOM_HF_MODEL_ID
-                    else self.config.MODEL_ID
+                    self.config.custom_hf_model_id
+                    if self.config.custom_hf_model_id
+                    else self.config.model_id
                 ),
                 source,
             )

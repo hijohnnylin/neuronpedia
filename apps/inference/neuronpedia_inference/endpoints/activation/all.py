@@ -55,15 +55,15 @@ async def activation_all(
         request.selected_sources = sae_manager.sae_set_to_saes[request.source_set]
 
     # Check if the number of requested layers exceeds the maximum
-    if len(request.selected_sources) > config.MAX_LOADED_SAES:
+    if len(request.selected_sources) > config.max_loaded_saes:
         logger.error(
             "Number of requested layers (%s) exceeds the maximum allowed (%s)",
             len(request.selected_sources),
-            config.MAX_LOADED_SAES,
+            config.max_loaded_saes,
         )
         return JSONResponse(
             content={
-                "error": f"Number of requested SAEs ({len(request.selected_sources)}) exceeds the maximum allowed ({config.MAX_LOADED_SAES})"
+                "error": f"Number of requested SAEs ({len(request.selected_sources)}) exceeds the maximum allowed ({config.max_loaded_saes})"
             },
             status_code=400,
         )
@@ -162,9 +162,9 @@ class ActivationProcessor:
         model = Model.get_instance()
         config = Config.get_instance()
         tokens = model.to_tokens(text, prepend_bos=prepend_bos, truncate=False)[0]
-        if len(tokens) > config.TOKEN_LIMIT:
+        if len(tokens) > config.token_limit:
             raise ValueError(
-                f"Text too long: {len(tokens)} tokens, max is {config.TOKEN_LIMIT}"
+                f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
             )
 
         str_tokens = model.to_str_tokens(text, prepend_bos=prepend_bos)
@@ -220,10 +220,10 @@ class ActivationProcessor:
     ) -> torch.Tensor:
         """Get activations by index for a specific layer and SAE type."""
         if sae_type == "neurons":
-            mlp_activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
+            mlp_activation_data = cache[hook_name].to(Config.get_instance().device)
             return torch.transpose(mlp_activation_data[0], 0, 1)
 
-        activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
+        activation_data = cache[hook_name].to(Config.get_instance().device)
         feature_activation_data = (
             SAEManager.get_instance().get_sae(selected_source).encode(activation_data)
         )
@@ -238,17 +238,17 @@ class ActivationProcessor:
         """Process activations for a single layer."""
         max_values, max_indices = torch.max(activations_by_index, dim=1)
         layer_num_tensor = torch.full(max_values.shape, layer_num).to(
-            Config.get_instance().DEVICE
+            Config.get_instance().device
         )
         indices_num_tensor = torch.arange(0, max_values.size(0)).to(
-            Config.get_instance().DEVICE
+            Config.get_instance().device
         )
 
         if sort_by_token_indexes:
             sum_values = activations_by_index[:, sort_by_token_indexes].sum(dim=1)
         else:
             sum_values = torch.full(max_values.shape, 0).to(
-                Config.get_instance().DEVICE
+                Config.get_instance().device
             )
 
         return {
@@ -266,7 +266,7 @@ class ActivationProcessor:
         request: ActivationAllPostRequest,
     ) -> list[list[float]]:
         """Sort and filter activations based on request parameters."""
-        device = Config.get_instance().DEVICE
+        device = Config.get_instance().device
         all_activations = torch.cat(
             [
                 torch.cat(

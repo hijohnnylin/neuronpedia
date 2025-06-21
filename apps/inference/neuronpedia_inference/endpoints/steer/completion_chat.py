@@ -46,7 +46,7 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
     steer_method = request.steer_method
     normalize_steering = request.normalize_steering
     steer_special_tokens = request.steer_special_tokens
-    custom_hf_model_id = config.CUSTOM_HF_MODEL_ID
+    custom_hf_model_id = config.custom_hf_model_id
 
     # Ensure exactly one of features or vector is provided
     if (request.features is not None) == (request.vectors is not None):
@@ -89,15 +89,15 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
     promptTokenized = torch.tensor(promptTokenized)
 
     # logger.info("promptTokenized: %s", promptTokenized)
-    if len(promptTokenized) > config.TOKEN_LIMIT:
+    if len(promptTokenized) > config.token_limit:
         logger.error(
             "Text too long: %s tokens, max is %s",
             len(promptTokenized),
-            config.TOKEN_LIMIT,
+            config.token_limit,
         )
         return JSONResponse(
             content={
-                "error": f"Text too long: {len(promptTokenized)} tokens, max is {config.TOKEN_LIMIT}"
+                "error": f"Text too long: {len(promptTokenized)} tokens, max is {config.token_limit}"
             },
             status_code=400,
         )

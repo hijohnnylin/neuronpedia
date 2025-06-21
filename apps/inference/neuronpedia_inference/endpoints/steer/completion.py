@@ -77,15 +77,15 @@ async def completion(request: SteerCompletionRequest):
         prompt, prepend_bos=model.cfg.tokenizer_prepends_bos, truncate=False
     )[0]
 
-    if len(tokens) > config.TOKEN_LIMIT:
+    if len(tokens) > config.token_limit:
         logger.error(
             "Text too long: %s tokens, max is %s",
             len(tokens),
-            config.TOKEN_LIMIT,
+            config.token_limit,
         )
         return JSONResponse(
             content={
-                "error": f"Text too long: {len(tokens)} tokens, max is {config.TOKEN_LIMIT}"
+                "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
             },
             status_code=400,
         )
