@@ -4,6 +4,7 @@ INFERENCE_SPEC = openapi/inference-server.yaml
 AUTOINTERP_SPEC = openapi/autointerp-server.yaml
 TS_OUTPUT_DIR = ../packages/typescript
 PY_OUTPUT_DIR = ../packages/python
+IGNORE_FILE = .openapi-generator-ignore
 
 .PHONY: generate-inference-clients generate-autointerp-clients clean-inference-clients clean-autointerp-clients \
         inference-setup-env autointerp-setup-env webapp-setup-env-inference webapp-setup-env-autointerp
@@ -22,14 +23,16 @@ generate-inference-clients: check-version clean-inference-clients
 		-g python \
 		-o $(PY_OUTPUT_DIR)/neuronpedia-inference-client \
 		--package-name neuronpedia_inference_client \
-		--additional-properties=packageVersion=$(VERSION)
+		--additional-properties=packageVersion=$(VERSION) \
+		--ignore-file-override=$(IGNORE_FILE)
 
 	@echo "Generating TypeScript inference client..."
 	openapi-generator generate \
 		-i $(INFERENCE_SPEC) \
 		-g typescript-fetch \
 		-o $(TS_OUTPUT_DIR)/neuronpedia-inference-client \
-		-p npmName=neuronpedia-inference-client,npmVersion=$(VERSION)
+		-p npmName=neuronpedia-inference-client,npmVersion=$(VERSION) \
+		--ignore-file-override=$(IGNORE_FILE)
 
 # Clean and generate autointerp clients
 generate-autointerp-clients: check-version clean-autointerp-clients
@@ -39,14 +42,16 @@ generate-autointerp-clients: check-version clean-autointerp-clients
 		-g python \
 		-o $(PY_OUTPUT_DIR)/neuronpedia-autointerp-client \
 		--package-name neuronpedia_autointerp_client \
-		--additional-properties=packageVersion=$(VERSION)
+		--additional-properties=packageVersion=$(VERSION) \
+		--ignore-file-override=$(IGNORE_FILE)
 
 	@echo "Generating TypeScript autointerp client..."
 	openapi-generator generate \
 		-i $(AUTOINTERP_SPEC) \
 		-g typescript-fetch \
 		-o $(TS_OUTPUT_DIR)/neuronpedia-autointerp-client \
-		-p npmName=neuronpedia-autointerp-client,npmVersion=$(VERSION)
+		-p npmName=neuronpedia-autointerp-client,npmVersion=$(VERSION) \
+		--ignore-file-override=$(IGNORE_FILE)
 
 # Setup inference server environment
 inference-setup-env:
