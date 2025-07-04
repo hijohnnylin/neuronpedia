@@ -1,0 +1,11 @@
+# k8s/components/config/inference/kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Secret overrides
+secretGenerator:
+  # Inference secrets
+  - name: inference-secrets
+    literals:
+      - HF_TOKEN=your-huggingface-token

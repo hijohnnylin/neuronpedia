@@ -1,0 +1,23 @@
+# k8s/overlays/harbor-deepseek-gpu-standard-example/kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/corporate-ca-certs # optional, if needed
+  - ../../components/registry/harbor
+  - ../../components/config/app
+  - ../../components/config/db
+  - ../../components/resources/inference-gpu-standard
+  - ../../components/models/deepseek-r1-distill-llama-8b
+
+# Only environment-specific overrides here
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - NEXT_PUBLIC_URL=https://example.neuronpedia.org # TODO change this
+      - NEXTAUTH_URL=https://example.neuronpedia.org # TODO change this

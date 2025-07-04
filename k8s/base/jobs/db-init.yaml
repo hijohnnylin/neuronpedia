@@ -1,0 +1,48 @@
+# k8s/base/jobs/db-init.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  # Don't include namespace here, as it's set in the overlay kustomization
+spec:
+  backoffLimit: 4
+  template:
+    spec:
+      # This container runs first and blocks until PostgreSQL is ready
+      initContainers:
+      - name: wait-for-postgres
+        image: alpine:3.14
+        command: ['/bin/sh', '-c']
+        args:
+          - |
+            apk add --no-cache netcat-openbsd
+            echo "Waiting for PostgreSQL to become ready..."
+            # Use fully qualified domain name
+            # TODO change the target address in the ``nc`` command below!!! The "neuronpedia" subdomain typically maps to the k8s namespace (i.e., namespace is assumed to be "neuronpedia")
+            until nc -z postgres.neuronpedia.svc.cluster.local 5432; do
+              echo "PostgreSQL is not ready yet - waiting..."
+              sleep 2
+            done
+            echo "PostgreSQL is ready!"
+      
+      # Main container only runs after the initContainer succeeds
+      containers:
+      - name: db-init
+        image: neuronpedia-webapp
+        command: ["/bin/sh", "-c"]
+        args: ["npm run db:migrate:deploy && npm run db:seed"]
+        envFrom:
+        - secretRef:
+            name: db-credentials
+        # TODO test the new corporate-ca-certs patch component before removing
+        # volumeMounts:
+        # - name: etc-ssl-certs
+        #   mountPath: /etc/ssl/certs
+        #   readOnly: true
+      # TODO test the new corporate-ca-certs patch component before removing
+      # volumes:
+      # - name: etc-ssl-certs
+      #   configMap:
+      #     name: corporate-ca-certificates
+      #     optional: false
+      restartPolicy: OnFailure

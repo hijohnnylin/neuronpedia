@@ -1,0 +1,13 @@
+# k8s/base/services/postgres.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  # Don't include namespace here, as it's set in the overlay kustomization
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None  # Headless service for StatefulSet

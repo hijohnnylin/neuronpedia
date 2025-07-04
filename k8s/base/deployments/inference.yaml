@@ -1,0 +1,66 @@
+# k8s/base/deployments/inference.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference
+  labels:
+    app: inference
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inference
+  template:
+    metadata:
+      labels:
+        app: inference
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      containers:
+        - name: inference
+          image: neuronpedia-inference
+          ports:
+            - containerPort: 5002
+          envFrom:
+            - configMapRef:
+                name: inference-config
+            - secretRef:
+                name: inference-secrets
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 5002
+            failureThreshold: 30 # Allow up to 30 failures during startup
+            periodSeconds: 60 # Total max startup time = 30min
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5002
+            initialDelaySeconds: 10
+            periodSeconds: 30 # Check every 30s during runtime
+            timeoutSeconds: 10
+            failureThreshold: 5 # 3 failures = not ready
+          resources:
+            limits:
+              cpu: "2000m"
+              memory: "8Gi"
+              # nvidia.com/gpu: 1  # Uncomment if using GPU
+            requests:
+              cpu: "1000m"
+              memory: "4Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference
+spec:
+  selector:
+    app: inference
+    # ``instance`` allows you to target a particular deployment instance when you have multiple deployments of the same application
+    # You may want to uncomment/use if running multiple environments (dev, staging, prod) or multiple versions of the same service in the same namespace
+    #instance: ${INSTANCE_NAME} # TODO optionally specify a label selector for the specific pod you are targeting
+  ports:
+  - port: 5002
+    targetPort: 5002
+  type: ClusterIP

@@ -1,0 +1,21 @@
+# k8s/overlays/development/resources/inference-gpu-standard/patches/resources.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference
+spec:
+  template:
+    spec:
+      containers:
+      - name: inference
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+            cpu: "10"
+            memory: "70Gi"
+          limits:
+            nvidia.com/gpu: 1
+            cpu: "12"
+            memory: "80Gi"
+---

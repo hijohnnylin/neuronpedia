@@ -1,0 +1,21 @@
+# k8s/overlays/development/resources/inference-gpu-lite/patches/resources.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference
+spec:
+  template:
+    spec:
+      containers:
+      - name: inference
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+            cpu: "7"
+            memory: "26Gi"
+          limits:
+            nvidia.com/gpu: 1
+            cpu: "8"
+            memory: "26Gi"
+---

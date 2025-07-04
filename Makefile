@@ -40,7 +40,7 @@ webapp-demo-build: ## Webapp: Public Demo Environment - Build
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
-	ENV_FILE=.env.demo docker compose build webapp
+	ENV_FILE=.env.demo docker compose -f docker/docker-compose.yaml build webapp
 
 webapp-demo-run: ## Webapp: Public Demo Environment - Run
 	@echo "Bringing up the webapp and connecting to the demo database..."
@@ -48,13 +48,11 @@ webapp-demo-run: ## Webapp: Public Demo Environment - Run
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
-	ENV_FILE=.env.demo docker compose --env-file .env.demo --env-file .env up webapp
-
+	ENV_FILE=.env.demo docker compose -f docker/docker-compose.yaml --env-file .env.demo --env-file .env up webapp
 
 webapp-demo-check: ## Webapp: Public Demo Environment - Check Config
 	@echo "Printing the webapp configuration - this is useful to see if your environment variables are set correctly."
-	ENV_FILE=.env.demo docker compose config webapp
-
+	ENV_FILE=.env.demo docker compose -f docker/docker-compose.yaml config webapp
 
 webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Build)
 	@echo "Building the webapp for connecting to the localhost database..."
@@ -62,7 +60,7 @@ webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Bui
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
-	ENV_FILE=.env.localhost docker compose build webapp db-init postgres
+	ENV_FILE=.env.localhost docker compose -f docker/docker-compose.yaml build webapp db-init postgres
 
 webapp-localhost-run: ## Webapp: Localhost Environment - Run (Production Build)
 	@echo "Bringing up the webapp and connecting to the localhost database..."
@@ -70,7 +68,7 @@ webapp-localhost-run: ## Webapp: Localhost Environment - Run (Production Build)
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
-	ENV_FILE=.env.localhost docker compose --env-file .env.localhost --env-file .env up webapp db-init postgres
+	ENV_FILE=.env.localhost docker compose -f docker/docker-compose.yaml --env-file .env.localhost --env-file .env up webapp db-init postgres
 
 install-nodejs: # Install Node.js for Webapp
 	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
@@ -94,8 +92,8 @@ webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
 		exit 1; \
 	fi
 	ENV_FILE=.env.localhost docker compose \
-		-f docker-compose.yaml \
-		-f docker-compose.webapp.dev.yaml \
+		-f docker/docker-compose.yaml \
+		-f docker/docker-compose.webapp.dev.yaml \
 		--env-file .env.localhost \
 		--env-file .env \
 		up webapp db-init postgres
@@ -107,12 +105,11 @@ webapp-localhost-test: ## Webapp: Localhost Environment - Run (Playwright)
 		exit 1; \
 	fi
 	ENV_FILE=.env.localhost docker compose \
-		-f docker-compose.yaml \
-		-f docker-compose.webapp.test.yaml \
+		-f docker/docker-compose.yaml \
+		-f docker/docker-compose.webapp.test.yaml \
 		--env-file .env.localhost \
 		--env-file .env \
 		up webapp db-init postgres
-	
 
 inference-localhost-install: ## Inference: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the inference dependencies for development in the localhost environment..."
@@ -126,8 +123,8 @@ inference-localhost-build: ## Inference: Localhost Environment - Build
 	ENV_FILE=.env.localhost \
 		BUILD_TYPE=$(BUILD_TYPE) \
 		docker compose \
-		-f docker-compose.yaml \
-		$(if $(USE_LOCAL_HF_CACHE),-f docker-compose.hf-cache.yaml,) \
+		-f docker/docker-compose.yaml \
+		$(if $(USE_LOCAL_HF_CACHE),-f docker/docker-compose.hf-cache.yaml,) \
 		build inference
 
 inference-localhost-build-gpu: ## Inference: Localhost Environment - Build (CUDA). Usage: make inference-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
@@ -145,10 +142,10 @@ inference-localhost-dev: ## Inference: Localhost Environment - Run (Development 
 		RELOAD=$$([ "$(AUTORELOAD)" = "1" ] && echo "1" || echo "0") \
 		ENV_FILE=.env.inference.$(MODEL_SOURCESET) \
 			docker compose \
-			-f docker-compose.yaml \
-			-f docker-compose.inference.dev.yaml \
-			$(if $(ENABLE_GPU),-f docker-compose.inference.gpu.yaml,) \
-			$(if $(USE_LOCAL_HF_CACHE),-f docker-compose.hf-cache.yaml,) \
+			-f docker/docker-compose.yaml \
+			-f docker/docker-compose.inference.dev.yaml \
+			$(if $(ENABLE_GPU),-f docker/docker-compose.inference.gpu.yaml,) \
+			$(if $(USE_LOCAL_HF_CACHE),-f docker/docker-compose.hf-cache.yaml,) \
 			--env-file .env.inference.$(MODEL_SOURCESET) \
 			--env-file .env.localhost \
 			--env-file .env \
@@ -184,4 +181,4 @@ reset-docker-data: ## Reset Docker Data - this deletes your local database!
 		exit 1; \
 	fi
 	@echo "Resetting Docker data..."
-	docker compose down -v
+	docker compose -f docker/docker-compose.yaml down -v

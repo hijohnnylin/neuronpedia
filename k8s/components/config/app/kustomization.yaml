@@ -1,0 +1,73 @@
+# k8s/components/config/app/kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# ConfigMap overrides
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      # Public URLs
+      - NEXT_PUBLIC_URL=http://localhost:3000
+      - NEXTAUTH_URL=http://localhost:3000
+      
+      # Feature flags
+      - NEXT_PUBLIC_ENABLE_SIGNIN=true
+      - ENABLE_RATE_LIMITER=false
+      - ENABLE_VERCEL_ANALYTICS=false
+      - NEXT_PUBLIC_DEMO_MODE=false
+      
+      # Service configuration
+      - USE_LOCALHOST_INFERENCE=false
+      - USE_LOCALHOST_AUTOINTERP=false
+      - USE_LOCALHOST_GRAPH=false
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      
+      # Default values
+      - DEFAULT_CREATOR_USER_ID=clkht01d40000jv08hvalcvly
+      - INFERENCE_ACTIVATION_USER_ID=cljgamm90000076zdchicy6zj
+      - PUBLIC_ACTIVATIONS_USER_IDS=clsxqq2xd0000vvp2k5itlhqj,clkht01d40000jv08hvalcvly,cljqfoqm1000776wmbr1f5mux,cljj57d3c000076ei38vwnv35
+      - NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS=gemma-2-2b-it
+      - NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH=1024
+      - CONTACT_EMAIL_ADDRESS=johnny@neuronpedia.org
+
+# Secret overrides
+secretGenerator:
+  - name: app-secrets
+    behavior: merge
+    literals:
+      # NextAuth
+      - NEXTAUTH_SECRET=88888888888888888888888888888888
+      
+      # AI API Keys
+      - OPENAI_API_KEY=your-openai-api-key
+      - ANTHROPIC_API_KEY=your-anthropic-api-key
+      - GEMINI_API_KEY=your-gemini-api-key
+      - OPENROUTER_API_KEY=your-openrouter-api-key
+      - AZURE_OPENAI_API_KEY=your-azure-openai-api-key
+      
+      # Server secrets
+      - INFERENCE_SERVER_SECRET=your-inference-secret
+      - AUTOINTERP_SERVER_SECRET=your-autointerp-secret
+      - GRAPH_SERVER_SECRET=your-graph-secret
+      - GRAPH_RUNPOD_SECRET=your-runpod-secret
+      
+      # OAuth providers
+      - GITHUB_ID=your-github-client-id
+      - GITHUB_SECRET=your-github-client-secret
+      - GOOGLE_CLIENT_ID=your-google-client-id
+      - GOOGLE_CLIENT_SECRET=your-google-client-secret
+      - APPLE_CLIENT_ID=your-apple-client-id
+      - APPLE_CLIENT_SECRET=your-apple-client-secret
+      
+      # Email providers (choose one)
+      - RESEND_EMAIL_API_KEY=your-resend-api-key
+      # OR AWS SES
+      - AWS_ACCESS_KEY_ID=your-aws-access-key
+      - AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+      
+      # Admin/API tokens
+      - GRAPH_ADMIN_BROWSE_KEY=your-admin-browse-key
+      - HIGHER_LIMIT_API_TOKENS=token1,token2

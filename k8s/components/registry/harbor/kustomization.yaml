@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+images:
+  - name: neuronpedia-inference
+    newName: harbor.contoso.org/neuronpedia/inference
+  - name: neuronpedia-webapp
+    newName: harbor.contoso.org/neuronpedia/webapp
+  - name: neuronpedia-db-init
+    newName: harbor.contoso.org/neuronpedia/db-init
+  - name: neuronpedia-autointerp
+    newName: harbor.contoso.org/neuronpedia/autointerp

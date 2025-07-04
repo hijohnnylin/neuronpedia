@@ -1,0 +1,41 @@
+---
+# k8s/base/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployments/webapp.yaml
+  - deployments/inference.yaml
+  - deployments/autointerp.yaml
+  - statefulsets/postgres.yaml
+  - jobs/db-init.yaml
+  - networking/ingress.yaml
+  - services/postgres.yaml
+
+configMapGenerator:
+  
+  # # App config (empty in base layer, populated in k8s/components/config/app/kustomization.yaml)
+  - name: app-config
+    literals: []
+  
+  # Base inference config (empty in base layer, populated in model-specific components)
+  - name: inference-config
+    literals: []
+  
+  # pgvector initialization
+  - name: pgvector-init
+    files:
+      - config/init-vector.sql
+
+secretGenerator:
+  # Database credentials (empty in base layer, populated in k8s/components/config/db/kustomization.yaml)
+  - name: db-credentials
+    literals: []
+  
+  # App secrets (empty in base layer, populated in k8s/components/config/app/kustomization.yaml)
+  - name: app-secrets
+    literals: []
+  
+  # Inference secrets (empty in base layer, populated in k8s/components/config/inference/kustomization.yaml)
+  - name: inference-secrets
+    literals: []

@@ -1,0 +1,33 @@
+# k8s/base/networking/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: neuronpedia-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: neuronpedia.org  # TODO replace with your webapp hosting domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: webapp
+            port:
+              number: 3000
+      - path: /api/inference
+        pathType: Prefix
+        backend:
+          service:
+            name: inference
+            port:
+              number: 5002
+      - path: /api/autointerp
+        pathType: Prefix
+        backend:
+          service:
+            name: autointerp
+            port:
+              number: 5003

@@ -1,0 +1,55 @@
+# k8s/components/models/deepseek-r1-distill-llama-8b/kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Apply naming and instance labels to inference resources
+patches:
+  - target:
+      kind: Deployment
+      name: inference
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: deepseek-r1-distill-llama-8b-inference
+      - op: add
+        path: /metadata/labels/instance
+        value: deepseek-r1-distill-llama-8b
+      - op: add
+        path: /metadata/labels/model
+        value: deepseek-r1-distill-llama-8b
+      - op: add
+        path: /spec/selector/matchLabels/instance
+        value: deepseek-r1-distill-llama-8b
+      - op: add
+        path: /spec/template/metadata/labels/instance
+        value: deepseek-r1-distill-llama-8b
+
+  - target:
+      kind: Service
+      name: inference
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: deepseek-r1-distill-llama-8b-inference
+      - op: add
+        path: /spec/selector/instance
+        value: deepseek-r1-distill-llama-8b
+
+# Model-specific inference configuration
+configMapGenerator:
+  - name: inference-config
+    behavior: merge
+    literals:
+      - MODEL_ID=meta-llama/Llama-3.1-8B
+      - OVERRIDE_MODEL_ID=meta-llama/Llama-3.1-8B
+      - CUSTOM_HF_MODEL_ID=deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+      - DEVICE=cuda
+      - MODEL_DTYPE=bfloat16
+      - SAE_DTYPE=bfloat16
+      - HOST=0.0.0.0
+      - TOKEN_LIMIT=4096
+      - PORT=5002
+      - MAX_LOADED_SAES=500
+      - SAE_SETS=["llamascope-slimpj-res-32k", "llamascope-openr1-res-32k", "llamascope-slimpj-openr1-res-32k"]
+      - INCLUDE_SAE=["^15-llamascope-slimpj-res-32k$", "^15-llamascope-openr1-res-32k$", "^15-llamascope-slimpj-openr1-res-32k$"]

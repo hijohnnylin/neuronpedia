@@ -1,0 +1,14 @@
+# k8s/components/config/db/kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+secretGenerator:
+  - name: db-credentials
+    behavior: merge
+    literals:
+      - POSTGRES_USER=neuronpedia
+      - POSTGRES_PASSWORD=org-secure-password
+      - POSTGRES_DB=neuronpedia
+      - POSTGRES_URL_NON_POOLING=postgres://neuronpedia:org-secure-password@postgres:5432/neuronpedia
+      - POSTGRES_PRISMA_URL=postgres://neuronpedia:org-secure-password@postgres:5432/neuronpedia?pgbouncer=true&connect_timeout=15
