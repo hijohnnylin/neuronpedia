@@ -176,6 +176,41 @@ inference-list-configs: ## Inference: List Configurations (possible values for M
 		echo ""; \
 	done
 
+autointerp-localhost-install: ## Autointerp: Localhost Environment - Install Dependencies (Development Build)
+	@echo "Installing the autointerp dependencies for development in the localhost environment..."
+	cd apps/autointerp && \
+	poetry remove neuronpedia-autointerp-client || true && \
+	poetry add ../../packages/python/neuronpedia-autointerp-client && \
+	poetry lock && poetry install
+
+autointerp-localhost-build: ## Autointerp: Localhost Environment - Build
+	@echo "Building the autointerp server for the localhost environment..."
+	ENV_FILE=.env.localhost \
+		BUILD_TYPE=$(BUILD_TYPE) \
+		docker compose \
+		-f docker-compose.yaml \
+		$(if $(USE_LOCAL_HF_CACHE),-f docker-compose.hf-cache.yaml,) \
+		build autointerp
+
+autointerp-localhost-build-gpu: ## Autointerp: Localhost Environment - Build (CUDA). Usage: make autointerp-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) autointerp-localhost-build BUILD_TYPE=cuda
+
+autointerp-localhost-dev: ## Autointerp: Localhost Environment - Run (Development Build). Usage: make autointerp-localhost-dev [AUTORELOAD=1]
+	@echo "Bringing up the autointerp server for development in the localhost environment..."
+	RELOAD=$$([ "$(AUTORELOAD)" = "1" ] && echo "1" || echo "0") \
+	ENV_FILE=.env.localhost \
+		docker compose \
+		-f docker-compose.yaml \
+		-f docker-compose.autointerp.dev.yaml \
+		$(if $(ENABLE_GPU),-f docker-compose.autointerp.gpu.yaml,) \
+		$(if $(USE_LOCAL_HF_CACHE),-f docker-compose.hf-cache.yaml,) \
+		--env-file .env.localhost \
+		--env-file .env \
+		up autointerp
+
+autointerp-localhost-dev-gpu: ## Autointerp: Localhost Environment - Run (Development Build with CUDA). Usage: make autointerp-localhost-dev-gpu [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) autointerp-localhost-dev ENABLE_GPU=1 AUTORELOAD=$(AUTORELOAD)
+
 reset-docker-data: ## Reset Docker Data - this deletes your local database!
 	@echo "WARNING: This will delete all your local neuronpedia Docker data and databases!"
 	@read -p "Are you sure you want to continue? (y/N) " confirm; \
