@@ -2965,18 +2965,20 @@ name = "neuronpedia-autointerp-client"
 version = "1.0.0"
 description = "Neuronpedia - AutoInterp Server"
 optional = false
-python-versions = "*"
+python-versions = "^3.8"
 groups = ["main"]
-files = [
-    {file = "neuronpedia_autointerp_client-1.0.0-py3-none-any.whl", hash = "sha256:1a0b6da75c7cc50c128180d9d121586da1ef96ddc47ad08f5439937e57efac36"},
-    {file = "neuronpedia_autointerp_client-1.0.0.tar.gz", hash = "sha256:24c975a0b7727047b11bf41b1cf12c2af70e9d617034acf969000e0bea53ecb2"},
-]
+files = []
+develop = false
 
 [package.dependencies]
-pydantic = ">=2"
-python-dateutil = ">=2.8.2"
-typing-extensions = ">=4.7.1"
-urllib3 = ">=1.25.3,<3.0.0"
+pydantic = ">= 2"
+python-dateutil = ">= 2.8.2"
+typing-extensions = ">= 4.7.1"
+urllib3 = ">= 1.25.3, < 3.0.0"
+
+[package.source]
+type = "directory"
+url = "../../packages/python/neuronpedia-autointerp-client"
 
 [[package]]
 name = "nh3"
@@ -7565,4 +7567,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "b9cc5f9ef8702e1e770bf05ba993031c8d0e133c3ab608cd4ac2053c0727f3da"
+content-hash = "50df6fc2fc91d82cb5e004110544f9055b20e39fed6131a3dff90cccd9f7e8e9"
