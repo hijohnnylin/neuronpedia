@@ -306,12 +306,57 @@ look at the `.env.inference.deepseek-r1-distill-llama-8b.llamascope-slimpj-res-3
 
 ## 'i want to run/develop autointerp locally`
 
-this section is under construction.
+#### what this does + what you'll get
 
-- check out the [autointerp readme](apps/autointerp/README.md)
-- [TODO](https://github.com/hijohnnylin/neuronpedia/issues/5) instructions for setting up autointerp server locally
-- TODO - look at the `autointerp` service in [docker-compose.yaml](docker-compose.yaml)
-- schema-driven development: [openapi readme: making changes to the autointerp server](schemas/README.md#making-changes-to-the-autointerp-server)
+the autointerp server provides automatic interpretation and scoring of neural network features. it uses eleutherAI's [delphi](https://github.com/EleutherAI/delphi) for generating explanations and scoring.
+
+> ⚠️ **warning:** the eleuther embedding scorer uses an embedding model only supported on CUDA (it won't work on mac mps or cpu)
+
+#### steps
+
+1. ensure you have [installed poetry](https://python-poetry.org/docs/#installation)
+2. install the autointerp server's dependencies
+   ```
+   make autointerp-localhost-install
+   ```
+3. build the image, picking the correct command based on if the machine has CUDA or not:
+   ```
+   # CUDA
+   make autointerp-localhost-build-gpu USE_LOCAL_HF_CACHE=1
+   ```
+   ```
+   # no CUDA
+   make autointerp-localhost-build USE_LOCAL_HF_CACHE=1
+   ```
+   > ➡️ The [`USE_LOCAL_HF_CACHE=1` flag](https://github.com/hijohnnylin/neuronpedia/pull/89) mounts your local HuggingFace cache at `${HOME}/.cache/huggingface/hub:/root/.cache/huggingface/hub`. If you wish to create a new cache in your container instead, you can omit this flag here and in the next step.
+4. run the autointerp server:
+   ```
+   # CUDA
+   make autointerp-localhost-dev-gpu \
+        USE_LOCAL_HF_CACHE=1
+
+   # no CUDA
+   make autointerp-localhost-dev \
+        USE_LOCAL_HF_CACHE=1
+   ```
+5. wait for it to load
+
+#### using the autointerp server
+
+to interact with the autointerp server, you have a few options:
+
+1. use the pre-generated autointerp python client at `packages/python/neuronpedia-autointerp-client` (set environment variable `AUTOINTERP_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
+2. use the openapi spec, located at `schemas/openapi/autointerp-server.yaml` to make calls with any client of your choice.
+3. TODO: Use a documentation generator to make a simple tester-server that can be activated with `make doc-autointerp-localhost`
+
+#### doing local autointerp development
+
+- **schema-driven development**: to add new endpoints or change existing endpoints, you will need to start by updating the openapi schemas, then generating clients from that, then finally updating the actual autointerp and webapp code. for details on how to do this, see the [openapi readme: making changes to the autointerp server](schemas/README.md#making-changes-to-the-autointerp-server)
+- **no auto-reload**: when you change any files in the `apps/autointerp` subdirectory, the autointerp server will _NOT_ automatically reload by default. if you want to enable autoreload, then append `AUTORELOAD=1` to the `make autointerp-localhost-dev` call, like so:
+  ```
+  make autointerp-localhost-dev \
+       AUTORELOAD=1
+  ```
 
 ## 'i want to do high volume autointerp explanations'
 

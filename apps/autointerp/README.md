@@ -3,7 +3,7 @@
 - [repo status](#repo-status)
 - [what this is](#what-this-is)
 - [simple non-docker setup](#simple-non-docker-setup)
-- [some docker commands for reference (outdated, needs fixing)](#some-docker-commands-for-reference-outdated-needs-fixing)
+- [some docker commands for reference](#some-docker-commands-for-reference)
 
 ## repo status
 
@@ -33,9 +33,7 @@ as much as possible we try to use classes/types from the `packages/python/neuron
    poetry run uvicorn server:app --host 0.0.0.0 --port 5003 --workers 1 --reload
    ```
 
-## some docker commands for reference (outdated, needs fixing)
-
-likely we will just have these instructions in the root directory `readme` instead, and manual builds should happen the same way as we do it for `inference`.
+## some docker commands for reference
 
 build the image from root directory
 
@@ -65,10 +63,10 @@ Run the container locally
 # replace SECRET with your own value - it must match what webapp knows, or auth will fail
 
 # cpu
-docker run -p 5003:5003 -e SECRET=[SECRET] neuronpedia-autointerp:cpu poetry run autointerp
+docker run -p 5003:5003 -e SECRET=[SECRET] neuronpedia-autointerp:cpu
 
 # gpu
-docker run --gpus all -p 5003:5003 -e SECRET=[SECRET] neuronpedia-autointerp:gpu poetry run autointerp
+docker run --gpus all -p 5003:5003 -e SECRET=[SECRET] neuronpedia-autointerp:gpu
 ```
 
 ## Testing, Linting, and Formatting
@@ -81,7 +79,7 @@ If you add new code, it would be greatly appreciated if you could add tests in t
 make test
 ```
 
-Before commiting, make sure you format the code with:
+Before committing, make sure you format the code with:
 
 ```bash
 make format

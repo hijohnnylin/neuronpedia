@@ -1,10 +1,11 @@
 [tool.poetry]
-name = "neuronpedia_autointerp"
+name = "neuronpedia-autointerp"
 version = "1.0.0"
 description = "Neuronpedia's AutoInterp Server - Based on EleutherAI's sae-auto-interp."
 authors = ["Johnny Lin <johnny@neuronpedia.org>"]
 license = "MIT"
 readme = "README.md"
+package-mode = false
 keywords = ["interpretability", "explainable-ai"]
 
 [tool.poetry.dependencies]
@@ -13,11 +14,12 @@ fastapi = "^0.115.0"
 pydantic = "^2.0.0"
 uvicorn = "^0.34.0"
 python-dotenv = "^1.1.0"
-neuronpedia-autointerp-client = "^1.0.0"
 sentry-sdk = { extras = ["fastapi"], version = "^2.20.0" }
 sae-auto-interp = { git = "https://github.com/hijohnnylin/sae-auto-interp" }
 bitsandbytes = "==0.42.0"
 torchtyping = "^0.1.5"
+pytest = "^8.1.1"
+neuronpedia-autointerp-client = {path = "../../packages/python/neuronpedia-autointerp-client"}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.1"
@@ -29,6 +31,9 @@ pytest-cov = "^6.0.0"
 [build-system]
 requires = ["poetry-core>=1.4.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.Union".msg = "Use '|' instead"
