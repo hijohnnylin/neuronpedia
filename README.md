@@ -310,7 +310,7 @@ this section is under construction.
 
 - check out the [autointerp readme](apps/autointerp/README.md)
 - [TODO](https://github.com/hijohnnylin/neuronpedia/issues/5) instructions for setting up autointerp server locally
-- TODO - look at the `autointerp` service in [docker-compose.yaml](docker-compose.yaml)
+- TODO - look at the `autointerp` service in [docker-compose.yaml](./docker/docker-compose.yaml)
 - schema-driven development: [openapi readme: making changes to the autointerp server](schemas/README.md#making-changes-to-the-autointerp-server)
 
 ## 'i want to do high volume autointerp explanations'

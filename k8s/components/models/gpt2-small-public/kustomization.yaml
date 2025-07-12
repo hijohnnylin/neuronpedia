@@ -1,0 +1,59 @@
+# k8s/components/models/gpt2-small-public/kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Apply naming and instance labels to inference resources
+patches:
+  - target:
+      kind: Deployment
+      name: inference
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: gpt2-small-public-inference
+      - op: add
+        path: /metadata/labels/instance
+        value: gpt2-small-public
+      - op: add
+        path: /metadata/labels/model
+        value: gpt2-small-public
+      - op: add
+        path: /spec/selector/matchLabels/instance
+        value: gpt2-small-public
+      - op: add
+        path: /spec/template/metadata/labels/instance
+        value: gpt2-small-public
+
+  - target:
+      kind: Service
+      name: inference
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: gpt2-small-public-inference
+      - op: add
+        path: /spec/selector/instance
+        value: gpt2-small-public
+
+# Model-specific inference configuration
+configMapGenerator:
+  - name: inference-config
+    behavior: merge
+    literals:
+      - MODEL_ID=gpt2-small
+      - OVERRIDE_MODEL_ID=gpt2-small
+      - DEVICE=cpu
+      - MODEL_DTYPE=float32
+      - SAE_DTYPE=float32
+      - HOST=0.0.0.0
+      - TOKEN_LIMIT=400
+      - PORT=5002
+      - MAX_LOADED_SAES=500
+      - SAE_SETS='["res-jb"]'
+
+secretGenerator:
+  - name: server-secret
+    behavior: merge
+    literals:
+      - SECRET=public

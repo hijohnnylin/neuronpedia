@@ -1,0 +1,53 @@
+# k8s/components/models/gemma-2-2b-it-a/kustomization.yaml
+---
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Apply naming and instance labels to inference resources
+patches:
+  - target:
+      kind: Deployment
+      name: inference
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: gemma-2-2b-it-a-inference
+      - op: add
+        path: /metadata/labels/instance
+        value: gemma-2-2b-it-a
+      - op: add
+        path: /metadata/labels/model
+        value: gemma-2-2b-it-a
+      - op: add
+        path: /spec/selector/matchLabels/instance
+        value: gemma-2-2b-it-a
+      - op: add
+        path: /spec/template/metadata/labels/instance
+        value: gemma-2-2b-it-a
+
+  - target:
+      kind: Service
+      name: inference
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: gemma-2-2b-it-a-inference
+      - op: add
+        path: /spec/selector/instance
+        value: gemma-2-2b-it-a
+
+# Model-specific inference configuration
+configMapGenerator:
+  - name: inference-config
+    behavior: merge
+    literals:
+      - MODEL_ID=gemma-2-2b
+      - OVERRIDE_MODEL_ID=gemma-2-2b-it
+      - DEVICE=cuda
+      - MODEL_DTYPE=bfloat16
+      - SAE_DTYPE=float16
+      - TOKEN_LIMIT=400
+      - HOST=0.0.0.0
+      - PORT=5002
+      - MAX_LOADED_SAES=500
+      - SAE_SETS=["gemmascope-res-16k", "gemmascope-att-16k", "gemmascope-res-65k"]

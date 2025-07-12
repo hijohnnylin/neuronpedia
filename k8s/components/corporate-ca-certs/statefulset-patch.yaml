@@ -1,0 +1,19 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  template:
+    spec:
+      containers:
+      - name: postgres
+        volumeMounts:
+        - name: corporate-ca-certs
+          mountPath: /usr/local/share/ca-certificates # TODO specify path to CA bundle here
+          readOnly: true
+      volumes:
+      - name: corporate-ca-certs
+        configMap:
+          name: corporate-ca-certificates
+          optional: false

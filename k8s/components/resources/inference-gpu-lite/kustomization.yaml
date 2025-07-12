@@ -1,0 +1,9 @@
+# k8s/overlays/development/resources/inference-gpu-lite/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+patches:
+  - path: patches/resources.yaml
+    target:
+      kind: Deployment
+      name: inference

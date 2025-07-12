@@ -1,0 +1,46 @@
+# k8s/base/deployments/autointerp.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autointerp
+  labels:
+    app: autointerp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: autointerp
+  template:
+    metadata:
+      labels:
+        app: autointerp
+    spec:
+      containers:
+      - name: autointerp
+        image: neuronpedia-autointerp
+        ports:
+        - containerPort: 5003
+        envFrom:
+        - secretRef:
+            name: app-secrets
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+      imagePullSecrets:
+      - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autointerp
+spec:
+  selector:
+    app: autointerp
+  ports:
+  - port: 5003
+    targetPort: 5003
+  type: ClusterIP

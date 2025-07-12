@@ -1,0 +1,80 @@
+# k8s/base/statefulsets/postgres.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  # Don't include namespace here, as it's set in the overlay kustomization
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      securityContext:
+        fsGroup: 999  # postgres group ID
+      containers:
+      - name: postgres
+        image: pgvector/pgvector:pg15
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_USER
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: POSTGRES_DB
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres # Add subPath to avoid permission issues
+        - name: pgvector-init
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+        readinessProbe:
+          exec:
+            command: 
+            - sh
+            - -c
+            - "pg_isready -U $POSTGRES_USER"
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 5
+      volumes:
+      - name: pgvector-init
+        configMap:
+          name: pgvector-init
+      # TODO test the new corporate-ca-certs patch component before removing
+      # - name: etc-ssl-certs
+      #   configMap:
+      #     name: corporate-ca-certificates
+      #     optional: false
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
