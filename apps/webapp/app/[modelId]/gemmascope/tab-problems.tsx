@@ -17,13 +17,13 @@ export default function TabProblems({ tabUpdater }: { tabUpdater: (tab: string) 
           💡 Purpose
         </span>
 
-        <div className=" flex w-full flex-col items-start justify-start text-left text-sm font-medium text-slate-500">
-          <div className=" leading-normal">
+        <div className="flex w-full flex-col items-start justify-start text-left text-sm font-medium text-slate-500">
+          <div className="leading-normal">
             Interpretability has many unsolved problems. If{' '}
             {`you'd like to try your hand at solving one of them, consider the following starting points.`} Once{' '}
             {`you're ready to share or collaborate, join us in the `} Open Source Mechanistic Interpretability{' '}
             <a
-              href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA"
+              href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-375zalm04-GFd5tdBU1yLKlu_T_JSqZQ"
               target="_blank"
               rel="noreferrer"
               className="text-gBlue"
@@ -40,7 +40,7 @@ export default function TabProblems({ tabUpdater }: { tabUpdater: (tab: string) 
       </div>
 
       <div className="mb-5 flex w-full flex-row items-center justify-start px-2 sm:px-5">
-        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded  px-2 py-1 pb-24 sm:flex-row">
+        <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-1 pb-24 sm:flex-row">
           <span className="w-[105px] min-w-[105px] max-w-[105px] whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-center text-[10px] font-bold uppercase text-slate-600">
             ❓ Problems
           </span>

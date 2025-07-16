@@ -43,6 +43,7 @@ export default function QuizNeuron({
         neuron={neuron}
         overallMaxValue={100}
         hideBos
+        hideSteer
         enterSubmits
         formValue=""
         placeholder={`Test ${name}`}
@@ -54,7 +55,7 @@ export default function QuizNeuron({
             setShowAnswer(true);
           }}
           className={`mt-0.5 rounded-full ${
-            showAnswer ? 'bg-gRed text-slate-800' : 'bg-white  hover:bg-gRed/20'
+            showAnswer ? 'bg-gRed text-slate-800' : 'bg-white hover:bg-gRed/20'
           } border border-gRed px-3 py-1.5 text-[11px] font-medium text-slate-800 transition-all`}
         >
           🫣 Reveal Our Label

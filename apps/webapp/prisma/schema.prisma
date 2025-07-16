@@ -117,6 +117,7 @@ model User {
   initiatedExplanationScore    ExplanationScore[]
   graphMetadatas               GraphMetadata[]
   graphMetadataDataPutRequests GraphMetadataDataPutRequest[]
+  graphMetadataSubgraphs       GraphMetadataSubgraph[]
 
   emailNewsletterNotification Boolean @default(true)
   emailUnsubscribeAll         Boolean @default(false)
@@ -126,6 +127,28 @@ model User {
 
   @@unique(emailUnsubscribeCode)
   @@index(bot)
+}
+
+model GraphMetadataSubgraph {
+  id              String        @id @default(cuid())
+  displayName     String?
+  
+  graphMetadataId String
+  graphMetadata   GraphMetadata @relation(fields: [graphMetadataId], references: [id], onDelete: Cascade)
+
+  pinnedIds        String[] @default([])
+  supernodes       Json     @default("[]")
+  clerps           Json     @default("[]")
+  pruningThreshold Float?
+  densityThreshold Float?
+
+  userId     String
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isFeaturedSolution Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model GraphMetadata {
@@ -141,10 +164,11 @@ model GraphMetadata {
   titlePrefix  String // anthropic equivalent = "title_prefix"
 
   // following are only ours
-  isFeatured Boolean @default(false)
-  url    String  // full url of where the json file is stored
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isFeatured Boolean                 @default(false)
+  subgraphs  GraphMetadataSubgraph[]
+  url        String // full url of where the json file is stored
+  userId     String?
+  user       User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

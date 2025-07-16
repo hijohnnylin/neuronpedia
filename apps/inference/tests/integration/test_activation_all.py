@@ -1,5 +1,4 @@
-from collections import Counter
-
+import pytest
 from fastapi.testclient import TestClient
 from neuronpedia_inference_client.models.activation_all_post200_response import (
     ActivationAllPost200Response,
@@ -8,7 +7,17 @@ from neuronpedia_inference_client.models.activation_all_post_request import (
     ActivationAllPostRequest,
 )
 
-from tests.conftest import BOS_TOKEN_STR, TEST_PROMPT, X_SECRET_KEY
+from tests.conftest import (
+    ABS_TOLERANCE,
+    BOS_TOKEN_STR,
+    MODEL_ID,
+    SAE_SELECTED_SOURCES,
+    SAE_SOURCE_SET,
+    TEST_PROMPT,
+    X_SECRET_KEY,
+)
+
+ENDPOINT = "/v1/activation/all"
 
 
 def test_activation_all(client: TestClient):
@@ -17,15 +26,16 @@ def test_activation_all(client: TestClient):
     """
     request = ActivationAllPostRequest(
         prompt=TEST_PROMPT,
-        model="gpt2-small",
-        source_set="res-jb",
-        selected_sources=["7-res-jb"],
+        model=MODEL_ID,
+        source_set=SAE_SOURCE_SET,
+        selected_sources=SAE_SELECTED_SOURCES,
         sort_by_token_indexes=[],
+        num_results=5,
         ignore_bos=True,
     )
 
     response = client.post(
-        "/v1/activation/all",
+        ENDPOINT,
         json=request.model_dump(),
         headers={"X-SECRET-KEY": X_SECRET_KEY},
     )
@@ -37,21 +47,88 @@ def test_activation_all(client: TestClient):
     data = response.json()
     response_model = ActivationAllPost200Response(**data)
 
-    # Ensure we received non-empty results
-    assert len(response_model.tokens) > 0, "No tokens returned"
-    assert len(response_model.activations) > 0, "No activations returned"
+    # Expected data based on the provided response
+    expected_activations_data = [
+        {
+            "source": "7-res-jb",
+            "index": 16653,
+            "values": [0.0, 46.481327056884766, 11.279630661010742, 0.0, 0.0],
+            "max_value": 46.481327056884766,
+            "max_value_index": 1,
+        },
+        {
+            "source": "7-res-jb",
+            "index": 11553,
+            "values": [
+                0.0,
+                0.0,
+                3.798774480819702,
+                6.36670446395874,
+                8.832769393920898,
+            ],
+            "max_value": 8.832769393920898,
+            "max_value_index": 4,
+        },
+        {
+            "source": "7-res-jb",
+            "index": 9810,
+            "values": [
+                0.0,
+                8.095728874206543,
+                3.749096632003784,
+                4.03702449798584,
+                6.3894195556640625,
+            ],
+            "max_value": 8.095728874206543,
+            "max_value_index": 1,
+        },
+        {
+            "source": "7-res-jb",
+            "index": 14806,
+            "values": [
+                0.0,
+                0.7275917530059814,
+                6.788952827453613,
+                5.938947677612305,
+                0.0,
+            ],
+            "max_value": 6.788952827453613,
+            "max_value_index": 2,
+        },
+        {
+            "source": "7-res-jb",
+            "index": 16488,
+            "values": [
+                0.0,
+                3.8083033561706543,
+                2.710123062133789,
+                6.348649501800537,
+                2.1380198001861572,
+            ],
+            "max_value": 6.348649501800537,
+            "max_value_index": 3,
+        },
+    ]
 
-    # Check for duplicate indices
-    indices = [activation.index for activation in response_model.activations]
-    index_counts = Counter(indices)
-    duplicate_indices = [index for index, count in index_counts.items() if count > 1]
-    assert len(duplicate_indices) == 0, f"Found duplicate indices: {duplicate_indices}"
+    # Verify we have the expected number of activations
+    assert len(response_model.activations) == len(expected_activations_data)
+
+    # Check each activation against expected data
+    for i, (actual, expected) in enumerate(
+        zip(response_model.activations, expected_activations_data)
+    ):
+        assert actual.source == expected["source"], f"Activation {i}: source mismatch"
+        assert actual.index == expected["index"], f"Activation {i}: index mismatch"
+        assert (
+            pytest.approx(actual.values, abs=ABS_TOLERANCE) == expected["values"]
+        ), f"Activation {i}: values mismatch"
+        assert (
+            pytest.approx(actual.max_value, abs=ABS_TOLERANCE) == expected["max_value"]
+        ), f"Activation {i}: max_value mismatch"
+        assert (
+            actual.max_value_index == expected["max_value_index"]
+        ), f"Activation {i}: max_value_index mismatch"
 
     # Check expected tokens sequence
-    assert (
-        response_model.tokens[0] == BOS_TOKEN_STR
-    ), f"First token is not '{BOS_TOKEN_STR}'"
-    assert response_model.tokens[1] == "Hello", "Second token is not 'Hello'"
-    assert response_model.tokens[2] == ",", "Third token is not ','"
-    assert response_model.tokens[3] == " world", "Fourth token is not ' world'"
-    assert response_model.tokens[4] == "!", "Fifth token is not '!'"
+    expected_tokens = [BOS_TOKEN_STR, "Hello", ",", " world", "!"]
+    assert response_model.tokens == expected_tokens

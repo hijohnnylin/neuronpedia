@@ -60,7 +60,7 @@ export default function SourceSetSelector({
             position="popper"
             align="center"
             sideOffset={2}
-            className="z-30 max-h-[420px] cursor-pointer overflow-hidden rounded-md border border-slate-300 bg-white text-xs font-medium text-sky-700 shadow"
+            className="z-[100] max-h-[420px] cursor-pointer overflow-hidden rounded-md border border-slate-300 bg-white text-xs font-medium text-sky-700 shadow"
           >
             <Select.ScrollUpButton className="flex justify-center border-b bg-slate-100 text-slate-300">
               <ChevronUpIcon className="h-4 w-4" />

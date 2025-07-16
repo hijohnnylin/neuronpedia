@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "neuronpedia"
-version = "1.0.15"
-description = "Neuronpedia (Official)"
+version = "1.0.22"
+description = "Neuronpedia"
 authors = ["johnny <johnny@neuronpedia.org>"]
 readme = "README.md"
 
@@ -9,9 +9,6 @@ readme = "README.md"
 python = "^3.10"
 python-dotenv = "^1.0.1"
 requests = "^2.32.3"
-huggingface-hub = "^0.26.2"
-pandas = "^2.2.3"
-tiny-dashboard = "^0.2.1"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"

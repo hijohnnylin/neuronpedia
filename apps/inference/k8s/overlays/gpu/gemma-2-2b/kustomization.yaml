@@ -1,5 +1,5 @@
 resources:
-  - ../base
+  - ../base-lite
 namePrefix: gemma-2-2b-
 commonLabels:
   instance: gemma-2-2b
@@ -15,4 +15,4 @@ configMapGenerator:
       - HOST=0.0.0.0
       - PORT=5002
       - MAX_LOADED_SAES=500
-      - SAE_SETS=["gemmascope-res-16k", "gemmascope-att-16k", "gemmascope-res-65k", "res-matryoshka-dc"]
+      - SAE_SETS=["gemmascope-res-16k", "gemmascope-att-16k", "res-matryoshka-dc"]

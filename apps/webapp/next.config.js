@@ -32,6 +32,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'neuronpedia.s3.us-east-1.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async redirects() {

@@ -18,7 +18,7 @@ const s3Client = new S3Client({ region: 'us-east-1' });
  *     summary: Delete Graph
  *     description: Deletes an existing graph from Neuronpedia. You can only delete graphs you created.
  *     tags:
- *       - Circuit Graphs
+ *       - Attribution Graphs
  *     security:
  *       - apiKey: []
  *     requestBody:

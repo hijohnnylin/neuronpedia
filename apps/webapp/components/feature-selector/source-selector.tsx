@@ -170,7 +170,7 @@ export default function SourceSelector({
               setSourceSetOpen(defaultSource ? getSourceSetNameFromSource(defaultSource) : '');
             }}
             sideOffset={3}
-            className="z-30 cursor-pointer  overflow-hidden rounded  bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+            className="z-30 cursor-pointer overflow-hidden rounded bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
           >
             <DropdownMenu.Label className="sticky top-0 cursor-default border-b border-slate-100 bg-white py-1.5 text-center text-[10px] uppercase text-slate-400">
               Release
@@ -191,22 +191,20 @@ export default function SourceSelector({
                     onMouseEnter={() => {
                       setReleaseOpen(releaseFiltered.name);
                     }}
-                    className="group flex w-full max-w-[340px] flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b-slate-100 bg-white px-3 py-3 text-xs font-medium hover:bg-sky-100  hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600 [&:not(:last-child)]:border-b"
+                    className="group flex w-full max-w-[340px] flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b-slate-100 bg-white px-3 py-3 text-xs font-medium hover:bg-sky-100 hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600 [&:not(:last-child)]:border-b"
                   >
                     <div className="flex w-full flex-col items-start justify-center gap-y-1.5 leading-tight">
                       <div className="flex w-full flex-row items-center justify-between gap-x-5 text-[10.5px] leading-none text-sky-700/70 group-hover:text-sky-700 group-data-[state=open]:text-sky-700">
                         <div className="whitespace-pre font-mono font-bold uppercase">{releaseFiltered?.name}</div>
-                        <div className="font-medium text-slate-400  ">{releaseFiltered.creatorNameShort}</div>
+                        <div className="font-medium text-slate-400">{releaseFiltered.creatorNameShort}</div>
                       </div>
                       {releaseFiltered && (
-                        <div className="font-sans text-[12px] font-semibold capitalize text-slate-500 group-hover:text-slate-600 group-data-[state=open]:text-slate-600 ">
+                        <div className="font-sans text-[12px] font-semibold capitalize text-slate-500 group-hover:text-slate-600 group-data-[state=open]:text-slate-600">
                           {releaseFiltered.description}
                         </div>
                       )}
                     </div>
-                    <ChevronRightIcon
-                      className={`-mr-2 ml-0 w-3 leading-none text-slate-400 group-hover:text-slate-600 group-data-[state=open]:text-slate-600 `}
-                    />
+                    <ChevronRightIcon className="-mr-2 ml-0 w-3 leading-none text-slate-400 group-hover:text-slate-600 group-data-[state=open]:text-slate-600" />
                   </DropdownMenu.SubTrigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.SubContent
@@ -237,18 +235,16 @@ export default function SourceSelector({
                                 }}
                                 asChild
                               >
-                                <div className="group flex w-full flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b-slate-100 bg-white  px-3 py-2.5 text-xs font-medium hover:bg-sky-100  hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600 [&:not(:last-child)]:border-b">
+                                <div className="group flex w-full flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b-slate-100 bg-white px-3 py-2.5 text-xs font-medium hover:bg-sky-100 hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600 [&:not(:last-child)]:border-b">
                                   <div className="flex w-full flex-col items-start justify-center gap-y-1 leading-snug">
-                                    <div className="flex w-full flex-row items-center justify-between gap-x-5 whitespace-pre font-mono  text-[12px] font-semibold uppercase text-sky-700/70 group-hover:text-sky-700 group-data-[state=open]:text-sky-700 ">
+                                    <div className="flex w-full flex-row items-center justify-between gap-x-5 whitespace-pre font-mono text-[12px] font-semibold uppercase text-sky-700/70 group-hover:text-sky-700 group-data-[state=open]:text-sky-700">
                                       {sourceSet}
                                     </div>
-                                    <div className="w-full text-left font-sans text-[10.5px] font-semibold text-slate-500 group-hover:text-slate-600 group-data-[state=open]:text-slate-600   ">
+                                    <div className="w-full text-left font-sans text-[10.5px] font-semibold text-slate-500 group-hover:text-slate-600 group-data-[state=open]:text-slate-600">
                                       {getSourceSet(modelId, sourceSet)?.type}
                                     </div>
                                   </div>
-                                  <ChevronRightIcon
-                                    className={`-mr-2 ml-0 w-3 leading-none text-slate-400 group-hover:text-slate-600 group-data-[state=open]:text-slate-600 `}
-                                  />
+                                  <ChevronRightIcon className="-mr-2 ml-0 w-3 leading-none text-slate-400 group-hover:text-slate-600 group-data-[state=open]:text-slate-600" />
                                 </div>
                               </DropdownMenu.SubTrigger>
 
@@ -293,7 +289,7 @@ export default function SourceSelector({
                                         }}
                                         className={`${
                                           defaultSource === source.id ? 'bg-sky-200' : 'bg-white hover:bg-sky-100'
-                                        } group flex w-full flex-1 cursor-pointer flex-col items-start justify-start gap-x-1  border-b-slate-100 px-3 py-2.5 text-xs font-medium focus:outline-none`}
+                                        } group flex w-full flex-1 cursor-pointer flex-col items-start justify-start gap-x-1 border-b-slate-100 px-3 py-2.5 text-xs font-medium focus:outline-none`}
                                       >
                                         <div className="flex w-full flex-col items-start justify-center gap-y-1 leading-snug">
                                           <div
@@ -304,9 +300,9 @@ export default function SourceSelector({
                                             {source.id}
                                           </div>
                                           <div
-                                            className={`font-sans text-[10.5px] font-bold capitalize  ${
+                                            className={`font-sans text-[10.5px] font-bold capitalize ${
                                               defaultSource === source.id ? 'text-slate-600' : 'text-slate-500'
-                                            }  group-hover:text-slate-600 group-data-[state=open]:text-slate-600`}
+                                            } group-hover:text-slate-600 group-data-[state=open]:text-slate-600`}
                                           >
                                             Layer {getLayerNumFromSource(source.id || '')}{' '}
                                             {isCanonicalSource(source.id || '')

@@ -39,6 +39,7 @@ class HOOK_POINT_TYPE_CHOICES(str, Enum):
     hook_resid_pre = "hook_resid_pre"
     hook_resid_mid = "hook_resid_mid"
     hook_resid_post = "hook_resid_post"
+    hook_mlp_in = "hook_mlp_in"
     hook_mlp_out = "hook_mlp_out"
     hook_attn_in = "hook_attn_in"
     hook_attn_out = "hook_attn_out"
@@ -56,6 +57,10 @@ def make_option(*option_names: str, help_text: str, **kwargs) -> Any:
         prompt="\n" + help_text + "\n",
         **kwargs,
     )
+
+
+# TODO: Use tokenizer to get BOS tokens
+BOS_TOKENS = ["<bos>"]
 
 
 @app.command()
@@ -166,6 +171,14 @@ def main(
             help_text="[Dashboard Gen Parameters] Context Tokens per Prompt: The number of tokens per prompt to use for each activation in the dashboard. More requires more time and memory. We typically use 128.",
         ),
     ] = 128,
+    # gemma 2 was not trained with BOS tokens, so we need to zero them out
+    zero_out_bos_token: Annotated[
+        bool,
+        make_option(
+            "--zero-out-bos-token",
+            help_text="[Dashboard Gen Parameters] Zero Out BOS Token: Whether to zero out the BOS token in the activations.",
+        ),
+    ] = False,
 ):
     print("Running with arguments:\n")
     for param, value in ctx.params.items():
@@ -193,6 +206,9 @@ def main(
 
         global VECTOR_STEER_HOOK_NAME
         VECTOR_STEER_HOOK_NAME = hook_point.value
+
+        global ZERO_OUT_BOS_TOKEN
+        ZERO_OUT_BOS_TOKEN = zero_out_bos_token
 
         # get the hf folder id from the hf weights path
         hf_folder_id = "/".join(hf_weights_path.split("/")[:-1])
@@ -383,6 +399,14 @@ def process_data(
         )
         max_act_approx = 0
         for activation_data in feature_data["activations"]:
+            if ZERO_OUT_BOS_TOKEN:
+                for i, token in enumerate(activation_data["tokens"]):
+                    if token in BOS_TOKENS and activation_data["values"][i] != 0:
+                        print(
+                            f"Zeroing out BOS token {token} at index {i}, source_id: {source_id}, feature_index: {feature_data['feature_index']}, file: {batch_file_name}"
+                        )
+                        activation_data["values"][i] = 0
+
             max_value = max(activation_data["values"])
             max_value_token_index = activation_data["values"].index(max_value)
             if max_value > max_act_approx:

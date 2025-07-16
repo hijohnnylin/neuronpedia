@@ -1,3 +1,4 @@
+import { ASSET_BASE_URL } from '@/lib/env';
 import fs from 'fs';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import path from 'path';
@@ -33,7 +34,8 @@ export function getBlogDateString(date: string) {
 export const getPostBySlug = async (slug: string): Promise<{ meta: PostMetaData; content: any }> => {
   const formattedSlug = slug.replace(/\.mdx$/, '');
   const filePath = path.join(rootDir, `${formattedSlug}.mdx`);
-  const fileContent = fs.readFileSync(filePath, { encoding: 'utf8' });
+  let fileContent = fs.readFileSync(filePath, { encoding: 'utf8' });
+  fileContent = fileContent.replaceAll('ASSET_BASE_URL', ASSET_BASE_URL);
   const { frontmatter, content } = await compileMDX({
     source: fileContent,
     options: {
@@ -55,5 +57,7 @@ export const getPostsMetaData = async () => {
     const { meta } = await getPostBySlug(fileName);
     posts.push(meta);
   }
+  // Sort posts by date in descending order (newest first)
+  posts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   return posts;
 };

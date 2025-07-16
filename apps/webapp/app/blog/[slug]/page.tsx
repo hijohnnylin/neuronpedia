@@ -2,6 +2,7 @@ import { getBlogDateString, getPostBySlug, PostMetaData } from '@/app/blog/blog-
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import { BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
+import { ASSET_BASE_URL } from '@/lib/env';
 import { Metadata } from 'next';
 import Image from 'next/image';
 import BlogSidebar from '../blog-sidebar';
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           url: meta.imagePreview,
         },
         {
-          url: '/images/blog/the-residual-stream.jpg',
+          url: `${ASSET_BASE_URL}/blog/the-residual-stream.jpg`,
         },
       ],
     },
@@ -44,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           url: meta.imagePreview,
         },
         {
-          url: '/images/blog/the-residual-stream.jpg',
+          url: `${ASSET_BASE_URL}/blog/the-residual-stream.jpg`,
         },
       ],
       locale: 'en_US',
@@ -61,7 +62,7 @@ export default async function Page({ params }: Props) {
       <BreadcrumbsComponent
         crumbsArray={[
           <BreadcrumbLink href="/blog" key={1}>
-            The Residual Stream - Neuronpedia&apos;s Blog
+            Residual Stream - Blog
           </BreadcrumbLink>,
           <BreadcrumbLink href={`/blog/${params.slug}`} key={2}>
             {/* @ts-ignore */}
@@ -77,9 +78,11 @@ export default async function Page({ params }: Props) {
         <Card className="mb-12 mt-2 w-full bg-white">
           <CardHeader className="flex flex-col px-3 pb-1 sm:px-8">
             <Image src={meta.image} alt={meta.title} width={800} height={400} className="w-full rounded-md" />
-            <CardTitle className="pb-0 pt-5 text-[28px] font-bold text-slate-800">{meta.title}</CardTitle>
+            <CardTitle className="pb-0 pt-5 text-[22px] font-bold text-slate-800 sm:text-[28px]">
+              {meta.title}
+            </CardTitle>
             <div className="mb-2 text-[15px] font-medium text-slate-800">{meta.description}</div>
-            <div className="font-mono text-[12px] font-medium text-slate-600">
+            <div className="font-mono text-[12px] font-medium text-slate-400">
               By {meta.author} · {getBlogDateString(meta.date)}
             </div>
           </CardHeader>

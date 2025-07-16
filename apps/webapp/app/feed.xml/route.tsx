@@ -1,5 +1,5 @@
 import { getPostsMetaData } from '@/app/blog/blog-util';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { ASSET_BASE_URL, NEXT_PUBLIC_URL } from '@/lib/env';
 import RSS from 'rss';
 
 export async function GET() {
@@ -12,7 +12,7 @@ export async function GET() {
     description: "Neuronpedia's official blog.",
     site_url: siteUrl,
     feed_url: `${siteUrl}/feed.xml`,
-    image_url: `${siteUrl}/images/blog/the-residual-stream.jpg`,
+    image_url: `${ASSET_BASE_URL}/blog/the-residual-stream.jpg`,
     pubDate: new Date().toUTCString(),
     copyright: `All rights reserved - ${new Date().getFullYear()}`,
   };

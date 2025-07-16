@@ -30,6 +30,7 @@ export default function FeatureStats({
   embed = false,
   embedPlots = true,
   forceMiniStats = false,
+  activationMarkerValue,
 }: {
   currentNeuron: NeuronWithPartialRelations;
   vertical?: boolean;
@@ -37,6 +38,7 @@ export default function FeatureStats({
   embed?: boolean;
   embedPlots?: boolean;
   forceMiniStats?: boolean;
+  activationMarkerValue?: number;
 }) {
   const { getSourceSet, globalModels } = useGlobalContext();
   const [maxLogit, setMaxLogit] = useState<number | undefined>();
@@ -389,6 +391,21 @@ export default function FeatureStats({
                       color: makeColorRangeForFrequencyHistogram(currentNeuron?.freq_hist_data_bar_values.length),
                     },
                   },
+                  ...(activationMarkerValue !== undefined
+                    ? [
+                        {
+                          x: [activationMarkerValue, activationMarkerValue],
+                          y: [0, Math.max(...(currentNeuron?.freq_hist_data_bar_heights || []))],
+                          type: 'scatter' as const,
+                          mode: 'lines' as const,
+                          line: {
+                            color: 'green',
+                            width: 2,
+                          },
+                          showlegend: false,
+                        },
+                      ]
+                    : []),
                 ]}
                 layout={{
                   height: (windowSize.width && windowSize.width < 640) || forceMiniStats ? 35 : 70,

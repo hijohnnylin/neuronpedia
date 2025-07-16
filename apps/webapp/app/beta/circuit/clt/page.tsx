@@ -12,7 +12,6 @@ export default function CircuitCLTRedirectPage({
   searchParams,
 }: {
   searchParams: {
-    clickedId?: string;
     logitDiff?: string;
     model?: string;
     slug?: string;

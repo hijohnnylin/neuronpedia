@@ -4,6 +4,8 @@ import { neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
 import { steerCompletion } from '@/lib/utils/inference';
 import {
+  STEER_FREQUENCY_PENALTY_MAX,
+  STEER_FREQUENCY_PENALTY_MIN,
   STEER_MAX_PROMPT_CHARS,
   STEER_METHOD,
   STEER_N_COMPLETION_TOKENS_MAX,
@@ -132,7 +134,7 @@ const steerSchema = object({
     .required(),
   temperature: number().min(0).max(STEER_TEMPERATURE_MAX).required(),
   n_tokens: number().integer().min(1).max(STEER_N_COMPLETION_TOKENS_MAX).required(),
-  freq_penalty: number().min(-2).max(2).required(),
+  freq_penalty: number().min(STEER_FREQUENCY_PENALTY_MIN).max(STEER_FREQUENCY_PENALTY_MAX).required(),
   seed: number().min(-100000000).max(100000000).required(),
   strength_multiplier: number().min(0).max(STEER_STRENGTH_MULTIPLIER_MAX).required(),
   stream: bool().default(false),

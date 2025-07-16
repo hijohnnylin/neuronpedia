@@ -96,8 +96,20 @@ export const USE_LOCALHOST_AUTOINTERP = process.env.USE_LOCALHOST_AUTOINTERP ===
 export const AUTOINTERP_SERVER = process.env.AUTOINTERP_SERVER || '';
 export const AUTOINTERP_SERVER_SECRET = process.env.AUTOINTERP_SERVER_SECRET || '';
 
-// Deprecated - Scorer Server
-export const OLD_SCORER_SERVER = process.env.OLD_SCORER_SERVER || '';
+// Graph Server
+// Three possible states: Localhost Graph, Remote Graph, and Runpod Graph
+// USE_LOCALHOST_GRAPH and USE_RUNPOD_GRAPH cannot both be true.
+export const USE_LOCALHOST_GRAPH = process.env.USE_LOCALHOST_GRAPH === 'true';
+export const GRAPH_SERVER = process.env.GRAPH_SERVER || '';
+export const GRAPH_SERVER_SECRET = process.env.GRAPH_SERVER_SECRET || '';
+
+// Runpod Graph
+export const USE_RUNPOD_GRAPH = process.env.USE_RUNPOD_GRAPH === 'true';
+if (USE_RUNPOD_GRAPH && USE_LOCALHOST_GRAPH) {
+  throw new Error('USE_LOCALHOST_GRAPH and USE_RUNPOD_GRAPH cannot both be true.');
+}
+export const GRAPH_RUNPOD_SECRET = process.env.GRAPH_RUNPOD_SECRET || '';
+export const GRAPH_RUNPOD_SERVER = process.env.GRAPH_RUNPOD_SERVER || '';
 
 // Authentication Methods
 // Apple
@@ -123,3 +135,10 @@ export const IS_ACTUALLY_NEURONPEDIA_ORG =
 export const NODE_ENV = process.env.NODE_ENV || '';
 export const IS_DOCKER_COMPOSE = process.env.IS_DOCKER_COMPOSE === 'true';
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || IS_ONE_CLICK_VERCEL_DEPLOY;
+export const ASSET_BASE_URL = 'https://neuronpedia.s3.us-east-1.amazonaws.com/site-assets';
+export const GRAPH_ADMIN_BROWSE_KEY = process.env.GRAPH_ADMIN_BROWSE_KEY || '';
+
+export const API_KEY_HEADER_NAME = 'x-api-key';
+export const HIGHER_LIMIT_API_TOKENS = process.env.HIGHER_LIMIT_API_TOKENS
+  ? process.env.HIGHER_LIMIT_API_TOKENS.split(',').map((t) => t.trim())
+  : [];

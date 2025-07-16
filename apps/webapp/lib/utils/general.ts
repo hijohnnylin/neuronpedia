@@ -5,7 +5,7 @@ export const UNNAMED_AUTHOR_NAME = 'Unnamed';
 export enum SearchExplanationsType {
   BY_ALL = 'byAll',
   BY_RELEASE = 'byRelease',
-  BY_SAE = 'bySAE',
+  BY_SOURCE = 'bySource',
   BY_MODEL = 'byModel',
 }
 

@@ -1,6 +1,6 @@
 import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
-import { createModel } from '../../../../lib/db/model';
+import { createModelAdmin } from '../../../../lib/db/model';
 
 type ModelToCreate = {
   id: string;
@@ -15,7 +15,7 @@ export const POST = withAuthedAdminUser(async (request: RequestAuthedAdminUser) 
   const modelId = body.id.toLowerCase();
   const { displayName } = body;
 
-  const model = await createModel(modelId, displayName, body.layers, body.owner, request.user);
+  const model = await createModelAdmin(modelId, displayName, body.layers, body.owner, request.user);
 
   return NextResponse.json(model);
 });

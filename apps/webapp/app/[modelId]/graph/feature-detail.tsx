@@ -1,98 +1,91 @@
-import { GRAPH_PREFETCH_ACTIVATIONS_COUNT, useGraphContext } from '@/components/provider/graph-provider';
+import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
+import { useGraphContext } from '@/components/provider/graph-provider';
+import { useGraphStateContext } from '@/components/provider/graph-state-provider';
 import { Button } from '@/components/shadcn/button';
-import { ActivationWithPartialRelations } from '@/prisma/generated/zod';
 import { Circle } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso';
+import { GroupedVirtuoso } from 'react-virtuoso';
 import FeatureDashboard from '../[layer]/[index]/feature-dashboard';
 import GraphFeatureDetailItem from './feature-detail-item';
 import GraphFeatureLink from './np-feature-link';
-import { CLTGraphNode, nodeTypeHasFeatureDetail } from './utils';
+import { clientCheckIsEmbed, CLTGraphNode, nodeTypeHasFeatureDetail } from './utils';
 
 export default function GraphFeatureDetail() {
   const {
     visState,
     selectedGraph,
+    updateVisStateField,
     isEditingLabel,
     setIsEditingLabel,
-    updateVisStateField,
-    getOriginalClerpForNode,
     getOverrideClerpForNode,
+    getNodeSupernodeAndOverrideLabel,
+    getOriginalClerpForNode,
+    setFullNPFeatureDetail,
   } = useGraphContext();
+
+  const { hoveredIdRef, clickedIdRef, registerHoverCallback, registerClickedCallback } = useGraphStateContext();
+
   const [node, setNode] = useState<CLTGraphNode | null>(null);
-  const [overallMaxActivationValue, setOverallMaxActivationValue] = useState<number>(0);
+  const [overallMaxActivationValue, setOverallMaxActivationValue] = useState<number>(1);
+  const [tempLabel, setTempLabel] = useState('');
   const activationContainerRef = useRef<HTMLDivElement>(null);
-  const groupRef = useRef<GroupedVirtuosoHandle>(null);
-  const [tempLabel, setTempLabel] = useState(node?.ppClerp || '');
+  const groupRef = useRef<any>(null);
 
+  const { openWelcomeModalToStep } = useGraphModalContext();
+
+  // Track current displayed node to avoid unnecessary updates
+  const currentDisplayedNodeRef = useRef<string | null>(null);
+
+  // Register for both hover and clicked changes and update node display
   useEffect(() => {
-    setIsEditingLabel(false);
-    const clickedNode = visState.clickedId
-      ? selectedGraph?.nodes.find((e) => e.nodeId === visState.clickedId) || null
-      : null;
+    const updateDisplayedNode = () => {
+      // Determine which node to show: hovered node takes priority over clicked
+      const nodeIdToShow = hoveredIdRef.current || clickedIdRef.current;
 
-    let maxActValue = Math.max(
-      ...(clickedNode?.featureDetail?.examples_quantiles[0].examples.flatMap((e) => e.tokens_acts_list) || []),
-    );
+      // Only update if the node actually changed
+      if (currentDisplayedNodeRef.current === nodeIdToShow) return;
 
-    if (visState.hoveredId) {
-      const hoveredNode = selectedGraph?.nodes.find((e) => e.featureId === visState.hoveredId);
-      if (hoveredNode && hoveredNode.feature) {
-        setNode(hoveredNode);
-        if (hoveredNode.featureDetail) {
-          maxActValue = Math.max(
-            ...hoveredNode.featureDetail.examples_quantiles[0].examples.flatMap((e) => e.tokens_acts_list),
+      currentDisplayedNodeRef.current = nodeIdToShow;
+
+      if (nodeIdToShow && selectedGraph) {
+        const targetNode = selectedGraph.nodes.find((e) => e.nodeId === nodeIdToShow || e.featureId === nodeIdToShow);
+        if (targetNode) {
+          // Get the max activation value across all nodes for scaling
+          const maxActValue = Math.max(
+            1,
+            ...selectedGraph.nodes.map((n) => (n.activation !== undefined ? n.activation : 0)),
           );
+          setNode(targetNode);
+          setOverallMaxActivationValue(maxActValue);
         }
       } else {
-        setNode(clickedNode);
+        setNode(null);
       }
-    } else {
-      setNode(clickedNode);
-    }
+    };
 
-    setOverallMaxActivationValue(maxActValue);
-  }, [visState.hoveredId, visState.clickedId, selectedGraph]);
+    const unregisterHover = registerHoverCallback(() => {
+      updateDisplayedNode();
+    });
+
+    const unregisterClicked = registerClickedCallback(() => {
+      updateDisplayedNode();
+    });
+
+    // Initial call to set the current state
+    updateDisplayedNode();
+
+    return () => {
+      unregisterHover();
+      unregisterClicked();
+    };
+  }, [registerHoverCallback, registerClickedCallback, selectedGraph, clickedIdRef, hoveredIdRef]);
 
   // Separate useEffect for scrolling when 'feature' changes
   useEffect(() => {
     groupRef.current?.scrollToIndex(0);
-    console.log('node set with activations:', node?.featureDetailNP?.activations?.length);
-    // load the rest of the activations on demand
-    if (
-      node?.featureDetailNP &&
-      node?.featureDetailNP.activations &&
-      node?.featureDetailNP.activations.length <= GRAPH_PREFETCH_ACTIVATIONS_COUNT
-    ) {
-      fetch(`/api/activation/get`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelId: node.featureDetailNP.modelId,
-          source: node.featureDetailNP.layer,
-          index: node.featureDetailNP.index,
-        }),
-      })
-        .then((response) => response.json())
-        .then((acts: ActivationWithPartialRelations[]) => {
-          // fillInActivationsForNode(node, acts);
-          if (node?.featureDetailNP) {
-            // Create a new node object with updated activations to trigger re-render
-            setNode((prevNode) => {
-              if (!prevNode || !prevNode.featureDetailNP) return prevNode;
-              return {
-                ...prevNode,
-                featureDetailNP: {
-                  ...prevNode.featureDetailNP,
-                  activations: acts,
-                },
-              };
-            });
-          }
-        })
-        .catch((error) => {
-          console.error(`error submitting getting rest of feature: ${error}`);
-        });
+    // console.log('node set with activations:', node?.featureDetailNP?.activations?.length);
+    if (node) {
+      setFullNPFeatureDetail(setNode, node);
     }
   }, [node]);
 
@@ -130,15 +123,29 @@ export default function GraphFeatureDetail() {
   const memoizedFeatureDetail = useMemo(() => {
     if (!node)
       return (
-        <div className="flex h-[100%] min-h-[410px] flex-col items-center justify-center text-center text-sm font-medium text-slate-700">
+        <div className="relative hidden h-[100%] flex-col items-center justify-center text-center text-sm font-medium text-slate-700 sm:flex">
           <div className="mb-2 text-lg font-bold">Feature Details</div>
           <div className="">Hover over a node in the graph to see its details and edit its label.</div>
+          {!clientCheckIsEmbed() && (
+            <button
+              type="button"
+              onClick={() => openWelcomeModalToStep(5)}
+              className="absolute right-0 top-1 flex h-[24px] w-[24px] items-center justify-center gap-x-1 rounded-full bg-slate-200 py-0.5 text-[12px] font-medium transition-colors hover:bg-slate-300"
+              aria-label="Open User Guide"
+            >
+              ?
+            </button>
+          )}
         </div>
       );
 
     return (
-      <>
-        <div className="flex flex-row items-center justify-between gap-x-1.5 pl-3 pt-2 text-sm font-medium text-slate-600">
+      <div
+        className={`max-h-full w-full flex-col overflow-y-scroll sm:flex ${
+          clickedIdRef.current ? 'absolute left-0 top-0 z-10 flex sm:relative' : ''
+        }`}
+      >
+        <div className="flex flex-row items-center justify-between gap-x-1.5 py-1 pl-3 pt-1 text-sm font-medium text-slate-600 sm:py-0">
           <div className="flex flex-1 flex-row items-center gap-x-2">
             <Circle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
             {isEditingLabel ? (
@@ -159,7 +166,7 @@ export default function GraphFeatureDetail() {
                       e.preventDefault();
                     }
                   }}
-                  className="w-full flex-1 rounded border border-slate-300 px-2 py-0 text-xs placeholder:text-slate-300"
+                  className="temp-edit-feat-detail w-full flex-1 rounded border border-slate-300 px-2 py-0 text-xs placeholder:text-slate-300"
                 />
                 {getOriginalClerpForNode(node) && (
                   <div className="text-xs">
@@ -171,7 +178,14 @@ export default function GraphFeatureDetail() {
                 )}
               </div>
             ) : (
-              <div className="text-xs">{getOverrideClerpForNode(node)}</div>
+              <div className="flex flex-col items-start justify-start text-[10px] leading-snug sm:text-xs sm:leading-normal">
+                {getNodeSupernodeAndOverrideLabel(node)}
+                {node.activation && (
+                  <span className="text-[9px] font-medium uppercase text-slate-400">
+                    Activation: {node.activation.toFixed(2)}
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <div className="flex flex-row gap-x-1">
@@ -179,7 +193,7 @@ export default function GraphFeatureDetail() {
               <Button
                 variant="outline"
                 size="xs"
-                className="w-18"
+                className="w-18 hidden sm:inline-flex"
                 onClick={() => {
                   if (isEditingLabel) {
                     if (selectedGraph) {
@@ -229,36 +243,52 @@ export default function GraphFeatureDetail() {
           {!(node.feature_type === 'embedding' || node.feature_type === 'logit') && (
             <GraphFeatureLink selectedGraph={selectedGraph} node={node} />
           )}
+
+          {!clientCheckIsEmbed() && (
+            <button
+              type="button"
+              onClick={() => openWelcomeModalToStep(5)}
+              className="hidden h-[24px] w-[24px] items-center justify-center gap-x-1 self-start rounded-full bg-slate-200 py-0.5 text-[12px] font-medium transition-colors hover:bg-slate-300 sm:flex"
+              aria-label="Open User Guide"
+            >
+              ?
+            </button>
+          )}
         </div>
         {node.featureDetailNP ? (
-          <div className="ml-3 flex max-h-[394px] overflow-y-scroll overscroll-y-none rounded-b-md border-b border-slate-200">
+          <div className="ml-3 flex flex-1 overflow-y-scroll overscroll-y-none rounded-b-md border-b border-slate-200">
             <FeatureDashboard
               forceMiniStats
               key={`${node.featureDetailNP.index}-${node.featureDetailNP.activations?.length || 0}`}
               initialNeuron={node.featureDetailNP}
+              activationMarkerValue={node.activation}
               embed
             />
           </div>
         ) : (
           node.featureDetail && (
             <div className="pl-4 pt-1">
-              <div className="mb-1.5 mt-2 border-b pb-1 text-sm font-bold text-slate-600">Token Predictions</div>
-              <div className="flex h-5 w-full items-center justify-start gap-x-1 gap-y-0.5 overflow-x-scroll font-mono text-[10px] text-slate-400">
-                <div className="sticky left-0 mr-1 flex h-5 items-center justify-center">Top:</div>
-                {node.featureDetail?.top_logits.map((logit, idx) => (
-                  <span key={idx} className="cursor-default rounded bg-slate-100 px-1 py-[1px] text-slate-700">
-                    {logit}
-                  </span>
-                ))}
-              </div>
-              <div className="flex h-5 w-full items-center justify-start gap-x-1 gap-y-0.5 overflow-x-scroll font-mono text-[10px] text-slate-400">
-                <div className="sticky left-0 mr-1 flex h-5 items-center justify-center">Bottom:</div>
-                {node?.featureDetail?.bottom_logits.map((logit, idx) => (
-                  <span key={idx} className="cursor-default rounded bg-slate-100 px-1 py-[1px] text-slate-700">
-                    {logit}
-                  </span>
-                ))}
-              </div>
+              {node.featureDetail?.top_logits && node.featureDetail?.bottom_logits && (
+                <>
+                  <div className="mb-1.5 mt-2 border-b pb-1 text-sm font-bold text-slate-600">Token Predictions</div>
+                  <div className="flex h-5 w-full items-center justify-start gap-x-1 gap-y-0.5 overflow-x-scroll font-mono text-[10px] text-slate-400">
+                    <div className="sticky left-0 mr-1 flex h-5 items-center justify-center">Top:</div>
+                    {node.featureDetail?.top_logits?.map((logit, idx) => (
+                      <span key={idx} className="cursor-default rounded bg-slate-100 px-1 py-[1px] text-slate-700">
+                        {logit}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex h-5 w-full items-center justify-start gap-x-1 gap-y-0.5 overflow-x-scroll font-mono text-[10px] text-slate-400">
+                    <div className="sticky left-0 mr-1 flex h-5 items-center justify-center">Bottom:</div>
+                    {node?.featureDetail?.bottom_logits?.map((logit, idx) => (
+                      <span key={idx} className="cursor-default rounded bg-slate-100 px-1 py-[1px] text-slate-700">
+                        {logit}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
               <div
                 ref={activationContainerRef}
                 className="flex max-h-[310px] w-full flex-col overflow-y-scroll overscroll-none"
@@ -291,18 +321,9 @@ export default function GraphFeatureDetail() {
             </div>
           )
         )}
-      </>
+      </div>
     );
-  }, [
-    node,
-    node?.featureDetailNP?.activations,
-    overallMaxActivationValue,
-    isEditingLabel,
-    tempLabel,
-    visState.clerps,
-    visState.clickedId,
-    visState.hoveredId,
-  ]);
+  }, [node, node?.featureDetailNP?.activations, overallMaxActivationValue, isEditingLabel, tempLabel, visState.clerps]);
 
-  return <div className="flex min-h-[410px] w-full flex-1 flex-col">{memoizedFeatureDetail}</div>;
+  return <div className="flex h-full w-full flex-1 flex-col overflow-y-scroll">{memoizedFeatureDetail}</div>;
 }

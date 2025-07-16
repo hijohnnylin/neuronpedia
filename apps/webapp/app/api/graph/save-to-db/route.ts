@@ -1,7 +1,14 @@
-import { CLTGraph, makeGraphPublicAccessGraphUrl } from '@/app/[modelId]/graph/utils';
+import {
+  ATTRIBUTION_GRAPH_SCHEMA,
+  CLTGraph,
+  ERROR_MODEL_DOES_NOT_EXIST,
+  makeGraphPublicAccessGraphUrl,
+} from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
 import { getUserByName } from '@/lib/db/user';
+import { NEXT_PUBLIC_URL } from '@/lib/env';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import Ajv from 'ajv';
 import { NextResponse } from 'next/server';
 import { object, string } from 'yup';
 
@@ -16,7 +23,7 @@ const saveToDbSchema = object({
  *     summary: Upload Graph 2/2 - Save Graph Metadata to Database
  *     description: Saves metadata about an uploaded graph file to the database after it has been uploaded to S3.
  *     tags:
- *       - Circuit Graphs
+ *       - Attribution Graphs
  *     security:
  *       - apiKey: []
  *     requestBody:
@@ -69,27 +76,49 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     const response = await fetch(cleanUrl);
     const graph = (await response.json()) as CLTGraph;
 
-    // if the graph is not valid, return an error
-    if (!graph.metadata || !graph.nodes || !graph.links) {
-      return NextResponse.json({ error: 'Invalid graph' }, { status: 400 });
-    }
+    // Validate the graph against the JSON schema
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    const validate = ajv.compile(ATTRIBUTION_GRAPH_SCHEMA);
+    const isValid = validate(graph);
 
-    // if scan or slug has weird characters, return error
-    if (/[^a-zA-Z0-9_-]/.test(graph.metadata.scan) || /[^a-zA-Z0-9_-]/.test(graph.metadata.slug)) {
+    if (!isValid) {
+      const errors = validate.errors?.map((error) => {
+        const path = error.instancePath || 'root';
+        return `${path}: ${error.message}`;
+      }) || ['Unknown validation error'];
+
       return NextResponse.json(
-        { error: 'Invalid scan or slug. They must be alphanumeric and contain only underscores and hyphens.' },
+        {
+          error: `Invalid graph format. Use the validator to check your graph json: ${NEXT_PUBLIC_URL}/graph/validator`,
+          details: errors,
+        },
         { status: 400 },
       );
     }
 
-    // if model doesn't exist in our database, return error
+    // if scan or slug has weird characters, return error
+    if (/[^a-zA-Z0-9_.-]/.test(graph.metadata.scan) || /[^a-zA-Z0-9_.-]/.test(graph.metadata.slug)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid scan or slug. They must be alphanumeric and contain only underscores, hyphens, and periods.',
+        },
+        { status: 400 },
+      );
+    }
+
+    // if model doesn't exist in our database, create it with the owner as the signed in user
     const model = await prisma.model.findUnique({
       where: {
         id: graph.metadata.scan,
       },
     });
     if (!model) {
-      return NextResponse.json({ error: 'Model not supported' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: ERROR_MODEL_DOES_NOT_EXIST,
+        },
+        { status: 400 },
+      );
     }
 
     // if exists, return error (only if it's not the same user)
@@ -103,7 +132,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     });
     if (existingGraph && existingGraph.userId !== userId) {
       return NextResponse.json(
-        { error: 'This model already has this slug. Please use a different slug.' },
+        { error: 'This model already has this slug, and it was created by another user. Please use a different slug.' },
         { status: 400 },
       );
     }

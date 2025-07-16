@@ -590,7 +590,7 @@
     "/api/explanation/search": {
       "post": {
         "tags": ["Explanations"],
-        "summary": "Search by SAEs",
+        "summary": "Search by Sources/SAEs",
         "security": [
           {
             "apiKey": []

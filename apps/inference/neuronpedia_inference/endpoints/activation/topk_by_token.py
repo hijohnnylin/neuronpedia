@@ -52,15 +52,15 @@ async def activation_topk_by_token(
         truncate=False,
     )[0]
 
-    if len(tokens) > config.TOKEN_LIMIT:
+    if len(tokens) > config.token_limit:
         logger.error(
             "Text too long: %s tokens, max is %s",
             len(tokens),
-            config.TOKEN_LIMIT,
+            config.token_limit,
         )
         return JSONResponse(
             content={
-                "error": f"Text too long: {len(tokens)} tokens, max is {config.TOKEN_LIMIT}"
+                "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
             },
             status_code=400,
         )
@@ -120,10 +120,10 @@ def get_activations_by_index(
     hook_name: str,
 ) -> torch.Tensor:
     if sae_type == "neurons":
-        mlp_activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
+        mlp_activation_data = cache[hook_name].to(Config.get_instance().device)
         return torch.transpose(mlp_activation_data[0], 0, 1)
 
-    activation_data = cache[hook_name].to(Config.get_instance().DEVICE)
+    activation_data = cache[hook_name].to(Config.get_instance().device)
     feature_activation_data = (
         SAEManager.get_instance().get_sae(selected_layer).encode(activation_data)
     )

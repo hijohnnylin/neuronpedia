@@ -262,17 +262,6 @@ test('Slack', async ({ page }) => {
   await expect(newPage).toHaveURL(/.*slack\.com*/);
 });
 
-test('Donate', async ({ page }) => {
-  await page.goto('https://neuronpedia.org');
-
-  const [newPage] = await Promise.all([
-    page.waitForEvent('popup'),
-    page.getByRole('button', { name: 'Donate' }).click(),
-  ]);
-
-  await expect(newPage).toHaveURL(/.*every\.org*/);
-});
-
 // test('Feedback', async({ page }) => {
 //   await page.goto('https://neuronpedia.org');
 

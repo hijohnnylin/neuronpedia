@@ -3,8 +3,8 @@ title: Neuronpedia is Now Open Source
 description: 'Interpretability tools for absolutely everyone, for free. Plus 4TB of datasets.'
 date: 2025-03-31
 author: Johnny Lin
-image: /images/blog/neuronpedia-is-now-open-source.gif
-imagePreview: /images/blog/neuronpedia-is-now-open-source-preview.gif
+image: ASSET_BASE_URL/blog/neuronpedia-is-now-open-source.gif
+imagePreview: ASSET_BASE_URL/blog/neuronpedia-is-now-open-source-preview.gif
 ---
 
 # TL;DR
@@ -12,14 +12,14 @@ imagePreview: /images/blog/neuronpedia-is-now-open-source-preview.gif
 Podcast Summary by NotebookLM - [[Apple]](https://podcasts.apple.com/us/podcast/the-babble-a-residual-stream-podcast/id1809283401?i=1000703948045) [[Spotify]](https://creators.spotify.com/pod/show/neuronpedia/episodes/Ep--2-A-Bunch-of-Updates-e31nm2b)
 
 - Get started on running Neuronpedia: [GitHub](https://github.com/hijohnnylin/neuronpedia) or [Instant Deploy](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org)
-- Download 4+ terabytes of interpretability data: [Public Datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/)
+- Download 4+ terabytes of interpretability data: [Public Datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1)
 - Review [a summary](#current-capabilities) of Neuronpedia's features and submit [feature requests](https://github.com/hijohnnylin/neuronpedia/issues).
-- Reach out to us via [Slack #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA), [email](mailto:johnny@neuronpedia.org), or [GitHub Issues](https://github.com/hijohnnylin/neuronpedia/issues)
+- Reach out to us via [Slack #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-375zalm04-GFd5tdBU1yLKlu_T_JSqZQ), [email](mailto:johnny@neuronpedia.org), or [GitHub Issues](https://github.com/hijohnnylin/neuronpedia/issues)
 - Check out the [tweet thread](https://x.com/neuronpedia/status/1906793456879775745) with demos
 
 <figure className="pb-5 pt-4">
   <img
-    src="/images/blog/summary.jpg"
+    src="ASSET_BASE_URL/blog/summary.jpg"
     alt="The new open source Neuronpedia - still supporting researchers, but now open sourced."
     className="rounded-xl border-4 border-slate-200 sm:max-w-screen-sm"
   />
@@ -31,7 +31,7 @@ A summary of [Neuronpedia](https://neuronpedia.org)'s current capabilities - not
 
 <figure>
   <img
-    src="/images/blog/np-functionality-mar25.png"
+    src="ASSET_BASE_URL/blog/np-functionality-mar25.png"
     alt="Neuronpedia's current functionality map, including API, search, auto-interp, exploration tools, and more."
   />
 </figure>
@@ -54,7 +54,7 @@ One early experiment was crowdsourcing human explanations for neurons. By [using
 
 <figure>
   <img
-    src="/images/blog/np-initial-game.jpg"
+    src="ASSET_BASE_URL/blog/np-initial-game.jpg"
     alt="The Neuronpedia game: with pixel art, animations, collectibles, leaderboards, and even an item shop."
   />
   <figcaption>
@@ -86,11 +86,7 @@ For the impatient, you can instantly deploy a custom Neuronpedia by clicking `De
 </p>
 
 <video controls muted>
-  <source
-    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/puppyneurons-shrink.mp4"
-    alt="video of using instant deploy"
-    type="video/mp4"
-  />
+  <source src="ASSET_BASE_URL/puppyneurons-shrink.mp4" alt="video of using instant deploy" type="video/mp4" />
 </video>
 
 Custom Neuronpedias are as simple as a few clicks. And you can `git pull` new changes when we deploy them, to stay updated with the latest fixes/features.
@@ -104,11 +100,7 @@ We're grateful for the people and organizations that came before us to make Neur
 For example, with a [single prompt](https://github.com/hijohnnylin/neuronpedia/blob/main/apps/experiments/steerify/README.md#claude-code-prompt) to Claude Code, it builds a new app "Steerify" using Neuronpedia components, with no intervention or fixes:
 
 <video controls muted>
-  <source
-    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/steerify-shrink.mp4"
-    alt="video of building steerify"
-    type="video/mp4"
-  />
+  <source src="ASSET_BASE_URL/steerify-shrink.mp4" alt="video of building steerify" type="video/mp4" />
 </video>
 
 Neuronpedia is comprised of multiple services that can run independently, so you can also just fork parts of Neuronpedia that you want and replace other parts entirely. For example, if you want just the frontend of Neuronpedia but plug in a different system for inference, just replace the Neuronpedia inference server, ensuring that your new inference server matches the defined OpenAPI spec.
@@ -135,16 +127,12 @@ We're currently working on porting our TODOs and roadmap from our private task m
 
 ## New: Global Datasets - Export and Import (WIP)
 
-Let's say you came up with a new type of sparse coder, called the Sparse PuppyEncoder (SPE), and you want to not only [host it yourself](#new-host-neuronpedia-yourself), but also to let others load Sparse PuppyEncoders (and your generated data) into _their own_ local Neuronpedia and tinker with it? You can do that, too - just use the `neuronpedia-utils` export tools to export your activations, explanations, and metadata. Then, we upload your data to the public [neuronpedia-datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/), so that anyone running a local instance can import it.
+Let's say you came up with a new type of sparse coder, called the Sparse PuppyEncoder (SPE), and you want to not only [host it yourself](#new-host-neuronpedia-yourself), but also to let others load Sparse PuppyEncoders (and your generated data) into _their own_ local Neuronpedia and tinker with it? You can do that, too - just use the `neuronpedia-utils` export tools to export your activations, explanations, and metadata. Then, we upload your data to the public [neuronpedia-datasets](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1), so that anyone running a local instance can import it.
 
 Here's importing datasets from the global Neuronpedia bucket to a localhost instance:
 
 <video controls muted>
-  <source
-    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/import-shrink.mp4"
-    alt="video of importing data"
-    type="video/mp4"
-  />
+  <source src="ASSET_BASE_URL/import-shrink.mp4" alt="video of importing data" type="video/mp4" />
 </video>
 
 # What Does Open Sourcing _Not_ Change?
@@ -169,7 +157,7 @@ All documention for getting started is in the READMEs in our public repository. 
   - Neuronpedia is a monorepo with multiple services and packages
   - Multiple tutorials / methods for setting it up, depending on your level of customization
   - Demo environment is publicly available to connect to (database, inference instances)
-- [Datasets (4+ TB)](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/)
+- [Datasets (4+ TB)](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1)
   - Includes all current public Neuronpedia data
   - 11 models
   - 60+ million latents/features/concepts, 50+ million explanations, 3+ billion activations
@@ -190,7 +178,7 @@ We wanted make the open source Neuronpedia available ASAP so that people can sta
 Neuronpedia is platform that's constantly evolving for the latest in interpretability science. So your feedback, feature requests, and bug reports are critical to its success. Reach us via:
 
 - [GitHub Issues](https://github.com/hijohnnylin/neuronpedia/issues): Good for longer-form feature requests and specific bugs
-- [Slack #neuronpedia or #general](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA): Good for quick questions and general tips
+- [Slack #neuronpedia or #general](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-375zalm04-GFd5tdBU1yLKlu_T_JSqZQ): Good for quick questions and general tips
 - [Email](mailto:johnny@neuronpedia.org): Good for high priority issues, privacy-sensitive communication, and collaborations
 
 # Acknowledgements
@@ -202,6 +190,7 @@ We're always standing on the shoulders of giants, and we're grateful for every o
 - Neel Nanda
 - The Long Term Future Fund
 - AISTOF
+- Survival & Flourishing Fund
 - OpenAI's Superalignment Team
 
 We hope by open sourcing Neuronpedia, we can advance research and go further together in building public, shared interpretability tools - and maybe have some fun along the way.

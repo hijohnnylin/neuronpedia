@@ -1,8 +1,8 @@
-from requests import Response
-from neuronpedia.requests.base_request import (
-    NPRequest,
-)
+from typing import Optional
+
 from neuronpedia.np_vector import NPVector
+from neuronpedia.requests.base_request import NPRequest
+from requests import Response
 
 VALID_HOOK_TYPES = ["hook_resid_pre"]
 
@@ -10,8 +10,9 @@ VALID_HOOK_TYPES = ["hook_resid_pre"]
 class VectorRequest(NPRequest):
     def __init__(
         self,
+        api_key: Optional[str] = None,
     ):
-        super().__init__("vector")
+        super().__init__("vector", api_key=api_key)
 
     def new(
         self,
@@ -23,7 +24,9 @@ class VectorRequest(NPRequest):
         default_steer_strength: float | None = 10,
     ) -> NPVector:
         if hook_type not in VALID_HOOK_TYPES:
-            raise ValueError(f"Invalid hook name: {hook_type}. Valid hook names are {VALID_HOOK_TYPES}.")
+            raise ValueError(
+                f"Invalid hook name: {hook_type}. Valid hook names are {VALID_HOOK_TYPES}."
+            )
         payload = {
             "modelId": model_id,
             "layerNumber": layer_num,
@@ -81,7 +84,10 @@ class VectorRequest(NPRequest):
         )
 
     def get_owned(self) -> list[NPVector]:
-        response = self._get_owned()
+        response = self.send_request(
+            method="POST",
+            uri="list-owned",
+        )
         return [
             NPVector(
                 model_id=vector["modelId"],
@@ -94,9 +100,3 @@ class VectorRequest(NPRequest):
             )
             for vector in response["vectors"]
         ]
-
-    def _get_owned(self) -> Response:
-        return self.send_request(
-            method="POST",
-            uri="list-owned",
-        )

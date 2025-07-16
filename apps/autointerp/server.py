@@ -99,6 +99,9 @@ async def startup_event():
 async def check_secret_key(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
+    # if we didn't specify a secret, then just allow the request through
+    if SECRET is None:
+        return await call_next(request)
     secret_key = request.headers.get("X-SECRET-KEY")
     if not secret_key or secret_key != SECRET:
         return JSONResponse(

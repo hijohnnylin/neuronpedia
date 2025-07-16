@@ -17,11 +17,10 @@
 <p align="center" style="color: #cccccc;">
   <a href="https://github.com/hijohnnylin/neuronpedia/blob/main/LICENSE"><img height="20px" src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT"></a>
   <a href="https://status.neuronpedia.org"><img height="20px" src="https://uptime.betterstack.com/status-badges/v2/monitor/1roih.svg" alt="Uptime"></a>
-  <a href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA"><img height="20px" src="https://img.shields.io/badge/slack-purple?logo=slack&logoColor=white" alt="Slack"></a>
+  <a href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-375zalm04-GFd5tdBU1yLKlu_T_JSqZQ"><img height="20px" src="https://img.shields.io/badge/slack-purple?logo=slack&logoColor=white" alt="Slack"></a>
   <a href="mailto:johnny@neuronpedia.org"><img height="20px" src="https://img.shields.io/badge/contact-blue.svg?logo=data:image/svg%2bxml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9IlNWR1JlcG9fYmdDYXJyaWVyIiBzdHJva2Utd2lkdGg9IjAiPjwvZz48ZyBpZD0iU1ZHUmVwb190cmFjZXJDYXJyaWVyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjwvZz48ZyBpZD0iU1ZHUmVwb19pY29uQ2FycmllciI+IDxwYXRoIGQ9Ik00IDcuMDAwMDVMMTAuMiAxMS42NUMxMS4yNjY3IDEyLjQ1IDEyLjczMzMgMTIuNDUgMTMuOCAxMS42NUwyMCA3IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L3BhdGg+IDxyZWN0IHg9IjMiIHk9IjUiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxNCIgcng9IjIiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiPjwvcmVjdD4gPC9nPjwvc3ZnPg==" alt="Email"></a>
   <a href="https://neuronpedia.org/blog"><img height="20px" src="https://img.shields.io/badge/blog-10b981.svg" alt="blog"></a>
   <a href="https://neuronpedia.org"><img height="20px" src="https://img.shields.io/badge/website-gray.svg" alt="website"></a>
-  <a href="https://www.every.org/decode-research"><img height="20px" src="https://img.shields.io/badge/sponsor-green.svg" alt="Sponsor"></a>
 
 </p>
 
@@ -307,12 +306,57 @@ look at the `.env.inference.deepseek-r1-distill-llama-8b.llamascope-slimpj-res-3
 
 ## 'i want to run/develop autointerp locally`
 
-this section is under construction.
+#### what this does + what you'll get
 
-- check out the [autointerp readme](apps/autointerp/README.md)
-- [TODO](https://github.com/hijohnnylin/neuronpedia/issues/5) instructions for setting up autointerp server locally
-- TODO - look at the `autointerp` service in [docker-compose.yaml](docker-compose.yaml)
-- schema-driven development: [openapi readme: making changes to the autointerp server](schemas/README.md#making-changes-to-the-autointerp-server)
+the autointerp server provides automatic interpretation and scoring of neural network features. it uses eleutherAI's [delphi](https://github.com/EleutherAI/delphi) for generating explanations and scoring.
+
+> ⚠️ **warning:** the eleuther embedding scorer uses an embedding model only supported on CUDA (it won't work on mac mps or cpu)
+
+#### steps
+
+1. ensure you have [installed poetry](https://python-poetry.org/docs/#installation)
+2. install the autointerp server's dependencies
+   ```
+   make autointerp-localhost-install
+   ```
+3. build the image, picking the correct command based on if the machine has CUDA or not:
+   ```
+   # CUDA
+   make autointerp-localhost-build-gpu USE_LOCAL_HF_CACHE=1
+   ```
+   ```
+   # no CUDA
+   make autointerp-localhost-build USE_LOCAL_HF_CACHE=1
+   ```
+   > ➡️ The [`USE_LOCAL_HF_CACHE=1` flag](https://github.com/hijohnnylin/neuronpedia/pull/89) mounts your local HuggingFace cache at `${HOME}/.cache/huggingface/hub:/root/.cache/huggingface/hub`. If you wish to create a new cache in your container instead, you can omit this flag here and in the next step.
+4. run the autointerp server:
+   ```
+   # CUDA
+   make autointerp-localhost-dev-gpu \
+        USE_LOCAL_HF_CACHE=1
+
+   # no CUDA
+   make autointerp-localhost-dev \
+        USE_LOCAL_HF_CACHE=1
+   ```
+5. wait for it to load
+
+#### using the autointerp server
+
+to interact with the autointerp server, you have a few options:
+
+1. use the pre-generated autointerp python client at `packages/python/neuronpedia-autointerp-client` (set environment variable `AUTOINTERP_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
+2. use the openapi spec, located at `schemas/openapi/autointerp-server.yaml` to make calls with any client of your choice.
+3. TODO: Use a documentation generator to make a simple tester-server that can be activated with `make doc-autointerp-localhost`
+
+#### doing local autointerp development
+
+- **schema-driven development**: to add new endpoints or change existing endpoints, you will need to start by updating the openapi schemas, then generating clients from that, then finally updating the actual autointerp and webapp code. for details on how to do this, see the [openapi readme: making changes to the autointerp server](schemas/README.md#making-changes-to-the-autointerp-server)
+- **no auto-reload**: when you change any files in the `apps/autointerp` subdirectory, the autointerp server will _NOT_ automatically reload by default. if you want to enable autoreload, then append `AUTORELOAD=1` to the `make autointerp-localhost-dev` call, like so:
+  ```
+  make autointerp-localhost-dev \
+       AUTORELOAD=1
+  ```
 
 ## 'i want to do high volume autointerp explanations'
 
@@ -460,7 +504,7 @@ we don't currently have an official bounty program, but we'll try our best to gi
 
 # contact / support
 
-- slack: [join #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-2o756ku1c-_yKBeUQMVfS_p_qcK6QLeA)
+- slack: [join #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-375zalm04-GFd5tdBU1yLKlu_T_JSqZQ)
 - email: [johnny@neuronpedia.org](mailto:johnny@neuronpedia.org)
 - issues: [github issues](https://github.com/hijohnnylin/neuronpedia/issues)
 

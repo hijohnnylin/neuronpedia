@@ -1,8 +1,8 @@
-from requests import Response
-from neuronpedia.requests.base_request import (
-    NPRequest,
-)
+from typing import Optional
+
 from neuronpedia.np_vector import NPVector
+from neuronpedia.requests.base_request import NPRequest
+from requests import Response
 
 ChatMessage = dict[str, str]
 
@@ -10,15 +10,20 @@ ChatMessage = dict[str, str]
 class SteerChatRequest(NPRequest):
     def __init__(
         self,
+        api_key: Optional[str] = None,
     ):
-        super().__init__("steer-chat")
+        super().__init__("steer-chat", api_key=api_key)
 
     def steer(
         self,
         model_id: str,
         vectors: list[NPVector],
-        default_chat_messages: list[ChatMessage] = [{"role": "user", "content": "Write a one sentence story."}],
-        steered_chat_messages: list[ChatMessage] = [{"role": "user", "content": "Write a one sentence story."}],
+        default_chat_messages: list[ChatMessage] = [
+            {"role": "user", "content": "Write a one sentence story."}
+        ],
+        steered_chat_messages: list[ChatMessage] = [
+            {"role": "user", "content": "Write a one sentence story."}
+        ],
         temperature: float = 0.5,
         n_tokens: int = 32,
         freq_penalty: float = 2,
@@ -52,8 +57,8 @@ class SteerChatRequest(NPRequest):
 
 
 class SteerCompletionRequest(NPRequest):
-    def __init__(self):
-        super().__init__("steer")
+    def __init__(self, api_key: Optional[str] = None):
+        super().__init__("steer", api_key=api_key)
 
     def steer(
         self,

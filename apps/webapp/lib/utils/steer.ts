@@ -4,20 +4,35 @@ import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '../env';
 
 export const STEER_N_COMPLETION_TOKENS = 64;
+export const STEER_N_COMPLETION_TOKENS_GRAPH = 10;
 export const STEER_N_COMPLETION_TOKENS_THINKING = 512;
+export const STEER_N_COMPLETION_TOKENS_GRAPH_MAX = 20;
 export const STEER_N_COMPLETION_TOKENS_MAX = 128;
 export const STEER_N_COMPLETION_TOKENS_MAX_THINKING = 768;
 export const STEER_TEMPERATURE = 0.5;
+export const STEER_TEMPERATURE_GRAPH = 0;
 export const STEER_TEMPERATURE_MAX = 2;
 export const STEER_STRENGTH_MULTIPLIER = 1;
 export const STEER_STRENGTH_MULTIPLIER_MAX = 10;
 export const STEER_STRENGTH_MIN = -300;
 export const STEER_STRENGTH_MAX = 300;
+export const STEER_STRENGTH_GRAPH = 100;
+export const STEER_STRENGTH_ADDED_MULTIPLIER_MIN = -5;
+export const STEER_STRENGTH_ADDED_MULTIPLIER_MAX = 5;
+export const STEER_STRENGTH_ADDED_MULTIPLIER_GRAPH = -1;
+export const STEER_STRENGTH_ADDED_MULTIPLIER_CUSTOM_GRAPH = 1;
+export const STEER_MULTIPLIER_STEP = 0.1;
 export const STEER_SPECIAL_TOKENS = true;
+export const STEER_FREQUENCY_PENALTY_GRAPH = 0;
 export const STEER_FREQUENCY_PENALTY = 1.0;
+export const STEER_FREQUENCY_PENALTY_MIN = -2;
+export const STEER_FREQUENCY_PENALTY_MAX = 2;
 export const STEER_MAX_PROMPT_CHARS = 2048;
 export const STEER_SEED = 16;
 export const STEER_METHOD = NPSteerMethod.SimpleAdditive;
+export const STEER_TOPK_LOGITS = 5;
+export const STEER_TOPK_LOGITS_MAX = 10;
+export const STEER_FREEZE_ATTENTION = true;
 
 export function replaceSteerModelIdIfNeeded(modelId: string) {
   if (STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(modelId)) {

@@ -1,6 +1,7 @@
 import { MAX_GRAPH_UPLOAD_SIZE_BYTES, NP_GRAPH_BUCKET } from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
 import { getUserByName } from '@/lib/db/user';
+import { GRAPH_S3_USER_GRAPHS_DIR, MAX_PUT_REQUESTS_PER_DAY } from '@/lib/utils/graph';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -8,8 +9,6 @@ import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { number, object, string } from 'yup';
 
-const USER_GRAPHS_DIR = 'user-graphs';
-const MAX_PUT_REQUESTS_PER_DAY = 100;
 const signedPutRequestSchema = object({
   filename: string().required(),
   contentLength: number().required().min(1024).max(MAX_GRAPH_UPLOAD_SIZE_BYTES),
@@ -22,7 +21,7 @@ const signedPutRequestSchema = object({
  *     summary: Upload Graph 1/2 - Get Pre-Signed URL
  *     description: Creates a pre-signed URL that allows authenticated users to upload graph files directly to S3. Both this and the second step are necessary for your graph to be saved correctly. Use the returned URL with a PUT request, like this `curl -X PUT -T my-graph.json [returned-url]`. Don't lose your putRequestId, you'll need it for the second part.
  *     tags:
- *       - Circuit Graphs
+ *       - Attribution Graphs
  *     security:
  *       - apiKey: []
  *     requestBody:
@@ -105,7 +104,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     }
     console.log('putRequests count | user ID', putRequests.length, userId);
 
-    const key = `${USER_GRAPHS_DIR}/${userId}/${body.filename}`;
+    const key = `${GRAPH_S3_USER_GRAPHS_DIR}/${userId}/${body.filename}`;
 
     // Initialize S3 client
     const s3Client = new S3Client({

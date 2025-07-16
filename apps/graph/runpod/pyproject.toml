@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "neuronpedia-graph"
+version = "0.1.0"
+description = "Based on Circuit-Tracer by Piotrowski & Hanna. Server for generating and pruning circuit graphs from prompts."
+authors = ["Johnny Lin <johnny@neuronpedia.org>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "neuronpedia_graph"}]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+pydantic = ">=2.11.4"
+torch = ">=2.0.0"
+runpod = ">=1.7.0"
+transformers = ">=4.0.0"
+circuit-tracer = { git = "https://github.com/safety-research/circuit-tracer.git", branch = "main" }
+python-dotenv = "^1.1.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[virtualenvs]
+in-project = true

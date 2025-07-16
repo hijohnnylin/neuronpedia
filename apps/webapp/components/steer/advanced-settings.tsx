@@ -1,6 +1,8 @@
 import { Button } from '@/components/shadcn/button';
 import {
   STEER_FREQUENCY_PENALTY,
+  STEER_FREQUENCY_PENALTY_MAX,
+  STEER_FREQUENCY_PENALTY_MIN,
   STEER_N_COMPLETION_TOKENS,
   STEER_N_COMPLETION_TOKENS_MAX,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
@@ -105,8 +107,11 @@ export default function SteerAdvancedSettings({
           <input
             type="number"
             onChange={(e) => {
-              if (parseFloat(e.target.value) > 2 || parseFloat(e.target.value) < -2) {
-                alert('Freq penalty must be >= -2 and <= 2');
+              if (
+                parseFloat(e.target.value) > STEER_FREQUENCY_PENALTY_MAX ||
+                parseFloat(e.target.value) < STEER_FREQUENCY_PENALTY_MIN
+              ) {
+                alert(`Freq penalty must be >= ${STEER_FREQUENCY_PENALTY_MIN} and <= ${STEER_FREQUENCY_PENALTY_MAX}`);
               } else {
                 setFreqPenalty(parseFloat(e.target.value));
               }

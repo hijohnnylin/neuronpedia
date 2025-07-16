@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
  *     summary: Get Graph Metadata
  *     description: Retrieves metadata for a specific graph by model ID and slug
  *     tags:
- *       - Circuit Graphs
+ *       - Attribution Graphs
  *     parameters:
  *       - name: modelId
  *         in: path

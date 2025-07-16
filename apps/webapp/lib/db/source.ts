@@ -187,10 +187,10 @@ export const upsertSourceForVector = async (
   });
 };
 
-export const createSourceSet = async (input: SourceSet, user: AuthenticatedUser) => {
+export const createSourceSetWithSources = async (input: SourceSet, layers: number, user: AuthenticatedUser) => {
   // eslint-disable-next-line no-param-reassign
   input.creatorId = user.id;
-  // First check if source set exists
+
   const existingSourceSet = await prisma.sourceSet.findUnique({
     where: {
       modelId_name: {
@@ -200,15 +200,34 @@ export const createSourceSet = async (input: SourceSet, user: AuthenticatedUser)
     },
   });
 
-  // Only create if it doesn't exist
-  if (!existingSourceSet) {
+  if (existingSourceSet) {
+    throw new Error('Source set name already exists for this model.');
+  } else {
+    // make sources to create
+    const sourcesToCreate = [];
+    for (let i = 0; i < layers; i += 1) {
+      sourcesToCreate.push({
+        // modelId: input.modelId,
+        id: `${i}-${input.name}`,
+        // setName: input.name,
+        creatorId: user.id,
+        visibility: Visibility.UNLISTED,
+        inferenceEnabled: false,
+        hasDashboards: true,
+      });
+    }
+
     return prisma.sourceSet.create({
-      data: input,
+      data: {
+        ...input,
+        sources: {
+          createMany: {
+            data: sourcesToCreate,
+          },
+        },
+      },
     });
   }
-
-  // Return existing source set if already exists
-  return existingSourceSet;
 };
 
 export const createSourceRelease = async (input: SourceRelease, user: AuthenticatedUser) => {

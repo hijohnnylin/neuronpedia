@@ -3,12 +3,19 @@
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import BrowserPane from '@/components/panes/browser-pane/browser-pane';
 import JumpToPane from '@/components/panes/jump-to-pane';
+import SearchExplanationsPane from '@/components/panes/search-explanations-pane';
+import SearchInferenceSourcePane from '@/components/panes/search-inference-source-pane';
+import SearchTopkByTokenPane from '@/components/panes/search-topk-by-token-pane';
 import UmapPane from '@/components/panes/umap-pane';
 import { BreadcrumbItem, BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
 import { getVisibilityBadge } from '@/components/visibility-badge';
 import { Visibility } from '@prisma/client';
 import Link from 'next/link';
-import { SourceReleaseWithRelations, SourceSetWithPartialRelations } from 'prisma/generated/zod';
+import {
+  ModelWithPartialRelations,
+  SourceReleaseWithRelations,
+  SourceSetWithPartialRelations,
+} from 'prisma/generated/zod';
 
 export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithPartialRelations }) {
   let defaultSourceId: string | undefined;
@@ -43,7 +50,7 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
       )}
 
       <div className="flex w-full flex-row items-center justify-center border-b border-slate-200 py-6">
-        <div className="flex w-full  max-w-screen-lg flex-row items-center justify-between">
+        <div className="flex w-full max-w-screen-lg flex-row items-center justify-between">
           <div className="flex flex-col items-start">
             {sourceSet.visibility !== Visibility.PUBLIC && (
               <div className="pb-1">{getVisibilityBadge(sourceSet.visibility)}</div>
@@ -56,7 +63,7 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
               <Link
                 prefetch={false}
                 href={`/${sourceSet?.releases?.name}`}
-                className=" text-sky-700 hover:text-sky-600 hover:underline"
+                className="text-sky-700 hover:text-sky-600 hover:underline"
               >
                 {sourceSet?.releases?.name}
               </Link>{' '}
@@ -77,18 +84,20 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
             </div>
             {sourceSet.urls && sourceSet.urls.length > 0 && (
               <div className="mt-2 flex flex-row items-center justify-center gap-x-1.5">
-                {sourceSet.urls.map((url, i) => (
-                  <a
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={i}
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-block cursor-pointer break-all rounded-full border-slate-200 bg-slate-200/70 px-3.5 py-1 font-sans text-[11px] text-slate-500 hover:bg-slate-300"
-                  >
-                    {new URL(url).hostname.replace('www.', '')} ↗
-                  </a>
-                ))}
+                {sourceSet.urls
+                  .filter((url) => url.length > 0)
+                  .map((url, i) => (
+                    <a
+                      // eslint-disable-next-line react/no-array-index-key
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block cursor-pointer break-all rounded-full border-slate-200 bg-slate-200/70 px-3.5 py-1 font-sans text-[11px] text-slate-500 hover:bg-slate-300"
+                    >
+                      {new URL(url).hostname.replace('www.', '')} ↗
+                    </a>
+                  ))}
               </div>
             )}
           </div>
@@ -109,6 +118,38 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
 
       <div className="flex w-full max-w-screen-xl flex-col items-center pb-5 pt-6 text-slate-700">
         <div className="mb-6 flex w-full flex-col items-stretch gap-x-3 gap-y-6">
+          {sourceSet.allowInferenceSearch && sourceSet.model && (
+            <SearchInferenceSourcePane
+              model={sourceSet.model as ModelWithPartialRelations}
+              sourceSetName={sourceSet.name}
+            />
+          )}
+
+          {sourceSet.allowInferenceSearch && sourceSet.model && (
+            <div className="flex w-full items-center justify-center">
+              <div className="flex w-full max-w-screen-lg">
+                <SearchTopkByTokenPane
+                  modelId={sourceSet.modelId}
+                  source={defaultSourceId || ''}
+                  showResultsInNewPage
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex w-full items-center justify-center">
+            <div className="flex w-full max-w-screen-lg">
+              <SearchExplanationsPane
+                initialModelId={sourceSet.modelId}
+                initialSourceSetName={sourceSet.name}
+                initialSelectedLayers={[defaultSourceId || '']}
+                filterToRelease={sourceSet.releases as SourceReleaseWithRelations}
+                defaultTab="bySource"
+                showTabs={false}
+              />
+            </div>
+          </div>
+
           {sourceSet.showUmap && (
             <div className="w-full pb-6">
               <UmapPane

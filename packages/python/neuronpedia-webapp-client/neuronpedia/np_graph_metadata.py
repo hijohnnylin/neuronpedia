@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from typing import List
 
 
@@ -19,8 +19,12 @@ class NPGraphMetadata:
 
     def __post_init__(self):
         if not self.url:
-            USE_LOCALHOST = os.getenv("USE_LOCALHOST", False)
-            BASE_URL = "https://neuronpedia.org" if not USE_LOCALHOST else "http://localhost:3000"
+            USE_LOCALHOST = os.getenv("USE_LOCALHOST", "false").lower() == "true"
+            BASE_URL = (
+                "https://neuronpedia.org"
+                if not USE_LOCALHOST
+                else "http://localhost:3000"
+            )
             self.url = f"{BASE_URL}/{self.model_id}/graph?slug={self.slug}"
             self.url_embed = f"{self.url}&embed=true"
 
@@ -54,6 +58,30 @@ class NPGraphMetadata:
         from neuronpedia.requests.graph_request import GraphRequest
 
         return GraphRequest().list_owned()
+
+    @classmethod
+    def generate(
+        cls,
+        model_id: str,
+        prompt: str,
+        graph_id: str,
+        max_n_logits: int = 10,
+        desired_logit_prob: float = 0.95,
+        node_threshold: float = 0.8,
+        edge_threshold: float = 0.98,
+    ) -> "NPGraphMetadata":
+        # import here to avoid circular import
+        from neuronpedia.requests.graph_request import GraphRequest
+
+        return GraphRequest().generate(
+            model_id,
+            prompt,
+            graph_id,
+            max_n_logits,
+            desired_logit_prob,
+            node_threshold,
+            edge_threshold,
+        )
 
     @classmethod
     def upload(cls, json_str: str) -> "NPGraphMetadata":

@@ -1,14 +1,31 @@
-import { FilterGraphType, getGraphBaseUrlToName } from '@/app/[modelId]/graph/utils';
+import {
+  clientCheckIsEmbed,
+  CLTGraph,
+  FilterGraphType,
+  getGraphBaseUrlToName,
+  modelIdToModelDisplayName,
+} from '@/app/[modelId]/graph/utils';
 import { useGlobalContext } from '@/components/provider/global-provider';
+import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { Button } from '@/components/shadcn/button';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import copy from 'copy-to-clipboard';
-import { ChevronDownIcon, ChevronUpIcon, CopyIcon, DownloadIcon, ExternalLinkIcon, UploadCloud } from 'lucide-react';
+import {
+  BookOpenIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  ExternalLinkIcon,
+  Plus,
+  Share2,
+  Trash,
+  UploadCloud,
+} from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next-nprogress-bar';
 import { useSearchParams } from 'next/navigation';
+import { Fragment, useState } from 'react';
+import GraphInfoModal from './graph-info-modal';
 import UploadGraphModal from './upload-graph-modal';
 
 export default function GraphToolbar() {
@@ -17,16 +34,19 @@ export default function GraphToolbar() {
   const isEmbed = searchParams.get('embed') === 'true';
   const { setSignInModalOpen } = useGlobalContext();
   const router = useRouter();
+  const [isDeleting, setIsDeleting] = useState(false);
   const {
     modelIdToMetadataMap,
     selectedModelId,
     selectedMetadataGraph,
+    selectedGraph,
     setSelectedMetadataGraph,
-    modelIdToModelDisplayName,
     filterGraphsSetting,
     setFilterGraphsSetting,
     shouldShowGraphToCurrentUser,
   } = useGraphContext();
+  const { setIsWelcomeModalOpen, setIsCopyModalOpen, setIsGenerateGraphModalOpen } = useGraphModalContext();
+  const { globalModels } = useGlobalContext();
 
   if (isEmbed) {
     return (
@@ -43,7 +63,7 @@ export default function GraphToolbar() {
               className="h-7 gap-x-2 px-2.5 py-0 font-mono text-xs font-medium leading-snug text-sky-700 hover:border-sky-500 hover:bg-sky-100 hover:text-sky-800"
             >
               <span className="rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                {modelIdToModelDisplayName.get(selectedModelId)}
+                {modelIdToModelDisplayName.get(selectedModelId) || globalModels[selectedModelId]?.displayName}
               </span>
               <span className="px-1">{selectedMetadataGraph?.slug}</span>
               <ExternalLinkIcon className="h-3.5 w-3.5" />
@@ -55,19 +75,79 @@ export default function GraphToolbar() {
               {selectedMetadataGraph?.prompt}
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            title="Share Graph, Subgraph, and Custom Labels"
+            aria-label="Share Graph Subgraph, and Custom Labels"
+            className="flex h-8 w-8 items-center justify-center whitespace-nowrap border-slate-300 px-0 text-sm text-slate-500 hover:bg-slate-50"
+            onClick={() => {
+              setIsCopyModalOpen(true);
+            }}
+            disabled={selectedMetadataGraph === null}
+          >
+            <Share2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     );
   }
+
+  function makeCreatorNameFromGraph(graph: CLTGraph) {
+    if (graph.metadata.info?.creator_name) {
+      return graph.metadata.info?.creator_name;
+    }
+    if (selectedMetadataGraph?.user?.name) {
+      return selectedMetadataGraph?.user.name;
+    }
+    if (selectedMetadataGraph?.url) {
+      return getGraphBaseUrlToName(selectedMetadataGraph.url);
+    }
+    return 'Anonymous';
+  }
+
   return (
-    <div className="flex w-full flex-col pt-2">
-      <div className="flex w-full flex-row gap-x-2">
-        <div className="flex flex-col">
-          <div className="w-full pb-0.5 text-center text-[9px] font-medium uppercase text-slate-400">Model</div>
+    <div className="flex w-full flex-col pt-2.5">
+      <div className="flex w-full flex-row items-end gap-x-2">
+        <Button
+          variant="outline"
+          title="Show User Guide"
+          aria-label="Show User Guide"
+          size="sm"
+          className="relative hidden h-12 items-center justify-center whitespace-nowrap border-sky-500 bg-sky-50 text-xs font-medium leading-none text-sky-600 hover:bg-sky-100 hover:text-sky-700 sm:flex"
+          onClick={() => setIsWelcomeModalOpen(true)}
+        >
+          <BookOpenIcon className="mr-1.5 h-4 w-4" /> User Guide
+          {(() => {
+            try {
+              const hasVisited = localStorage.getItem('circuit-tracer-visited');
+              if (!hasVisited) {
+                return <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500" />;
+              }
+            } catch (error) {
+              // Silently handle localStorage errors
+            }
+            return null;
+          })()}
+        </Button>
+
+        <Button
+          variant="outline"
+          title="Generate Graph"
+          aria-label="Generate Graph"
+          size="sm"
+          className="flex h-12 items-center justify-center whitespace-nowrap border-emerald-500 bg-emerald-50 text-xs font-medium leading-none text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700"
+          onClick={() => setIsGenerateGraphModalOpen(true)}
+        >
+          <Plus className="mr-1.5 h-4 w-4" /> New<span className="hidden pl-[3px] sm:inline">Graph</span>
+        </Button>
+
+        <div className="hidden flex-col sm:flex">
+          <div className="w-full pb-0.5 text-center text-[9px] font-medium uppercase text-slate-400">Select Model</div>
           <Select.Root
             value={selectedModelId}
             onValueChange={(newVal) => {
-              router.replace(`/${newVal}/graph`);
+              window.location.href = `/${newVal}/graph`;
             }}
           >
             <Select.Trigger
@@ -77,19 +157,24 @@ export default function GraphToolbar() {
                   e.stopPropagation();
                 }
               }}
-              className="inline-flex h-12 w-52 max-w-52 items-center justify-between gap-1 rounded border border-slate-300 bg-white px-4 py-2 text-sm leading-none focus:outline-none focus:ring-0"
+              className="inline-flex h-12 w-40 max-w-40 items-center justify-between gap-1 rounded border border-slate-300 bg-white px-4 py-2 pr-2 text-sm leading-none focus:outline-none focus:ring-0"
             >
               <Select.Value>
-                {modelIdToModelDisplayName.get(selectedModelId) ? (
-                  <div className="flex flex-col items-start justify-start gap-y-0.5 text-left">
-                    <div className="text-xs font-medium text-slate-600">
-                      {modelIdToModelDisplayName.get(selectedModelId)}
-                    </div>
-                    <div className="text-[9px] font-normal text-slate-400">{selectedModelId}</div>
+                <div className="flex flex-col items-start justify-start gap-y-0.5 text-left">
+                  <div className="text-xs font-medium text-slate-600">
+                    {modelIdToModelDisplayName.get(selectedModelId) ||
+                      globalModels[selectedModelId]?.displayName ||
+                      selectedModelId}
                   </div>
-                ) : (
-                  <div className="text-slate-400">Select a model</div>
-                )}
+                  {globalModels[selectedModelId]?.owner && (
+                    <div className="w-full text-[9px] font-normal text-slate-400">
+                      {globalModels[selectedModelId]?.owner}
+                    </div>
+                  )}
+                  {selectedModelId === 'jackl-circuits-runs-1-4-sofa-v3_0' && (
+                    <div className="w-full text-[9px] font-normal text-slate-400">Anthropic</div>
+                  )}
+                </div>
               </Select.Value>
               <Select.Icon>
                 <ChevronDownIcon className="w-5 text-slate-500" />
@@ -100,7 +185,7 @@ export default function GraphToolbar() {
                 position="popper"
                 align="center"
                 sideOffset={3}
-                className="z-[99999] max-h-[400px] overflow-hidden rounded-md border bg-white shadow-lg"
+                className="z-[99999] max-h-[400px] min-w-52 overflow-hidden rounded-md border bg-white shadow-lg"
               >
                 <Select.ScrollUpButton className="flex h-7 cursor-pointer items-center justify-center bg-white text-slate-700 hover:bg-slate-100">
                   <ChevronUpIcon className="w-5 text-slate-500" />
@@ -114,8 +199,17 @@ export default function GraphToolbar() {
                     >
                       <Select.ItemText className="w-full">
                         <div className="flex w-full flex-col items-start justify-start gap-y-0">
-                          <div className="w-full truncate text-left">{modelIdToModelDisplayName.get(modelId)}</div>
-                          <div className="w-full text-[9px] font-normal text-slate-400">{modelId}</div>
+                          <div className="w-full truncate text-left">
+                            {modelIdToModelDisplayName.get(modelId) || globalModels[modelId]?.displayName || modelId}
+                          </div>
+                          {globalModels[modelId]?.owner && (
+                            <div className="w-full text-[9px] font-normal text-slate-400">
+                              {globalModels[modelId]?.owner}
+                            </div>
+                          )}
+                          {modelId === 'jackl-circuits-runs-1-4-sofa-v3_0' && (
+                            <div className="w-full text-[9px] font-normal text-slate-400">Anthropic</div>
+                          )}
                         </div>
                       </Select.ItemText>
                     </Select.Item>
@@ -128,7 +222,7 @@ export default function GraphToolbar() {
             </Select.Portal>
           </Select.Root>
         </div>
-        <div className="flex flex-col">
+        <div className="hidden flex-col">
           <div className="w-full pb-0.5 text-center text-[9px] font-medium uppercase text-slate-400">Filter Graphs</div>
           <ToggleGroup.Root
             type="multiple"
@@ -149,21 +243,23 @@ export default function GraphToolbar() {
             <ToggleGroup.Item
               value={FilterGraphType.Mine}
               aria-label="Shows only your uploaded graphs."
-              className="w-[86px] border-r border-sky-600 px-2.5 text-xs text-slate-400 data-[state=on]:bg-sky-100 data-[state=on]:text-sky-700 data-[state=off]:hover:bg-slate-100"
+              className="w-[86px] rounded-r border-sky-600 px-2.5 text-xs text-slate-400 data-[state=on]:bg-sky-100 data-[state=on]:text-sky-700 data-[state=off]:hover:bg-slate-100"
             >
               Mine
             </ToggleGroup.Item>
-            <ToggleGroup.Item
+            {/* <ToggleGroup.Item
               aria-label="Shows all graphs, including other user uploaded graphs."
               value={FilterGraphType.Community}
               className="w-[86px] rounded-r border-sky-600 px-2.5 text-xs text-slate-400 data-[state=on]:bg-sky-100 data-[state=on]:text-sky-700 data-[state=off]:hover:bg-slate-100"
             >
               Community
-            </ToggleGroup.Item>
+            </ToggleGroup.Item> */}
           </ToggleGroup.Root>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="w-full pb-0.5 text-center text-[9px] font-medium uppercase text-slate-400">Graph</div>
+          <div className="hidden w-full pb-0.5 text-center text-[9px] font-medium uppercase text-slate-400 sm:block">
+            Select Graph
+          </div>
           <Select.Root
             value={selectedMetadataGraph?.slug}
             onValueChange={(newVal) => {
@@ -180,24 +276,28 @@ export default function GraphToolbar() {
                   e.stopPropagation();
                 }
               }}
-              className="relative inline-flex h-12 max-w-full items-center justify-between gap-1 overflow-x-hidden rounded border border-slate-300 bg-white px-4 py-0 pr-10 text-sm leading-none focus:outline-none focus:ring-0"
+              className="relative inline-flex h-12 max-w-full items-center justify-between gap-1 overflow-x-hidden rounded border border-slate-300 bg-white py-0 pl-3 pr-10 text-sm leading-none focus:outline-none focus:ring-0"
             >
               {selectedMetadataGraph !== null ? (
                 <Select.Value asChild>
-                  <div className="flex w-full flex-col items-start justify-start gap-y-1.5 overflow-y-visible">
-                    <div className="flex w-full flex-row items-center justify-between">
-                      <div className="font-mono text-[12px] font-medium text-sky-700">{selectedMetadataGraph.slug}</div>
-                      <div className="text-[9px] font-normal text-slate-400">
-                        {selectedMetadataGraph.user?.name
-                          ? selectedMetadataGraph.user?.name
-                          : getGraphBaseUrlToName(selectedMetadataGraph.url)}
-                      </div>
-                    </div>
+                  <div className="flex w-full flex-col items-start justify-start gap-y-[7px] overflow-y-visible">
                     <div className="text-overflow-ellipsis whitespace-nowrap text-[10px] font-normal leading-none text-slate-500">
                       {/* <span className="rounded bg-slate-200 px-1 py-0.5 text-[8px] font-bold text-slate-600">
                         PROMPT
                       </span>{' '} */}
-                      {selectedMetadataGraph.prompt.replaceAll('\n', ' ').trim()}
+                      {selectedMetadataGraph.promptTokens.map((token, i) => (
+                        <span
+                          key={`${token}-${i}`}
+                          className="mx-0.5 rounded bg-slate-100 px-[3px] py-0.5 font-mono text-slate-700"
+                        >
+                          {token.replaceAll('\n', ' ').replaceAll(' ', '\u00A0')}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex w-full flex-row items-center justify-between">
+                      <div className="whitespace-pre font-mono text-[10px] font-medium text-sky-700">
+                        {selectedMetadataGraph.slug}
+                      </div>
                     </div>
                   </div>
                 </Select.Value>
@@ -225,6 +325,18 @@ export default function GraphToolbar() {
                     const featuredGraphs = allVisibleGraphs.filter(
                       (graph) => graph.isFeatured && session.data?.user?.id !== graph.userId,
                     );
+                    const otherSelectedGraph =
+                      selectedMetadataGraph &&
+                      !myGraphs.some(
+                        (graph) =>
+                          graph.slug === selectedMetadataGraph.slug && graph.modelId === selectedMetadataGraph.modelId,
+                      ) &&
+                      !featuredGraphs.some(
+                        (graph) =>
+                          graph.slug === selectedMetadataGraph.slug && graph.modelId === selectedMetadataGraph.modelId,
+                      )
+                        ? selectedMetadataGraph
+                        : null;
                     const communityGraphs = allVisibleGraphs.filter(
                       (graph) => !graph.isFeatured && session.data?.user?.id !== graph.userId,
                     );
@@ -236,36 +348,115 @@ export default function GraphToolbar() {
                     if (filterGraphsSetting.includes(FilterGraphType.Community))
                       graphsDisplayedCount += communityGraphs.length;
 
-                    const renderGraphItem = (graph: (typeof allVisibleGraphs)[0]) => (
-                      <Select.Item
-                        key={graph.slug}
-                        value={graph.slug}
-                        className="relative flex w-full min-w-full cursor-pointer select-none items-center overflow-x-hidden py-2.5 pl-4 pr-6 text-xs outline-none hover:bg-slate-100 data-[highlighted]:bg-sky-100"
-                      >
-                        <Select.ItemText className="w-full min-w-full" asChild>
-                          <div className="flex w-full min-w-full flex-col items-start justify-start gap-y-0">
-                            <div className="flex w-full flex-row items-center justify-between">
-                              <div className="font-mono text-[12px] font-medium text-sky-700">{graph.slug}</div>
-                              <div className="text-[9px] font-normal text-slate-400">
-                                {graph.user?.name ? graph.user?.name : getGraphBaseUrlToName(graph.url)}
+                    const renderGraphItem = (graph: (typeof allVisibleGraphs)[0], isMyGraph: boolean) => (
+                      <div className="relative flex w-full flex-row items-center hover:bg-sky-100">
+                        <Select.Item
+                          key={graph.slug}
+                          value={graph.slug}
+                          className="group relative flex w-full cursor-pointer select-none items-center overflow-x-hidden py-2.5 pl-4 pr-4 text-xs outline-none hover:bg-slate-100 data-[highlighted]:bg-sky-50"
+                        >
+                          <Select.ItemText className="w-full min-w-full" asChild>
+                            <div className="flex w-full min-w-full flex-col items-start justify-start gap-y-0">
+                              <div className="flex w-full flex-row items-center justify-between">
+                                <div className="font-mono text-[10px] font-medium text-sky-700">{graph.slug}</div>
+                                {!isMyGraph && (
+                                  <div className="mr-0 flex flex-row items-center gap-x-2">
+                                    <div className="text-[10px] font-normal text-slate-500">
+                                      {graph.user?.name
+                                        ? graph.user?.name
+                                        : getGraphBaseUrlToName(graph.url) || 'Anonymous'}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-2 w-full whitespace-pre-line pl-0 text-[10px] leading-tight text-slate-500">
+                                <div className="flex flex-wrap">
+                                  {graph.promptTokens.map((token, i) => (
+                                    <Fragment key={`${token}-${i}`}>
+                                      <span className="mx-[1px] mb-1 rounded bg-slate-100 px-[2px] py-0.5 font-mono text-slate-700 group-hover:bg-sky-200 group-hover:text-sky-700 group-data-[highlighted]:bg-sky-200 group-data-[highlighted]:text-sky-700">
+                                        {token.replaceAll(' ', '\u00A0')}
+                                      </span>
+                                      {(token === '⏎' || token === '⏎⏎') && <div className="w-full" />}
+                                    </Fragment>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                            <div className="mt-1.5 w-full whitespace-pre-line pl-3 text-[11px] leading-tight text-slate-500">
-                              {graph.prompt.trim()}
-                            </div>
-                          </div>
-                        </Select.ItemText>
-                      </Select.Item>
+                          </Select.ItemText>
+                        </Select.Item>
+                        {isMyGraph && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1.5 top-1.5 h-6 w-6 p-0 text-red-500 hover:bg-red-100 hover:text-red-700"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+
+                              // eslint-disable-next-line
+                              if (confirm(`Are you sure you want to delete graph "${graph.slug}"?`)) {
+                                try {
+                                  setIsDeleting(true);
+                                  const res = await fetch('/api/graph/delete', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ modelId: selectedModelId, slug: graph.slug }),
+                                  });
+                                  if (res.ok) {
+                                    // Reload to the first available graph
+                                    const remainingGraphs = allVisibleGraphs.filter((g) => g.slug !== graph.slug);
+                                    if (remainingGraphs.length > 0) {
+                                      const nextGraph = remainingGraphs.sort((a, b) => a.slug.localeCompare(b.slug))[0];
+                                      router.replace(`/${selectedModelId}/graph?slug=${nextGraph.slug}`);
+                                      setSelectedMetadataGraph(nextGraph);
+                                    } else {
+                                      // find first graph in any model
+                                      const anyModelId = Object.keys(modelIdToMetadataMap).find(
+                                        (mId) => modelIdToMetadataMap[mId]?.length > 0,
+                                      );
+                                      if (anyModelId) {
+                                        const nextGraph = modelIdToMetadataMap[anyModelId]!.sort((a, b) =>
+                                          a.slug.localeCompare(b.slug),
+                                        )[0];
+                                        router.replace(`/${anyModelId}/graph?slug=${nextGraph.slug}`);
+                                        setSelectedMetadataGraph(nextGraph);
+                                      } else {
+                                        router.replace(`${anyModelId}/graph`);
+                                      }
+                                    }
+                                    window.location.reload();
+                                  } else {
+                                    const errorData = await res.json();
+                                    alert(`Failed to delete graph: ${errorData.message || 'Unknown error'}`);
+                                  }
+                                } catch (error) {
+                                  console.error('Error deleting graph:', error);
+                                  alert('An unexpected error occurred while deleting the graph.');
+                                } finally {
+                                  setIsDeleting(false);
+                                }
+                              }
+                            }}
+                          >
+                            <Trash className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     );
 
                     return (
                       <>
+                        {otherSelectedGraph && (
+                          <Select.Group className="divide-y divide-slate-200">
+                            {renderGraphItem(otherSelectedGraph, session.data?.user?.id === otherSelectedGraph.userId)}
+                          </Select.Group>
+                        )}
                         {filterGraphsSetting.includes(FilterGraphType.Mine) && myGraphs.length > 0 && (
                           <Select.Group className="divide-y divide-slate-200">
                             <Select.Label className="sticky top-0 z-10 border-b border-t border-slate-100 bg-slate-50 py-2 pl-4 pr-6 pt-2.5 text-center text-xs font-bold text-slate-500">
                               My Graphs
                             </Select.Label>
-                            {myGraphs.sort((a, b) => a.slug.localeCompare(b.slug)).map(renderGraphItem)}
+                            {myGraphs.sort((a, b) => a.slug.localeCompare(b.slug)).map((g) => renderGraphItem(g, true))}
                           </Select.Group>
                         )}
                         {filterGraphsSetting.includes(FilterGraphType.Featured) && featuredGraphs.length > 0 && (
@@ -273,17 +464,21 @@ export default function GraphToolbar() {
                             <Select.Label className="sticky top-0 z-10 border-b border-t border-slate-100 bg-slate-50 py-2 pl-4 pr-6 pt-2.5 text-center text-xs font-bold text-slate-500">
                               Featured Graphs
                             </Select.Label>
-                            {featuredGraphs.sort((a, b) => a.slug.localeCompare(b.slug)).map(renderGraphItem)}
+                            {featuredGraphs
+                              .sort((a, b) => a.slug.localeCompare(b.slug))
+                              .map((g) => renderGraphItem(g, session.data?.user?.id === g.userId))}
                           </Select.Group>
                         )}
-                        {filterGraphsSetting.includes(FilterGraphType.Community) && communityGraphs.length > 0 && (
+                        {/* {filterGraphsSetting.includes(FilterGraphType.Community) && communityGraphs.length > 0 && (
                           <Select.Group className="divide-y divide-slate-200">
                             <Select.Label className="sticky top-0 z-10 border-b border-t border-slate-100 bg-slate-50 py-2 pl-4 pr-6 pt-2.5 text-center text-xs font-bold text-slate-500">
                               Community-Submitted Graphs
                             </Select.Label>
-                            {communityGraphs.sort((a, b) => a.slug.localeCompare(b.slug)).map(renderGraphItem)}
+                            {communityGraphs
+                              .sort((a, b) => a.slug.localeCompare(b.slug))
+                              .map((g) => renderGraphItem(g, session.data?.user?.id === g.userId))}
                           </Select.Group>
-                        )}
+                        )} */}
                         {graphsDisplayedCount === 0 && (
                           <div className="relative w-full cursor-default select-none px-5 py-3 text-center text-sm text-slate-400">
                             No graphs matched your filters. Include more filters on the left.
@@ -301,55 +496,79 @@ export default function GraphToolbar() {
           </Select.Root>
         </div>
         <div className="flex flex-col">
-          <div className="w-full pb-0.5 text-center text-[9px] font-medium uppercase text-slate-400">Tools</div>
+          <div className="hidden w-full pb-0.5 text-center text-[9px] font-medium uppercase text-slate-400 sm:block">
+            Tools
+          </div>
           <div className="flex flex-row gap-x-2">
             <Button
               variant="outline"
               size="sm"
-              title="Download Graph JSON"
-              aria-label="Download Graph JSON"
-              className="flex h-12 flex-col items-center justify-center gap-y-1.5 whitespace-nowrap border-slate-300 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-50"
+              disabled={!selectedGraph}
               onClick={() => {
-                if (selectedMetadataGraph) {
-                  window.open(selectedMetadataGraph.url, '_blank');
+                if (selectedGraph?.metadata.info?.creator_url) {
+                  if (
+                    // eslint-disable-next-line
+                    confirm(
+                      `Confirm navigation to ${selectedGraph.metadata.info?.creator_name ? selectedGraph.metadata.info?.creator_name : 'the creator'}'s website.\n\n${selectedGraph.metadata.info.creator_url}.`,
+                    )
+                  ) {
+                    window.open(selectedGraph.metadata.info.creator_url, '_blank');
+                  }
+                } else if (selectedGraph) {
+                  alert(`This graph was generated by ${makeCreatorNameFromGraph(selectedGraph)}.`);
                 }
               }}
-              disabled={selectedMetadataGraph === null}
+              className="group hidden h-12 w-[160px] max-w-[160px] flex-col items-center justify-center gap-x-2 gap-y-[5px] overflow-x-clip border-slate-200 bg-slate-200 px-0 text-xs leading-none text-slate-500 transition-none hover:border-sky-200 hover:bg-sky-200 sm:flex"
             >
-              <DownloadIcon className="h-4 w-4" />
+              <div className="text-[8px] font-semibold leading-none text-slate-400 group-hover:text-sky-600">
+                GENERATED BY
+              </div>
+              <div className="text-center text-[11px] leading-none text-sky-700 group-hover:text-sky-800">
+                {selectedGraph ? makeCreatorNameFromGraph(selectedGraph) : 'Loading...'}
+              </div>
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              title="Copy Graph URL + State to Clipboard"
-              aria-label="Copy Graph URL + State to Clipboard"
-              className="flex h-12 items-center justify-center whitespace-nowrap border-slate-300 text-sm text-slate-500 hover:bg-slate-50"
-              onClick={() => {
-                copy(window.location.href);
-                alert('The graph URL state has been copied to clipboard. You can paste it to share with others.');
-              }}
-              disabled={selectedMetadataGraph === null}
-            >
-              <CopyIcon className="h-4 w-4" />
-            </Button>
-
+            <GraphInfoModal cltGraph={selectedGraph} selectedMetadataGraph={selectedMetadataGraph} />
             {session.data?.user ? (
               <UploadGraphModal />
             ) : (
               <Button
                 variant="outline"
                 size="sm"
-                className="flex h-12 items-center justify-center border-slate-300"
+                className="hidden h-12 items-center justify-center gap-x-2 border-slate-300 text-xs sm:flex"
                 onClick={() => {
                   setSignInModalOpen(true);
                 }}
               >
                 <UploadCloud className="h-4 w-4" />
+                Upload
+              </Button>
+            )}
+            {!clientCheckIsEmbed() && (
+              <Button
+                variant="outline"
+                size="sm"
+                title="Share Graph, Subgraph, and Custom Labels"
+                aria-label="Share Graph Subgraph, and Custom Labels"
+                className="hidden h-12 items-center justify-center gap-x-2 whitespace-nowrap border-slate-300 text-xs text-slate-500 hover:bg-slate-50 sm:flex"
+                onClick={() => {
+                  setIsCopyModalOpen(true);
+                }}
+                disabled={selectedMetadataGraph === null || !selectedGraph}
+              >
+                <Share2 className="h-4 w-4" />
+                Share & Embed
               </Button>
             )}
           </div>
         </div>
       </div>
+      {isDeleting && (
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-800/50">
+          <div className="cursor-default select-none rounded-lg bg-white p-6 text-lg font-semibold text-slate-700 shadow-xl">
+            Deleting Graph...
+          </div>
+        </div>
+      )}
     </div>
   );
 }

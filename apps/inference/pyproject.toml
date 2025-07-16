@@ -24,7 +24,7 @@ pytest = "^8.1.1"
 huggingface-hub = "^0.26.1"
 huggingface = "^0.0.1"
 pandas = "^2.2.2"
-sae-lens = "^5.8.1"
+sae-lens = "^5.10.2"
 fastapi = "^0.115.6"
 uvicorn = "^0.34.0"
 sentry-sdk = {extras = ["fastapi"], version = "^2.20.0"}
@@ -55,8 +55,6 @@ select = ["UP", "TID", "I", "F", "E", "ARG", "SIM", "RET", "LOG", "T20"]
 "typing.List".msg = "Use `list` instead"
 
 [tool.pyright]
-include = ["sae_vis"]
-exclude = ["sae_vis/css", "sae_vis/js", "sae_vis/html", "dist"]
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"
 reportUnknownMemberType = "none"

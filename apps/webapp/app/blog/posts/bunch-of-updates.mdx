@@ -3,8 +3,8 @@ title: 'New Features, Tools, and Our Podcast: The Babble'
 description: 'TopK By Token Search, Matryoshka SAEs, Probity, and Auto-Interp with Latest GPTs/Claudes'
 date: 2025-04-21
 author: Johnny Lin & Curt Tigges
-image: /images/blog/search-topk.gif
-imagePreview: /images/blog/search-topk.gif
+image: ASSET_BASE_URL/blog/search-topk.gif
+imagePreview: ASSET_BASE_URL/site-assets/blog/search-topk.gif
 ---
 
 # The Babble: Residual Stream's Podcast by NotebookLM
@@ -62,11 +62,7 @@ Clicking the demo link above, we see the Search TopK by Token results for a text
 The video demo below shows some of the other functionalities, like zooming in on a single token, filtering, sorting, etc.
 
 <video controls muted>
-  <source
-    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/search-topk-example-shrink.mp4"
-    alt="video of search topk by tokens"
-    type="video/mp4"
-  />
+  <source src="ASSET_BASE_URL/search-topk-example-shrink.mp4" alt="video of search topk by tokens" type="video/mp4" />
 </video>
 
 # Data Release: Matryoshka SAEs (In Progress)
@@ -89,7 +85,7 @@ Here, we use the new "Search TopK By Token" on the [gemma-2-2b@12-res-matryoshka
 
 <video controls muted>
   <source
-    src="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/mat-demo.mp4"
+    src="ASSET_BASE_URL/mat-demo.mp4"
     alt="video of finding a 'z' feature using search topk by tokens"
     type="video/mp4"
   />
@@ -109,7 +105,7 @@ Probes are relatively inexpensive and have been found to [outperform SAEs](https
 
 In the [[first Probity demo]](https://github.com/curt-tigges/probity/blob/main/tutorials/1-probity-basics.py), we train a probe for "positive sentiment" for GPT2-Small, and upload it onto Neuronpedia, where we [steer it](https://www.neuronpedia.org/gpt2-small/steer?saved=cm9nod81t001ve5muaezhadax) toward a positive restaurant review:
 
-![screenshot of Neuronpedia steering interface](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/steerprobe.png)
+![screenshot of Neuronpedia steering interface](ASSET_BASE_URL/steerprobe.png)
 
 Once uploaded to Neuronpedia, these probes can be shared, steered, and embedded into your websites/posts, and more. You can even upload your own activations via API for a custom dashboard! (Tutorial soon.)
 

@@ -25,13 +25,13 @@ const ACTS_TO_RETURN = 3;
       "tags": [
         "Explanations"
       ],
-      "summary": "Search by SAEs",
+      "summary": "Search by SAEs/Sources",
       "security": [
         {
           "apiKey": []
         }
       ],
-      "description": "Search for explanations in the features of one or more SAEs in a model. Takes a query and returns up to 20 results at a time.",
+      "description": "Search for explanations in the features of one or more SAEs/Sources in a model. Takes a query and returns up to 20 results at a time.",
       "requestBody": {
         "required": true,
         "content": {

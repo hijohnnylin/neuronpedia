@@ -36,7 +36,7 @@ here's how to create or update an endpoint in the inference server.
 
 the instructions are _mostly_ the same as [making changes to the inference server](#making-changes-to-the-inference-server), except names are changed from `neuronpedia-inference` to `neuronpedia-autointerp`, etc.
 
-1. spec out your new addition(s) or change(s) under [openapi/inference-server.yaml](openapi/autointerp-server.yaml) and the [openapi/autointerp](openapi/autointerp/) subdirectory.
+1. spec out your new addition(s) or change(s) under [openapi/autointerp-server.yaml](openapi/autointerp-server.yaml) and the [openapi/autointerp](openapi/autointerp/) subdirectory.
 2. run the command, replacing `BUMPED_SEMANTIC_VERSION`
    ```
    make setup-all-autointerp VERSION=BUMPED_SEMANTIC_VERSION

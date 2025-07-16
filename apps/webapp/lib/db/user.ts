@@ -5,9 +5,7 @@ import { prisma } from '@/lib/db';
 import { RequestOptionalUser } from '@/lib/with-user';
 import { UserSecretType } from '@prisma/client';
 import { getServerSession, Session } from 'next-auth';
-import { DEMO_MODE } from '../env';
-
-export const API_KEY_HEADER_NAME = 'x-api-key';
+import { API_KEY_HEADER_NAME, DEMO_MODE } from '../env';
 
 export const getAuthenticatedUserFromApiKey = async (request: RequestOptionalUser, throwOnFail = true) => {
   const apiKey = request.headers.get(API_KEY_HEADER_NAME);

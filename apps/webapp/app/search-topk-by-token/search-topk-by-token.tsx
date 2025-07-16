@@ -72,13 +72,8 @@ export default function SearchTopkByToken({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const { windowSize } = useWindowSize();
   const [sortBy, setSortBy] = useState<'frequency' | 'strength' | 'density'>(initialSortBy ?? 'frequency');
-  const {
-    getFirstSourceForSourceSet,
-    globalModels,
-    showToastServerError,
-    setFeatureModalFeature,
-    setFeatureModalOpen,
-  } = useGlobalContext();
+  const { getSourcesForSourceSet, globalModels, showToastServerError, setFeatureModalFeature, setFeatureModalOpen } =
+    useGlobalContext();
   const [maxAct, setMaxAct] = useState<number>(0);
   const [densityThreshold, setDensityThreshold] = useState<number>(
     initialDensityThreshold ?? DEFAULT_DENSITY_THRESHOLD_CLIENT,
@@ -202,7 +197,7 @@ export default function SearchTopkByToken({
     setSourceSet(newSourceSet);
     // Only run the side effect if we're past initialization
     if (isInitializedRef.current) {
-      const sourceId = getFirstSourceForSourceSet(modelId, newSourceSet);
+      const sourceId = getSourcesForSourceSet(modelId, newSourceSet, false, true, false)[0];
       if (sourceId) {
         setSource(sourceId);
       }
@@ -279,7 +274,7 @@ export default function SearchTopkByToken({
 
   return (
     <div className="mt-0 flex h-full w-full flex-col items-center justify-center gap-y-0 pt-0 sm:flex-row">
-      <div className="flex w-full max-w-screen-md flex-col sm:h-full sm:flex-1">
+      <div className="flex w-full max-w-screen-lg flex-col sm:h-full sm:flex-1">
         <div className="flex w-full flex-row items-center justify-start gap-x-2">
           <ModelSelector
             filterToRelease={filterModelsToRelease}

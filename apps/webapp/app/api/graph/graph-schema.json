@@ -1,0 +1,240 @@
+{
+  "$id": "root",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Anthropic Attribution Graph",
+  "version": "1.0.0",
+  "description": "JSON Schema for an attribution graph compatible with Anthropic's Attribution Graph and Neuronpedia's frontend.",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "examples": ["my-neat-graph"]
+        },
+        "scan": {
+          "type": "string",
+          "description": "Indicates what the model and coders were used. Neuronpedia uses this as a model ID only. For example, gemma-2-2b.",
+          "examples": ["gemma-2-2b"]
+        },
+        "prompt_tokens": {
+          "type": "array",
+          "description": "The prompt, tokenized.",
+          "items": {
+            "type": "string",
+            "examples": ["The", " cat", " in", " the", " hat"]
+          }
+        },
+        "prompt": {
+          "type": "string",
+          "description": "The prompt, untokenized.",
+          "examples": ["The cat in the hat"]
+        },
+        "feature_details": {
+          "type": "object",
+          "description": "[Optional] Specify how to fetch feature details. If you are hosting your own feature JSONs (in the Anthropic feature format), use feature_json_base_url. If Neuronpedia has the feature dashboards for the source you are using, use neuronpedia_source_set.",
+          "properties": {
+            "feature_json_base_url": {
+              "type": "string",
+              "description": "The base URL for the feature JSON files (Anthropic feature format), if you want the frontend to download your features details from your server. If a base url is https://my-cloudfront.s3.amazonaws.com/my_model/features, then the feature JSON would be at https://my-cloudfront.s3.amazonaws.com/my_model/features/781859.json. Remember to enable public access, CORS from all origins, and https.",
+              "examples": ["https://my-cloudfront.s3.amazonaws.com/my_model/features"]
+            },
+            "neuronpedia_source_set": {
+              "type": "string",
+              "description": "Specifies which source set on Neuronpedia your features correspond to. For example, a source set of gemmascope-transcoder-16k when combined with scan/modelId, corresponds to: https://www.neuronpedia.org/gemma-2-2b/gemmascope-transcoder-16k",
+              "examples": ["gemmascope-transcoder-16k"]
+            }
+          }
+        },
+        "node_threshold": {
+          "type": "number",
+          "description": "[Optional] Default dynamic pruning threshold. It uses nodes.influence value to determine pruning - see https://github.com/safety-research/circuit-tracer",
+          "examples": [0.8]
+        },
+        "info": {
+          "type": "object",
+          "description": "[Optional] Additional information that may be displayed to the user. All fields are optional.",
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "An optional longer description of the graph, if you want to add more context or notes."
+            },
+            "creator_name": {
+              "type": "string",
+              "description": "The name of the person/group that triggered the generation of this specific graph. Not necessarily the creator of the graph generation code."
+            },
+            "creator_url": {
+              "type": "string",
+              "description": "The url of the person/group that triggered the generation of this specific graph. Not necessarily the creator of the graph generation code."
+            },
+            "source_urls": {
+              "type": "array",
+              "description": "An array of urls to the transcoders, CLTs, etc that were used to generate this graph."
+            },
+            "generator": {
+              "type": "object",
+              "description": "Information about the graph generator - the code used to generate the graph.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The name of the graph generator."
+                },
+                "version": {
+                  "type": "string",
+                  "description": "The version of the graph generator used."
+                },
+                "url": {
+                  "type": "string",
+                  "description": "The URL to the graph generator - either code or the graph generator's website."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The email of the person/group that triggered the generation of this specific graph."
+                }
+              }
+            },
+            "create_time_ms": {
+              "type": "number",
+              "description": "The timestamp of when the graph was created, in milliseconds since epoch."
+            }
+          }
+        },
+        "generation_settings": {
+          "type": "object",
+          "description": "[Optional] Settings used to generate the graph. These are optional and only for information purposes and may be displayed to the user, so you can track what settings were used. Based on circuit-tracer (https://github.com/safety-research/circuit-tracer), but you can use whatever keys are useful for you, and add your own.",
+          "properties": {
+            "max_n_logits": {
+              "description": "Maximum number of logit nodes to attribute from",
+              "type": "integer"
+            },
+            "desired_logit_prob": {
+              "description": "Desired logit probability: Cumulative probability threshold for top logits",
+              "type": "number"
+            },
+            "batch_size": {
+              "description": "Batch size for backward passes",
+              "type": "integer"
+            },
+            "max_feature_nodes": {
+              "description": "Maximum number of feature nodes",
+              "type": "integer"
+            }
+          }
+        },
+        "pruning_settings": {
+          "type": "object",
+          "description": "[Optional] Settings used to prune the graph. These are optional and only for information purposes and may be displayed to the user, so you can track what settings were used. Based on circuit-tracer (https://github.com/safety-research/circuit-tracer), but you can use whatever keys are useful for you, and add your own.",
+          "properties": {
+            "node_threshold": {
+              "type": "number",
+              "description": "Keeps minimum nodes with cumulative influence ≥ threshold",
+              "examples": [0.8]
+            },
+            "edge_threshold": {
+              "type": "number",
+              "description": "Keeps minimum edges with cumulative influence ≥ threshold",
+              "examples": [0.98]
+            }
+          }
+        }
+      },
+      "required": ["slug", "scan", "prompt_tokens", "prompt"]
+    },
+    "qParams": {
+      "type": "object",
+      "description": "Query parameters - this is a saved state for the subgraph and clicked node.",
+      "properties": {
+        "pinnedIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supernodes": {
+          "type": "array"
+        },
+        "linkType": {
+          "type": "string",
+          "examples": ["both"]
+        },
+        "clickedId": {
+          "type": "string"
+        },
+        "sg_pos": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "examples": ["0_253_1"]
+          },
+          "feature": {
+            "type": ["integer", "null"],
+            "examples": [253]
+          },
+          "layer": {
+            "type": ["string", "integer"],
+            "examples": ["0", 1]
+          },
+          "ctx_idx": {
+            "type": "integer",
+            "examples": [1]
+          },
+          "feature_type": {
+            "type": "string",
+            "examples": ["cross layer transcoder", "mlp reconstruction error", "embedding", "logit"]
+          },
+          "jsNodeId": {
+            "type": "string",
+            "examples": ["0_253-0"]
+          },
+          "clerp": {
+            "type": "string",
+            "examples": ["my label for this feature"]
+          },
+          "influence": {
+            "type": ["number", "null"],
+            "description": "Influence, used for dynamic graph pruning. Optional, from https://github.com/safety-research/circuit-tracer",
+            "examples": [0.48267510533332825]
+          },
+          "activation": {
+            "type": ["number", "null"],
+            "description": "Activation to show in the activation histogram. Optional, from https://github.com/safety-research/circuit-tracer",
+            "examples": [9.449039459228516]
+          }
+        },
+        "required": ["node_id", "feature", "layer", "ctx_idx", "feature_type", "jsNodeId", "clerp"]
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "examples": ["E_2_0"]
+          },
+          "target": {
+            "type": "string",
+            "examples": ["0_253_1"]
+          },
+          "weight": {
+            "type": "number",
+            "examples": [12.964216232299805]
+          }
+        },
+        "required": ["source", "target", "weight"]
+      }
+    }
+  },
+  "required": ["metadata", "qParams", "nodes", "links"]
+}

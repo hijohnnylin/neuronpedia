@@ -13,6 +13,7 @@ the following are instructions for how we set up this up. you'll need to customi
 - [restart instances to pick up new docker image](#restart-instances-to-pick-up-new-docker-image)
 - [misc k8s commands](#misc-k8s-commands)
   - [delete instance](#delete-instance)
+  - [remove unused instance from node pool](#remove-unused-instance-from-node-pool)
   - [updating node pool configs](#updating-node-pool-configs)
   - [preview changes for config](#preview-changes-for-config)
   - ["ssh" into the container](#ssh-into-the-container)
@@ -146,6 +147,22 @@ example deleting the `gemma-2-2b-it-public` instance
 
 ```
 kubectl delete -k k8s/overlays/gpu/gemma-2-2b-it-public
+```
+
+### remove unused instance from node pool
+
+```
+# cordon it
+kubectl cordon [NODE_NAME]
+
+# drain it
+kubectl drain [NODE_NAME] --ignore-daemonsets --delete-emptydir-data
+
+# resize pool
+gcloud container clusters resize [CLUSTER_NAME] \
+  --node-pool [NODE_POOL_NAME] \
+  --num-nodes [NEW_COUNT] \
+  --zone [ZONE]
 ```
 
 ### updating node pool configs

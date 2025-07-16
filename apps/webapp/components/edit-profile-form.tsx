@@ -221,7 +221,7 @@ export default function EditProfileForm({
         <EditProfileFormAutointerpKeyField
           keyLabel="OpenAI Key"
           keyType={UserSecretType.OPENAI}
-          keyMessage={`By adding your OpenAI API key, you agree that Neuronpedia will store it and use it when you perform OpenAI calls for auto-interp or other OpenAI-necessary features.\n\nYou agree that requests to OpenAI on your behalf will incur charges to your OpenAI account. A test, one-token 'hi' call will be made with your key to ensure it's valid, which will incur charges of a fraction of a cent.`}
+          keyMessage={`By adding your OpenAI API key, you agree that Neuronpedia will store it and use it when you perform OpenAI calls for auto-interp or other OpenAI-necessary features.\n\nYou agree that requests to OpenAI on your behalf will incur charges to your OpenAI account. A test, one-token 'hi' call will be made with your key to ensure it's valid, which will incur charges of a fraction of a cent.\n\nEnsure that your key has access to the 'gpt-4o-mini' model.`}
         />
 
         <EditProfileFormAutointerpKeyField

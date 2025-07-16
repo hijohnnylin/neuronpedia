@@ -1,13 +1,6 @@
 import { UserSecretType } from '@prisma/client';
 import { BASE_PATH, Configuration, DefaultApi } from 'neuronpedia-autointerp-client';
-import {
-  AUTOINTERP_SERVER,
-  AUTOINTERP_SERVER_SECRET,
-  IS_DOCKER_COMPOSE,
-  IS_LOCALHOST,
-  OLD_SCORER_SERVER,
-  USE_LOCALHOST_AUTOINTERP,
-} from '../env';
+import { AUTOINTERP_SERVER, AUTOINTERP_SERVER_SECRET, IS_DOCKER_COMPOSE, USE_LOCALHOST_AUTOINTERP } from '../env';
 
 export const AUTOINTERP_SERVER_API = new DefaultApi(
   new Configuration({
@@ -24,10 +17,7 @@ export const AUTOINTERP_SERVER_API = new DefaultApi(
 );
 
 export const EXPLANATIONTYPE_HUMAN = 'human';
-export const SCORER_VERSION = 2;
 
-export const ACTIVATIONS_TO_USE_OLD_SCORER = 20;
-export const OLD_SCORER_URL = IS_LOCALHOST ? 'http://127.0.0.1:5001/score' : `${OLD_SCORER_SERVER}/score`;
 export enum AutoInterpModelType {
   OPENAI = 'openai',
   ANTHROPIC = 'anthropic',

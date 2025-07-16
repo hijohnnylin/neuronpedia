@@ -11,7 +11,7 @@ sae-dashboard = "^0.6.8"
 cuid2 = "^2.0.0"
 python-dotenv = "^1.0.0"
 psycopg2 = "^2.9.9"
-automated-interpretability = "^0.0.9"
+automated-interpretability = "^0.0.12"
 openai = "^1.63.2"
 
 [build-system]

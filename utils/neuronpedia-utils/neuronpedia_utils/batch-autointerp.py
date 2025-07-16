@@ -15,6 +15,7 @@ import typer
 from cuid2 import Cuid
 from neuronpedia_utils.db_models.activation import Activation
 from neuronpedia_utils.db_models.explanation import Explanation
+from neuronpedia_utils.db_models.feature import Feature
 from tqdm import tqdm
 
 # openai requires us to set the openai api key before the neuron_explainer imports
@@ -31,6 +32,7 @@ from neuron_explainer.activations.activations import ActivationRecord
 from neuron_explainer.api_client import ApiClient
 from neuron_explainer.explanations.explainer import (
     AttentionHeadExplainer,
+    MaxActivationAndLogitsExplainer,
     TokenActivationPairExplainer,
 )
 from neuron_explainer.explanations.prompt_builder import PromptFormat
@@ -45,17 +47,30 @@ if UPLOAD_EXPLANATION_AUTHORID is None:
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-large"
 DEFAULT_EMBEDDING_DIMENSIONS = 256
 
-VALID_EXPLAINER_TYPE_NAMES = ["oai_token-act-pair", "oai_attention-head"]
+VALID_EXPLAINER_TYPE_NAMES = [
+    "oai_token-act-pair",
+    "oai_attention-head",
+    "np_max-act-logits",
+]
 
 # you can change this yourself if you want to experiment with other models
-VALID_EXPLAINER_MODEL_NAMES = ["gpt-4o-mini", "gpt-4.1-nano", "gemini-2.0-flash"]
+VALID_EXPLAINER_MODEL_NAMES = [
+    "gpt-4o-mini",
+    "gpt-4.1-nano",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
 
 # GEMINI SUPPORT
-GEMINI_MODEL_NAMES = ["gemini-2.0-flash"]
+GEMINI_MODEL_NAMES = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # we should use this one (ai studio, simpler) but we're super rate limited
 # GEMINI_BASE_API_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_VERTEX = True
 # so we use vertex instead. when we are not rate limited on AI studio, remove the following 4 properties
 GEMINI_PROJECT_ID = os.getenv("GEMINI_PROJECT_ID")
 GEMINI_LOCATION = os.getenv("GEMINI_LOCATION")
@@ -116,6 +131,7 @@ def replace_html_anomalies_and_special_chars(texts: list[str]) -> list[str]:
 
 async def call_autointerp_openai_for_activations(
     activations_sorted_by_max_value: List[Activation],
+    feature: Feature,
 ):
     if len(activations_sorted_by_max_value) == 0:
         return
@@ -168,7 +184,7 @@ async def call_autointerp_openai_for_activations(
                     all_activation_records=activationRecords,
                     num_samples=1,
                 ),
-                timeout=10,
+                timeout=20,
             )
         elif EXPLAINER_TYPE_NAME == "oai_token-act-pair":
             for activation in activations_sorted_by_max_value:
@@ -190,8 +206,43 @@ async def call_autointerp_openai_for_activations(
                     max_activation=calculate_max_activation(activationRecords),
                     num_samples=1,
                 ),
-                timeout=10,
+                timeout=20,
             )
+        elif EXPLAINER_TYPE_NAME == "np_max-act-logits":
+            for activation in activations_sorted_by_max_value:
+                activationRecord = ActivationRecord(
+                    tokens=activation.tokens,
+                    activations=activation.values,
+                )
+                activationRecords.append(activationRecord)
+            explainer = MaxActivationAndLogitsExplainer(
+                model_name=model_name,
+                prompt_format=PromptFormat.HARMONY_V4,
+                max_concurrent=1,
+                base_api_url=base_api_url,
+                override_api_key=override_api_key,
+            )
+            try:
+                explanations = await asyncio.wait_for(
+                    explainer.generate_explanations(
+                        all_activation_records=activationRecords,
+                        max_tokens=60,
+                        max_activation=calculate_max_activation(activationRecords),
+                        top_positive_logits=feature.pos_str,
+                        num_samples=1,
+                    ),
+                    timeout=20,
+                )
+            except Exception as e:
+                print(
+                    f"Error in MaxActivationAndLogitsExplainer.generate_explanations for feature index {feature_index}:"
+                )
+                print(f"Exception type: {type(e).__name__}")
+                print(f"Exception message: {str(e)}")
+                import traceback
+
+                print(f"Traceback: {traceback.format_exc()}")
+                raise  # Re-raise to be caught by the outer try-except block
 
     except Exception as e:
         if isinstance(e, asyncio.TimeoutError):
@@ -210,29 +261,44 @@ async def call_autointerp_openai_for_activations(
     if explanation.endswith("."):
         explanation = explanation[:-1]
     explanation = explanation.replace("\n", "").replace("\r", "")
-    # print(f"{explanation=}")
 
-    global queuedToSave
-    queuedToSave.append(
-        Explanation(
-            id=CUID_GENERATOR.generate(),
-            modelId=top_activation.modelId,
-            layer=top_activation.layer,
-            index=str(feature_index),
-            description=explanation,
-            typeName=EXPLAINER_TYPE_NAME,
-            explanationModelName=EXPLAINER_MODEL_NAME,
-            authorId=UPLOAD_EXPLANATION_AUTHORID or "",
+    print(f"Explanation: {explanation}  {feature.layer} {feature.index}")
+
+    # Skip explanations that are just "unclear"
+    if (
+        "unclear" in explanation.strip().lower()
+        or "unsure" in explanation.strip().lower()
+        or "first token" in explanation.strip().lower()
+    ):
+        print(
+            f"Skipping 'unclear'/'unsure' explanation for feature index {feature_index}"
         )
-    )
+    elif len(explanation.strip()) == 0:
+        print(f"Skipping empty explanation for feature index {feature_index}")
+    else:
+        global queuedToSave
+        queuedToSave.append(
+            Explanation(
+                id=CUID_GENERATOR.generate(),
+                modelId=top_activation.modelId,
+                layer=top_activation.layer,
+                index=str(feature_index),
+                description=explanation,
+                typeName=EXPLAINER_TYPE_NAME,
+                explanationModelName=EXPLAINER_MODEL_NAME,
+                authorId=UPLOAD_EXPLANATION_AUTHORID or "",
+            )
+        )
 
 
 semaphore = asyncio.Semaphore(AUTOINTERP_BATCH_SIZE)
 
 
-async def enqueue_autointerp_openai_task_with_activations(activations):
+async def enqueue_autointerp_openai_task_with_activations(
+    activations: List[Activation], feature: Feature
+):
     async with semaphore:
-        return await call_autointerp_openai_for_activations(activations)
+        return await call_autointerp_openai_for_activations(activations, feature)
 
 
 async def start(activations_dir: str):
@@ -255,54 +321,71 @@ async def start(activations_dir: str):
     for activations_file in tqdm(activations_files, desc="Processing files"):
         # print(f"processing activations file: {activations_file}")
         with gzip.open(activations_file, "rt") as f:
-            # read jsonl file line by line
-            activations: List[Activation] = []
-            for line in f:
-                activation_json = json.loads(line)
-                activation = Activation.from_dict(activation_json)
-                if int(activation.index) < START_INDEX:
-                    continue
-                if END_INDEX is not None and int(activation.index) > END_INDEX:
-                    continue
-                global FAILED_FEATURE_INDEXES_QUEUED
-                if (
-                    FAILED_FEATURE_INDEXES_QUEUED is not None
-                    and len(FAILED_FEATURE_INDEXES_QUEUED) > 0
-                    and int(activation.index) not in FAILED_FEATURE_INDEXES_QUEUED
-                ):
-                    continue
-                activations.append(activation)
-            activations_by_index: Dict[str, List[Activation]] = {}
-            for activation in activations:
-                if activation.index not in activations_by_index:
-                    activations_by_index[activation.index] = []
-                activations_by_index[activation.index].append(activation)
-            # sort each activations_by_index by maxAct, largest to smallest
-            # then run them in batches
-            for index in tqdm(
-                activations_by_index,
-                desc=f"Auto-Interping activations in {os.path.basename(activations_file)}",
-                leave=False,
-            ):
-                # Sort and take top MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE activations
-                activations_by_index[index] = sorted(
-                    activations_by_index[index], key=lambda x: x.maxValue, reverse=True
-                )[:MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE]
+            # also decompress its associated features file
+            features_file = activations_file.replace("activations", "features")
+            with gzip.open(features_file, "rt") as f_features:
+                # read the features file line by line
+                features: List[Feature] = []
+                for line in f_features:
+                    feature_json = json.loads(line)
+                    feature = Feature.from_dict(feature_json)
+                    features.append(feature)
+                features_by_index: Dict[str, Feature] = {}
+                for feature in features:
+                    if feature.index not in features_by_index:
+                        features_by_index[feature.index] = feature
 
-                # enqueue it
-                task = asyncio.create_task(
-                    enqueue_autointerp_openai_task_with_activations(
-                        activations_by_index[index]
+                # read activations jsonl file line by line
+                activations: List[Activation] = []
+                for line in f:
+                    activation_json = json.loads(line)
+                    activation = Activation.from_dict(activation_json)
+                    if int(activation.index) < START_INDEX:
+                        continue
+                    if END_INDEX is not None and int(activation.index) > END_INDEX:
+                        continue
+                    global FAILED_FEATURE_INDEXES_QUEUED
+                    if (
+                        FAILED_FEATURE_INDEXES_QUEUED is not None
+                        and len(FAILED_FEATURE_INDEXES_QUEUED) > 0
+                        and int(activation.index) not in FAILED_FEATURE_INDEXES_QUEUED
+                    ):
+                        continue
+                    activations.append(activation)
+                activations_by_index: Dict[str, List[Activation]] = {}
+                for activation in activations:
+                    if activation.index not in activations_by_index:
+                        activations_by_index[activation.index] = []
+                    activations_by_index[activation.index].append(activation)
+                # sort each activations_by_index by maxAct, largest to smallest
+                # then run them in batches
+                for index in tqdm(
+                    activations_by_index,
+                    desc=f"Auto-Interping activations in {os.path.basename(activations_file)}",
+                    leave=False,
+                ):
+                    # Sort and take top MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE activations
+                    activations_by_index[index] = sorted(
+                        activations_by_index[index],
+                        key=lambda x: x.maxValue,
+                        reverse=True,
+                    )[:MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE]
+
+                    # enqueue it
+                    task = asyncio.create_task(
+                        enqueue_autointerp_openai_task_with_activations(
+                            activations_by_index[index],
+                            features_by_index[index],
+                        )
                     )
-                )
-                autointerp_tasks.append(task)
-                # if we have enough tasks, run them
-                if len(autointerp_tasks) >= AUTOINTERP_BATCH_SIZE:
-                    # print(f"Enqueuing {len(autointerp_tasks)} tasks")
-                    await asyncio.gather(*autointerp_tasks)
-                    autointerp_tasks.clear()
-                    generate_embeddings_and_flush_explanations_to_file(queuedToSave)
-                    queuedToSave.clear()
+                    autointerp_tasks.append(task)
+                    # if we have enough tasks, run them
+                    if len(autointerp_tasks) >= AUTOINTERP_BATCH_SIZE:
+                        # print(f"Enqueuing {len(autointerp_tasks)} tasks")
+                        await asyncio.gather(*autointerp_tasks)
+                        autointerp_tasks.clear()
+                        generate_embeddings_and_flush_explanations_to_file(queuedToSave)
+                        queuedToSave.clear()
 
     # do the last batch
     await asyncio.gather(*autointerp_tasks)
@@ -503,7 +586,7 @@ def generate_embeddings_and_flush_explanations_to_file(explanations: List[Explan
         )
     except Exception as e:
         print(f"Error generating embeddings: {str(e)}")
-        print(f"Descriptions: {descriptions}")
+        print(f"Descriptions: {json.dumps(descriptions)}")
         print(f"Length of descriptions: {len(descriptions)}")
         # add all the description indexes to the failed_feature_indexes
         global FAILED_FEATURE_INDEXES_OUTPUT

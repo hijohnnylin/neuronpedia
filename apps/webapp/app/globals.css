@@ -58,17 +58,17 @@
 
 .forceShowScrollBarHorizontal::-webkit-scrollbar {
   display: block !important;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .forceShowScrollBarHorizontal::-webkit-scrollbar-track:horizontal {
   background-color: rgba(57, 57, 57, 0);
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .forceShowScrollBarHorizontal::-webkit-scrollbar-thumb:horizontal {
-  border-radius: 8px;
+  border-radius: 6px;
   background-color: rgba(203, 213, 225, 1);
 }
 
@@ -540,6 +540,14 @@ div[data-virtuoso-scroller='true'] table {
     font-size: 0.75rem;
   }
 
+  a {
+    color: #0369a1;
+  }
+
+  a:hover {
+    color: #0284c7;
+  }
+
   :where(blockquote p:first-of-type):not(:where([class~='not-prose'], [class~='not-prose'] *))::before {
     content: no-open-quote;
   }
@@ -613,6 +621,7 @@ div[data-virtuoso-scroller='true'] table {
   top: -1000px;
   position: fixed;
   padding: 5px;
+  max-width: 120px;
   background: rgba(255, 255, 255, 1);
   border: 1px solid lightgray;
   pointer-events: none;
@@ -886,7 +895,7 @@ foreignObject canvas {
   }
 
   .grouping-selected .member-circles {
-    outline: 2px solid #0ff;
+    outline: 2px solid #0ea5e9;
   }
 
   .checkbox-container {

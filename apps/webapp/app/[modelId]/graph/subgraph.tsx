@@ -1,17 +1,21 @@
 /* eslint-disable no-param-reassign */
 
+import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
 import { useGraphContext } from '@/components/provider/graph-provider';
+import { useGraphStateContext } from '@/components/provider/graph-state-provider';
 import { Button } from '@/components/shadcn/button';
 import { Card, CardContent } from '@/components/shadcn/card';
 import { useScreenSize } from '@/lib/hooks/use-screen-size';
-import * as Checkbox from '@radix-ui/react-checkbox';
-import { Check, HelpCircleIcon, Trash2, XIcon } from 'lucide-react';
+import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
+import { Circle, FolderOpen, Joystick, PinIcon, PinOffIcon, Save, Share2, TrashIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import d3 from './d3-jetpack';
-import { CLTGraphLink, CLTGraphNode, hideTooltip, showTooltip } from './utils';
+import { clientCheckIsEmbed, CLTGraphLink, CLTGraphNode, hideTooltip, showTooltip } from './utils';
 
 const NODE_WIDTH = 75;
 const NODE_HEIGHT = 25;
+const MINIMUM_SUBGRAPH_LINK_STROKE_WIDTH = 1;
+const MAX_SUBGRAPH_LINK_LUMINANCE = 0.9;
 
 // Custom force container function to keep nodes within bounds
 function forceContainer(bbox: [[number, number], [number, number]]) {
@@ -79,8 +83,28 @@ export default function Subgraph() {
     updateVisStateField,
     isEditingLabel,
     getOverrideClerpForNode,
-    resetSelectedGraphToDefaultVisState,
+    makeTooltipText,
+    resetSelectedGraphToBlankVisState,
   } = useGraphContext();
+
+  // Use the new graph state context
+  const {
+    updateHoverState,
+    clearHoverState,
+    clickedIdRef,
+    updateClickedState,
+    registerHoverCallback,
+    registerClickedCallback,
+  } = useGraphStateContext();
+
+  const {
+    setIsCopyModalOpen,
+    setIsSaveSubgraphModalOpen,
+    setIsLoadSubgraphModalOpen,
+    openWelcomeModalToStep,
+    setIsSteerModalOpen,
+  } = useGraphModalContext();
+
   const simulationRef = useRef<d3.Simulation<ForceNode, undefined> | null>(null);
   const nodeSelRef = useRef<d3.Selection<HTMLDivElement, ForceNode, HTMLDivElement, unknown> | null>(null);
   const memberNodeSelRef = useRef<d3.Selection<HTMLDivElement, CLTGraphNode, HTMLDivElement, ForceNode> | null>(null);
@@ -89,6 +113,42 @@ export default function Subgraph() {
   const sgLinksRef = useRef<SubgraphLink[]>([]);
   const [selForceNodes, setSelForceNodes] = useState<ForceNode[]>([]);
   const [nodeIdToNode, setNodeIdToNode] = useState<Record<string, CLTGraphNode>>({});
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isMetaKeyHeld, setIsMetaKeyHeld] = useState(false);
+
+  // State to track current hover/click values for triggering effects
+  const [currentHoveredId, setCurrentHoveredId] = useState<string | null>(null);
+  const [currentClickedId, setCurrentClickedId] = useState<string | null>(null);
+
+  function togglePinNode(nodeId: string) {
+    // Toggle pinned state
+    const newPinnedIds = [...visState.pinnedIds];
+    const pinnedIndex = newPinnedIds.indexOf(nodeId || '');
+
+    if (pinnedIndex === -1 && nodeId) {
+      newPinnedIds.push(nodeId);
+    } else if (pinnedIndex !== -1) {
+      newPinnedIds.splice(pinnedIndex, 1);
+    }
+
+    updateVisStateField('pinnedIds', newPinnedIds);
+  }
+
+  // Register callbacks to be notified when hover/click state changes
+  useEffect(() => {
+    const unregisterHover = registerHoverCallback((hoveredId) => {
+      setCurrentHoveredId(hoveredId);
+    });
+
+    const unregisterClicked = registerClickedCallback((clickedId) => {
+      setCurrentClickedId(clickedId);
+    });
+
+    return () => {
+      unregisterHover();
+      unregisterClicked();
+    };
+  }, [registerHoverCallback, registerClickedCallback]);
 
   // Ref to hold the latest active grouping state for event handlers
   const activeGroupingRef = useRef(visState.subgraph?.activeGrouping);
@@ -126,114 +186,7 @@ export default function Subgraph() {
     isEditingLabelRef.current = isEditingLabel;
   }, [isEditingLabel]);
 
-  // Handler for keydown event to enable grouping mode
-  useEffect(() => {
-    if (!selectedGraph) return;
-
-    function handleKeyDown(ev: KeyboardEvent) {
-      if (ev.repeat) return;
-      if (!visState.isEditMode || ev.key !== 'g') return;
-
-      if (visState.subgraph) {
-        updateVisStateField('subgraph', {
-          ...visState.subgraph,
-          activeGrouping: {
-            ...visState.subgraph.activeGrouping,
-            isActive: true,
-          },
-        });
-      }
-
-      const subgraphEl = document.querySelector('.subgraph');
-      if (subgraphEl) {
-        subgraphEl.classList.add('is-grouping');
-      }
-    }
-
-    function handleKeyUp(ev: KeyboardEvent) {
-      if (!visState.isEditMode || ev.key !== 'g') return;
-      if (!visState.subgraph) return;
-
-      if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
-        const allSelectedIds: string[] = [];
-        let prevSupernodeLabel = '';
-        const supernodesToRemove: string[][] = [];
-
-        visState.subgraph.activeGrouping.selectedNodeIds.forEach((id) => {
-          const node = nodeIdToNode[id];
-          if (!node?.memberNodeIds) {
-            allSelectedIds.push(id);
-            return;
-          }
-
-          prevSupernodeLabel = node.ppClerp || '';
-
-          // find the supernode to remove
-          // eslint-disable-next-line
-          const supernodeToRemove = visState.subgraph?.supernodes.find(([_, ...nodeIds]) =>
-            nodeIds.every((d) => node.memberNodeIds?.includes(d)),
-          );
-
-          if (supernodeToRemove) {
-            supernodesToRemove.push(supernodeToRemove);
-          }
-
-          // Add its member nodes to selection
-          node.memberNodeIds.forEach((memberId) => allSelectedIds.push(memberId));
-        });
-
-        // Find a label for the new supernode
-        const label =
-          prevSupernodeLabel || allSelectedIds.map((id) => nodeIdToNode[id]?.ppClerp).find((d) => d) || 'supernode';
-
-        // remove the supernodes to remove
-        let newSupernodes = visState.subgraph?.supernodes.filter(
-          // eslint-disable-next-line
-          ([_, ...nodeIds]) => !supernodesToRemove.some((d) => nodeIds.every((e) => d.includes(e))),
-        );
-
-        if (visState.subgraph) {
-          newSupernodes = [...(newSupernodes || []), [label, ...new Set(allSelectedIds)]];
-          updateVisStateField('subgraph', {
-            ...visState.subgraph,
-            supernodes: newSupernodes,
-            activeGrouping: {
-              isActive: false,
-              selectedNodeIds: new Set(),
-            },
-          });
-        }
-      } else {
-        // reset grouping state
-        updateVisStateField('subgraph', {
-          ...visState.subgraph,
-          activeGrouping: {
-            isActive: false,
-            selectedNodeIds: new Set(),
-          },
-        });
-      }
-
-      const subgraphEl = document.querySelector('.subgraph');
-      if (subgraphEl) {
-        subgraphEl.classList.remove('is-grouping');
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keyup', handleKeyUp);
-
-    // eslint-disable-next-line
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [selectedGraph, visState, nodeIdToNode, updateVisStateField]);
-
-  // Initialize subgraph state if not already initialized
-  useEffect(() => {
-    if (visState.subgraph) return;
-
+  function resetGroupingState() {
     updateVisStateField('subgraph', {
       sticky: true,
       dagrefy: true,
@@ -243,6 +196,143 @@ export default function Subgraph() {
         selectedNodeIds: new Set(),
       },
     });
+  }
+
+  function toggleNodeInGrouping(nodeId: string) {
+    const currentActiveGrouping = activeGroupingRef.current;
+
+    // Read selected IDs from the ref, but create a new Set for modification
+    const currentSelectedNodeIds = currentActiveGrouping?.selectedNodeIds || new Set();
+    const selectedNodeIds = new Set(currentSelectedNodeIds);
+    if (selectedNodeIds.has(nodeId)) {
+      selectedNodeIds.delete(nodeId);
+    } else {
+      selectedNodeIds.add(nodeId);
+    }
+
+    // Update the main state (which will trigger the ref update and styling effect)
+    updateVisStateField('subgraph', {
+      sticky: visState.subgraph?.sticky || false,
+      dagrefy: visState.subgraph?.dagrefy || false,
+      supernodes: visState.subgraph?.supernodes || [],
+      activeGrouping: {
+        isActive: true,
+        selectedNodeIds,
+      },
+    });
+  }
+
+  function ungroupSupernodeWithNodeIds(memberNodeIds: string[]) {
+    if (visState.subgraph) {
+      const newSupernodes = visState.subgraph.supernodes.filter(
+        // eslint-disable-next-line
+        ([_, ...nodeIds]) => !nodeIds.every((id) => memberNodeIds?.includes(id)),
+      );
+
+      updateVisStateField('subgraph', {
+        ...visState.subgraph,
+        supernodes: newSupernodes,
+      });
+    }
+  }
+
+  function setGroupingModeActive(newActiveState: boolean) {
+    if (visState.subgraph) {
+      if (newActiveState) {
+        // unclick the clicked node
+        updateClickedState(null);
+
+        // set the grouping mode active
+        updateVisStateField('subgraph', {
+          ...visState.subgraph,
+          activeGrouping: {
+            ...visState.subgraph.activeGrouping,
+            isActive: newActiveState,
+          },
+        });
+        const subgraphEl = document.querySelector('.subgraph');
+        if (subgraphEl) {
+          subgraphEl.classList.add('is-grouping');
+        }
+      } else {
+        // unclick the clicked node
+        updateVisStateField('subgraph', {
+          ...visState.subgraph,
+          activeGrouping: {
+            isActive: false,
+            selectedNodeIds: new Set(),
+          },
+        });
+
+        const subgraphEl = document.querySelector('.subgraph');
+        if (subgraphEl) {
+          subgraphEl.classList.remove('is-grouping');
+        }
+      }
+    }
+  }
+
+  function groupSelectedNodes(selectedNodeIds: Set<string>) {
+    if (visState.subgraph) {
+      const allSelectedIds: string[] = [];
+      let prevSupernodeLabel = '';
+      const supernodesToRemove: string[][] = [];
+
+      selectedNodeIds.forEach((id) => {
+        const node = nodeIdToNode[id];
+        if (!node?.memberNodeIds) {
+          allSelectedIds.push(id);
+          return;
+        }
+
+        prevSupernodeLabel = node.ppClerp || '';
+
+        // find the supernode to remove
+        // eslint-disable-next-line
+        const supernodeToRemove = visState.subgraph?.supernodes.find(([_, ...nodeIds]) =>
+          nodeIds.every((d) => node.memberNodeIds?.includes(d)),
+        );
+
+        if (supernodeToRemove) {
+          supernodesToRemove.push(supernodeToRemove);
+        }
+
+        // Add its member nodes to selection
+        node.memberNodeIds.forEach((memberId) => allSelectedIds.push(memberId));
+      });
+
+      // Find a label for the new supernode
+      const label =
+        prevSupernodeLabel || allSelectedIds.map((id) => nodeIdToNode[id]?.ppClerp).find((d) => d) || 'supernode';
+
+      // remove the supernodes to remove
+      let newSupernodes = visState.subgraph?.supernodes.filter(
+        // eslint-disable-next-line
+        ([_, ...nodeIds]) => !supernodesToRemove.some((d) => nodeIds.every((e) => d.includes(e))),
+      );
+
+      newSupernodes = [...(newSupernodes || []), [label, ...new Set(allSelectedIds)]];
+      updateVisStateField('subgraph', {
+        ...visState.subgraph,
+        supernodes: newSupernodes,
+        activeGrouping: {
+          isActive: false,
+          selectedNodeIds: new Set(),
+        },
+      });
+
+      const subgraphEl = document.querySelector('.subgraph');
+      if (subgraphEl) {
+        subgraphEl.classList.remove('is-grouping');
+      }
+    }
+  }
+
+  // Initialize subgraph state if not already initialized
+  useEffect(() => {
+    if (visState.subgraph) return;
+
+    resetGroupingState();
   }, [visState, updateVisStateField]);
 
   // Initialize the D3 subgraph visualization - runs only when layout needs reset
@@ -268,10 +358,10 @@ export default function Subgraph() {
 
     // Set up margins and container dimensions
     const margin = {
-      top: 26,
-      bottom: 5,
-      left: visState.isHideLayer ? 0 : 30,
-      right: 5,
+      top: 40,
+      bottom: 40,
+      left: 20,
+      right: 40,
     };
 
     const svgBBox = svgRef.current.getBoundingClientRect();
@@ -586,8 +676,17 @@ export default function Subgraph() {
       .appendMany('path.link-path', sgLinks)
       .attr('fill', 'none')
       .attr('marker-mid', (d) => (d.weight > 0 ? 'url(#mid-positive)' : 'url(#mid-negative)'))
-      .attr('stroke-width', (d) => Math.abs(d.weight) * 15)
-      .attr('stroke', (d) => d.color)
+      .attr('stroke-width', (d) => Math.max(MINIMUM_SUBGRAPH_LINK_STROKE_WIDTH, Math.abs(d.weight) * 15))
+      .attr('stroke', (d) => {
+        const rgbMatch = d.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        if (!rgbMatch) return d.color; // fallback if not rgb format
+        const r = parseInt(rgbMatch[1], 10);
+        const g = parseInt(rgbMatch[2], 10);
+        const b = parseInt(rgbMatch[3], 10);
+        // Calculate relative luminance
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > MAX_SUBGRAPH_LINK_LUMINANCE ? '#ddd' : d.color;
+      })
       .attr('opacity', 0.8)
       .attr('stroke-linecap', 'round');
 
@@ -630,67 +729,36 @@ export default function Subgraph() {
       .on('mouseover', (ev: MouseEvent, d: ForceNode) => {
         if (ev.buttons === 1) return; // Ignore if dragging/clicking
         if (!ev.metaKey && !ev.ctrlKey && !activeGroupingRef.current?.isActive && !isEditingLabelRef.current) {
-          updateVisStateField('hoveredId', d.node.featureId || null);
-          updateVisStateField('hoveredCtxIdx', d.node.ctx_idx);
-          showTooltip(ev, d.node, getOverrideClerpForNode(d.node));
+          updateHoverState(d.node);
+          showTooltip(ev, d.node, makeTooltipText(d.node));
         }
       })
       .on('mouseleave', (ev: MouseEvent) => {
         if (ev.buttons === 1) return; // Ignore if dragging/clicking
-        updateVisStateField('hoveredId', null);
-        updateVisStateField('hoveredCtxIdx', null);
+        clearHoverState();
         hideTooltip();
       })
       .on('click', (ev: MouseEvent, d: ForceNode) => {
         const currentActiveGrouping = activeGroupingRef.current;
-
-        // Handle grouping mode
-        if (currentActiveGrouping?.isActive) {
-          const nodeId = d.node.supernodeId || d.node.nodeId;
-          if (nodeId) {
-            // Read selected IDs from the ref, but create a new Set for modification
-            const currentSelectedNodeIds = currentActiveGrouping?.selectedNodeIds || new Set();
-            const selectedNodeIds = new Set(currentSelectedNodeIds);
-            if (selectedNodeIds.has(nodeId)) {
-              selectedNodeIds.delete(nodeId);
-            } else {
-              selectedNodeIds.add(nodeId);
-            }
-
-            // Update the main state (which will trigger the ref update and styling effect)
-            updateVisStateField('subgraph', {
-              sticky: visState.subgraph?.sticky || false,
-              dagrefy: visState.subgraph?.dagrefy || false,
-              supernodes: visState.subgraph?.supernodes || [],
-              activeGrouping: {
-                isActive: true,
-                selectedNodeIds,
-              },
-            });
-          }
-
+        const nodeId = d.node.supernodeId || d.node.nodeId;
+        if (currentActiveGrouping?.isActive && nodeId) {
+          toggleNodeInGrouping(nodeId);
           ev.stopPropagation();
           ev.preventDefault();
           return;
         }
 
         if (ev.metaKey || ev.ctrlKey) {
-          // Toggle pinned state
-          const newPinnedIds = [...visState.pinnedIds];
-          const pinnedIndex = newPinnedIds.indexOf(d.node.nodeId || '');
-
-          if (pinnedIndex === -1 && d.node.nodeId) {
-            newPinnedIds.push(d.node.nodeId);
-          } else if (pinnedIndex !== -1) {
-            newPinnedIds.splice(pinnedIndex, 1);
+          if (d.node.nodeId) {
+            togglePinNode(d.node.nodeId);
           }
-
-          updateVisStateField('pinnedIds', newPinnedIds);
         } else {
           // Set as clicked node
-          const newClickedId = visState.clickedId === d.node.nodeId ? null : d.node.nodeId;
-          updateVisStateField('clickedId', newClickedId || null);
-          updateVisStateField('clickedCtxIdx', newClickedId ? d.node.ctx_idx : null);
+          const newClickedId = clickedIdRef.current === d.node.nodeId ? null : d.node.nodeId;
+          if (newClickedId !== clickedIdRef.current) {
+            const clickedNode = newClickedId ? d.node : null;
+            updateClickedState(clickedNode);
+          }
         }
       })
       // @ts-ignore
@@ -722,15 +790,13 @@ export default function Subgraph() {
       .on('mouseover', (ev: MouseEvent, d: CLTGraphNode) => {
         if (ev.buttons === 1) return; // Ignore if dragging
         if (activeGroupingRef.current?.isActive || ev.metaKey || ev.ctrlKey || isEditingLabelRef.current) return;
-        updateVisStateField('hoveredId', d.featureId || null);
-        updateVisStateField('hoveredCtxIdx', d.ctx_idx);
-        showTooltip(ev, d, getOverrideClerpForNode(d));
+        updateHoverState(d);
+        showTooltip(ev, d, makeTooltipText(d));
         ev.stopPropagation();
       })
       .on('mouseleave', (ev: MouseEvent) => {
         if (ev.buttons === 1) return; // Ignore if dragging out
-        updateVisStateField('hoveredId', null);
-        updateVisStateField('hoveredCtxIdx', null);
+        clearHoverState();
         hideTooltip();
       })
       .on('click', (ev: MouseEvent, d: CLTGraphNode) => {
@@ -743,21 +809,16 @@ export default function Subgraph() {
         // Regular click behavior
         if (ev.metaKey || ev.ctrlKey) {
           // Toggle pinned state
-          const newPinnedIds = [...visState.pinnedIds];
-          const pinnedIndex = newPinnedIds.indexOf(d.nodeId || '');
-
-          if (pinnedIndex === -1 && d.nodeId) {
-            newPinnedIds.push(d.nodeId);
-          } else if (pinnedIndex !== -1) {
-            newPinnedIds.splice(pinnedIndex, 1);
+          if (d.nodeId) {
+            togglePinNode(d.nodeId);
           }
-
-          updateVisStateField('pinnedIds', newPinnedIds);
         } else {
           // Set as clicked node
-          const newClickedId = visState.clickedId === d.nodeId ? null : d.nodeId;
-          updateVisStateField('clickedId', newClickedId || null);
-          updateVisStateField('clickedCtxIdx', newClickedId ? d.ctx_idx : null);
+          const newClickedId = clickedIdRef.current === d.nodeId ? null : d.nodeId;
+          if (newClickedId !== clickedIdRef.current) {
+            const clickedNode = newClickedId ? d : null;
+            updateClickedState(clickedNode);
+          }
         }
       })
       .attr('title', (d: CLTGraphNode) => getOverrideClerpForNode(d) || '');
@@ -781,15 +842,7 @@ export default function Subgraph() {
           ev.stopPropagation();
 
           if (visState.subgraph && d.node.memberNodeIds) {
-            const newSupernodes = visState.subgraph.supernodes.filter(
-              // eslint-disable-next-line
-              ([_, ...nodeIds]) => !nodeIds.every((id) => d.node.memberNodeIds?.includes(id)),
-            );
-
-            updateVisStateField('subgraph', {
-              ...visState.subgraph,
-              supernodes: newSupernodes,
-            });
+            ungroupSupernodeWithNodeIds(d.node.memberNodeIds);
           }
         });
     }
@@ -811,11 +864,11 @@ export default function Subgraph() {
           .append('input')
           .at({ class: 'temp-edit', value: spanSel.text() })
           // eslint-disable-next-line
-          .on('blur', save)
+          .on('blur', saveSupergroupLabel)
           .on('keydown', (saveEvent) => {
             if (saveEvent.key === 'Enter') {
               // eslint-disable-next-line
-              save();
+              saveSupergroupLabel();
               input.node()?.blur();
             }
             saveEvent.stopPropagation();
@@ -823,7 +876,7 @@ export default function Subgraph() {
 
         input.node()?.focus();
 
-        function save() {
+        function saveSupergroupLabel() {
           // eslint-disable-next-line
           const idx = visState.subgraph?.supernodes.findIndex(([_, ...nodeIds]) =>
             nodeIds.every((id) => d.node.memberNodeIds?.includes(id)),
@@ -947,8 +1000,8 @@ export default function Subgraph() {
 
     // Apply classes based on interaction state
     nodeSel
-      .classed('clicked', (d: ForceNode) => d.node.nodeId === visState.clickedId)
-      .classed('hovered', (d: ForceNode) => d.node.featureId === visState.hoveredId)
+      .classed('clicked', (d: ForceNode) => d.node.nodeId === currentClickedId)
+      .classed('hovered', (d: ForceNode) => d.node.featureId === currentHoveredId)
       .classed(
         'grouping-selected', // This class should now be applied correctly
         (d: ForceNode) => visState.subgraph?.activeGrouping.selectedNodeIds.has(d.node.nodeId || '') || false,
@@ -967,7 +1020,7 @@ export default function Subgraph() {
     });
 
     // Calculate and apply new clicked link highlighting state
-    if (visState.clickedId && nodeIdToNode[visState.clickedId]) {
+    if (currentClickedId && nodeIdToNode[currentClickedId]) {
       currentSgLinks.forEach((link) => {
         // Resolve source/target, potentially using nodeIdToNode map if needed
         const sourceForceNode = typeof link.source === 'object' ? link.source : null;
@@ -978,7 +1031,7 @@ export default function Subgraph() {
         const targetNode = nodeIdToNode[targetNodeId];
 
         if (link.ogLinks && sourceNode && targetNode) {
-          if (sourceNodeId === visState.clickedId) {
+          if (sourceNodeId === currentClickedId) {
             // Highlight target member nodes
             link.ogLinks.forEach((ogLink) => {
               if (ogLink.targetNode && nodeIdToNode[ogLink.targetNode.nodeId || '']) {
@@ -990,7 +1043,7 @@ export default function Subgraph() {
             if (nodeIdToNode[targetNodeId]) {
               nodeIdToNode[targetNodeId].tmpClickedSgTarget = link;
             }
-          } else if (targetNodeId === visState.clickedId) {
+          } else if (targetNodeId === currentClickedId) {
             // Highlight source member nodes
             link.ogLinks.forEach((ogLink) => {
               if (ogLink.sourceNode && nodeIdToNode[ogLink.sourceNode.nodeId || '']) {
@@ -1009,15 +1062,15 @@ export default function Subgraph() {
 
     // Apply styles based on the potentially updated tmpClickedLink property
     memberNodeSel
-      .classed('clicked', (d: CLTGraphNode) => d.nodeId === visState.clickedId)
-      .classed('hovered', (d: CLTGraphNode) => d.featureId === visState.hoveredId)
+      .classed('clicked', (d: CLTGraphNode) => d.nodeId === currentClickedId)
+      .classed('hovered', (d: CLTGraphNode) => d.featureId === currentHoveredId)
       .style('background', (d: CLTGraphNode) => d?.tmpClickedLink?.pctInputColor || '#fff')
       .style('color', (d: CLTGraphNode) => bgColorToTextColor(d?.tmpClickedLink?.pctInputColor) || 'black');
 
     // NOTE: This effect intentionally avoids restarting the simulation or changing layout.
   }, [
-    visState.clickedId,
-    visState.hoveredId,
+    currentClickedId,
+    currentHoveredId,
     visState.subgraph?.activeGrouping.selectedNodeIds,
     bgColorToTextColor,
     nodeIdToNode,
@@ -1033,77 +1086,359 @@ export default function Subgraph() {
     }
   }, [visState.pinnedIds]);
 
-  const SUBGRAPH_HEIGHT = 410;
+  // Handler for keydown event to enable grouping mode
+  useEffect(() => {
+    if (!selectedGraph) return;
+
+    function handleKeyDown(ev: KeyboardEvent) {
+      if (ev.repeat) return;
+      // if temp-edit is active, don't allow grouping mode
+      // look for any input with class temp-edit
+      const tempEdit = document.querySelector('input.temp-edit');
+      const tempEditFeatDetail = document.querySelector('input.temp-edit-feat-detail');
+      if (!visState.isEditMode || ev.key !== 'g' || tempEdit || tempEditFeatDetail) return;
+
+      if (visState.subgraph) {
+        setGroupingModeActive(true);
+      }
+    }
+
+    function handleKeyUp(ev: KeyboardEvent) {
+      const tempEdit = document.querySelector('input.temp-edit');
+      const tempEditFeatDetail = document.querySelector('input.temp-edit-feat-detail');
+      if (!visState.isEditMode || ev.key !== 'g' || tempEdit || tempEditFeatDetail) return;
+      if (!visState.subgraph) return;
+
+      if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
+        groupSelectedNodes(visState.subgraph.activeGrouping.selectedNodeIds);
+      } else {
+        // reset grouping state
+        setGroupingModeActive(false);
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    // eslint-disable-next-line
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [selectedGraph, visState, nodeIdToNode, updateVisStateField]);
+
+  // Handler for tracking meta/ctrl key state for pin/unpin mode
+  useEffect(() => {
+    function handleKeyDown(ev: KeyboardEvent) {
+      if (ev.key === 'Meta' || ev.key === 'Control') {
+        setIsMetaKeyHeld(true);
+      }
+    }
+
+    function handleKeyUp(ev: KeyboardEvent) {
+      if (ev.key === 'Meta' || ev.key === 'Control') {
+        setIsMetaKeyHeld(false);
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  function getTotalNodesFromNodeIds(nodeIds: Set<string>) {
+    let totalNodes = 0;
+    nodeIds.forEach((id) => {
+      const node = nodeIdToNode[id];
+      if (node?.memberNodeIds) {
+        totalNodes += node.memberNodeIds.length;
+      } else {
+        totalNodes += 1;
+      }
+    });
+    return totalNodes;
+  }
 
   return (
-    <Card className="mt-2 w-full bg-white">
-      <CardContent className="px-2 py-2">
-        {/* <div className="mb-3 mt-2 flex w-full flex-row items-center justify-start gap-x-2">
-        <div className="text-sm font-bold text-slate-600">Subgraph</div>
-        <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4 text-slate-500" />}>
-          <div className="flex flex-col">
-            <p>The subgraph shows a force-directed visualization of pinned nodes.</p>
-            <p>Keyboard shortcuts:</p>
-            <ul>
-              <li>Press g to enter grouping mode, then click nodes to group them</li>
-              <li>Hold Ctrl/Cmd to pin/unpin nodes</li>
-            </ul>
+    <Card
+      className={`h-full w-full flex-1 bg-white transition-all sm:block ${clickedIdRef.current ? 'hidden' : ''} ${
+        visState.subgraph?.activeGrouping.isActive ? 'border-sky-600' : ''
+      }`}
+    >
+      <CardContent className="relative h-full px-0 py-0">
+        {visState.subgraph?.activeGrouping.isActive && (
+          <div className="absolute right-0 top-0 z-10 flex w-40 flex-col items-center justify-center gap-y-0 overflow-hidden rounded-bl-lg rounded-tr-lg bg-sky-600 text-[11px] font-bold text-white">
+            <div className="pt-2.5 text-center text-[12px]">Grouping Mode</div>
+            <div className="px-2 pb-1.5 pt-0.5 text-center">
+              {visState.subgraph.activeGrouping.selectedNodeIds.size === 0 ? (
+                <div className="flex flex-col gap-y-0.5 pt-1.5 text-[9.5px] font-medium">
+                  <div>Click subgraph nodes to select.</div>
+                  <div>{visState.subgraph.supernodes.length > 0 ? ' Click ✕ to ungroup.' : ''}</div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-y-0 pt-1 text-[9.5px] font-medium">
+                  <div>
+                    {getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds)} node
+                    {getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds) === 1 ? '' : 's'}{' '}
+                    selected for grouping.
+                  </div>
+                </div>
+              )}
+            </div>
+            {visState.subgraph.activeGrouping.selectedNodeIds.size > 0 && (
+              <div className="mb-[1px] flex flex-row gap-x-0 rounded border-slate-400 bg-slate-200 p-[4px]">
+                {Array.from({
+                  length: getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds),
+                }).map((_, i) => (
+                  <div key={i} className="h-[9px] w-[9px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+                ))}
+              </div>
+            )}
+            <div className="mt-2 flex w-full flex-row">
+              <Button
+                onClick={() => setGroupingModeActive(false)}
+                variant="outline"
+                size="xs"
+                className="flex-1 rounded-none border-0 bg-slate-300 py-2 text-[9px] font-medium uppercase text-slate-600 hover:bg-slate-400 hover:text-slate-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (visState.subgraph) {
+                    if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
+                      groupSelectedNodes(visState.subgraph.activeGrouping.selectedNodeIds);
+                    } else {
+                      alert('Select at least two nodes to group them.');
+                    }
+                  }
+                }}
+                variant="outline"
+                size="xs"
+                className="flex-1 rounded-none border-0 bg-sky-200 py-2 text-[9px] font-semibold uppercase text-sky-800 hover:bg-sky-300 hover:text-sky-800"
+              >
+                Save Group
+              </Button>
+            </div>
           </div>
-        </CustomTooltip>
-      </div> */}
-        <div className="subgraph relative h-[410px] w-full">
-          <svg className={`absolute h-[${SUBGRAPH_HEIGHT}px] w-full`} height={SUBGRAPH_HEIGHT} ref={svgRef} />
-          <div className={`absolute h-[${SUBGRAPH_HEIGHT}px] w-full`} ref={divRef} />
+        )}
+        <div className="subgraph relative h-full w-full">
+          <svg className="absolute h-full w-full" ref={svgRef} />
+          <div className="absolute h-full w-full" ref={divRef} />
 
           {(visState.pinnedIds.length === 0 || showSubgraphHelp) && (
-            <div
-              className={`absolute flex bg-white/80 h-[${SUBGRAPH_HEIGHT}px] min-h-[${SUBGRAPH_HEIGHT}px] w-full flex-col items-start justify-center gap-y-1.5 px-5 text-slate-700`}
-            >
-              <div className="mb-1.5 w-full text-center text-lg font-bold">Creating a Subgraph</div>
-              <div>
-                <strong>· Pin or Unpin a Node</strong>
-                {`: Hold 'Command/Ctrl', then click a node in the link graph above.`}
+            <div className="absolute hidden h-full min-h-full w-full flex-col items-start justify-center gap-y-3 rounded-xl bg-white/70 px-5 text-sm text-slate-700 backdrop-blur-sm sm:flex">
+              <div className="flex w-full flex-col items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-base font-medium">
+                Subgraph (Solution){' '}
+                <Button
+                  variant="slateLight"
+                  size="xs"
+                  onClick={() => openWelcomeModalToStep(4)}
+                  className="hidden rounded-full px-3 hover:bg-sky-200 hover:text-sky-700 sm:block"
+                >
+                  Video Demo
+                </Button>
               </div>
-              <div>
-                <strong>· Group Nodes into a Supernode</strong>
-                {`: Hold 'g', then click multiple nodes in this subgraph. When you release, they'll be grouped into a "supernode".`}
+              <div className="flex w-full flex-col items-center gap-y-0.5">
+                <strong>Pin Node to Subgraph</strong>
+                <div className="ml-8 text-xs">
+                  Click a <Circle className="mb-1 mr-0.5 inline h-3 w-3" />
+                  node in the link graph above, then click <strong>Pin Node</strong>.
+                </div>
               </div>
-              <div>
-                <strong>· Ungroup Supernodes</strong>
-                {`: Hold 'g', then click the x next to a supernode to ungroup it.`}
+              <div className="flex w-full flex-col items-center gap-y-0.5">
+                <strong>Grouping</strong>
+                <div className="ml-8 text-center text-xs">
+                  Click <strong>Grouping Mode</strong>, select subgraph nodes, and click <strong>Save Group</strong>.
+                </div>
               </div>
-              <div>
-                <strong>· Label a Supernode</strong>: Click the label under a supernode to edit its name.
+              <div className="flex w-full flex-col items-center gap-y-0.5">
+                <strong>Label Group</strong>
+                <div className="ml-8 text-xs">Click the label under a group to give it a custom label.</div>
               </div>
-              <div>
-                <strong>· Share the Subgraph</strong>: Copy the URL, or click the Copy button in the top right toolbar.
+              <div className="flex w-full flex-col items-center gap-y-0.5">
+                <strong>Save & Share</strong>
+                <div className="ml-8 text-xs">
+                  Use the tools at the top left to load, save, and share your subgraph.
+                </div>
               </div>
             </div>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className={`${visState.pinnedIds.length === 0 ? 'hidden' : 'absolute left-1.5 top-1 h-8 w-28 gap-x-1.5 rounded-full border-0 bg-slate-100 px-0 py-0 text-slate-600 hover:bg-slate-200'}`}
-            onClick={() => setShowSubgraphHelp(!showSubgraphHelp)}
-          >
-            {showSubgraphHelp ? (
-              <>
-                <XIcon className="h-5 w-5" />
-                <span>Hide Help</span>
-              </>
-            ) : (
-              <>
-                <HelpCircleIcon className="h-5 w-5" />
-                <span>Show Help</span>
-              </>
+          {(visState.pinnedIds.length === 0 || showSubgraphHelp) && (
+            <div className="mt-10 block w-full px-4 text-center text-sm font-medium text-slate-500 sm:hidden">
+              Subgraph functionality is reduced on mobile.
+              <br />
+              Please use a larger screen with a keyboard.
+            </div>
+          )}
+
+          <div className="absolute right-3 top-3 flex flex-col gap-x-2 gap-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (clickedIdRef.current) {
+                  togglePinNode(clickedIdRef.current);
+                }
+              }}
+              className="hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-sky-600 bg-sky-100 px-0 text-[9.5px] font-semibold leading-none text-sky-700 shadow transition-all hover:bg-sky-200 hover:text-sky-700 sm:flex"
+              aria-label="Pin/Unpin Node"
+              disabled={clickedIdRef.current === null || visState.subgraph?.activeGrouping.isActive}
+            >
+              {clickedIdRef.current && visState.pinnedIds.includes(clickedIdRef.current) ? (
+                <>
+                  <div className="flex flex-row items-center justify-center gap-x-0">
+                    <PinOffIcon className="h-3.5 w-3.5" />
+                    <div className="h-[11px] w-[11px] rounded-full border-[1.5px] border-[#f0f] bg-white" />
+                  </div>
+                  Unpin Node
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-row items-center justify-center gap-x-0">
+                    <PinIcon className="h-3.5 w-3.5" />
+                    <div className="h-[11px] w-[11px] rounded-full border-[1.5px] border-[#f0f] bg-white" />
+                  </div>
+                  Pin Node
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (visState.subgraph?.activeGrouping.isActive) {
+                  if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
+                    groupSelectedNodes(visState.subgraph.activeGrouping.selectedNodeIds);
+                  } else {
+                    setGroupingModeActive(false);
+                  }
+                } else {
+                  if (visState.pinnedIds.length < 2) {
+                    alert(
+                      'You need at least two pinned nodes to group them.\nPin nodes by selecting them in the link graph above, then clicking "Pin Node".',
+                    );
+                    return;
+                  }
+                  setGroupingModeActive(true);
+                }
+              }}
+              className="hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-sky-600 bg-sky-100 px-0 text-[9.5px] font-semibold leading-none text-sky-700 shadow transition-all hover:bg-sky-200 hover:text-sky-700 sm:flex"
+              aria-label="Grouping Mode"
+            >
+              <div className="flex h-3.5 max-h-3.5 min-h-3.5 flex-row items-center justify-center gap-x-0 rounded border-[1.5px] border-slate-400 bg-slate-200 px-[3px] py-[0px]">
+                <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+                <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+                <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+              </div>
+              Grouping Mode
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsSteerModalOpen(true);
+              }}
+              className={`h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-emerald-600 bg-emerald-100 px-0 text-[9.5px] font-semibold leading-none text-emerald-700 shadow transition-all hover:bg-emerald-200 hover:text-emerald-700 ${
+                visState.subgraph?.activeGrouping.isActive ? 'hidden' : 'hidden sm:flex'
+              }`}
+              disabled={visState.pinnedIds.length === 0}
+              aria-label="Steer"
+            >
+              <Joystick className="h-3.5 w-3.5" />
+              Steer (Beta)
+            </Button>
+          </div>
+
+          <div className="absolute left-3 top-3 hidden flex-row items-center justify-center gap-x-1.5 sm:flex">
+            {!clientCheckIsEmbed() && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openWelcomeModalToStep(4)}
+                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                aria-label="Open User Guide"
+              >
+                <QuestionMarkCircledIcon className="h-4 w-4" />
+                Help
+              </Button>
             )}
-          </Button>
-          <Button
+            {!clientCheckIsEmbed() && (
+              <Button
+                variant="outline"
+                size="sm"
+                title="Load Subgraph"
+                aria-label="Load Subgraph"
+                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                onClick={() => {
+                  setIsLoadSubgraphModalOpen(true);
+                }}
+              >
+                <FolderOpen className="h-4 w-4" /> Load
+              </Button>
+            )}
+            {!clientCheckIsEmbed() && (
+              <Button
+                variant="outline"
+                size="sm"
+                title="Save Subgraph"
+                aria-label="Save Subgraph"
+                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                onClick={() => {
+                  setIsSaveSubgraphModalOpen(true);
+                }}
+                disabled={visState.pinnedIds.length === 0}
+              >
+                <Save className="h-4 w-4" />
+                Save
+              </Button>
+            )}
+
+            {!clientCheckIsEmbed() && (
+              <Button
+                variant="outline"
+                size="sm"
+                title="Copy Graph + Subgraph + Custom Labels to Clipboard"
+                aria-label="Copy Graph + Subgraph + Custom Labels to Clipboard"
+                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                onClick={() => {
+                  setIsCopyModalOpen(true);
+                }}
+                disabled={visState.pinnedIds.length === 0}
+              >
+                <Share2 className="h-4 w-4" />
+                Share
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              title="Clear Subgraph"
+              aria-label="Clear Subgraph"
+              className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none border-slate-300 bg-slate-100 px-0 text-[8px] font-medium leading-none text-red-500 hover:bg-red-100 hover:text-red-600"
+              onClick={() => {
+                // eslint-disable-next-line
+                if (confirm('Are you sure you want to clear this subgraph?')) {
+                  resetSelectedGraphToBlankVisState();
+                }
+              }}
+              disabled={visState.pinnedIds.length === 0}
+            >
+              <TrashIcon className="h-4 w-4" />
+              Clear
+            </Button>
+          </div>
+
+          {/* <Button
             variant="outline"
             size="sm"
             title="Reset Graph to Defaults"
             aria-label="Reset Graph to Defaults"
-            className={`${visState.pinnedIds.length === 0 ? 'hidden' : 'absolute'} right-0.5 top-0.5 h-8 w-8 flex-col items-center justify-center gap-y-1.5 whitespace-nowrap border-none border-slate-300 bg-slate-100 px-0 text-[8px] font-medium leading-none text-red-500 hover:bg-red-100 hover:text-red-600`}
+            className={`${visState.pinnedIds.length === 0 ? 'hidden' : 'absolute'} bottom-3 right-3 h-8 w-8 flex-col items-center justify-center gap-y-1.5 whitespace-nowrap border-none border-slate-300 bg-slate-100 px-0 text-[8px] font-medium leading-none text-red-500 hover:bg-red-100 hover:text-red-600`}
             onClick={() => {
               // eslint-disable-next-line
               if (confirm('Are you sure you want to reset the graph to its default state?')) {
@@ -1112,64 +1447,8 @@ export default function Subgraph() {
             }}
             disabled={visState.pinnedIds.length === 0}
           >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="hidden w-full flex-row items-center justify-center gap-x-3">
-          <label
-            className="flex flex-row items-center gap-x-1 text-xs font-bold leading-none text-slate-600"
-            htmlFor="stickyCheck"
-          >
-            <Checkbox.Root
-              className="flex h-4 w-4 appearance-none items-center justify-center rounded-[3px] border border-slate-300 bg-white outline-none"
-              defaultChecked
-              checked={visState.subgraph?.sticky ? visState.subgraph.sticky : false}
-              onCheckedChange={(e) => {
-                updateVisStateField('subgraph', {
-                  sticky: e === true,
-                  dagrefy: visState.subgraph?.dagrefy ? visState.subgraph.dagrefy : false,
-                  supernodes: visState.subgraph?.supernodes || [],
-                  activeGrouping: visState.subgraph?.activeGrouping || {
-                    isActive: false,
-                    selectedNodeIds: new Set(),
-                  },
-                });
-              }}
-              id="stickyCheck"
-            >
-              <Checkbox.Indicator className="text-slate-600">
-                <Check className="h-4 w-4" />
-              </Checkbox.Indicator>
-            </Checkbox.Root>
-            Sticky
-          </label>
-          <label
-            className="flex flex-row items-center gap-x-1 text-xs font-bold leading-none text-slate-600"
-            htmlFor="dagrefyCheck"
-          >
-            <Checkbox.Root
-              className="flex h-4 w-4 appearance-none items-center justify-center rounded-[3px] border border-slate-300 bg-white outline-none"
-              defaultChecked
-              checked={visState.subgraph?.dagrefy ? visState.subgraph.dagrefy : false}
-              onCheckedChange={(e) => {
-                updateVisStateField('subgraph', {
-                  dagrefy: e === true,
-                  sticky: visState.subgraph?.sticky ? visState.subgraph.sticky : false,
-                  supernodes: visState.subgraph?.supernodes || [],
-                  activeGrouping: visState.subgraph?.activeGrouping || {
-                    isActive: false,
-                    selectedNodeIds: new Set(),
-                  },
-                });
-              }}
-              id="dagrefyCheck"
-            >
-              <Checkbox.Indicator className="text-slate-600">
-                <Check className="h-4 w-4" />
-              </Checkbox.Indicator>
-            </Checkbox.Root>
-            Dagrefy
-          </label>
+            <ResetIcon className="h-4 w-4" />
+          </Button> */}
         </div>
       </CardContent>
     </Card>

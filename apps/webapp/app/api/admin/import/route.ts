@@ -168,7 +168,7 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
         }
 
         /* EXPLANATIONS */
-        const explanationsPaths = await getFilesInPath(`${path}/explanations`, '.jsonl.gz');
+        const explanationsPaths = await getFilesInPath(`${path}/explanations/`, '.jsonl.gz');
         for (const [index, explanationsPath] of explanationsPaths.entries()) {
           enqueueProgress(controller, index / explanationsPaths.length, `(3 of 4) Importing Explanations...`);
           console.log('Importing explanations from', explanationsPath);

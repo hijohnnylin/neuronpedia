@@ -1,7 +1,6 @@
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
+import SearchTopkByTokenPane from '@/components/panes/search-topk-by-token-pane';
 import { BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
-import SearchTopkByToken from './search-topk-by-token';
 
 export default async function Page({
   searchParams,
@@ -37,23 +36,16 @@ export default async function Page({
             : []),
         ]}
       />
-      <Card className="mt-3 w-full max-w-screen-xl overflow-y-hidden bg-white sm:h-full">
-        <CardHeader className="w-full pb-3 pt-6">
-          <div className="flex w-full flex-row items-center justify-between">
-            <CardTitle>Search TopK by Token</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="h-full w-full overflow-y-hidden pt-3">
-          <SearchTopkByToken
-            initialModelId={modelId}
-            initialSource={source}
-            initialText={text}
-            initialDensityThreshold={initialDensityThreshold}
-            initialIgnoreBos={initialIgnoreBos}
-            initialSortBy={initialSortBy}
-          />
-        </CardContent>
-      </Card>
+      <div className="mt-3 flex w-full max-w-screen-xl flex-col items-center overflow-y-scroll sm:h-full">
+        <SearchTopkByTokenPane
+          modelId={modelId || ''}
+          source={source || ''}
+          text={text || ''}
+          initialDensityThreshold={initialDensityThreshold || 0.5}
+          initialIgnoreBos={initialIgnoreBos || false}
+          initialSortBy={initialSortBy || 'frequency'}
+        />
+      </div>
     </div>
   );
 }

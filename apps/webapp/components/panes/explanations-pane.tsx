@@ -206,7 +206,11 @@ export default function ExplanationsPane({
                             </button>
                           );
                         }
-                        return '';
+                        return (
+                          <div className="font-sans text-[10px] font-medium text-slate-300">
+                            Explanation Uploaded by User
+                          </div>
+                        );
                       })()}
                       {/* we don't have DFA scoring yet */}
                       {!currentNeuron?.sourceSet?.showDfa && (

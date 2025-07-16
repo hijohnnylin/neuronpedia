@@ -9,7 +9,7 @@ export default async function Page({
     q: string;
     releaseName: string;
     modelId: string;
-    saes: string;
+    sources: string;
     embed: string;
   };
 }) {
@@ -17,15 +17,15 @@ export default async function Page({
   let selectedTab: SearchExplanationsType | undefined;
   if (searchParams.releaseName) {
     selectedTab = SearchExplanationsType.BY_RELEASE;
-  } else if (searchParams.saes) {
-    selectedTab = SearchExplanationsType.BY_SAE;
+  } else if (searchParams.sources) {
+    selectedTab = SearchExplanationsType.BY_SOURCE;
   } else if (searchParams.modelId) {
     selectedTab = SearchExplanationsType.BY_MODEL;
   } else {
     selectedTab = SearchExplanationsType.BY_ALL;
   }
 
-  const selectedLayers = searchParams.saes ? JSON.parse(searchParams.saes) : [];
+  const selectedLayers = searchParams.sources ? JSON.parse(searchParams.sources) : [];
   let sourceSet: string | undefined;
   if (selectedLayers.length > 0) {
     sourceSet = getSourceSetNameFromSource(selectedLayers[0]);

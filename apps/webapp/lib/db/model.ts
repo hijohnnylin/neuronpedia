@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { AuthenticatedUser } from '@/lib/with-user';
-import { Visibility } from '@prisma/client';
+import { Model, Visibility } from '@prisma/client';
 import { AllowUnlistedFor, userCanAccessClause } from './userCanAccess';
 
 // for globalModels, return unlisted to everyone, but filter them out in the UI
@@ -83,7 +83,26 @@ export const getModelByIdWithSourceSets = async (modelId: string, user?: Authent
     },
   });
 
-export const createModel = async (
+export const createModel = async (model: Model, user: AuthenticatedUser) => {
+  // eslint-disable-next-line no-param-reassign
+  model.creatorId = user.id;
+
+  const existingModel = await prisma.model.findUnique({
+    where: {
+      id: model.id,
+    },
+  });
+
+  if (existingModel) {
+    throw new Error('Model already exists.');
+  } else {
+    return prisma.model.create({
+      data: model,
+    });
+  }
+};
+
+export const createModelAdmin = async (
   modelId: string,
   displayName: string,
   layers: number,

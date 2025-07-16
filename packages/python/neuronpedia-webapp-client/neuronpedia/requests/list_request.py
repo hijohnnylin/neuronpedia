@@ -1,20 +1,27 @@
-from neuronpedia.np_list import NPListItem, NPList
-from neuronpedia.requests.base_request import (
-    NPRequest,
-)
+from typing import Optional
+
+from neuronpedia.np_list import NPList, NPListItem
+from neuronpedia.requests.base_request import NPRequest
 
 
 class ListRequest(NPRequest):
     def __init__(
         self,
+        api_key: Optional[str] = None,
     ):
-        super().__init__("list")
+        super().__init__("list", api_key=api_key)
 
     def get_owned(self) -> list[NPList]:
         response = self.send_request(method="POST", uri="list")
 
         return [
-            NPList(id=list["id"], name=list["name"], description=list["description"], items=[]) for list in response
+            NPList(
+                id=list["id"],
+                name=list["name"],
+                description=list["description"],
+                items=[],
+            )
+            for list in response
         ]
 
     def new(self, name: str, description: str = "") -> NPList:
@@ -29,7 +36,12 @@ class ListRequest(NPRequest):
 
     def add_items(self, nplist: NPList, items: list[NPListItem]) -> NPList:
         formatted_items = [
-            {"modelId": item.model_id, "layer": item.source, "index": item.index, "description": item.description}
+            {
+                "modelId": item.model_id,
+                "layer": item.source,
+                "index": item.index,
+                "description": item.description,
+            }
             for item in items
         ]
         payload = {"listId": nplist.id, "featuresToAdd": formatted_items}

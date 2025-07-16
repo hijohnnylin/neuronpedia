@@ -1,8 +1,7 @@
+from typing import List, Optional, TypedDict
+
+from neuronpedia.requests.base_request import NPRequest
 from requests import Response
-from neuronpedia.requests.base_request import (
-    NPRequest,
-)
-from typing import TypedDict, List
 
 
 class Activation(TypedDict):
@@ -19,10 +18,13 @@ class Activation(TypedDict):
 class ActivationRequest(NPRequest):
     def __init__(
         self,
+        api_key: Optional[str] = None,
     ):
-        super().__init__("activation")
+        super().__init__("activation", api_key=api_key)
 
-    def compute_activation_for_text(self, model_id: str, source: str, index: str, text: str) -> Activation:
+    def compute_activation_for_text(
+        self, model_id: str, source: str, index: str, text: str
+    ) -> Activation:
         payload = {
             "feature": {
                 "modelId": model_id,
@@ -43,7 +45,6 @@ class ActivationRequest(NPRequest):
         index: str,
         activations: List[Activation],
     ) -> Response:
-
         payload = {
             "modelId": model_id,
             "source": source,

@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
  *     summary: List User's Graphs
  *     description: Retrieves a list of all graph metadata for the authenticated user
  *     tags:
- *       - Circuit Graphs
+ *       - Attribution Graphs
  *     security:
  *       - apiKey: []
  *     responses:
