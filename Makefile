@@ -176,6 +176,17 @@ inference-list-configs: ## Inference: List Configurations (possible values for M
 		echo ""; \
 	done
 
+doc-inference-localhost: ## Inference: Generate Interactive API Documentation
+	@echo "Generating interactive API documentation..."
+	@if ! command -v docker &> /dev/null; then \
+		echo "Error: Docker is required to generate API documentation"; \
+		exit 1; \
+	fi
+	docker run --rm -p 8080:8080 \
+		-v $(PWD)/schemas/openapi:/tmp/openapi:ro \
+		-e SWAGGER_JSON=/tmp/openapi/inference-server.yaml \
+		swaggerapi/swagger-ui
+
 reset-docker-data: ## Reset Docker Data - this deletes your local database!
 	@echo "WARNING: This will delete all your local neuronpedia Docker data and databases!"
 	@read -p "Are you sure you want to continue? (y/N) " confirm; \
