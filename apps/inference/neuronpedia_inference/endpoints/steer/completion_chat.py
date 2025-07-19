@@ -21,6 +21,7 @@ from transformer_lens import HookedTransformer
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.inference_utils.steering import (
     OrthogonalProjector,
+    apply_generic_chat_template,
     convert_to_chat_array,
     format_sse_message,
     process_features_vectorized,
@@ -83,9 +84,23 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
     # tokenize = True adds a BOS
     if model.tokenizer is None:
         raise ValueError("Tokenizer is not initialized")
-    promptTokenized = model.tokenizer.apply_chat_template(
-        promptChatFormatted, tokenize=True, add_generation_prompt=True
-    )
+
+    # If the tokenizer does not support chat templates, we need to apply a generic chat template
+    if (
+        not hasattr(model.tokenizer, "chat_template")
+        or model.tokenizer.chat_template is None
+    ):
+        logger.warning(
+            "Model's tokenizer does not support chat templates. Utilizing general chat template."
+        )
+        template_applied_prompt = apply_generic_chat_template(
+            promptChatFormatted, add_generation_prompt=True
+        )
+        promptTokenized = model.to_tokens(template_applied_prompt)[0]
+    else:
+        promptTokenized = model.tokenizer.apply_chat_template(
+            promptChatFormatted, tokenize=True, add_generation_prompt=True
+        )
     promptTokenized = torch.tensor(promptTokenized)
 
     # logger.info("promptTokenized: %s", promptTokenized)
