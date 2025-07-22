@@ -6,6 +6,7 @@ import os
 import sys
 import traceback
 from collections.abc import Awaitable
+from contextlib import asynccontextmanager
 from typing import Callable
 
 import sentry_sdk
@@ -55,55 +56,11 @@ load_dotenv()
 global initialized
 initialized = False
 
-app = FastAPI()
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 args = parse_env_and_args()
 
 
-# we have to initialize SAE's AFTER server startup, because some infrastructure providers require
-# our server to respond to health checks within a few minutes of starting up
-@app.on_event("startup")  # pyright: ignore[reportDeprecated]
-async def startup_event():
-    logger.info("Starting initialization...")
-    # Wait briefly to ensure server is ready
-    await asyncio.sleep(3)
-    # Start initialization in background
-    asyncio.create_task(initialize(args.custom_hf_model_id))
-    logger.info("Initialization started")
-
-
-v1_router = APIRouter(prefix="/v1")
-
-v1_router.include_router(activation_all_router)
-v1_router.include_router(steer_completion_chat_router)
-v1_router.include_router(steer_completion_router)
-v1_router.include_router(activation_single_router)
-v1_router.include_router(activation_topk_by_token_router)
-v1_router.include_router(sae_topk_by_decoder_cossim_router)
-v1_router.include_router(sae_vector_router)
-v1_router.include_router(tokenize_router)
-
-app.include_router(v1_router)
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
-
-@app.post("/initialize")
-async def initialize(
-    custom_hf_model_id: str | None = None,
-):
+# Define initialization function that will be called during startup
+async def initialize(custom_hf_model_id: str | None = None):
     logger.info("Initializing...")
 
     # Move the heavy operations to a separate thread pool to prevent blocking
@@ -216,6 +173,57 @@ async def initialize(
         logger.info("Initialized: %s", initialized)
 
     await asyncio.get_event_loop().run_in_executor(None, load_model_and_sae)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ARG001
+    logger.info("Starting initialization...")
+    # Wait briefly to ensure server is ready
+    await asyncio.sleep(3)
+    # Start initialization in background
+    asyncio.create_task(initialize(args.custom_hf_model_id))
+    logger.info("Initialization started")
+
+    yield
+
+    logger.info("Shutting down...")
+
+
+app = FastAPI(lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+v1_router = APIRouter(prefix="/v1")
+
+v1_router.include_router(activation_all_router)
+v1_router.include_router(steer_completion_chat_router)
+v1_router.include_router(steer_completion_router)
+v1_router.include_router(activation_single_router)
+v1_router.include_router(activation_topk_by_token_router)
+v1_router.include_router(sae_topk_by_decoder_cossim_router)
+v1_router.include_router(sae_vector_router)
+v1_router.include_router(tokenize_router)
+
+app.include_router(v1_router)
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
+@app.post("/initialize")
+async def initialize_endpoint(
+    custom_hf_model_id: str | None = None,
+):
+    return await initialize(custom_hf_model_id)
 
 
 @app.middleware("http")
