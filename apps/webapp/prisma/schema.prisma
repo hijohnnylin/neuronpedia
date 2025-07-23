@@ -59,6 +59,7 @@ enum UserSecretType {
   GOOGLE
   ANTHROPIC
   OPENROUTER
+  AZURE_OPENAI
 }
 
 model UserSecret {

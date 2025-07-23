@@ -535,7 +535,14 @@ export const NullsOrderSchema = z.enum(['first', 'last']);
 
 export const JsonNullValueFilterSchema = z.enum(['DbNull', 'JsonNull', 'AnyNull']);
 
-export const UserSecretTypeSchema = z.enum(['NEURONPEDIA', 'OPENAI', 'GOOGLE', 'ANTHROPIC', 'OPENROUTER']);
+export const UserSecretTypeSchema = z.enum([
+  'NEURONPEDIA',
+  'OPENAI',
+  'GOOGLE',
+  'ANTHROPIC',
+  'OPENROUTER',
+  'AZURE_OPENAI',
+]);
 
 export type UserSecretTypeType = `${z.infer<typeof UserSecretTypeSchema>}`;
 

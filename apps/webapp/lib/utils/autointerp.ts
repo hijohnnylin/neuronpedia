@@ -61,7 +61,7 @@ export function getKeyTypeForAutoInterpModelType(modelType: AutoInterpModelType)
   }
   return UserSecretType.OPENROUTER;
 }
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
 export function requiresOpenRouterForExplanationType(explanationType: string) {
   return explanationType === 'eleuther_acts_top20';
 }

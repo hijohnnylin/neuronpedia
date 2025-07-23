@@ -2,6 +2,7 @@ import { SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2';
 import { promises as fs } from 'fs';
 import _ from 'lodash';
 import mjml2html from 'mjml';
+import * as nodemailer from 'nodemailer';
 import path from 'path';
 import { Resend } from 'resend';
 import {
@@ -10,14 +11,22 @@ import {
   CONTACT_EMAIL_ADDRESS,
   NEXT_PUBLIC_URL,
   RESEND_EMAIL_API_KEY,
+  SMTP_SERVER_FROM,
+  SMTP_SERVER_HOST,
+  SMTP_SERVER_PORT,
+  USE_AWS_SES,
+  USE_RESEND,
+  USE_SMTP,
 } from '../env';
 
 const { htmlToText } = require('html-to-text');
 
 let awsSesClient: SESv2Client;
 let resendClient: Resend;
+let smtpTransporter: nodemailer.Transporter;
 
-if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
+// Initialize email client based on USE_* flags
+if (USE_AWS_SES) {
   awsSesClient = new SESv2Client({
     region: 'us-east-1',
     credentials: {
@@ -25,8 +34,15 @@ if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
       secretAccessKey: AWS_SECRET_ACCESS_KEY,
     },
   });
-} else if (RESEND_EMAIL_API_KEY) {
+} else if (USE_RESEND) {
   resendClient = new Resend(RESEND_EMAIL_API_KEY);
+} else if (USE_SMTP) {
+  smtpTransporter = nodemailer.createTransport({
+    host: SMTP_SERVER_HOST,
+    port: Number(SMTP_SERVER_PORT),
+    secure: false,
+    requireTLS: true,
+  });
 }
 
 export const EMAIL_TEMPLATES_PATH = '/lib/email';
@@ -49,8 +65,10 @@ export const sendEmail = async (
   subject: string,
   html: string,
 ) => {
-  // try aws first
-  if (awsSesClient) {
+  const textContent = htmlToText(html);
+
+  // Try AWS SES first
+  if (USE_AWS_SES && awsSesClient) {
     const command = new SendEmailCommand({
       FromEmailAddress: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
       FeedbackForwardingEmailAddress: CONTACT_EMAIL_ADDRESS,
@@ -69,7 +87,7 @@ export const sendEmail = async (
               Data: html,
             },
             Text: {
-              Data: htmlToText(html),
+              Data: textContent,
             },
           },
           Headers: unsubscribeCode
@@ -87,13 +105,15 @@ export const sendEmail = async (
     if (result.$metadata.httpStatusCode !== 200) {
       console.error('Email failed to send', result);
     }
-  } else if (resendClient) {
+  }
+  // Second try Resend.com
+  else if (USE_RESEND && resendClient) {
     const result = await resendClient.emails.send({
       from: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
       to: emailAddress,
       subject,
       html,
-      text: htmlToText(html),
+      text: textContent,
       headers: unsubscribeCode
         ? {
             'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
@@ -103,10 +123,31 @@ export const sendEmail = async (
     if (result.error) {
       console.error('Resend email failed to send', result);
     }
+  }
+  // Finally try SMTP
+  else if (USE_SMTP && smtpTransporter) {
+    try {
+      const mailOptions: nodemailer.SendMailOptions = {
+        from: SMTP_SERVER_FROM || `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
+        to: emailAddress,
+        subject,
+        html,
+        text: textContent,
+        headers: unsubscribeCode
+          ? {
+            'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
+          }
+          : undefined,
+      };
+
+      const result = await smtpTransporter.sendMail(mailOptions);
+      console.log('Email sent via SMTP:', result.messageId);
+    } catch (error) {
+      console.error('SMTP email failed to send', error);
+      throw error;
+    }
   } else {
-    console.error(
-      'No email provider defined. Set either AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY or RESEND_EMAIL_API_KEY',
-    );
+    console.error('No email provider configured. Enable one provider using USE_AWS_SES, USE_RESEND, or USE_SMTP');
   }
 };
 

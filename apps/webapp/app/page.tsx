@@ -181,7 +181,7 @@ export default function Page() {
             >
               <svg
                 fill="#000000"
-                fill-rule="evenodd"
+                fillRule="evenodd"
                 height="1.2em"
                 style={{ flex: 'none', lineHeight: '1' }}
                 viewBox="0 0 24 24"

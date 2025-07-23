@@ -15,6 +15,8 @@ export function EditProfileFormAutointerpKeyField({
   const [showKey, setShowKey] = useState(false);
   const [key, setKey] = useState('');
 
+  const isAzureOpenAI = keyType === UserSecretType.AZURE_OPENAI;
+
   return (
     <label htmlFor="key" className="mb-2.5 block text-sm leading-none">
       <span className="block text-xs leading-none text-slate-600">{keyLabel}</span>
@@ -70,17 +72,38 @@ export function EditProfileFormAutointerpKeyField({
           onClick={(e) => {
             e.preventDefault();
             alert(keyMessage);
+
             const newKey = prompt(
-              "Your key will only be used for your requests and not for any other user's requests.\n\nIt is your responsibility to monitor your key's usage and to disable it when necessary.\n\nIf you agree with these terms, you can save your OpenRouter API key to Neuronpedia by pasting it below.\n\nIf you wish to remove your key, set it to blank.",
+              "Your key will only be used for your requests and not for any other user's requests.\n\nIt is your responsibility to monitor your key's usage and to disable it when necessary.\n\nIf you agree with these terms, you can save your API key to Neuronpedia by pasting it below.\n\nIf you wish to remove your key, set it to blank.",
             );
-            if (newKey || newKey === '') {
+            if (newKey !== null) {
+              // For Azure OpenAI, also prompt for endpoint
+              let endpoint: string | undefined;
+              if (isAzureOpenAI && newKey !== '') {
+                const endpointInput = prompt(
+                  'Please enter your Azure OpenAI endpoint URL (e.g., https://your-resource.openai.azure.com/):',
+                );
+
+                if (!endpointInput) {
+                  alert('Azure OpenAI requires an endpoint URL. Cancelling operation.');
+                  return;
+                }
+                endpoint = endpointInput;
+              }
+
+              const requestBody: any = {
+                type: keyType,
+                value: newKey,
+              };
+
+              if (endpoint) {
+                requestBody.endpoint = endpoint;
+              }
+
               fetch(`/api/user/api-key-update`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  type: keyType,
-                  value: newKey,
-                }),
+                body: JSON.stringify(requestBody),
               })
                 .then((response) => {
                   if (response.status !== 200) {
