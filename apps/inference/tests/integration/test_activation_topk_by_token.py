@@ -10,6 +10,7 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post_request i
 from tests.conftest import (
     ABS_TOLERANCE,
     BOS_TOKEN_STR,
+    INVALID_SAE_SOURCE,
     MODEL_ID,
     SAE_SELECTED_SOURCES,
     TEST_PROMPT,
@@ -198,7 +199,7 @@ def test_activation_topk_by_token_invalid_source(client: TestClient):
     request = ActivationTopkByTokenPostRequest(
         prompt=TEST_PROMPT,
         model=MODEL_ID,
-        source="invalid-source",
+        source=INVALID_SAE_SOURCE,
         top_k=TOP_K,
         ignore_bos=True,
     )
@@ -210,7 +211,7 @@ def test_activation_topk_by_token_invalid_source(client: TestClient):
             headers={"X-SECRET-KEY": X_SECRET_KEY},
         )
 
-    assert "Found 0 entries when searching for gpt2-small/invalid-source" in str(
+    assert f"Found 0 entries when searching for {MODEL_ID}/{INVALID_SAE_SOURCE}" in str(
         excinfo.value
     )
 

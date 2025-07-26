@@ -21,6 +21,7 @@ MODEL_ID = "gpt2-small"
 SAE_SOURCE_SET = "res-jb"
 SAE_SELECTED_SOURCES = ["7-res-jb"]
 ABS_TOLERANCE = 0.1
+INVALID_SAE_SOURCE = "fake-source"
 
 
 @pytest.fixture(scope="session")
