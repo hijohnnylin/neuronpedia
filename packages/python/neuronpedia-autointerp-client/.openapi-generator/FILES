@@ -1,8 +1,4 @@
-.github/workflows/python.yml
 .gitignore
-.gitlab-ci.yml
-.openapi-generator-ignore
-.travis.yml
 README.md
 docs/DefaultApi.md
 docs/ExplainDefaultPost200Response.md
@@ -15,7 +11,6 @@ docs/ScoreEmbeddingPostRequest.md
 docs/ScoreFuzzDetectionPost200Response.md
 docs/ScoreFuzzDetectionPost200ResponseBreakdownInner.md
 docs/ScoreFuzzDetectionPostRequest.md
-git_push.sh
 neuronpedia_autointerp_client/__init__.py
 neuronpedia_autointerp_client/api/__init__.py
 neuronpedia_autointerp_client/api/default_api.py
@@ -37,20 +32,4 @@ neuronpedia_autointerp_client/models/score_fuzz_detection_post_request.py
 neuronpedia_autointerp_client/py.typed
 neuronpedia_autointerp_client/rest.py
 pyproject.toml
-requirements.txt
-setup.cfg
 setup.py
-test-requirements.txt
-test/__init__.py
-test/test_default_api.py
-test/test_explain_default_post200_response.py
-test/test_explain_default_post_request.py
-test/test_np_activation.py
-test/test_np_score_fuzz_detection_type.py
-test/test_score_embedding_post200_response.py
-test/test_score_embedding_post200_response_breakdown_inner.py
-test/test_score_embedding_post_request.py
-test/test_score_fuzz_detection_post200_response.py
-test/test_score_fuzz_detection_post200_response_breakdown_inner.py
-test/test_score_fuzz_detection_post_request.py
-tox.ini
