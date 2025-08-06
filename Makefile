@@ -190,8 +190,8 @@ autointerp-localhost-build: ## Autointerp: Localhost Environment - Build
 	ENV_FILE=../.env.localhost \
 		BUILD_TYPE=$(BUILD_TYPE) \
 		docker compose \
-		-f docker-compose.yaml \
-		$(if $(USE_LOCAL_HF_CACHE),-f docker-compose.hf-cache.yaml,) \
+		-f docker/compose.yaml \
+		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
 		build autointerp
 
 autointerp-localhost-build-gpu: ## Autointerp: Localhost Environment - Build (CUDA). Usage: make autointerp-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
@@ -202,10 +202,10 @@ autointerp-localhost-dev: ## Autointerp: Localhost Environment - Run (Developmen
 	RELOAD=$$([ "$(AUTORELOAD)" = "1" ] && echo "1" || echo "0") \
 	ENV_FILE=../.env.localhost \
 		docker compose \
-		-f docker-compose.yaml \
-		-f docker-compose.autointerp.dev.yaml \
-		$(if $(ENABLE_GPU),-f docker-compose.autointerp.gpu.yaml,) \
-		$(if $(USE_LOCAL_HF_CACHE),-f docker-compose.hf-cache.yaml,) \
+		-f docker/compose.yaml \
+		-f docker/compose.autointerp.dev.yaml \
+		$(if $(ENABLE_GPU),-f docker/compose.autointerp.gpu.yaml,) \
+		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
 		--env-file .env.localhost \
 		--env-file .env \
 		up autointerp
