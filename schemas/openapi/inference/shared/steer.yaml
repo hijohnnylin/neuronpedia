@@ -47,6 +47,40 @@ components:
       type: string
       enum: ["SIMPLE_ADDITIVE", "ORTHOGONAL_DECOMP"]
 
+    NPLogprobTop:
+      type: object
+      description: A single top logprob candidate
+      required:
+        - token
+        - logprob
+      properties:
+        token:
+          type: string
+          description: The token string
+        logprob:
+          type: number
+          description: The log probability of this token
+
+    NPLogprob:
+      type: object
+      description: Logprobs for a single token
+      required:
+        - token
+        - logprob
+        - top_logprobs
+      properties:
+        token:
+          type: string
+          description: The chosen token
+        logprob:
+          type: number
+          description: The log probability of the chosen token
+        top_logprobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/NPLogprobTop"
+          description: Top candidate tokens and their log probabilities
+
     NPSteerCompletionResponseInner:
       type: object
       description: A streamed steering/default response. Output is either the whole response or a chunk, depending on response type. 
@@ -58,6 +92,11 @@ components:
           $ref: "#/components/schemas/NPSteerType"
         output:
           type: string
+        logprobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/NPLogprob"
+          description: Token logprobs for the output sequence. Only present if n_logprobs > 0.
 
     NPSteerChatMessage:
       type: object
@@ -87,6 +126,11 @@ components:
           type: string
         type:
           $ref: "#/components/schemas/NPSteerType"
+        logprobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/NPLogprob"
+          description: Token logprobs for the output sequence. Only present if n_logprobs > 0.
 
     SteerCompletionRequest:
       type: object
@@ -147,4 +191,10 @@ components:
           type: boolean
           description: Whether or not to stream responses using Server Side Events (SSE). Note that the OpenAPI spec does not support SSE - you will receive multiple responses with the same format as non-streaming, except with the "output" field chunked.
           default: false
+        n_logprobs:
+          type: integer
+          minimum: 0
+          maximum: 10
+          default: 0
+          description: Number of logprobs to return per token. 0 means no logprobs.
 paths: {}

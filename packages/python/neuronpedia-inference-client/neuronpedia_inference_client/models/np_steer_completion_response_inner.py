@@ -18,8 +18,9 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
-from typing import Any, ClassVar, Dict, List
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional
+from neuronpedia_inference_client.models.np_logprob import NPLogprob
 from neuronpedia_inference_client.models.np_steer_type import NPSteerType
 from typing import Optional, Set
 from typing_extensions import Self
@@ -30,7 +31,8 @@ class NPSteerCompletionResponseInner(BaseModel):
     """ # noqa: E501
     type: NPSteerType
     output: StrictStr
-    __properties: ClassVar[List[str]] = ["type", "output"]
+    logprobs: Optional[List[NPLogprob]] = Field(default=None, description="Token logprobs for the output sequence. Only present if n_logprobs > 0.")
+    __properties: ClassVar[List[str]] = ["type", "output", "logprobs"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -71,6 +73,13 @@ class NPSteerCompletionResponseInner(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in logprobs (list)
+        _items = []
+        if self.logprobs:
+            for _item_logprobs in self.logprobs:
+                if _item_logprobs:
+                    _items.append(_item_logprobs.to_dict())
+            _dict['logprobs'] = _items
         return _dict
 
     @classmethod
@@ -84,7 +93,8 @@ class NPSteerCompletionResponseInner(BaseModel):
 
         _obj = cls.model_validate({
             "type": obj.get("type"),
-            "output": obj.get("output")
+            "output": obj.get("output"),
+            "logprobs": [NPLogprob.from_dict(_item) for _item in obj["logprobs"]] if obj.get("logprobs") is not None else None
         })
         return _obj
 

@@ -18,23 +18,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
-from typing import Any, ClassVar, Dict, List, Optional
-from neuronpedia_inference_client.models.np_logprob import NPLogprob
-from neuronpedia_inference_client.models.np_steer_chat_message import NPSteerChatMessage
-from neuronpedia_inference_client.models.np_steer_type import NPSteerType
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, StrictStr
+from typing import Any, ClassVar, Dict, List, Union
 from typing import Optional, Set
 from typing_extensions import Self
 
-class NPSteerChatResult(BaseModel):
+class NPLogprobTop(BaseModel):
     """
-    The formatted and unformatted (\"raw\") chat messages
+    A single top logprob candidate
     """ # noqa: E501
-    chat_template: List[NPSteerChatMessage]
-    raw: StrictStr
-    type: Optional[NPSteerType] = None
-    logprobs: Optional[List[NPLogprob]] = Field(default=None, description="Token logprobs for the output sequence. Only present if n_logprobs > 0.")
-    __properties: ClassVar[List[str]] = ["chat_template", "raw", "type", "logprobs"]
+    token: StrictStr = Field(description="The token string")
+    logprob: Union[StrictFloat, StrictInt] = Field(description="The log probability of this token")
+    __properties: ClassVar[List[str]] = ["token", "logprob"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -54,7 +49,7 @@ class NPSteerChatResult(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of NPSteerChatResult from a JSON string"""
+        """Create an instance of NPLogprobTop from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -75,25 +70,11 @@ class NPSteerChatResult(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in chat_template (list)
-        _items = []
-        if self.chat_template:
-            for _item_chat_template in self.chat_template:
-                if _item_chat_template:
-                    _items.append(_item_chat_template.to_dict())
-            _dict['chat_template'] = _items
-        # override the default output from pydantic by calling `to_dict()` of each item in logprobs (list)
-        _items = []
-        if self.logprobs:
-            for _item_logprobs in self.logprobs:
-                if _item_logprobs:
-                    _items.append(_item_logprobs.to_dict())
-            _dict['logprobs'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of NPSteerChatResult from a dict"""
+        """Create an instance of NPLogprobTop from a dict"""
         if obj is None:
             return None
 
@@ -101,10 +82,8 @@ class NPSteerChatResult(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "chat_template": [NPSteerChatMessage.from_dict(_item) for _item in obj["chat_template"]] if obj.get("chat_template") is not None else None,
-            "raw": obj.get("raw"),
-            "type": obj.get("type"),
-            "logprobs": [NPLogprob.from_dict(_item) for _item in obj["logprobs"]] if obj.get("logprobs") is not None else None
+            "token": obj.get("token"),
+            "logprob": obj.get("logprob")
         })
         return _obj
 

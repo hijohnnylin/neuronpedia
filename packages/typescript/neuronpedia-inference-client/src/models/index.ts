@@ -11,6 +11,8 @@ export * from './ActivationTopkByTokenPost200ResponseResultsInner';
 export * from './ActivationTopkByTokenPost200ResponseResultsInnerTopFeaturesInner';
 export * from './ActivationTopkByTokenPostRequest';
 export * from './NPFeature';
+export * from './NPLogprob';
+export * from './NPLogprobTop';
 export * from './NPSteerChatMessage';
 export * from './NPSteerChatResult';
 export * from './NPSteerCompletionResponseInner';

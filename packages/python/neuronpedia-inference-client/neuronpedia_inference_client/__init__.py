@@ -15,7 +15,7 @@
 """  # noqa: E501
 
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 # import apis into sdk package
 from neuronpedia_inference_client.api.default_api import DefaultApi
@@ -43,6 +43,8 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post200_respon
 from neuronpedia_inference_client.models.activation_topk_by_token_post200_response_results_inner_top_features_inner import ActivationTopkByTokenPost200ResponseResultsInnerTopFeaturesInner
 from neuronpedia_inference_client.models.activation_topk_by_token_post_request import ActivationTopkByTokenPostRequest
 from neuronpedia_inference_client.models.np_feature import NPFeature
+from neuronpedia_inference_client.models.np_logprob import NPLogprob
+from neuronpedia_inference_client.models.np_logprob_top import NPLogprobTop
 from neuronpedia_inference_client.models.np_steer_chat_message import NPSteerChatMessage
 from neuronpedia_inference_client.models.np_steer_chat_result import NPSteerChatResult
 from neuronpedia_inference_client.models.np_steer_completion_response_inner import NPSteerCompletionResponseInner

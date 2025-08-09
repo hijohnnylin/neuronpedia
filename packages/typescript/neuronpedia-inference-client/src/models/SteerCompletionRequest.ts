@@ -126,6 +126,12 @@ export interface SteerCompletionRequest {
      * @memberof SteerCompletionRequest
      */
     stream?: boolean;
+    /**
+     * Number of logprobs to return per token. 0 means no logprobs.
+     * @type {number}
+     * @memberof SteerCompletionRequest
+     */
+    nLogprobs?: number;
 }
 
 
@@ -170,6 +176,7 @@ export function SteerCompletionRequestFromJSONTyped(json: any, ignoreDiscriminat
         'freqPenalty': json['freq_penalty'],
         'seed': json['seed'],
         'stream': json['stream'] == null ? undefined : json['stream'],
+        'nLogprobs': json['n_logprobs'] == null ? undefined : json['n_logprobs'],
     };
 }
 
@@ -197,6 +204,7 @@ export function SteerCompletionRequestToJSONTyped(value?: SteerCompletionRequest
         'freq_penalty': value['freqPenalty'],
         'seed': value['seed'],
         'stream': value['stream'],
+        'n_logprobs': value['nLogprobs'],
     };
 }
 

@@ -64,6 +64,7 @@ class TestSteerCompletionChatPostRequest(unittest.TestCase):
                 freq_penalty = 1.337,
                 seed = 1.337,
                 stream = True,
+                n_logprobs = 0,
                 steer_special_tokens = True
             )
         else:

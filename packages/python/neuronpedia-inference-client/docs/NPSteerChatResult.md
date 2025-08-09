@@ -9,6 +9,7 @@ Name | Type | Description | Notes
 **chat_template** | [**List[NPSteerChatMessage]**](NPSteerChatMessage.md) |  | 
 **raw** | **str** |  | 
 **type** | [**NPSteerType**](NPSteerType.md) |  | [optional] 
+**logprobs** | [**List[NPLogprob]**](NPLogprob.md) | Token logprobs for the output sequence. Only present if n_logprobs &gt; 0. | [optional] 
 
 ## Example
 

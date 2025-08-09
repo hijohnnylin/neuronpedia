@@ -4,6 +4,7 @@ from typing import Any
 import torch
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
+from neuronpedia_inference_client.models.np_logprob import NPLogprob
 from neuronpedia_inference_client.models.np_steer_completion_response_inner import (
     NPSteerCompletionResponseInner,
 )
@@ -28,6 +29,7 @@ from neuronpedia_inference.inference_utils.steering import (
 )
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.utils import make_logprob_from_logits
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,7 @@ async def completion(request: SteerCompletionRequest):
         steer_method=steer_method,
         normalize_steering=normalize_steering,
         use_stream_lock=request.stream if request.stream is not None else False,
+        n_logprobs=(request.n_logprobs or 0),
     )
 
     if request.stream:
@@ -126,7 +129,11 @@ async def completion(request: SteerCompletionRequest):
     if item is None:
         raise ValueError("Generator yielded no items")
     results = remove_sse_formatting(item)
-    return SteerCompletionPost200Response.from_json(results)
+    response = SteerCompletionPost200Response.from_json(results)
+    if response is None:
+        raise ValueError("Failed to parse response")
+    # set exclude_none to True to omit the logprobs field when n_logprobs isn't set in the request, for backwards compatibility
+    return JSONResponse(content=response.model_dump(exclude_none=True))
 
 
 async def run_batched_generate(
@@ -138,6 +145,7 @@ async def run_batched_generate(
     steer_method: NPSteerMethod = NPSteerMethod.SIMPLE_ADDITIVE,
     normalize_steering: bool = False,
     use_stream_lock: bool = False,
+    n_logprobs: int = 0,
     **kwargs: Any,
 ):
     async with await stream_lock(use_stream_lock):
@@ -194,6 +202,9 @@ async def run_batched_generate(
         if generate_both:
             steered_partial_result = ""
             default_partial_result = ""
+            steered_logprobs = None
+            default_logprobs = None
+
             # Generate STEERED and DEFAULT separately
             for flag in [NPSteerType.STEERED, NPSteerType.DEFAULT]:
                 if seed is not None:
@@ -215,13 +226,16 @@ async def run_batched_generate(
                 else:
                     editing_hooks = []
 
-                with model.hooks(fwd_hooks=editing_hooks):
-                    for i, result in enumerate(
+                logprobs = []
+
+                with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
+                    for i, (result, logits) in enumerate(
                         model.generate_stream(
                             stop_at_eos=(model.cfg.device != "mps"),
                             input=tokenized.unsqueeze(0),
                             do_sample=True,
                             max_tokens_per_yield=TOKENS_PER_YIELD,
+                            return_logits=True,
                             **kwargs,
                         )
                     ):
@@ -230,12 +244,29 @@ async def run_batched_generate(
                             to_append = model.to_string(result[0][1:])  # type: ignore
                         else:
                             to_append = model.to_string(result[0])  # type: ignore
+
+                        if n_logprobs > 0:
+                            current_logprobs = make_logprob_from_logits(
+                                result,  # type: ignore
+                                logits,  # type: ignore
+                                model,
+                                n_logprobs,
+                            )
+                            logprobs.append(current_logprobs)
+
                         if flag == NPSteerType.STEERED:
                             steered_partial_result += to_append  # type: ignore
+                            steered_logprobs = logprobs.copy() or None
                         else:
                             default_partial_result += to_append  # type: ignore
+                            default_logprobs = logprobs.copy() or None
+
                         to_return = make_steer_completion_response(
-                            steer_types, steered_partial_result, default_partial_result
+                            steer_types,
+                            steered_partial_result,
+                            default_partial_result,
+                            steered_logprobs,
+                            default_logprobs,
                         )  # type: ignore
                         yield format_sse_message(to_return.to_json())
 
@@ -259,12 +290,15 @@ async def run_batched_generate(
 
             with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
                 partial_result = ""
-                for i, result in enumerate(
+                logprobs = []
+
+                for i, (result, logits) in enumerate(
                     model.generate_stream(
                         stop_at_eos=(model.cfg.device != "mps"),
                         input=tokenized.unsqueeze(0),
                         do_sample=True,
                         max_tokens_per_yield=TOKENS_PER_YIELD,
+                        return_logits=True,
                         **kwargs,
                     )
                 ):
@@ -272,10 +306,22 @@ async def run_batched_generate(
                         partial_result = model.to_string(result[0][1:])  # type: ignore
                     else:
                         partial_result += model.to_string(result[0])  # type: ignore
+
+                    if n_logprobs > 0:
+                        current_logprobs = make_logprob_from_logits(
+                            result,  # type: ignore
+                            logits,  # type: ignore
+                            model,
+                            n_logprobs,
+                        )
+                        logprobs.append(current_logprobs)
+
                     to_return = make_steer_completion_response(
                         [steer_type],
                         partial_result,  # type: ignore
                         partial_result,  # type: ignore
+                        logprobs or None,
+                        logprobs or None,
                     )
                     yield format_sse_message(to_return.to_json())
 
@@ -284,15 +330,21 @@ def make_steer_completion_response(
     steer_types: list[NPSteerType],
     steered_result: str,
     default_result: str,
+    steered_logprobs: list[NPLogprob] | None = None,
+    default_logprobs: list[NPLogprob] | None = None,
 ) -> SteerCompletionPost200Response:
     steerResults = []
     for steer_type in steer_types:
         if steer_type == NPSteerType.STEERED:
             steerResults.append(
-                NPSteerCompletionResponseInner(type=steer_type, output=steered_result)
+                NPSteerCompletionResponseInner(
+                    type=steer_type, output=steered_result, logprobs=steered_logprobs
+                )
             )
         else:
             steerResults.append(
-                NPSteerCompletionResponseInner(type=steer_type, output=default_result)
+                NPSteerCompletionResponseInner(
+                    type=steer_type, output=default_result, logprobs=default_logprobs
+                )
             )
     return SteerCompletionPost200Response(outputs=steerResults)

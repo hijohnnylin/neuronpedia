@@ -16,6 +16,8 @@ docs/ActivationTopkByTokenPost200ResponseResultsInnerTopFeaturesInner.md
 docs/ActivationTopkByTokenPostRequest.md
 docs/DefaultApi.md
 docs/NPFeature.md
+docs/NPLogprob.md
+docs/NPLogprobTop.md
 docs/NPSteerChatMessage.md
 docs/NPSteerChatResult.md
 docs/NPSteerCompletionResponseInner.md
@@ -54,6 +56,8 @@ neuronpedia_inference_client/models/activation_topk_by_token_post200_response_re
 neuronpedia_inference_client/models/activation_topk_by_token_post200_response_results_inner_top_features_inner.py
 neuronpedia_inference_client/models/activation_topk_by_token_post_request.py
 neuronpedia_inference_client/models/np_feature.py
+neuronpedia_inference_client/models/np_logprob.py
+neuronpedia_inference_client/models/np_logprob_top.py
 neuronpedia_inference_client/models/np_steer_chat_message.py
 neuronpedia_inference_client/models/np_steer_chat_result.py
 neuronpedia_inference_client/models/np_steer_completion_response_inner.py
@@ -92,6 +96,8 @@ test/test_activation_topk_by_token_post200_response_results_inner_top_features_i
 test/test_activation_topk_by_token_post_request.py
 test/test_default_api.py
 test/test_np_feature.py
+test/test_np_logprob.py
+test/test_np_logprob_top.py
 test/test_np_steer_chat_message.py
 test/test_np_steer_chat_result.py
 test/test_np_steer_completion_response_inner.py

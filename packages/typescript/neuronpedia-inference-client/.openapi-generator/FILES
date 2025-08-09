@@ -17,6 +17,8 @@ src/models/ActivationTopkByTokenPost200ResponseResultsInner.ts
 src/models/ActivationTopkByTokenPost200ResponseResultsInnerTopFeaturesInner.ts
 src/models/ActivationTopkByTokenPostRequest.ts
 src/models/NPFeature.ts
+src/models/NPLogprob.ts
+src/models/NPLogprobTop.ts
 src/models/NPSteerChatMessage.ts
 src/models/NPSteerChatResult.ts
 src/models/NPSteerCompletionResponseInner.ts

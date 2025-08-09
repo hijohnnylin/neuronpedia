@@ -59,7 +59,8 @@ class TestSteerCompletionRequest(unittest.TestCase):
                 strength_multiplier = 1.337,
                 freq_penalty = 1.337,
                 seed = 1.337,
-                stream = True
+                stream = True,
+                n_logprobs = 0
             )
         else:
             return SteerCompletionRequest(

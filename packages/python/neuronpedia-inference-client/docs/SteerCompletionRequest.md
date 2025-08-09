@@ -19,6 +19,7 @@ Name | Type | Description | Notes
 **freq_penalty** | **float** |  | 
 **seed** | **float** |  | 
 **stream** | **bool** | Whether or not to stream responses using Server Side Events (SSE). Note that the OpenAPI spec does not support SSE - you will receive multiple responses with the same format as non-streaming, except with the \&quot;output\&quot; field chunked. | [optional] [default to False]
+**n_logprobs** | **int** | Number of logprobs to return per token. 0 means no logprobs. | [optional] [default to 0]
 
 ## Example
 

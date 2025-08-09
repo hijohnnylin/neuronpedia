@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime';
+import type { NPLogprob } from './NPLogprob';
+import {
+    NPLogprobFromJSON,
+    NPLogprobFromJSONTyped,
+    NPLogprobToJSON,
+    NPLogprobToJSONTyped,
+} from './NPLogprob';
 import type { NPSteerType } from './NPSteerType';
 import {
     NPSteerTypeFromJSON,
@@ -39,6 +46,12 @@ export interface NPSteerCompletionResponseInner {
      * @memberof NPSteerCompletionResponseInner
      */
     output: string;
+    /**
+     * Token logprobs for the output sequence. Only present if n_logprobs > 0.
+     * @type {Array<NPLogprob>}
+     * @memberof NPSteerCompletionResponseInner
+     */
+    logprobs?: Array<NPLogprob>;
 }
 
 
@@ -64,6 +77,7 @@ export function NPSteerCompletionResponseInnerFromJSONTyped(json: any, ignoreDis
         
         'type': NPSteerTypeFromJSON(json['type']),
         'output': json['output'],
+        'logprobs': json['logprobs'] == null ? undefined : ((json['logprobs'] as Array<any>).map(NPLogprobFromJSON)),
     };
 }
 
@@ -80,6 +94,7 @@ export function NPSteerCompletionResponseInnerToJSONTyped(value?: NPSteerComplet
         
         'type': NPSteerTypeToJSON(value['type']),
         'output': value['output'],
+        'logprobs': value['logprobs'] == null ? undefined : ((value['logprobs'] as Array<any>).map(NPLogprobToJSON)),
     };
 }
 

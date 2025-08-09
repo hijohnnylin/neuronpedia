@@ -37,7 +37,17 @@ class TestNPSteerCompletionResponseInner(unittest.TestCase):
         if include_optional:
             return NPSteerCompletionResponseInner(
                 type = 'STEERED',
-                output = ''
+                output = '',
+                logprobs = [
+                    neuronpedia_inference_client.models.np_logprob.NPLogprob(
+                        token = '', 
+                        logprob = 1.337, 
+                        top_logprobs = [
+                            neuronpedia_inference_client.models.np_logprob_top.NPLogprobTop(
+                                token = '', 
+                                logprob = 1.337, )
+                            ], )
+                    ]
             )
         else:
             return NPSteerCompletionResponseInner(

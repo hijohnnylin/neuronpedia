@@ -45,7 +45,8 @@ class SteerCompletionRequest(BaseModel):
     freq_penalty: Union[StrictFloat, StrictInt]
     seed: Union[StrictFloat, StrictInt]
     stream: Optional[StrictBool] = Field(default=False, description="Whether or not to stream responses using Server Side Events (SSE). Note that the OpenAPI spec does not support SSE - you will receive multiple responses with the same format as non-streaming, except with the \"output\" field chunked.")
-    __properties: ClassVar[List[str]] = ["prompt", "model", "steer_method", "normalize_steering", "types", "features", "vectors", "n_completion_tokens", "temperature", "strength_multiplier", "freq_penalty", "seed", "stream"]
+    n_logprobs: Optional[Annotated[int, Field(le=10, strict=True, ge=0)]] = Field(default=0, description="Number of logprobs to return per token. 0 means no logprobs.")
+    __properties: ClassVar[List[str]] = ["prompt", "model", "steer_method", "normalize_steering", "types", "features", "vectors", "n_completion_tokens", "temperature", "strength_multiplier", "freq_penalty", "seed", "stream", "n_logprobs"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -124,7 +125,8 @@ class SteerCompletionRequest(BaseModel):
             "strength_multiplier": obj.get("strength_multiplier"),
             "freq_penalty": obj.get("freq_penalty"),
             "seed": obj.get("seed"),
-            "stream": obj.get("stream") if obj.get("stream") is not None else False
+            "stream": obj.get("stream") if obj.get("stream") is not None else False,
+            "n_logprobs": obj.get("n_logprobs") if obj.get("n_logprobs") is not None else 0
         })
         return _obj
 

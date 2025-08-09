@@ -39,7 +39,17 @@ class TestSteerCompletionPost200Response(unittest.TestCase):
                 outputs = [
                     neuronpedia_inference_client.models.np_steer_completion_response_inner.NPSteerCompletionResponseInner(
                         type = 'STEERED', 
-                        output = '', )
+                        output = '', 
+                        logprobs = [
+                            neuronpedia_inference_client.models.np_logprob.NPLogprob(
+                                token = '', 
+                                logprob = 1.337, 
+                                top_logprobs = [
+                                    neuronpedia_inference_client.models.np_logprob_top.NPLogprobTop(
+                                        token = '', 
+                                        logprob = 1.337, )
+                                    ], )
+                            ], )
                     ]
             )
         else:
@@ -47,7 +57,17 @@ class TestSteerCompletionPost200Response(unittest.TestCase):
                 outputs = [
                     neuronpedia_inference_client.models.np_steer_completion_response_inner.NPSteerCompletionResponseInner(
                         type = 'STEERED', 
-                        output = '', )
+                        output = '', 
+                        logprobs = [
+                            neuronpedia_inference_client.models.np_logprob.NPLogprob(
+                                token = '', 
+                                logprob = 1.337, 
+                                top_logprobs = [
+                                    neuronpedia_inference_client.models.np_logprob_top.NPLogprobTop(
+                                        token = '', 
+                                        logprob = 1.337, )
+                                    ], )
+                            ], )
                     ],
         )
         """

@@ -134,6 +134,12 @@ export interface SteerCompletionChatPostRequest {
      */
     stream?: boolean;
     /**
+     * Number of logprobs to return per token. 0 means no logprobs.
+     * @type {number}
+     * @memberof SteerCompletionChatPostRequest
+     */
+    nLogprobs?: number;
+    /**
      * 
      * @type {boolean}
      * @memberof SteerCompletionChatPostRequest
@@ -184,6 +190,7 @@ export function SteerCompletionChatPostRequestFromJSONTyped(json: any, ignoreDis
         'freqPenalty': json['freq_penalty'],
         'seed': json['seed'],
         'stream': json['stream'] == null ? undefined : json['stream'],
+        'nLogprobs': json['n_logprobs'] == null ? undefined : json['n_logprobs'],
         'steerSpecialTokens': json['steer_special_tokens'],
     };
 }
@@ -212,6 +219,7 @@ export function SteerCompletionChatPostRequestToJSONTyped(value?: SteerCompletio
         'freq_penalty': value['freqPenalty'],
         'seed': value['seed'],
         'stream': value['stream'],
+        'n_logprobs': value['nLogprobs'],
         'steer_special_tokens': value['steerSpecialTokens'],
     };
 }

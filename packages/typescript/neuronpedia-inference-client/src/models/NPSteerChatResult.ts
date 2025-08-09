@@ -20,6 +20,13 @@ import {
     NPSteerChatMessageToJSON,
     NPSteerChatMessageToJSONTyped,
 } from './NPSteerChatMessage';
+import type { NPLogprob } from './NPLogprob';
+import {
+    NPLogprobFromJSON,
+    NPLogprobFromJSONTyped,
+    NPLogprobToJSON,
+    NPLogprobToJSONTyped,
+} from './NPLogprob';
 import type { NPSteerType } from './NPSteerType';
 import {
     NPSteerTypeFromJSON,
@@ -52,6 +59,12 @@ export interface NPSteerChatResult {
      * @memberof NPSteerChatResult
      */
     type?: NPSteerType;
+    /**
+     * Token logprobs for the output sequence. Only present if n_logprobs > 0.
+     * @type {Array<NPLogprob>}
+     * @memberof NPSteerChatResult
+     */
+    logprobs?: Array<NPLogprob>;
 }
 
 
@@ -78,6 +91,7 @@ export function NPSteerChatResultFromJSONTyped(json: any, ignoreDiscriminator: b
         'chatTemplate': ((json['chat_template'] as Array<any>).map(NPSteerChatMessageFromJSON)),
         'raw': json['raw'],
         'type': json['type'] == null ? undefined : NPSteerTypeFromJSON(json['type']),
+        'logprobs': json['logprobs'] == null ? undefined : ((json['logprobs'] as Array<any>).map(NPLogprobFromJSON)),
     };
 }
 
@@ -95,6 +109,7 @@ export function NPSteerChatResultToJSONTyped(value?: NPSteerChatResult | null, i
         'chat_template': ((value['chatTemplate'] as Array<any>).map(NPSteerChatMessageToJSON)),
         'raw': value['raw'],
         'type': NPSteerTypeToJSON(value['type']),
+        'logprobs': value['logprobs'] == null ? undefined : ((value['logprobs'] as Array<any>).map(NPLogprobToJSON)),
     };
 }
 

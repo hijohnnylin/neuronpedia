@@ -8,6 +8,7 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **type** | [**NPSteerType**](NPSteerType.md) |  | 
 **output** | **str** |  | 
+**logprobs** | [**List[NPLogprob]**](NPLogprob.md) | Token logprobs for the output sequence. Only present if n_logprobs &gt; 0. | [optional] 
 
 ## Example
 
