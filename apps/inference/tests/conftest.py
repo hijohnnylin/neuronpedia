@@ -21,6 +21,14 @@ MODEL_ID = "gpt2-small"
 SAE_SOURCE_SET = "res-jb"
 SAE_SELECTED_SOURCES = ["7-res-jb"]
 ABS_TOLERANCE = 0.1
+N_COMPLETION_TOKENS = 10
+TEMPERATURE = 0
+STRENGTH = 10.0  # Steering mechanism (feature or vector) specific strength
+STRENGTH_MULTIPLIER = 10.0  # Multiplier across all steering mechanisms
+FREQ_PENALTY = 0.0
+SEED = 42
+STEER_SPECIAL_TOKENS = False
+STEER_FEATURE_INDEX = 5
 
 
 @pytest.fixture(scope="session")
