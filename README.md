@@ -24,46 +24,46 @@
 
 </p>
 
-- [about neuronpedia](#about-neuronpedia)
-- [instant start - vercel deploy](#instant-start---vercel-deploy)
-- [quick start - local webapp + demo environment](#quick-start---local-webapp--demo-environment)
-- [setting up your local environment](#setting-up-your-local-environment)
-  - ["i want to use a local database / import more neuronpedia data"](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
-  - ["i want to do webapp (frontend + api) development"](#i-want-to-do-webapp-frontend--api-development)
-  - ["i want to run/develop inference locally"](#i-want-to-rundevelop-inference-locally)
-  - ['i want to run/develop autointerp locally\`](#i-want-to-rundevelop-autointerp-locally)
-  - ['i want to do high volume autointerp explanations'](#i-want-to-do-high-volume-autointerp-explanations)
-  - ['i want to generate my own dashboards/data and add it to neuronpedia'](#i-want-to-generate-my-own-dashboardsdata-and-add-it-to-neuronpedia)
-- [architecture](#architecture)
-  - [requirements](#requirements)
-  - [services](#services)
-    - [services are standalone apps](#services-are-standalone-apps)
-    - [service-specific documentation](#service-specific-documentation)
-  - [openapi schema](#openapi-schema)
-  - [monorepo directory structure](#monorepo-directory-structure)
-- [security](#security)
-- [contact / support](#contact--support)
-- [contributing](#contributing)
-- [appendix](#appendix)
-    - ['make' commands reference](#make-commands-reference)
-    - [import data into your local database](#import-data-into-your-local-database)
-    - [why an openai api key is needed for search explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
+- [About Neuronpedia](#about-neuronpedia)
+- [Instant Start - Vercel Deploy](#instant-start---vercel-deploy)
+- [Quick Start - Local Webapp + Demo Environment](#quick-start---local-webapp--demo-environment)
+- [Setting Up Your Local Environment](#setting-up-your-local-environment)
+  - ["I Want to Use a Local Database / Import More Neuronpedia Data"](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
+  - ["I Want to Do Webapp (Frontend + API) Development"](#i-want-to-do-webapp-frontend--api-development)
+  - ["I Want to Run/Develop Inference Locally"](#i-want-to-rundevelop-inference-locally)
+  - ['I Want to Run/Develop Autointerp Locally'](#i-want-to-rundevelop-autointerp-locally)
+  - ['I Want to Do High Volume Autointerp Explanations'](#i-want-to-do-high-volume-autointerp-explanations)
+  - ['I Want to Generate My Own Dashboards/Data and Add It to Neuronpedia'](#i-want-to-generate-my-own-dashboardsdata-and-add-it-to-neuronpedia)
+- [Architecture](#architecture)
+  - [Requirements](#requirements)
+  - [Services](#services)
+    - [Services Are Standalone Apps](#services-are-standalone-apps)
+    - [Service-Specific Documentation](#service-specific-documentation)
+  - [OpenAPI Schema](#openapi-schema)
+  - [Monorepo Directory Structure](#monorepo-directory-structure)
+- [Security](#security)
+- [Contact / Support](#contact--support)
+- [Contributing](#contributing)
+- [Appendix](#appendix)
+    - ['Make' Commands Reference](#make-commands-reference)
+    - [Import Data Into Your Local Database](#import-data-into-your-local-database)
+    - [Why an OpenAI API Key Is Needed for Search Explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
 
 <!-- # ultra-quick start: one-click deploy on vercel
 TODO, after making repo public -->
 
-# about neuronpedia
+# About Neuronpedia
 
-check out our [blog post](https://www.neuronpedia.org/blog/neuronpedia-is-now-open-source) about Neuronpedia, why we're open sourcing it, and other details. there's also a [tweet thread](https://x.com/neuronpedia/status/1906793456879775745) with quick demos.
+Check out our [blog post](https://www.neuronpedia.org/blog/neuronpedia-is-now-open-source) about Neuronpedia, why we're open sourcing it, and other details. There's also a [tweet thread](https://x.com/neuronpedia/status/1906793456879775745) with quick demos.
 
-**feature overview**
+**Feature Overview**
 
-a diagram showing the main features of neuronpedia as of march 2025.
+A diagram showing the main features of Neuronpedia as of March 2025.
 ![neuronpedia-features](https://github.com/user-attachments/assets/13e07a93-e046-4e1c-b670-2d26d251d55d)
 
-# instant start - vercel deploy
+# Instant Start - Vercel Deploy
 
-click the `Deploy` button to instantly deploy a custom neuronpedia. a [free vercel account](https://vercel.com/signup) is required.
+Click the `Deploy` button to instantly deploy a custom Neuronpedia. A [free vercel account](https://vercel.com/signup) is required.
 
 <p align="left">
   <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org">
@@ -71,25 +71,25 @@ click the `Deploy` button to instantly deploy a custom neuronpedia. a [free verc
   </a>
 </p>
 
-here's how easy it is to deploy a "PuppyNeurons" fork of Neuronpedia:
+Here's how easy it is to deploy a "PuppyNeurons" fork of Neuronpedia:
 
 https://github.com/user-attachments/assets/707deaed-02b4-442b-8c1f-bf44d193b9fa
 
-# quick start - local webapp + demo environment
+# Quick Start - Local Webapp + Demo Environment
 
-#### what this does
+#### What This Does
 
-this sets up the webapp (frontend + api) locally, and connects to a public remote demo database and public inference servers
+This sets up the webapp (frontend + api) locally, and connects to a public remote demo database and public inference servers
 
-#### what you'll get
+#### What You'll Get
 
-after following the quick start, you will be able to use neuronpedia for some sources/SAEs we have preloaded in `gpt2-small` and `gemma-2-2b/-it`.
+After following the quick start, you will be able to use Neuronpedia for some sources/SAEs we have preloaded in `gpt2-small` and `gemma-2-2b/-it`.
 
 > ⚠️ **warning:** since you are connecting to a public, read-only demo database, you will not be able to add new data immediately. you will need to follow [subsequent steps](#i-want-to-use-my-own-database--import-more-neuronpedia-data) to configure your own database that you can write to.
 
-#### steps
+#### Steps
 
-1. install [docker desktop (UI)](https://docs.docker.com/desktop/) or [docker engine (no UI)](https://docs.docker.com/engine/), and launch it.
+1. Install [docker desktop (UI)](https://docs.docker.com/desktop/) or [docker engine (no UI)](https://docs.docker.com/engine/), and launch it.
 2. generate your local `.env`
    ```
    make init-env
@@ -123,28 +123,28 @@ after following the quick start, you will be able to use neuronpedia for some so
 
    v. run the [gemma-scope demo](http://localhost:3000/gemma-scope#main)
 
-8. now that we've set up a local webapp that's usable, this is a good time to quickly review neuronpedia's [simple architecture](#architecture) and its [individual services](#services), so that you can get a better understanding of what you'll set up later. then, keep going to [setting up your local environment](#setting-up-your-local-environment).
+8. Now that we've set up a local webapp that's usable, this is a good time to quickly review Neuronpedia's [simple architecture](#architecture) and its [individual services](#services), so that you can get a better understanding of what you'll set up later. Then, keep going to [setting up your local environment](#setting-up-your-local-environment).
 
 > 🔥 **pro-tip:** see all the available `make` commands by running `make help`
 
-# setting up your local environment
+# Setting Up Your Local Environment
 
-once you've played around with the demo, you will start running into limitations, like having a limited number of models/SAEs to use, or not being able to generate new explanations. this is because the public demo database is read-only.
+Once you've played around with the demo, you will start running into limitations, like having a limited number of models/SAEs to use, or not being able to generate new explanations. This is because the public demo database is read-only.
 
-ideally, you will probably eventually want to do all of the sub-sections below, so you can have everything running locally. however, you may only be interested in specific parts of neuronpedia to start:
+Ideally, you will probably eventually want to do all of the sub-sections below, so you can have everything running locally. However, you may only be interested in specific parts of Neuronpedia to start:
 
-1. if you want to jump into developing webapp frontend or api with the demo environment, follow [webapp dev](#i-want-to-do-webapp-frontend--api-development)
-2. if you want to start loading more sources/data and relying on your own local database, follow [local database](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
+1. If you want to jump into developing webapp frontend or api with the demo environment, follow [webapp dev](#i-want-to-do-webapp-frontend--api-development)
+2. If you want to start loading more sources/data and relying on your own local database, follow [local database](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
 
-> 🔥 **pro-tip:** neuronpedia is configured for AI agent development. here's an example using a [single prompt](https://github.com/hijohnnylin/neuronpedia/blob/main/apps/experiments/steerify/README.md#claude-code-prompt) to build a custom app (Steerify) using Neuronpedia's inference server as a backend:
+> 🔥 **pro-tip:** Neuronpedia is configured for AI agent development. Here's an example using a [single prompt](https://github.com/hijohnnylin/neuronpedia/blob/main/apps/experiments/steerify/README.md#claude-code-prompt) to build a custom app (Steerify) using Neuronpedia's inference server as a backend:
 
 https://github.com/user-attachments/assets/bc82f88b-8155-4c1d-948a-ea5d987ae0f8
 
-## "i want to use a local database / import more neuronpedia data"
+## "I Want to Use a Local Database / Import More Neuronpedia Data"
 
-#### what this does + what you'll get
+#### What This Does + What You'll Get
 
-relying on the demo environment means you are limited to read-only access to a specific set of SAEs. these steps show you how to configure and connect to your own local database. you can then download sources/SAEs of your choosing:
+Relying on the demo environment means you are limited to read-only access to a specific set of SAEs. These steps show you how to configure and connect to your own local database. You can then download sources/SAEs of your choosing:
 
 https://github.com/user-attachments/assets/d7fbb46e-8522-4f98-aa08-21c6529424af
 
@@ -152,73 +152,73 @@ https://github.com/user-attachments/assets/d7fbb46e-8522-4f98-aa08-21c6529424af
 
 > ⚠️ **warning:** the local database environment does not have any inference servers connected, so you won't be able to do activation testing, steering, etc initially. you will need to [configure a local inference instance]().
 
-#### steps
+#### Steps
 
-1. build the webapp
+1. Build the webapp
    ```
    make webapp-localhost-build
    ```
-2. bring up the webapp
+2. Bring up the webapp
    ```
    make webapp-localhost-run
    ```
-3. go to [localhost:3000](http://localhost:3000) to see your local webapp instance, which is now connected to your local database
-4. see the `warnings` above for caveats, and `next steps` to finish setting up
+3. Go to [localhost:3000](http://localhost:3000) to see your local webapp instance, which is now connected to your local database
+4. See the `warnings` above for caveats, and `next steps` to finish setting up
 
-#### next steps
+#### Next Steps
 
 1. [click here](#import-data-into-your-local-database) for how to import data into your local database (activations, explanations, etc), because your local database will be empty to start
 2. [click here](#i-want-to-rundevelop-inference-locally) for how to bring up a local `inference` service for the model/source/SAE you're working with
 
-## "i want to do webapp (frontend + api) development"
+## "I Want to Do Webapp (Frontend + API) Development"
 
-#### what this does
+#### What This Does
 
-the webapp builds you've been doing so far are _production builds_, which are slow to build, and fast to run. since they are slow to build and don't have debug information, they are not ideal for development.
+The webapp builds you've been doing so far are _production builds_, which are slow to build, and fast to run. since they are slow to build and don't have debug information, they are not ideal for development.
 
-this subsection installs the development build on your local machine (not docker), then mounts the build inside your docker instance.
+This subsection installs the development build on your local machine (not docker), then mounts the build inside your docker instance.
 
-#### what you'll get
+#### What You'll Get
 
-once you do this section, you'll be able to do local development and quickly see changes that are made, as well as see more informative debug/errors. if you are purely interested in doing frontend/api development for neuronpedia, you don't need to set up anything else!
+Once you do this section, you'll be able to do local development and quickly see changes that are made, as well as see more informative debug/errors. If you are purely interested in doing frontend/api development for Neuronpedia, you don't need to set up anything else!
 
-#### steps
+#### Steps
 
-1. install [nodejs](https://nodejs.org) via [node version manager](https://github.com/nvm-sh/nvm)
+1. Install [nodejs](https://nodejs.org) via [node version manager](https://github.com/nvm-sh/nvm)
    ```
    make install-nodejs
    ```
-2. install the webapp's dependencies
+2. Install the webapp's dependencies
    ```
    make webapp-localhost-install
    ```
-3. run the development instance
+3. Run the development instance
    ```
    make webapp-localhost-dev
    ```
 4. go to [localhost:3000](http://localhost:3000) to see your local webapp instance
 
-#### doing local webapp development
+#### Doing Local Webapp Development
 
 - **auto-reload**: when you change any files in the `apps/webapp` subdirectory, the `localhost:3000` will automatically reload
 - **install commands**: you do not need to run `make install-nodejs` again, and you only need to run `make webapp-localhost-install` if dependencies change
 
-## "i want to run/develop inference locally"
+## "I Want to Run/Develop Inference Locally"
 
-#### what this does + what you'll get
+#### What This Does + What You'll Get
 
-once you start using a local environment, you won't be connected to the demo environment's inference instances. this subsection shows you how to run an inference instance locally so you can do things like steering, activation testing, etc on the sources/SAEs you've downloaded.
+Once you start using a local environment, you won't be connected to the demo environment's inference instances. This subsection shows you how to run an inference instance locally so you can do things like steering, activation testing, etc on the sources/SAEs you've downloaded.
 
 > ⚠️ **warning:** for the local environment, we only support running one inference server at a time. this is because you are unlikely to be running multiple models simultaneously on one machine, as they are memory and compute intensive.
 
-#### steps
+#### Steps
 
-1. ensure you have [installed poetry](https://python-poetry.org/docs/#installation)
-2. install the inference server's dependencies
+1. Ensure you have [installed poetry](https://python-poetry.org/docs/#installation)
+2. Install the inference server's dependencies
    ```
    make inference-localhost-install
    ```
-3. build the image, picking the correct command based on if the machine has CUDA or not:
+3. Build the image, picking the correct command based on if the machine has CUDA or not:
    ```
    # CUDA
    make inference-localhost-build-gpu USE_LOCAL_HF_CACHE=1
@@ -244,18 +244,18 @@ once you start using a local environment, you won't be connected to the demo env
 
 5. wait for it to load (first time will take longer). when you see `Initialized: True`, the local inference server is now ready on `localhost:5002`
 
-#### using the inference server
+#### Using the Inference Server
 
-to interact with the inference server, you have a few options - note that this will only work for the model / selected source you have loaded:
+To interact with the inference server, you have a few options - note that this will only work for the model / selected source you have loaded:
 
-1.  load the webapp with the [local database setup](#i-want-to-use-a-local-database--import-more-neuronpedia-data), then using the model / selected source as you would normally do on neuronpedia.
-2.  use the pre-generated inference python client at `packages/python/neuronpedia-inference-client` (set environment variable `INFERENCE_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
-3.  use the openapi spec, located at `schemas/openapi/inference-server.yaml` to make calls with any client of your choice.
+1.  Load the webapp with the [local database setup](#i-want-to-use-a-local-database--import-more-neuronpedia-data), then using the model / selected source as you would normally do on Neuronpedia.
+2.  Use the pre-generated inference python client at `packages/python/neuronpedia-inference-client` (set environment variable `INFERENCE_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
+3.  Use the openapi spec, located at `schemas/openapi/inference-server.yaml` to make calls with any client of your choice.
 4.  [TODO #1](https://github.com/hijohnnylin/neuronpedia/issues/1): Use a documentation generator to make a simple tester-server that can be activated with `make doc-inference-localhost`
 
-#### pre-loaded inference server configurations
+#### Pre-Loaded Inference Server Configurations
 
-we've provided some pre-loaded inference configs as examples of how to load a specific model and sourceset for inference. view them by running `make inference-list-configs`:
+We've provided some pre-loaded inference configs as examples of how to load a specific model and sourceset for inference. View them by running `make inference-list-configs`:
 
 ```
 $ make inference-list-configs
@@ -279,22 +279,22 @@ gpt2-small.res-jb
     make inference-localhost-dev MODEL_SOURCESET=gpt2-small.res-jb
 ```
 
-#### making your own inference server configurations
+#### Making Your Own Inference Server Configurations
 
-look at the `.env.inference.*` files for examples on how to make these inference server configurations.
+Look at the `.env.inference.*` files for examples on how to make these inference server configurations.
 
-the `MODEL_ID` is the model id from the [transformerlens model table](https://transformerlensorg.github.io/TransformerLens/generated/model_properties_table.html) and each of `SAE_SETS` is the text after the layer number and hyphen in a neuronpedia source ID - for example, if you have a neuronpedia feature at url `http://neuronpedia.org/gpt2-small/0-res-jb/123`, the `0-res-jb` is the source ID, and the item in the `SAE_SETS` is `res-jb`. This example matches the `.env.inference.gpt2-small.res-jb` file exactly.
+The `MODEL_ID` is the model id from the [transformerlens model table](https://transformerlensorg.github.io/TransformerLens/generated/model_properties_table.html) and each of `SAE_SETS` is the text after the layer number and hyphen in a Neuronpedia source ID - for example, if you have a Neuronpedia feature at url `http://neuronpedia.org/gpt2-small/0-res-jb/123`, the `0-res-jb` is the source ID, and the item in the `SAE_SETS` is `res-jb`. This example matches the `.env.inference.gpt2-small.res-jb` file exactly.
 
-you can find neuronpedia source IDs in the saelens [pretrained saes yaml file](https://github.com/jbloomAus/SAELens/blob/main/sae_lens/pretrained_saes.yaml) or by clicking into models in the [neuronpedia datasets exports](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/) directory.
+You can find Neuronpedia source IDs in the saelens [pretrained saes yaml file](https://github.com/jbloomAus/SAELens/blob/main/sae_lens/pretrained_saes.yaml) or by clicking into models in the [neuronpedia datasets exports](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/) directory.
 
-**using models not officially supported by transformerlens**
-look at the `.env.inference.deepseek-r1-distill-llama-8b.llamascope-slimpj-res-32k` to see an example of how to load a model not officially supported by transformerlens. this is mostly for swapping in weights of a distilled/fine-tuned model.
+**Using Models Not Officially Supported by TransformerLens**
+Look at the `.env.inference.deepseek-r1-distill-llama-8b.llamascope-slimpj-res-32k` to see an example of how to load a model not officially supported by transformerlens. This is mostly for swapping in weights of a distilled/fine-tuned model.
 
-**loading non-saelens sources/SAEs**
+**Loading Non-SAELens Sources/SAEs**
 
 - [TODO #2](https://github.com/hijohnnylin/neuronpedia/issues/2) document how to load SAEs/sources that are not in saelens pretrained yaml
 
-#### doing local inference development
+#### Doing Local Inference Development
 
 - **schema-driven development**: to add new endpoints or change existing endpoints, you will need to start by updating the openapi schemas, then generating clients from that, then finally updating the actual inference and webapp code. for details on how to do this, see the [openapi readme: making changes to the inference server](schemas/README.md#making-changes-to-the-inference-server)
 - **no auto-reload**: when you change any files in the `apps/inference` subdirectory, the inference server will _NOT_ automatically reload, because server reloads are slow: they reload the model and all sources/SAEs. if you want to enable autoreload, then append `AUTORELOAD=1` to the `make inference-localhost-dev` call, like so:
@@ -304,22 +304,64 @@ look at the `.env.inference.deepseek-r1-distill-llama-8b.llamascope-slimpj-res-3
        AUTORELOAD=1
   ```
 
-## 'i want to run/develop autointerp locally`
+## 'I Want to Run/Develop Graph Server Locally'
 
-#### what this does + what you'll get
+#### What This Does + What You'll Get
 
-the autointerp server provides automatic interpretation and scoring of neural network features. it uses eleutherAI's [delphi](https://github.com/EleutherAI/delphi) for generating explanations and scoring.
+The graph server powers the attribution graph generation functionality, built on top of [circuit-tracer](https://github.com/safety-research/circuit-tracer) by Piotrowski & Hanna. This service handles the backend processing when you create new graphs through the [Neuronpedia Circuit Tracer](https://www.neuronpedia.org/gemma-2-2b/graph) interface.
+
+#### Steps
+
+1. Ensure you have [installed poetry](https://python-poetry.org/docs/#installation)
+2. Install the graph server's dependencies
+   ```
+   make graph-localhost-install
+   ```
+3. Within the `apps/graph` directory, create a `.env` file with `SECRET` and `HF_TOKEN` (see `apps/graph/.env.example`)
+
+   - `SECRET` is the server secret that needs to be passed in the `x-secret-key` request header (see examples below)
+   - Make sure your `HF_TOKEN` has access to the [Gemma-2-2B model](https://huggingface.co/google/gemma-2-2b) on Huggingface.
+
+4. Build the image, picking the correct command based on if the machine has CUDA or not:
+   ```
+   # CUDA
+   make graph-localhost-build-gpu USE_LOCAL_HF_CACHE=1
+   ```
+   ```
+   # no CUDA
+   make graph-localhost-build USE_LOCAL_HF_CACHE=1
+   ```
+   > ➡️ The [`USE_LOCAL_HF_CACHE=1` flag](https://github.com/hijohnnylin/neuronpedia/pull/89) mounts your local HuggingFace cache at `${HOME}/.cache/huggingface/hub:/root/.cache/huggingface/hub`. If you wish to create a new cache in your container instead, you can omit this flag here and in the next step.
+5. run the graph server:
+   ```
+   # CUDA
+   make graph-localhost-dev-gpu \
+        USE_LOCAL_HF_CACHE=1
+
+   # no CUDA
+   make graph-localhost-dev \
+        USE_LOCAL_HF_CACHE=1
+   ```
+6. Wait for the container to spin up 
+
+For example requests, see the [Graph Server README](apps/graph/README.md#example-request---output-graph-json-directly).
+
+## 'I Want to Run/Develop Autointerp Locally'
+
+#### What This Does + What You'll Get
+
+The autointerp server provides automatic interpretation and scoring of neural network features. It uses eleutherAI's [delphi](https://github.com/EleutherAI/delphi) for generating explanations and scoring.
 
 > ⚠️ **warning:** the eleuther embedding scorer uses an embedding model only supported on CUDA (it won't work on mac mps or cpu)
 
-#### steps
+#### Steps
 
-1. ensure you have [installed poetry](https://python-poetry.org/docs/#installation)
-2. install the autointerp server's dependencies
+1. Ensure you have [installed poetry](https://python-poetry.org/docs/#installation)
+2. Install the autointerp server's dependencies
    ```
    make autointerp-localhost-install
    ```
-3. build the image, picking the correct command based on if the machine has CUDA or not:
+3. Build the image, picking the correct command based on if the machine has CUDA or not:
    ```
    # CUDA
    make autointerp-localhost-build-gpu USE_LOCAL_HF_CACHE=1
@@ -341,15 +383,15 @@ the autointerp server provides automatic interpretation and scoring of neural ne
    ```
 5. wait for it to load
 
-#### using the autointerp server
+#### Using the Autointerp Server
 
-to interact with the autointerp server, you have a few options:
+To interact with the autointerp server, you have a few options:
 
-1. use the pre-generated autointerp python client at `packages/python/neuronpedia-autointerp-client` (set environment variable `AUTOINTERP_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
-2. use the openapi spec, located at `schemas/openapi/autointerp-server.yaml` to make calls with any client of your choice.
+1. Use the pre-generated autointerp python client at `packages/python/neuronpedia-autointerp-client` (set environment variable `AUTOINTERP_SERVER_SECRET` to `public`, or whatever it's set to in `.env.localhost` if you've changed it)
+2. Use the openapi spec, located at `schemas/openapi/autointerp-server.yaml` to make calls with any client of your choice.
 3. TODO: Use a documentation generator to make a simple tester-server that can be activated with `make doc-autointerp-localhost`
 
-#### doing local autointerp development
+#### Doing Local Autointerp Development
 
 - **schema-driven development**: to add new endpoints or change existing endpoints, you will need to start by updating the openapi schemas, then generating clients from that, then finally updating the actual autointerp and webapp code. for details on how to do this, see the [openapi readme: making changes to the autointerp server](schemas/README.md#making-changes-to-the-autointerp-server)
 - **no auto-reload**: when you change any files in the `apps/autointerp` subdirectory, the autointerp server will _NOT_ automatically reload by default. if you want to enable autoreload, then append `AUTORELOAD=1` to the `make autointerp-localhost-dev` call, like so:
@@ -358,22 +400,22 @@ to interact with the autointerp server, you have a few options:
        AUTORELOAD=1
   ```
 
-## 'i want to do high volume autointerp explanations'
+## 'I Want to Do High Volume Autointerp Explanations'
 
-this section is under construction.
+This section is under construction.
 
 - use EleutherAI's [Delphi library](https://github.com/EleutherAI/delphi)
 - for OpenAI's autointerp, use [utils/neuronpedia_utils/batch-autointerp.py](utils/neuronpedia_utils/batch-autointerp.py)
 
-## 'i want to generate my own dashboards/data and add it to neuronpedia'
+## 'I Want to Generate My Own Dashboards/Data and Add It to Neuronpedia'
 
-this section is under construction.
+This section is under construction.
 
 [TODO: simplify generation + upload of data to neuronpedia](https://github.com/hijohnnylin/neuronpedia/issues/46)
 
 [TODO: neuronpedia-utils should use poetry](https://github.com/hijohnnylin/neuronpedia/issues/43)
 
-in this example, we will generate dashboards/data for an [SAELens](https://github.com/jbloomAus/SAELens)-compatible SAE, and upload it to our own Neuronpedia instance.
+In this example, we will generate dashboards/data for an [SAELens](https://github.com/jbloomAus/SAELens)-compatible SAE, and upload it to our own Neuronpedia instance.
 
 1. ensure you have [Poetry installed](https://python-poetry.org/docs/)
 2. [upload](https://github.com/jbloomAus/SAELens/blob/main/tutorials/uploading_saes_to_huggingface.ipynb) your SAELens-compatible source/SAE to HuggingFace.
@@ -397,7 +439,7 @@ in this example, we will generate dashboards/data for an [SAELens](https://githu
      - id: blocks.0.hook_resid_post                 # an id for this SAE
        path: standard/blocks.0.hook_resid_post      # the path in the repo_id to the SAE
        l0: 40.0
-       neuronpedia: gemma-2-2b/0-matryoshka-res-dc  # what you expect the neuronpedia URI to be - neuronpedia.org/[this_slug]. should be [model_id]/[layer]-[identical_slug_for_this_sae_set]
+       neuronpedia: gemma-2-2b/0-matryoshka-res-dc  # what you expect the Neuronpedia URI to be - neuronpedia.org/[this_slug]. should be [model_id]/[layer]-[identical_slug_for_this_sae_set]
      - id: blocks.1.hook_resid_post                 # more SAEs in this SAE set
        path: standard/blocks.1.hook_resid_post
        l0: 40.0
@@ -424,7 +466,7 @@ in this example, we will generate dashboards/data for an [SAELens](https://githu
    # start the generation. details for each argument (full details: https://github.com/jbloomAus/SAEDashboard/blob/main/sae_dashboard/neuronpedia/neuronpedia_runner_config.py)
    #     - sae-set = should match the unique ID for the set from pretrained_saes.yaml
    #     - sae-path = should match the id for the sae in from pretrained_saes.yaml
-   #     - np-set-name = should match the [identical_slug_for_this_sae_set] for the sae.neuronpedia from pretrained_saes.yaml
+   #     - np-set-name = should match the [identical_slug_for_this_sae_set] for the sae.Neuronpedia from pretrained_saes.yaml
    #     - dataset-path = the huggingface dataset to use for generating activations. usually you want to use the same dataset the model was trained on.
    #     - output-dir = the output directory of the dashboard data
    #     - n-prompts = number of activation texts to test from the dataset
@@ -444,25 +486,25 @@ in this example, we will generate dashboards/data for an [SAELens](https://githu
         --n-prompts-in-forward-pass=128
    ```
 
-8. convert these dashboards for import into neuronpedia
+8. Convert these dashboards for import into Neuronpedia
    ```
    cd neuronpedia/utils/neuronpedia-utils          # get into this current repository's util directory
    python convert-saedashboard-to-neuronpedia.py   # start guided conversion script. follow the steps.
    ```
-9. once dashboard files are generated for neuronpedia, upload these to the global Neuronpedia S3 bucket - currently you need to [contact us](mailto:johnny@neuronpedia.org) to do this.
-10. from a localhost instance, [import your data](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
+9. Once dashboard files are generated for Neuronpedia, upload these to the global Neuronpedia S3 bucket - currently you need to [contact us](mailto:johnny@neuronpedia.org) to do this.
+10. From a localhost instance, [import your data](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
 
-# architecture
+# Architecture
 
-here's how the services/scripts connect in neuronpedia. it's easiest to read this diagram by starting at the image of the laptop ("User").
+Here's how the services/scripts connect in Neuronpedia. It's easiest to read this diagram by starting at the image of the laptop ("User").
 
 ![architecture diagram](architecture.png)
 
-## requirements
+## Requirements
 
-you can run neuronpedia on any cloud and on any modern OS. neuronpedia is designed to avoid vendor lock-in. these instructions were written for and tested on macos 15 (sequoia), so you may need to repurpose commands for windows/ubuntu/etc. at least 16GB ram is recommended.
+You can run Neuronpedia on any cloud and on any modern OS. Neuronpedia is designed to avoid vendor lock-in. These instructions were written for and tested on macos 15 (sequoia), so you may need to repurpose commands for windows/ubuntu/etc. At least 16GB ram is recommended.
 
-## services
+## Services
 
 | name       | description                                                                                                                                                  | powered by                            |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
@@ -471,17 +513,17 @@ you can run neuronpedia on any cloud and on any modern OS. neuronpedia is design
 | inference  | [support server] steering, activation testing, search via inference, topk, etc. a separate instance is required for each model you want to run inference on. | python / torch                        |
 | autointerp | [support server] auto-interp explanations and scoring, using eleutherAI's [delphi](https://github.com/EleutherAI/delphi) (formerly `sae-auto-interp`)        | python                                |
 
-### services are standalone apps
+### Services Are Standalone Apps
 
 by design, each service can be run independently as a standalone app. this is to enable extensibility and forkability.
 
-for example, if you like the neuronpedia webapp frontend but want to use a different API for inference, you can do that! just ensure your alternative inference server supports the `schema/openapi/inference-server.yaml` spec, and/or that you modify the neuronpedia calls to inference under `apps/webapp/lib/utils`.
+For example, if you like the Neuronpedia webapp frontend but want to use a different API for inference, you can do that! Just ensure your alternative inference server supports the `schema/openapi/inference-server.yaml` spec, and/or that you modify the Neuronpedia calls to inference under `apps/webapp/lib/utils`.
 
-### service-specific documentation
+### Service-Specific Documentation
 
 there are draft `README`s for each specific app/service under `apps/[service]`, but they are heavily WIP. you can also check out the `Dockerfile` under the same directory to build your own images.
 
-## openapi schema
+## OpenAPI Schema
 
 for services to communicate with each other in a typed and consistent way, we use openapi schemas. there are some exceptions - for example, streaming is not offically supported by the openapi spec. however, even in that case, we still try our best to define a schema and use it.
 
@@ -489,44 +531,44 @@ especially for inference and autointerp server development, it is critical to un
 
 openapi schemas are located under `/schemas`. we use openapi generators to generate clients in both typescript and python.
 
-## monorepo directory structure
+## Monorepo Directory Structure
 
-`apps` - the three neuronpedia services: webapp, inference, and autointerp. most of the code is here.
+`apps` - the three Neuronpedia services: webapp, inference, and autointerp. most of the code is here.
 `schemas` - the openapi schemas. to make changes to inference and autointerp endpoints, first make changes to their schemas - see details in the [openapi readme](schemas/README.md).
 `packages` - clients generated from the `schemas` using generator tools. you will mostly not need to manually modify these files.
 `utils` - various utilities that help do offline processing, like high volume autointerp, or generating dashboards, or exporting data.
 
-# security
+# Security
 
-please report vulnerabilities to [johnny@neuronpedia.org](mailto:johnny@neuronpedia.org).
+Please report vulnerabilities to [johnny@neuronpedia.org](mailto:johnny@neuronpedia.org).
 
-we don't currently have an official bounty program, but we'll try our best to give compensation based on the severity of the vulnerability - though it's likely we will not able able to offer awards for any low-severity vulnerabilities.
+We don't currently have an official bounty program, but we'll try our best to give compensation based on the severity of the vulnerability - though it's likely we will not able able to offer awards for any low-severity vulnerabilities.
 
-# contact / support
+# Contact / Support
 
 - slack: [join #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-375zalm04-GFd5tdBU1yLKlu_T_JSqZQ)
 - email: [johnny@neuronpedia.org](mailto:johnny@neuronpedia.org)
 - issues: [github issues](https://github.com/hijohnnylin/neuronpedia/issues)
 
-# contributing
+# Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-# appendix
+# Appendix
 
-### 'make' commands reference
+### 'Make' Commands Reference
 
 you can view all available `make` commands and brief descriptions of them by running `make help`
 
-### import data into your local database
+### Import Data Into Your Local Database
 
-if you set up your own database, it will start out empty - no features, explanations, activations, etc. to load this data, there's a built-in `admin panel` where you can download this data for SAEs (or "sources") of your choosing.
+If you set up your own database, it will start out empty - no features, explanations, activations, etc. To load this data, there's a built-in `admin panel` where you can download this data for SAEs (or "sources") of your choosing.
 
 > ⚠️ **warning:** the admin panel is finicky and does not currently support resuming imports. if an import is interrupted, you must manually click `re-sync`. the admin panel currently does not check if your download is complete or missing parts - it is up to you to check if the data is complete, and if not, to click `re-sync` to re-download the entire dataset.
 
-> ℹ️ **recommendation:** when importing data, start with just one source (like `gpt2-small`@`10-res-jb`) instead of downloading everything at once. This makes it easier to verify the data imported correctly and lets you start using neuronpedia faster.
+> ℹ️ **recommendation:** When importing data, start with just one source (like `gpt2-small`@`10-res-jb`) instead of downloading everything at once. This makes it easier to verify the data imported correctly and lets you start using Neuronpedia faster.
 
-the instructions below demonstrate how to download the `gpt2-small`@`10-res-jb` SAE data.
+The instructions below demonstrate how to download the `gpt2-small`@`10-res-jb` SAE data.
 
 1. navigate to [localhost:3000/admin](http://localhost:3000/admin).
 2. scroll down to `gpt2-small`, and expand `res-jb` with the `▶`.
@@ -535,8 +577,8 @@ the instructions below demonstrate how to download the `gpt2-small`@`10-res-jb` 
 5. once it's done, click `Browse` or use the navbar to try it out: `Jump To`/`Search`/`Steer`.
 6. repeat for other SAE/source data you wish to download.
 
-### why an openai api key is needed for search explanations
+### Why an OpenAI API Key Is Needed for Search Explanations
 
-in the webapp, the `search explanations` feature requires you to set an `OPENAI_API_KEY`. otherwise you will get no search results.
+In the webapp, the `search explanations` feature requires you to set an `OPENAI_API_KEY`. Otherwise you will get no search results.
 
-this is because the `search explanations` functionality searches for features by semantic similarity. if you search `cat`, it will also return `feline`, `tabby`, `animal`, etc. to do this, it needs to calculate the embedding for your input `cat`. we use openai's embedding api (specifically, `text-embedding-3-large` with `dimension: 256`) to calculate the embeddings.
+This is because the `search explanations` functionality searches for features by semantic similarity. If you search `cat`, it will also return `feline`, `tabby`, `animal`, etc. To do this, it needs to calculate the embedding for your input `cat`. We use openai's embedding api (specifically, `text-embedding-3-large` with `dimension: 256`) to calculate the embeddings.

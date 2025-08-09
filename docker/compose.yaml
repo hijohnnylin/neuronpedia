@@ -95,6 +95,24 @@ services:
       - SECRET=${AUTOINTERP_SERVER_SECRET}
       - SENTRY_DSN=${SENTRY_DSN_AUTOINTERP}
 
+  graph:
+    platform: linux/amd64
+    image: neuronpedia-graph:latest
+    build:
+      context: ..
+      dockerfile: apps/graph/Dockerfile
+      args:
+        BUILD_TYPE: ${BUILD_TYPE:-nocuda}
+        CUDA_VERSION: "12.1.0"
+        UBUNTU_VERSION: "22.04"
+    ports:
+      - "5004:5004"
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - SECRET=${GRAPH_SERVER_SECRET}      
+
 volumes:
   postgres_data:
 

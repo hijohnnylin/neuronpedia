@@ -1,0 +1,13 @@
+services:
+  graph:
+    volumes:
+      - ./apps/graph:/app/apps/graph
+    environment:
+      - RELOAD=${RELOAD:-0}
+      - MODEL_ID=${MODEL_ID:-google/gemma-2-2b}
+    command: >    
+      sh -c "if [ \"$$RELOAD\" = \"1\" ]; then
+        python start.py --model_id \"$$MODEL_ID\" --reload;
+      else
+        python start.py --model_id \"$$MODEL_ID\";
+      fi"

@@ -13,7 +13,6 @@ from typing import Any
 import psutil
 import requests
 import torch
-import uvicorn
 from circuit_tracer.attribution import attribute, compute_salient_logits
 from circuit_tracer.graph import prune_graph
 from circuit_tracer.replacement_model import ReplacementModel
@@ -32,11 +31,10 @@ from transformers import AutoTokenizer
 
 load_dotenv()
 
-# TODO: make these env variables and/or command line arguments
-LIMIT_TOKENS = 64
-DEFAULT_MAX_FEATURE_NODES = 10000
+LIMIT_TOKENS = int(os.getenv("TOKEN_LIMIT", 64))
+DEFAULT_MAX_FEATURE_NODES = int(os.getenv("MAX_FEATURE_NODES", 10000))
 OFFLOAD = None
-UPDATE_INTERVAL = 1000
+UPDATE_INTERVAL = int(os.getenv("UPDATE_INTERVAL", 1000))
 
 SECRET_KEY = os.getenv("SECRET")
 if not SECRET_KEY:
@@ -49,6 +47,37 @@ if not HF_TOKEN:
     raise ValueError(
         "HF_TOKEN environment variable not set. Please create a .env file with HF_TOKEN=<your_huggingface_token>"
     )
+
+
+def get_device() -> torch.device:
+    """Determine the appropriate device for model loading."""
+    device_env = os.environ.get("DEVICE")
+    if device_env:
+        return torch.device(device_env)
+    
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
+
+
+def get_model_dtype() -> torch.dtype | None:
+    """
+    Parse MODEL_DTYPE environment variable into torch dtype.
+    Default is float32.
+    """
+    model_dtype_env = os.environ.get("MODEL_DTYPE", "float32")    
+    
+    dtype_mapping = {
+        "bfloat16": torch.bfloat16,
+        "float16": torch.float16,
+        "float32": torch.float32,
+    }
+    
+    return dtype_mapping.get(model_dtype_env)
+
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -69,11 +98,8 @@ NP_MODEL_ID_TO_TLENS_MODEL_ID = {
     "llama3.1-8b": "meta-llama/Llama-3.2-1B",
 }
 
-# on initial load we take the transformerlens model id
-if len(sys.argv) > 1:
-    loaded_model_arg = sys.argv[1]
-    print(f"Using transformerlens model specified via command line: {loaded_model_arg}")
-else:
+loaded_model_arg = os.getenv("MODEL_ID")
+if not loaded_model_arg:
     raise ValueError(
         "TransformerLens model name is required. Please specify a model as a command line argument. Valid models: "
         + ", ".join(TLENS_MODEL_ID_TO_SCAN.keys())
@@ -91,7 +117,10 @@ else:
         + ", ".join(TLENS_MODEL_ID_TO_SCAN.keys())
     )
 
-model = ReplacementModel.from_pretrained(loaded_model_arg, transcoder_name)
+device = get_device()
+model_dtype = get_model_dtype()
+
+model = ReplacementModel.from_pretrained(loaded_model_arg, transcoder_name, device=device, dtype=model_dtype)
 
 loaded_scan = TLENS_MODEL_ID_TO_SCAN.get(loaded_model_arg)
 if loaded_scan is None:
@@ -769,12 +798,3 @@ async def generate_graph(req: Request):
             print(
                 f"Thread {threading.get_ident()}: Lock was not held by current path in finally block (already released or never acquired)."
             )
-
-
-if __name__ == "__main__":
-    if loaded_model_arg is None:
-        print(
-            "Error: Model could not be loaded. Please check command line arguments and model configuration."
-        )
-        sys.exit(1)
-    uvicorn.run(app, host="0.0.0.0", port=5004)

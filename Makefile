@@ -223,3 +223,37 @@ reset-docker-data: ## Reset Docker Data - this deletes your local database!
 	@echo "Resetting Docker data..."
 	docker compose -f docker/compose.yaml down -v
 
+graph-localhost-install: ## Graph: Localhost Environment - Install Dependencies (Development Build)
+	@echo "Installing the graph server dependencies for development in the localhost environment..."
+	cd apps/graph && \	
+	poetry lock && poetry install
+
+
+graph-localhost-build: ## Graph: Localhost Environment - Build
+	@echo "Building the graph server for the localhost environment..."
+	ENV_FILE=.env.localhost \
+		BUILD_TYPE=$(BUILD_TYPE) \
+		docker compose \
+		-f docker/compose.yaml \
+		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
+		build graph
+
+graph-localhost-build-gpu: ## Graph: Localhost Environment - Build (CUDA). Usage: make graph-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) graph-localhost-build BUILD_TYPE=cuda
+
+graph-localhost-dev: ## Graph: Localhost Environment - Run (Development Build). Usage: make graph-localhost-dev [AUTORELOAD=1]
+	@echo "Bringing up the graph server for development in the localhost environment..."
+	RELOAD=$$([ "$(AUTORELOAD)" = "1" ] && echo "1" || echo "0") \
+	ENV_FILE=.env.localhost \
+		docker compose \
+		--project-directory . \
+		-f docker/compose.yaml \
+		-f docker/compose.graph.dev.yaml \
+		$(if $(ENABLE_GPU),-f docker/compose.graph.gpu.yaml,) \
+		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
+		--env-file .env.localhost \
+		--env-file apps/graph/.env \
+		up graph
+
+graph-localhost-dev-gpu: ## Graph: Localhost Environment - Run (Development Build with CUDA). Usage: make graph-localhost-dev-gpu [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) graph-localhost-dev ENABLE_GPU=1 AUTORELOAD=$(AUTORELOAD)
