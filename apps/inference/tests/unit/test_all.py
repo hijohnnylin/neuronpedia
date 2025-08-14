@@ -278,8 +278,13 @@ def test_process_activations_invalid_token_index(
     mock_config_class.get_instance.return_value = mock_config
     # Set invalid token index (beyond token length)
     sample_request.sort_by_token_indexes = [10]  # tokens only go 0-4
-    with pytest.raises(ValueError, match="Sort by token index .* is out of range"):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc_info:
         processor.process_activations(sample_request)
+    assert exc_info.value.status_code == 400
+    assert "Sort by token index" in exc_info.value.detail
+    assert "is out of range" in exc_info.value.detail
 
 
 @patch("neuronpedia_inference.endpoints.activation.all.get_activations_by_index")

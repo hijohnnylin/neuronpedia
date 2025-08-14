@@ -67,6 +67,12 @@ export interface ActivationAllPostRequest {
      * @memberof ActivationAllPostRequest
      */
     numResults?: number;
+    /**
+     * Skip this many top-ranked results before returning the next page.
+     * @type {number}
+     * @memberof ActivationAllPostRequest
+     */
+    offset?: number;
 }
 
 /**
@@ -100,6 +106,7 @@ export function ActivationAllPostRequestFromJSONTyped(json: any, ignoreDiscrimin
         'ignoreBos': json['ignore_bos'],
         'featureFilter': json['feature_filter'] == null ? undefined : json['feature_filter'],
         'numResults': json['num_results'] == null ? undefined : json['num_results'],
+        'offset': json['offset'] == null ? undefined : json['offset'],
     };
 }
 
@@ -122,6 +129,7 @@ export function ActivationAllPostRequestToJSONTyped(value?: ActivationAllPostReq
         'ignore_bos': value['ignoreBos'],
         'feature_filter': value['featureFilter'],
         'num_results': value['numResults'],
+        'offset': value['offset'],
     };
 }
 
