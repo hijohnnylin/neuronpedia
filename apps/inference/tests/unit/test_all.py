@@ -99,6 +99,7 @@ def processor() -> ActivationProcessor:
     return ActivationProcessor()
 
 
+@patch("neuronpedia_inference.endpoints.activation.all.get_activations_by_index")
 @patch("neuronpedia_inference.endpoints.activation.all.Model")
 @patch("neuronpedia_inference.endpoints.activation.all.SAEManager")
 @patch("neuronpedia_inference.endpoints.activation.all.Config")
@@ -106,6 +107,7 @@ def test_process_activations_basic(
     mock_config_class: MagicMock,
     mock_sae_manager_class: MagicMock,
     mock_model_class: MagicMock,
+    mock_get_activations: MagicMock,
     processor: ActivationProcessor,
     sample_request: ActivationAllPostRequest,
     mock_model: Mock,
@@ -117,6 +119,7 @@ def test_process_activations_basic(
     mock_model_class.get_instance.return_value = mock_model
     mock_sae_manager_class.get_instance.return_value = mock_sae_manager
     mock_config_class.get_instance.return_value = mock_config
+    mock_get_activations.return_value = torch.randn(128, 5)
     # Execute
     result = processor.process_activations(sample_request)
     # Verify result structure
@@ -132,6 +135,7 @@ def test_process_activations_basic(
     mock_model.run_with_cache.assert_called_once()
 
 
+@patch("neuronpedia_inference.endpoints.activation.all.get_activations_by_index")
 @patch("neuronpedia_inference.endpoints.activation.all.Model")
 @patch("neuronpedia_inference.endpoints.activation.all.SAEManager")
 @patch("neuronpedia_inference.endpoints.activation.all.Config")
@@ -139,6 +143,7 @@ def test_process_activations_with_sort_by_token_indexes(
     mock_config_class: MagicMock,
     mock_sae_manager_class: MagicMock,
     mock_model_class: MagicMock,
+    mock_get_activations: MagicMock,
     processor: ActivationProcessor,
     sample_request: ActivationAllPostRequest,
     mock_model: Mock,
@@ -150,6 +155,7 @@ def test_process_activations_with_sort_by_token_indexes(
     mock_model_class.get_instance.return_value = mock_model
     mock_sae_manager_class.get_instance.return_value = mock_sae_manager
     mock_config_class.get_instance.return_value = mock_config
+    mock_get_activations.return_value = torch.randn(128, 5)
     # Modify request to include sort_by_token_indexes
     sample_request.sort_by_token_indexes = [1, 2, 3]
     # Execute
@@ -159,6 +165,7 @@ def test_process_activations_with_sort_by_token_indexes(
     assert len(result.tokens) == 5  # Should match mock token length
 
 
+@patch("neuronpedia_inference.endpoints.activation.all.get_activations_by_index")
 @patch("neuronpedia_inference.endpoints.activation.all.Model")
 @patch("neuronpedia_inference.endpoints.activation.all.SAEManager")
 @patch("neuronpedia_inference.endpoints.activation.all.Config")
@@ -166,6 +173,7 @@ def test_process_activations_with_feature_filter(
     mock_config_class: MagicMock,
     mock_sae_manager_class: MagicMock,
     mock_model_class: MagicMock,
+    mock_get_activations: MagicMock,
     processor: ActivationProcessor,
     sample_request: ActivationAllPostRequest,
     mock_model: Mock,
@@ -177,6 +185,7 @@ def test_process_activations_with_feature_filter(
     mock_model_class.get_instance.return_value = mock_model
     mock_sae_manager_class.get_instance.return_value = mock_sae_manager
     mock_config_class.get_instance.return_value = mock_config
+    mock_get_activations.return_value = torch.randn(128, 5)
     # Modify request for single layer with feature filter
     sample_request.selected_sources = ["0-test_set"]
     sample_request.feature_filter = [0, 1, 5, 10]
@@ -212,6 +221,7 @@ def test_process_activations_with_neurons_sae_type(
     assert isinstance(result, ActivationAllPost200Response)
 
 
+@patch("neuronpedia_inference.endpoints.activation.all.get_activations_by_index")
 @patch("neuronpedia_inference.endpoints.activation.all.Model")
 @patch("neuronpedia_inference.endpoints.activation.all.SAEManager")
 @patch("neuronpedia_inference.endpoints.activation.all.Config")
@@ -219,6 +229,7 @@ def test_process_activations_with_dfa_enabled(
     mock_config_class: MagicMock,
     mock_sae_manager_class: MagicMock,
     mock_model_class: MagicMock,
+    mock_get_activations: MagicMock,
     processor: ActivationProcessor,
     sample_request: ActivationAllPostRequest,
     mock_model: Mock,
@@ -230,6 +241,7 @@ def test_process_activations_with_dfa_enabled(
     mock_model_class.get_instance.return_value = mock_model
     mock_sae_manager_class.get_instance.return_value = mock_sae_manager
     mock_config_class.get_instance.return_value = mock_config
+    mock_get_activations.return_value = torch.randn(128, 5)
     # Enable DFA
     mock_sae_manager.is_dfa_enabled.return_value = True
     # Mock calculate_per_source_dfa function
@@ -270,6 +282,7 @@ def test_process_activations_invalid_token_index(
         processor.process_activations(sample_request)
 
 
+@patch("neuronpedia_inference.endpoints.activation.all.get_activations_by_index")
 @patch("neuronpedia_inference.endpoints.activation.all.Model")
 @patch("neuronpedia_inference.endpoints.activation.all.SAEManager")
 @patch("neuronpedia_inference.endpoints.activation.all.Config")
@@ -277,6 +290,7 @@ def test_process_activations_ignore_bos(
     mock_config_class: MagicMock,
     mock_sae_manager_class: MagicMock,
     mock_model_class: MagicMock,
+    mock_get_activations: MagicMock,
     processor: ActivationProcessor,
     sample_request: ActivationAllPostRequest,
     mock_model: Mock,
@@ -288,6 +302,7 @@ def test_process_activations_ignore_bos(
     mock_model_class.get_instance.return_value = mock_model
     mock_sae_manager_class.get_instance.return_value = mock_sae_manager
     mock_config_class.get_instance.return_value = mock_config
+    mock_get_activations.return_value = torch.randn(128, 5)
     sample_request.ignore_bos = True
     # Execute
     result = processor.process_activations(sample_request)

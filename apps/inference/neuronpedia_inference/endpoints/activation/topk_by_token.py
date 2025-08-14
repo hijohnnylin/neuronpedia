@@ -15,11 +15,14 @@ from neuronpedia_inference_client.models.activation_topk_by_token_post200_respon
 from neuronpedia_inference_client.models.activation_topk_by_token_post_request import (
     ActivationTopkByTokenPostRequest,
 )
-from transformer_lens import ActivationCache
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.shared import (
+    Model,
+    get_activations_by_index,
+    with_request_lock,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,21 +113,3 @@ async def activation_topk_by_token(
         results=results,
         tokens=str_tokens,  # type: ignore
     )
-
-
-# Keep the get_activations_by_index function from the original code
-def get_activations_by_index(
-    sae_type: str,
-    selected_layer: str,
-    cache: ActivationCache | dict[str, torch.Tensor],
-    hook_name: str,
-) -> torch.Tensor:
-    if sae_type == "neurons":
-        mlp_activation_data = cache[hook_name].to(Config.get_instance().device)
-        return torch.transpose(mlp_activation_data[0], 0, 1)
-
-    activation_data = cache[hook_name].to(Config.get_instance().device)
-    feature_activation_data = (
-        SAEManager.get_instance().get_sae(selected_layer).encode(activation_data)
-    )
-    return torch.transpose(feature_activation_data.squeeze(0), 0, 1)
