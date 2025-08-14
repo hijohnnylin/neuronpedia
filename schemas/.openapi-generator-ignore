@@ -1,0 +1,26 @@
+# OpenAPI Generator Ignore File
+# This file works for both inference and autointerp clients (Python + TypeScript)
+# Patterns use ** for recursive matching across any directory structure
+
+# CI/CD files that we don't want in client packages
+**/.gitlab-ci.yml
+**/.travis.yml
+**/git_push.sh
+
+# GitHub workflows directories (if any get generated)
+**/.github/
+
+# Useless empty test stubs (no actual test logic)
+**/test/
+
+# Testing configuration files (no useful tests to run)
+**/tox.ini
+**/test-requirements.txt
+
+# Redundant packaging files (keep pyproject.toml for Poetry consistency)
+# Note: Keeping setup.py for installation compatibility with auto-generated README
+**/requirements.txt
+**/setup.cfg
+
+# Note: .openapi-generator/ directory cannot be ignored - contains generator metadata
+**/.openapi-generator-ignore
