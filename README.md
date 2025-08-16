@@ -31,6 +31,7 @@
   - ["I Want to Use a Local Database / Import More Neuronpedia Data"](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
   - ["I Want to Do Webapp (Frontend + API) Development"](#i-want-to-do-webapp-frontend--api-development)
   - ["I Want to Run/Develop Inference Locally"](#i-want-to-rundevelop-inference-locally)
+  - ['I Want to Run/Develop the Graph Server Locally'](#i-want-to-rundevelop-the-graph-server-locally)
   - ['I Want to Run/Develop Autointerp Locally'](#i-want-to-rundevelop-autointerp-locally)
   - ['I Want to Do High Volume Autointerp Explanations'](#i-want-to-do-high-volume-autointerp-explanations)
   - ['I Want to Generate My Own Dashboards/Data and Add It to Neuronpedia'](#i-want-to-generate-my-own-dashboardsdata-and-add-it-to-neuronpedia)
@@ -304,7 +305,7 @@ Look at the `.env.inference.deepseek-r1-distill-llama-8b.llamascope-slimpj-res-3
        AUTORELOAD=1
   ```
 
-## 'I Want to Run/Develop Graph Server Locally'
+## 'I Want to Run/Develop the Graph Server Locally'
 
 #### What This Does + What You'll Get
 
@@ -319,7 +320,7 @@ The graph server powers the attribution graph generation functionality, built on
    ```
 3. Within the `apps/graph` directory, create a `.env` file with `SECRET` and `HF_TOKEN` (see `apps/graph/.env.example`)
 
-   - `SECRET` is the server secret that needs to be passed in the `x-secret-key` request header (see examples below)
+   - `SECRET` is the server secret that needs to be passed in the `x-secret-key` request header
    - Make sure your `HF_TOKEN` has access to the [Gemma-2-2B model](https://huggingface.co/google/gemma-2-2b) on Huggingface.
 
 4. Build the image, picking the correct command based on if the machine has CUDA or not:
