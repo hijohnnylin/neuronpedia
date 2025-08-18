@@ -3,7 +3,9 @@
 - [repo status](#repo-status)
 - [what this is](#what-this-is)
 - [simple non-docker setup](#simple-non-docker-setup)
+- [Simple Usage](#simple-usage)
 - [some docker commands for reference](#some-docker-commands-for-reference)
+- [Testing, Linting, and Formatting](#testing-linting-and-formatting)
 
 ## repo status
 
@@ -32,6 +34,31 @@ as much as possible we try to use classes/types from the `packages/python/neuron
    # with auto-reload
    poetry run uvicorn server:app --host 0.0.0.0 --port 5003 --workers 1 --reload
    ```
+
+## Simple Usage
+
+Generate an explanation given 2 activations
+
+```
+curl -X POST "http://localhost:5003/v1/explain/default" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "activations": [
+      {
+        "tokens": ["The", " cat", " sat", " on", " the", " mat"],
+        "values": [0.0, 0.8, 0.0, 0.0, 0.0, 0.0]
+      },
+      {
+        "tokens": ["I", " like", " felines"],
+        "values": [0, 0, 0.9]
+      }
+    ],
+    "openrouter_key": "YOUR_OPENROUTER_KEY",
+    "model": "openai/gpt-4o-mini"
+  }'
+```
+
+See other endpoints under `/schemas/openapi/autointerp/paths`.
 
 ## some docker commands for reference
 

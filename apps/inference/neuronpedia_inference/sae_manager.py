@@ -190,23 +190,23 @@ class SAEManager:
         """
         Print a nicely formatted status of loadable and loaded SAEs.
         """
-        print("\nSAE Status:")
-        print("===========")
+        logger.info("\nSAE Status:")
+        logger.info("===========")
 
-        print("\nLoadable SAEs:")
+        logger.info("\nLoadable SAEs:")
         for sae_set, sae_ids in self.sae_set_to_saes.items():
             if sae_set == self.NEURONS_SOURCESET:
                 continue
-            print(f"  {sae_set}:")
+            logger.info(f"  {sae_set}:")
             for sae_id in sae_ids:
                 status = "Loaded" if sae_id in self.loaded_saes else "Not Loaded"
-                print(f"    - {sae_id}: {status}")
+                logger.info(f"    - {sae_id}: {status}")
 
-        print("\nCurrently Loaded SAEs:")
+        logger.info("\nCurrently Loaded SAEs:")
         for i, sae_id in enumerate(self.loaded_saes, 1):
-            print(f"  {i}. {sae_id}")
+            logger.info(f"  {i}. {sae_id}")
 
-        print(f"\nTotal Loaded: {len(self.loaded_saes)} / {self.max_loaded_saes}")
+        logger.info(f"\nTotal Loaded: {len(self.loaded_saes)} / {self.max_loaded_saes}")
 
     # Utility methods
     def get_sae_type(self, sae_id: str) -> str:
