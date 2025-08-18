@@ -1,7 +1,7 @@
-# ruff: noqa: T201
-
+import logging
 import os
 from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
 
 import sentry_sdk
 import torch
@@ -20,6 +20,7 @@ from neuronpedia_autointerp_client.models.score_fuzz_detection_post_request impo
 )
 from sentence_transformers import SentenceTransformer
 
+from neuronpedia_autointerp.logging import initialize_logging
 from neuronpedia_autointerp.routes.explain.default import explain_default
 from neuronpedia_autointerp.routes.score.embedding import generate_score_embedding
 from neuronpedia_autointerp.routes.score.fuzz_detection import (
@@ -34,9 +35,12 @@ router = APIRouter(prefix=VERSION_PREFIX_PATH)
 load_dotenv()
 SECRET = os.getenv("SECRET")
 
+initialize_logging()
+logger = logging.getLogger(__name__)
+
 # only initialize sentry if we have a dsn
 if os.getenv("SENTRY_DSN"):
-    print("initializing sentry")
+    logger.info("initializing sentry")
     sentry_sdk.init(
         dsn=os.getenv("SENTRY_DSN"),
         # Set traces_sample_rate to 1.0 to capture 100%
@@ -54,21 +58,20 @@ model = None
 
 
 def initialize_globals():
-    print("initializing globals")
+    logger.info("initializing globals")
     global model
     if torch.cuda.is_available():
         model = SentenceTransformer(
             "dunzhang/stella_en_400M_v5",
             trust_remote_code=True,  # type: ignore[call-arg]
         ).cuda()
-        print("initialized embedding model")
+        logger.info("initialized embedding model")
     else:
-        print("no cuda available, not initializing embedding model")
+        logger.info("no cuda available, not initializing embedding model")
 
 
 @router.post("/explain/default")
 async def explanation_endpoint(request: ExplainDefaultPostRequest):
-    print("Explain Default Called")
     return await explain_default(request)
 
 
@@ -76,23 +79,23 @@ async def explanation_endpoint(request: ExplainDefaultPostRequest):
 async def score_embedding_endpoint(request: ScoreEmbeddingPostRequest):
     if model is None:
         raise HTTPException(status_code=500, detail="Model not initialized")
-    print("Score Embedding Called")
     return await generate_score_embedding(request, model)
 
 
 @router.post("/score/fuzz-detection")
 async def score_fuzz_detection_endpoint(request: ScoreFuzzDetectionPostRequest):
-    print("Score Fuzz Detection Called")
     return await generate_score_fuzz_detection(request)
 
 
-app = FastAPI()
-app.include_router(router)
-
-
-@app.on_event("startup")  # type: ignore[deprecated]
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     initialize_globals()
+    yield
+    logger.info("shutting down")
+
+
+app = FastAPI(lifespan=lifespan)
+app.include_router(router)
 
 
 @app.middleware("http")
