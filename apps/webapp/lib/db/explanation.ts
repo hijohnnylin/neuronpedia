@@ -4,9 +4,9 @@ import { prisma } from '@/lib/db';
 import { getGlobalModels } from '@/lib/db/model';
 import { Explanation, Prisma } from '@prisma/client';
 import { ExplanationPartial, ExplanationPartialWithRelations, NeuronWithPartialRelations } from 'prisma/generated/zod';
-import { PUBLIC_ACTIVATIONS_USER_IDS } from '../env';
+import { env } from '../env';
+import { AuthenticatedUser } from '../types/auth';
 import { getSourceSetNameFromSource } from '../utils/source';
-import { AuthenticatedUser } from '../with-user';
 import {
   assertUserCanAccessModelAndSource,
   assertUserCanAccessModelAndSourceSet,
@@ -293,7 +293,7 @@ export const getExplanationByIdWithDetails = async (id: string, user: Authentica
           activations: {
             where: {
               creatorId: {
-                in: PUBLIC_ACTIVATIONS_USER_IDS,
+                in: env.PUBLIC_ACTIVATIONS_USER_IDS,
               },
             },
           },
@@ -332,7 +332,7 @@ export const getUmapExplanations = async (modelId: string, layers: string[], use
       prisma.explanation.findMany({
         where: {
           authorId: {
-            in: PUBLIC_ACTIVATIONS_USER_IDS,
+            in: env.PUBLIC_ACTIVATIONS_USER_IDS,
           },
           modelId,
           layer,

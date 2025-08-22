@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/db';
+import { AuthenticatedUser } from '@/lib/types/auth';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
-import { AuthenticatedUser } from '@/lib/with-user';
 import { Visibility } from '@prisma/client';
-import { NEXT_PUBLIC_URL } from '../env';
+import { env } from '../env';
 
-export const ERROR_NOT_FOUND_MESSAGE = `The model, source, or feature you specified is not available. Check available public models/sources (including which ones have inference enabled) at ${NEXT_PUBLIC_URL}/available-resources`;
+export const ERROR_NOT_FOUND_MESSAGE = `The model, source, or feature you specified is not available. Check available public models/sources (including which ones have inference enabled) at ${env.NEXT_PUBLIC_URL}/available-resources`;
 
 // for the most part, allowUnlistedFor is EVERYONE (since they can all technically access it), except global
 export enum AllowUnlistedFor {

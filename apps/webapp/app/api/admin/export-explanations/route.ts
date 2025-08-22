@@ -1,5 +1,6 @@
 import { exportExplanations } from '@/lib/db/explanation';
-import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
+import { RequestAuthedAdminUser } from '@/lib/types/auth';
+import { withAuthedAdminUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { number, object, string, ValidationError } from 'yup';
 

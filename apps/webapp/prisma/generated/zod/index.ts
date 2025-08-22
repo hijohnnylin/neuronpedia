@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 
 /////////////////////////////////////////
 // HELPER FUNCTIONS
@@ -8,7 +8,13 @@ import { Prisma } from '@prisma/client';
 // JSON
 //------------------------------------------------------
 
-export type NullableJsonInput = Prisma.JsonValue | null | 'JsonNull' | 'DbNull' | Prisma.NullTypes.DbNull | Prisma.NullTypes.JsonNull;
+export type NullableJsonInput =
+  | Prisma.JsonValue
+  | null
+  | 'JsonNull'
+  | 'DbNull'
+  | Prisma.NullTypes.DbNull
+  | Prisma.NullTypes.JsonNull;
 
 export const transformJsonNull = (v?: NullableJsonInput) => {
   if (!v || v === 'DbNull') return Prisma.DbNull;
@@ -43,116 +49,521 @@ export const InputJsonValue: z.ZodType<Prisma.InputJsonValue> = z.union([
 
 export type InputJsonValueType = z.infer<typeof InputJsonValue>;
 
-
 /////////////////////////////////////////
 // ENUMS
 /////////////////////////////////////////
 
-export const TransactionIsolationLevelSchema = z.enum(['ReadUncommitted','ReadCommitted','RepeatableRead','Serializable']);
+export const TransactionIsolationLevelSchema = z.enum([
+  'ReadUncommitted',
+  'ReadCommitted',
+  'RepeatableRead',
+  'Serializable',
+]);
 
-export const AccountScalarFieldEnumSchema = z.enum(['id','userId','type','provider','providerAccountId','refresh_token','access_token','expires_at','token_type','scope','id_token','session_state']);
+export const AccountScalarFieldEnumSchema = z.enum([
+  'id',
+  'userId',
+  'type',
+  'provider',
+  'providerAccountId',
+  'refresh_token',
+  'access_token',
+  'expires_at',
+  'token_type',
+  'scope',
+  'id_token',
+  'session_state',
+]);
 
-export const RelationLoadStrategySchema = z.enum(['query','join']);
+export const RelationLoadStrategySchema = z.enum(['query', 'join']);
 
-export const SessionScalarFieldEnumSchema = z.enum(['id','sessionToken','userId','expires']);
+export const SessionScalarFieldEnumSchema = z.enum(['id', 'sessionToken', 'userId', 'expires']);
 
-export const UserSecretScalarFieldEnumSchema = z.enum(['id','username','type','value','createdAt','updatedAt']);
+export const UserSecretScalarFieldEnumSchema = z.enum(['id', 'username', 'type', 'value', 'createdAt', 'updatedAt']);
 
-export const UserScalarFieldEnumSchema = z.enum(['id','name','bio','email','emailVerified','githubUsername','bot','image','admin','canTriggerExplanations','emailNewsletterNotification','emailUnsubscribeAll','emailUnsubscribeCode','createdAt']);
+export const UserScalarFieldEnumSchema = z.enum([
+  'id',
+  'name',
+  'bio',
+  'email',
+  'emailVerified',
+  'githubUsername',
+  'bot',
+  'image',
+  'admin',
+  'canTriggerExplanations',
+  'emailNewsletterNotification',
+  'emailUnsubscribeAll',
+  'emailUnsubscribeCode',
+  'createdAt',
+]);
 
-export const GraphMetadataSubgraphScalarFieldEnumSchema = z.enum(['id','displayName','graphMetadataId','pinnedIds','supernodes','clerps','pruningThreshold','densityThreshold','userId','isFeaturedSolution','createdAt','updatedAt']);
+export const GraphMetadataSubgraphScalarFieldEnumSchema = z.enum([
+  'id',
+  'displayName',
+  'graphMetadataId',
+  'pinnedIds',
+  'supernodes',
+  'clerps',
+  'pruningThreshold',
+  'densityThreshold',
+  'userId',
+  'isFeaturedSolution',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const GraphMetadataScalarFieldEnumSchema = z.enum(['id','modelId','slug','promptTokens','prompt','titlePrefix','isFeatured','url','userId','createdAt','updatedAt']);
+export const GraphMetadataScalarFieldEnumSchema = z.enum([
+  'id',
+  'modelId',
+  'slug',
+  'promptTokens',
+  'prompt',
+  'titlePrefix',
+  'isFeatured',
+  'url',
+  'userId',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const GraphMetadataDataPutRequestScalarFieldEnumSchema = z.enum(['id','ipAddress','filename','url','userId','createdAt']);
+export const GraphMetadataDataPutRequestScalarFieldEnumSchema = z.enum([
+  'id',
+  'ipAddress',
+  'filename',
+  'url',
+  'userId',
+  'createdAt',
+]);
 
-export const ListCommentScalarFieldEnumSchema = z.enum(['id','listId','text','userId','createdAt']);
+export const ListCommentScalarFieldEnumSchema = z.enum(['id', 'listId', 'text', 'userId', 'createdAt']);
 
-export const ListScalarFieldEnumSchema = z.enum(['id','name','description','defaultTestText','userId','createdAt','updatedAt']);
+export const ListScalarFieldEnumSchema = z.enum([
+  'id',
+  'name',
+  'description',
+  'defaultTestText',
+  'userId',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const ListsOnNeuronsScalarFieldEnumSchema = z.enum(['modelId','layer','index','listId','description','addedAt','userId']);
+export const ListsOnNeuronsScalarFieldEnumSchema = z.enum([
+  'modelId',
+  'layer',
+  'index',
+  'listId',
+  'description',
+  'addedAt',
+  'userId',
+]);
 
-export const ListsOnActivationsScalarFieldEnumSchema = z.enum(['activationId','listId']);
+export const ListsOnActivationsScalarFieldEnumSchema = z.enum(['activationId', 'listId']);
 
-export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier','token','expires']);
+export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier', 'token', 'expires']);
 
-export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
+export const ModelScalarFieldEnumSchema = z.enum([
+  'id',
+  'displayNameShort',
+  'displayName',
+  'creatorId',
+  'tlensId',
+  'dimension',
+  'thinking',
+  'visibility',
+  'defaultSourceSetName',
+  'defaultSourceId',
+  'inferenceEnabled',
+  'instruct',
+  'layers',
+  'neuronsPerLayer',
+  'createdAt',
+  'owner',
+  'updatedAt',
+  'website',
+]);
 
-export const GraphHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','runpodServerlessUrl','modelId','createdAt','updatedAt']);
+export const GraphHostSourceScalarFieldEnumSchema = z.enum([
+  'id',
+  'name',
+  'hostUrl',
+  'runpodServerlessUrl',
+  'modelId',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const GraphHostSourceOnSourceSetScalarFieldEnumSchema = z.enum(['sourceSetName','sourceSetModelId','graphHostSourceId']);
+export const GraphHostSourceOnSourceSetScalarFieldEnumSchema = z.enum([
+  'sourceSetName',
+  'sourceSetModelId',
+  'graphHostSourceId',
+]);
 
-export const InferenceHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','modelId','createdAt','updatedAt']);
+export const InferenceHostSourceScalarFieldEnumSchema = z.enum([
+  'id',
+  'name',
+  'hostUrl',
+  'modelId',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const InferenceHostSourceOnSourceScalarFieldEnumSchema = z.enum(['sourceId','sourceModelId','inferenceHostId']);
+export const InferenceHostSourceOnSourceScalarFieldEnumSchema = z.enum([
+  'sourceId',
+  'sourceModelId',
+  'inferenceHostId',
+]);
 
-export const SourceScalarFieldEnumSchema = z.enum(['id','modelId','hasDashboards','inferenceEnabled','saelensConfig','saelensRelease','saelensSaeId','hfRepoId','hfFolderId','visibility','defaultOfModelId','setName','creatorId','hasUmap','hasUmapLogSparsity','hasUmapClusters','num_prompts','num_tokens_in_prompt','dataset','notes','cosSimMatchModelId','cosSimMatchSourceId','createdAt']);
+export const SourceScalarFieldEnumSchema = z.enum([
+  'id',
+  'modelId',
+  'hasDashboards',
+  'inferenceEnabled',
+  'saelensConfig',
+  'saelensRelease',
+  'saelensSaeId',
+  'hfRepoId',
+  'hfFolderId',
+  'visibility',
+  'defaultOfModelId',
+  'setName',
+  'creatorId',
+  'hasUmap',
+  'hasUmapLogSparsity',
+  'hasUmapClusters',
+  'num_prompts',
+  'num_tokens_in_prompt',
+  'dataset',
+  'notes',
+  'cosSimMatchModelId',
+  'cosSimMatchSourceId',
+  'createdAt',
+]);
 
-export const SourceSetScalarFieldEnumSchema = z.enum(['modelId','name','hasDashboards','allowInferenceSearch','visibility','description','type','creatorName','urls','creatorEmail','creatorId','releaseName','graphEnabled','defaultOfModelId','defaultRange','defaultShowBreaks','showDfa','showCorrelated','showHeadAttribution','showUmap','createdAt']);
+export const SourceSetScalarFieldEnumSchema = z.enum([
+  'modelId',
+  'name',
+  'hasDashboards',
+  'allowInferenceSearch',
+  'visibility',
+  'description',
+  'type',
+  'creatorName',
+  'urls',
+  'creatorEmail',
+  'creatorId',
+  'releaseName',
+  'graphEnabled',
+  'defaultOfModelId',
+  'defaultRange',
+  'defaultShowBreaks',
+  'showDfa',
+  'showCorrelated',
+  'showHeadAttribution',
+  'showUmap',
+  'createdAt',
+]);
 
-export const SourceReleaseScalarFieldEnumSchema = z.enum(['name','visibility','isNewUi','featured','description','descriptionShort','urls','creatorEmail','creatorName','creatorNameShort','creatorId','defaultSourceSetName','defaultSourceId','defaultUmapSourceIds','createdAt']);
+export const SourceReleaseScalarFieldEnumSchema = z.enum([
+  'name',
+  'visibility',
+  'isNewUi',
+  'featured',
+  'description',
+  'descriptionShort',
+  'urls',
+  'creatorEmail',
+  'creatorName',
+  'creatorNameShort',
+  'creatorId',
+  'defaultSourceSetName',
+  'defaultSourceId',
+  'defaultUmapSourceIds',
+  'createdAt',
+]);
 
-export const EvalScalarFieldEnumSchema = z.enum(['id','typeName','modelId','sourceId','output','detailedMetrics','createdAt','updatedAt']);
+export const EvalScalarFieldEnumSchema = z.enum([
+  'id',
+  'typeName',
+  'modelId',
+  'sourceId',
+  'output',
+  'detailedMetrics',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const EvalTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','longerDescription','outputSchema','featured','url','createdAt','updatedAt']);
+export const EvalTypeScalarFieldEnumSchema = z.enum([
+  'name',
+  'displayName',
+  'description',
+  'longerDescription',
+  'outputSchema',
+  'featured',
+  'url',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const NeuronScalarFieldEnumSchema = z.enum(['modelId','layer','index','sourceSetName','creatorId','createdAt','maxActApprox','hasVector','vector','vectorLabel','vectorDefaultSteerStrength','hookName','topkCosSimIndices','topkCosSimValues','neuron_alignment_indices','neuron_alignment_values','neuron_alignment_l1','correlated_neurons_indices','correlated_neurons_pearson','correlated_neurons_l1','correlated_features_indices','correlated_features_pearson','correlated_features_l1','neg_str','neg_values','pos_str','pos_values','frac_nonzero','freq_hist_data_bar_heights','freq_hist_data_bar_values','logits_hist_data_bar_heights','logits_hist_data_bar_values','decoder_weights_dist','umap_cluster','umap_log_feature_sparsity','umap_x','umap_y']);
+export const NeuronScalarFieldEnumSchema = z.enum([
+  'modelId',
+  'layer',
+  'index',
+  'sourceSetName',
+  'creatorId',
+  'createdAt',
+  'maxActApprox',
+  'hasVector',
+  'vector',
+  'vectorLabel',
+  'vectorDefaultSteerStrength',
+  'hookName',
+  'topkCosSimIndices',
+  'topkCosSimValues',
+  'neuron_alignment_indices',
+  'neuron_alignment_values',
+  'neuron_alignment_l1',
+  'correlated_neurons_indices',
+  'correlated_neurons_pearson',
+  'correlated_neurons_l1',
+  'correlated_features_indices',
+  'correlated_features_pearson',
+  'correlated_features_l1',
+  'neg_str',
+  'neg_values',
+  'pos_str',
+  'pos_values',
+  'frac_nonzero',
+  'freq_hist_data_bar_heights',
+  'freq_hist_data_bar_values',
+  'logits_hist_data_bar_heights',
+  'logits_hist_data_bar_values',
+  'decoder_weights_dist',
+  'umap_cluster',
+  'umap_log_feature_sparsity',
+  'umap_x',
+  'umap_y',
+]);
 
-export const ExplanationScalarFieldEnumSchema = z.enum(['id','modelId','layer','index','description','authorId','triggeredByUserId','notes','scoreV1','scoreV2','umap_x','umap_y','umap_cluster','umap_log_feature_sparsity','typeName','explanationModelName','createdAt','updatedAt']);
+export const ExplanationScalarFieldEnumSchema = z.enum([
+  'id',
+  'modelId',
+  'layer',
+  'index',
+  'description',
+  'authorId',
+  'triggeredByUserId',
+  'notes',
+  'scoreV1',
+  'scoreV2',
+  'umap_x',
+  'umap_y',
+  'umap_cluster',
+  'umap_log_feature_sparsity',
+  'typeName',
+  'explanationModelName',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const ExplanationModelSettingsScalarFieldEnumSchema = z.enum(['id','temperature','maxTokens','topP','frequencyPenalty']);
+export const ExplanationModelSettingsScalarFieldEnumSchema = z.enum([
+  'id',
+  'temperature',
+  'maxTokens',
+  'topP',
+  'frequencyPenalty',
+]);
 
-export const ExplanationModelTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','openRouterModelId','url','creatorName','createdAt','updatedAt']);
+export const ExplanationModelTypeScalarFieldEnumSchema = z.enum([
+  'name',
+  'displayName',
+  'description',
+  'featured',
+  'openRouterModelId',
+  'url',
+  'creatorName',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const ExplanationTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','isAttention','explainerModelSettingsId','settings','url','creatorName','creatorId','createdAt','updatedAt']);
+export const ExplanationTypeScalarFieldEnumSchema = z.enum([
+  'name',
+  'displayName',
+  'description',
+  'featured',
+  'isAttention',
+  'explainerModelSettingsId',
+  'settings',
+  'url',
+  'creatorName',
+  'creatorId',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const ExplanationScoreScalarFieldEnumSchema = z.enum(['id','initiatedByUserId','value','explanationId','explanationScoreTypeName','explanationScoreModelName','jsonDetails','createdAt']);
+export const ExplanationScoreScalarFieldEnumSchema = z.enum([
+  'id',
+  'initiatedByUserId',
+  'value',
+  'explanationId',
+  'explanationScoreTypeName',
+  'explanationScoreModelName',
+  'jsonDetails',
+  'createdAt',
+]);
 
-export const ExplanationScoreTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','isAttention','scoreDescription','scorerModel','settings','url','creatorName','creatorId','createdAt','updatedAt']);
+export const ExplanationScoreTypeScalarFieldEnumSchema = z.enum([
+  'name',
+  'displayName',
+  'description',
+  'featured',
+  'isAttention',
+  'scoreDescription',
+  'scorerModel',
+  'settings',
+  'url',
+  'creatorName',
+  'creatorId',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const ExplanationScoreModelScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','openRouterModelId','url','creatorName','createdAt','updatedAt']);
+export const ExplanationScoreModelScalarFieldEnumSchema = z.enum([
+  'name',
+  'displayName',
+  'description',
+  'featured',
+  'openRouterModelId',
+  'url',
+  'creatorName',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const ExplanationActivationV1ScalarFieldEnumSchema = z.enum(['id','explanationId','activationId','expectedValues','score','scorerId','scorerAutoInterpModel','version','createdAt']);
+export const ExplanationActivationV1ScalarFieldEnumSchema = z.enum([
+  'id',
+  'explanationId',
+  'activationId',
+  'expectedValues',
+  'score',
+  'scorerId',
+  'scorerAutoInterpModel',
+  'version',
+  'createdAt',
+]);
 
-export const VoteScalarFieldEnumSchema = z.enum(['id','voterId','reason','points','explanationId','createdAt','updatedAt']);
+export const VoteScalarFieldEnumSchema = z.enum([
+  'id',
+  'voterId',
+  'reason',
+  'points',
+  'explanationId',
+  'createdAt',
+  'updatedAt',
+]);
 
-export const ActivationScalarFieldEnumSchema = z.enum(['id','tokens','dataIndex','index','layer','modelId','dataSource','maxValue','maxValueTokenIndex','minValue','values','dfaValues','dfaTargetIndex','dfaMaxValue','creatorId','createdAt','lossValues','logitContributions','binMin','binMax','binContains','qualifyingTokenIndex']);
+export const ActivationScalarFieldEnumSchema = z.enum([
+  'id',
+  'tokens',
+  'dataIndex',
+  'index',
+  'layer',
+  'modelId',
+  'dataSource',
+  'maxValue',
+  'maxValueTokenIndex',
+  'minValue',
+  'values',
+  'dfaValues',
+  'dfaTargetIndex',
+  'dfaMaxValue',
+  'creatorId',
+  'createdAt',
+  'lossValues',
+  'logitContributions',
+  'binMin',
+  'binMax',
+  'binContains',
+  'qualifyingTokenIndex',
+]);
 
-export const CommentScalarFieldEnumSchema = z.enum(['id','modelId','layer','index','text','userId','createdAt']);
+export const CommentScalarFieldEnumSchema = z.enum(['id', 'modelId', 'layer', 'index', 'text', 'userId', 'createdAt']);
 
-export const BookmarkScalarFieldEnumSchema = z.enum(['id','modelId','layer','index','userId','createdAt']);
+export const BookmarkScalarFieldEnumSchema = z.enum(['id', 'modelId', 'layer', 'index', 'userId', 'createdAt']);
 
-export const SavedSearchScalarFieldEnumSchema = z.enum(['id','query','tokens','modelId','selectedLayers','sortByIndexes','ignoreBos','sourceSet','userId','updatedAt','createdAt','counts','numResults','densityThreshold']);
+export const SavedSearchScalarFieldEnumSchema = z.enum([
+  'id',
+  'query',
+  'tokens',
+  'modelId',
+  'selectedLayers',
+  'sortByIndexes',
+  'ignoreBos',
+  'sourceSet',
+  'userId',
+  'updatedAt',
+  'createdAt',
+  'counts',
+  'numResults',
+  'densityThreshold',
+]);
 
-export const SavedSearchActivationScalarFieldEnumSchema = z.enum(['savedSearchId','activationId','order']);
+export const SavedSearchActivationScalarFieldEnumSchema = z.enum(['savedSearchId', 'activationId', 'order']);
 
-export const SteerOutputToNeuronScalarFieldEnumSchema = z.enum(['modelId','layer','index','strength','steerOutputId']);
+export const SteerOutputToNeuronScalarFieldEnumSchema = z.enum([
+  'modelId',
+  'layer',
+  'index',
+  'strength',
+  'steerOutputId',
+]);
 
-export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextChatTemplate','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds']);
+export const SteerOutputScalarFieldEnumSchema = z.enum([
+  'id',
+  'type',
+  'modelId',
+  'steerSpecialTokens',
+  'inputText',
+  'inputTextChatTemplate',
+  'outputText',
+  'outputTextChatTemplate',
+  'temperature',
+  'numTokens',
+  'freqPenalty',
+  'seed',
+  'strengthMultiplier',
+  'steerMethod',
+  'createdAt',
+  'creatorId',
+  'version',
+  'logprobs',
+  'connectedDefaultOutputId',
+  'connectedSteerOutputIds',
+]);
 
-export const SortOrderSchema = z.enum(['asc','desc']);
+export const SortOrderSchema = z.enum(['asc', 'desc']);
 
-export const JsonNullValueInputSchema = z.enum(['JsonNull',]);
+export const JsonNullValueInputSchema = z.enum(['JsonNull']);
 
-export const NullableJsonNullValueInputSchema = z.enum(['DbNull','JsonNull',]).transform((v) => transformJsonNull(v));
+export const NullableJsonNullValueInputSchema = z.enum(['DbNull', 'JsonNull']).transform((v) => transformJsonNull(v));
 
-export const QueryModeSchema = z.enum(['default','insensitive']);
+export const QueryModeSchema = z.enum(['default', 'insensitive']);
 
-export const NullsOrderSchema = z.enum(['first','last']);
+export const NullsOrderSchema = z.enum(['first', 'last']);
 
-export const JsonNullValueFilterSchema = z.enum(['DbNull','JsonNull','AnyNull',]);
+export const JsonNullValueFilterSchema = z.enum(['DbNull', 'JsonNull', 'AnyNull']);
 
-export const UserSecretTypeSchema = z.enum(['NEURONPEDIA','OPENAI','GOOGLE','ANTHROPIC','OPENROUTER']);
+export const UserSecretTypeSchema = z.enum(['NEURONPEDIA', 'OPENAI', 'GOOGLE', 'ANTHROPIC', 'OPENROUTER']);
 
-export type UserSecretTypeType = `${z.infer<typeof UserSecretTypeSchema>}`
+export type UserSecretTypeType = `${z.infer<typeof UserSecretTypeSchema>}`;
 
-export const SteerOutputTypeSchema = z.enum(['DEFAULT','STEERED']);
+export const SteerOutputTypeSchema = z.enum(['DEFAULT', 'STEERED']);
 
-export type SteerOutputTypeType = `${z.infer<typeof SteerOutputTypeSchema>}`
+export type SteerOutputTypeType = `${z.infer<typeof SteerOutputTypeSchema>}`;
 
-export const VisibilitySchema = z.enum(['PUBLIC','UNLISTED','PRIVATE']);
+export const VisibilitySchema = z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']);
 
-export type VisibilityType = `${z.infer<typeof VisibilitySchema>}`
+export type VisibilityType = `${z.infer<typeof VisibilitySchema>}`;
 
 /////////////////////////////////////////
 // MODELS
@@ -175,17 +586,17 @@ export const AccountSchema = z.object({
   scope: z.string().nullable(),
   id_token: z.string().nullable(),
   session_state: z.string().nullable(),
-})
+});
 
-export type Account = z.infer<typeof AccountSchema>
+export type Account = z.infer<typeof AccountSchema>;
 
 /////////////////////////////////////////
 // ACCOUNT PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const AccountPartialSchema = AccountSchema.partial()
+export const AccountPartialSchema = AccountSchema.partial();
 
-export type AccountPartial = z.infer<typeof AccountPartialSchema>
+export type AccountPartial = z.infer<typeof AccountPartialSchema>;
 
 // ACCOUNT RELATION SCHEMA
 //------------------------------------------------------
@@ -194,11 +605,13 @@ export type AccountRelations = {
   user: UserWithRelations;
 };
 
-export type AccountWithRelations = z.infer<typeof AccountSchema> & AccountRelations
+export type AccountWithRelations = z.infer<typeof AccountSchema> & AccountRelations;
 
-export const AccountWithRelationsSchema: z.ZodType<AccountWithRelations> = AccountSchema.merge(z.object({
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const AccountWithRelationsSchema: z.ZodType<AccountWithRelations> = AccountSchema.merge(
+  z.object({
+    user: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // ACCOUNT PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -207,17 +620,23 @@ export type AccountPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type AccountPartialWithRelations = z.infer<typeof AccountPartialSchema> & AccountPartialRelations
+export type AccountPartialWithRelations = z.infer<typeof AccountPartialSchema> & AccountPartialRelations;
 
-export const AccountPartialWithRelationsSchema: z.ZodType<AccountPartialWithRelations> = AccountPartialSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const AccountPartialWithRelationsSchema: z.ZodType<AccountPartialWithRelations> = AccountPartialSchema.merge(
+  z.object({
+    user: z.lazy(() => UserPartialWithRelationsSchema),
+  }),
+).partial();
 
-export type AccountWithPartialRelations = z.infer<typeof AccountSchema> & AccountPartialRelations
+export type AccountWithPartialRelations = z.infer<typeof AccountSchema> & AccountPartialRelations;
 
-export const AccountWithPartialRelationsSchema: z.ZodType<AccountWithPartialRelations> = AccountSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const AccountWithPartialRelationsSchema: z.ZodType<AccountWithPartialRelations> = AccountSchema.merge(
+  z
+    .object({
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // SESSION SCHEMA
@@ -228,17 +647,17 @@ export const SessionSchema = z.object({
   sessionToken: z.string(),
   userId: z.string(),
   expires: z.coerce.date(),
-})
+});
 
-export type Session = z.infer<typeof SessionSchema>
+export type Session = z.infer<typeof SessionSchema>;
 
 /////////////////////////////////////////
 // SESSION PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SessionPartialSchema = SessionSchema.partial()
+export const SessionPartialSchema = SessionSchema.partial();
 
-export type SessionPartial = z.infer<typeof SessionPartialSchema>
+export type SessionPartial = z.infer<typeof SessionPartialSchema>;
 
 // SESSION RELATION SCHEMA
 //------------------------------------------------------
@@ -247,11 +666,13 @@ export type SessionRelations = {
   user: UserWithRelations;
 };
 
-export type SessionWithRelations = z.infer<typeof SessionSchema> & SessionRelations
+export type SessionWithRelations = z.infer<typeof SessionSchema> & SessionRelations;
 
-export const SessionWithRelationsSchema: z.ZodType<SessionWithRelations> = SessionSchema.merge(z.object({
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const SessionWithRelationsSchema: z.ZodType<SessionWithRelations> = SessionSchema.merge(
+  z.object({
+    user: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // SESSION PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -260,17 +681,23 @@ export type SessionPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type SessionPartialWithRelations = z.infer<typeof SessionPartialSchema> & SessionPartialRelations
+export type SessionPartialWithRelations = z.infer<typeof SessionPartialSchema> & SessionPartialRelations;
 
-export const SessionPartialWithRelationsSchema: z.ZodType<SessionPartialWithRelations> = SessionPartialSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const SessionPartialWithRelationsSchema: z.ZodType<SessionPartialWithRelations> = SessionPartialSchema.merge(
+  z.object({
+    user: z.lazy(() => UserPartialWithRelationsSchema),
+  }),
+).partial();
 
-export type SessionWithPartialRelations = z.infer<typeof SessionSchema> & SessionPartialRelations
+export type SessionWithPartialRelations = z.infer<typeof SessionSchema> & SessionPartialRelations;
 
-export const SessionWithPartialRelationsSchema: z.ZodType<SessionWithPartialRelations> = SessionSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const SessionWithPartialRelationsSchema: z.ZodType<SessionWithPartialRelations> = SessionSchema.merge(
+  z
+    .object({
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // USER SECRET SCHEMA
@@ -283,17 +710,17 @@ export const UserSecretSchema = z.object({
   value: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type UserSecret = z.infer<typeof UserSecretSchema>
+export type UserSecret = z.infer<typeof UserSecretSchema>;
 
 /////////////////////////////////////////
 // USER SECRET PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const UserSecretPartialSchema = UserSecretSchema.partial()
+export const UserSecretPartialSchema = UserSecretSchema.partial();
 
-export type UserSecretPartial = z.infer<typeof UserSecretPartialSchema>
+export type UserSecretPartial = z.infer<typeof UserSecretPartialSchema>;
 
 // USER SECRET RELATION SCHEMA
 //------------------------------------------------------
@@ -302,11 +729,13 @@ export type UserSecretRelations = {
   user: UserWithRelations;
 };
 
-export type UserSecretWithRelations = z.infer<typeof UserSecretSchema> & UserSecretRelations
+export type UserSecretWithRelations = z.infer<typeof UserSecretSchema> & UserSecretRelations;
 
-export const UserSecretWithRelationsSchema: z.ZodType<UserSecretWithRelations> = UserSecretSchema.merge(z.object({
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const UserSecretWithRelationsSchema: z.ZodType<UserSecretWithRelations> = UserSecretSchema.merge(
+  z.object({
+    user: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // USER SECRET PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -315,17 +744,24 @@ export type UserSecretPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type UserSecretPartialWithRelations = z.infer<typeof UserSecretPartialSchema> & UserSecretPartialRelations
+export type UserSecretPartialWithRelations = z.infer<typeof UserSecretPartialSchema> & UserSecretPartialRelations;
 
-export const UserSecretPartialWithRelationsSchema: z.ZodType<UserSecretPartialWithRelations> = UserSecretPartialSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const UserSecretPartialWithRelationsSchema: z.ZodType<UserSecretPartialWithRelations> =
+  UserSecretPartialSchema.merge(
+    z.object({
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type UserSecretWithPartialRelations = z.infer<typeof UserSecretSchema> & UserSecretPartialRelations
+export type UserSecretWithPartialRelations = z.infer<typeof UserSecretSchema> & UserSecretPartialRelations;
 
-export const UserSecretWithPartialRelationsSchema: z.ZodType<UserSecretWithPartialRelations> = UserSecretSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const UserSecretWithPartialRelationsSchema: z.ZodType<UserSecretWithPartialRelations> = UserSecretSchema.merge(
+  z
+    .object({
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // USER SCHEMA
@@ -333,7 +769,12 @@ export const UserSecretWithPartialRelationsSchema: z.ZodType<UserSecretWithParti
 
 export const UserSchema = z.object({
   id: z.string().cuid(),
-  name: z.string().regex(new RegExp(/^[a-zA-Z0-9-.]+$/), "Name should contain only numbers, letters, dashes, and periods.",).min(1).max(39).transform((val) => val.toLowerCase()),
+  name: z
+    .string()
+    .regex(new RegExp(/^[a-zA-Z0-9-.]+$/), 'Name should contain only numbers, letters, dashes, and periods.')
+    .min(1)
+    .max(39)
+    .transform((val) => val.toLowerCase()),
   bio: z.string().nullable(),
   email: z.string().nullable(),
   emailVerified: z.coerce.date().nullable(),
@@ -346,17 +787,17 @@ export const UserSchema = z.object({
   emailUnsubscribeAll: z.boolean(),
   emailUnsubscribeCode: z.string().cuid(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type User = z.infer<typeof UserSchema>
+export type User = z.infer<typeof UserSchema>;
 
 /////////////////////////////////////////
 // USER PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const UserPartialSchema = UserSchema.partial()
+export const UserPartialSchema = UserSchema.partial();
 
-export type UserPartial = z.infer<typeof UserPartialSchema>
+export type UserPartial = z.infer<typeof UserPartialSchema>;
 
 // USER RELATION SCHEMA
 //------------------------------------------------------
@@ -390,36 +831,38 @@ export type UserRelations = {
   graphMetadataSubgraphs: GraphMetadataSubgraphWithRelations[];
 };
 
-export type UserWithRelations = z.infer<typeof UserSchema> & UserRelations
+export type UserWithRelations = z.infer<typeof UserSchema> & UserRelations;
 
-export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.merge(z.object({
-  secrets: z.lazy(() => UserSecretWithRelationsSchema).array(),
-  accounts: z.lazy(() => AccountWithRelationsSchema).array(),
-  explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
-  triggeredExplanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
-  sources: z.lazy(() => SourceWithRelationsSchema).array(),
-  sourceSets: z.lazy(() => SourceSetWithRelationsSchema).array(),
-  sourceReleases: z.lazy(() => SourceReleaseWithRelationsSchema).array(),
-  models: z.lazy(() => ModelWithRelationsSchema).array(),
-  sessions: z.lazy(() => SessionWithRelationsSchema).array(),
-  votes: z.lazy(() => VoteWithRelationsSchema).array(),
-  activations: z.lazy(() => ActivationWithRelationsSchema).array(),
-  bookmarks: z.lazy(() => BookmarkWithRelationsSchema).array(),
-  comments: z.lazy(() => CommentWithRelationsSchema).array(),
-  lists: z.lazy(() => ListWithRelationsSchema).array(),
-  listsOnNeurons: z.lazy(() => ListsOnNeuronsWithRelationsSchema).array(),
-  listComments: z.lazy(() => ListCommentWithRelationsSchema).array(),
-  savedSearches: z.lazy(() => SavedSearchWithRelationsSchema).array(),
-  explanationActivations: z.lazy(() => ExplanationActivationV1WithRelationsSchema).array(),
-  steerOutput: z.lazy(() => SteerOutputWithRelationsSchema).array(),
-  explanationType: z.lazy(() => ExplanationTypeWithRelationsSchema).array(),
-  explanationScoreType: z.lazy(() => ExplanationScoreTypeWithRelationsSchema).array(),
-  initiatedExplanationScore: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
-  graphMetadatas: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
-  graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestWithRelationsSchema).array(),
-  graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
-}))
+export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.merge(
+  z.object({
+    secrets: z.lazy(() => UserSecretWithRelationsSchema).array(),
+    accounts: z.lazy(() => AccountWithRelationsSchema).array(),
+    explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+    triggeredExplanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+    neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
+    sources: z.lazy(() => SourceWithRelationsSchema).array(),
+    sourceSets: z.lazy(() => SourceSetWithRelationsSchema).array(),
+    sourceReleases: z.lazy(() => SourceReleaseWithRelationsSchema).array(),
+    models: z.lazy(() => ModelWithRelationsSchema).array(),
+    sessions: z.lazy(() => SessionWithRelationsSchema).array(),
+    votes: z.lazy(() => VoteWithRelationsSchema).array(),
+    activations: z.lazy(() => ActivationWithRelationsSchema).array(),
+    bookmarks: z.lazy(() => BookmarkWithRelationsSchema).array(),
+    comments: z.lazy(() => CommentWithRelationsSchema).array(),
+    lists: z.lazy(() => ListWithRelationsSchema).array(),
+    listsOnNeurons: z.lazy(() => ListsOnNeuronsWithRelationsSchema).array(),
+    listComments: z.lazy(() => ListCommentWithRelationsSchema).array(),
+    savedSearches: z.lazy(() => SavedSearchWithRelationsSchema).array(),
+    explanationActivations: z.lazy(() => ExplanationActivationV1WithRelationsSchema).array(),
+    steerOutput: z.lazy(() => SteerOutputWithRelationsSchema).array(),
+    explanationType: z.lazy(() => ExplanationTypeWithRelationsSchema).array(),
+    explanationScoreType: z.lazy(() => ExplanationScoreTypeWithRelationsSchema).array(),
+    initiatedExplanationScore: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
+    graphMetadatas: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
+    graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestWithRelationsSchema).array(),
+    graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
+  }),
+);
 
 // USER PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -453,67 +896,73 @@ export type UserPartialRelations = {
   graphMetadataSubgraphs?: GraphMetadataSubgraphPartialWithRelations[];
 };
 
-export type UserPartialWithRelations = z.infer<typeof UserPartialSchema> & UserPartialRelations
+export type UserPartialWithRelations = z.infer<typeof UserPartialSchema> & UserPartialRelations;
 
-export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations> = UserPartialSchema.merge(z.object({
-  secrets: z.lazy(() => UserSecretPartialWithRelationsSchema).array(),
-  accounts: z.lazy(() => AccountPartialWithRelationsSchema).array(),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  triggeredExplanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
-  sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
-  sourceReleases: z.lazy(() => SourceReleasePartialWithRelationsSchema).array(),
-  models: z.lazy(() => ModelPartialWithRelationsSchema).array(),
-  sessions: z.lazy(() => SessionPartialWithRelationsSchema).array(),
-  votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
-  activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
-  bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
-  comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
-  lists: z.lazy(() => ListPartialWithRelationsSchema).array(),
-  listsOnNeurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
-  listComments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
-  savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
-  explanationActivations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
-  steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
-  explanationType: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
-  explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema).array(),
-  initiatedExplanationScore: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-  graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
-  graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
-  graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
-})).partial()
+export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations> = UserPartialSchema.merge(
+  z.object({
+    secrets: z.lazy(() => UserSecretPartialWithRelationsSchema).array(),
+    accounts: z.lazy(() => AccountPartialWithRelationsSchema).array(),
+    explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+    triggeredExplanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+    neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+    sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
+    sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
+    sourceReleases: z.lazy(() => SourceReleasePartialWithRelationsSchema).array(),
+    models: z.lazy(() => ModelPartialWithRelationsSchema).array(),
+    sessions: z.lazy(() => SessionPartialWithRelationsSchema).array(),
+    votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
+    activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
+    bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
+    comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
+    lists: z.lazy(() => ListPartialWithRelationsSchema).array(),
+    listsOnNeurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
+    listComments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
+    savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
+    explanationActivations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
+    steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
+    explanationType: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
+    explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema).array(),
+    initiatedExplanationScore: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+    graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
+    graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
+    graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+  }),
+).partial();
 
-export type UserWithPartialRelations = z.infer<typeof UserSchema> & UserPartialRelations
+export type UserWithPartialRelations = z.infer<typeof UserSchema> & UserPartialRelations;
 
-export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations> = UserSchema.merge(z.object({
-  secrets: z.lazy(() => UserSecretPartialWithRelationsSchema).array(),
-  accounts: z.lazy(() => AccountPartialWithRelationsSchema).array(),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  triggeredExplanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
-  sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
-  sourceReleases: z.lazy(() => SourceReleasePartialWithRelationsSchema).array(),
-  models: z.lazy(() => ModelPartialWithRelationsSchema).array(),
-  sessions: z.lazy(() => SessionPartialWithRelationsSchema).array(),
-  votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
-  activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
-  bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
-  comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
-  lists: z.lazy(() => ListPartialWithRelationsSchema).array(),
-  listsOnNeurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
-  listComments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
-  savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
-  explanationActivations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
-  steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
-  explanationType: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
-  explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema).array(),
-  initiatedExplanationScore: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-  graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
-  graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
-  graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
-}).partial())
+export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations> = UserSchema.merge(
+  z
+    .object({
+      secrets: z.lazy(() => UserSecretPartialWithRelationsSchema).array(),
+      accounts: z.lazy(() => AccountPartialWithRelationsSchema).array(),
+      explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+      triggeredExplanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+      neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+      sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
+      sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
+      sourceReleases: z.lazy(() => SourceReleasePartialWithRelationsSchema).array(),
+      models: z.lazy(() => ModelPartialWithRelationsSchema).array(),
+      sessions: z.lazy(() => SessionPartialWithRelationsSchema).array(),
+      votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
+      activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
+      bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
+      comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
+      lists: z.lazy(() => ListPartialWithRelationsSchema).array(),
+      listsOnNeurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
+      listComments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
+      savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
+      explanationActivations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
+      steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
+      explanationType: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
+      explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema).array(),
+      initiatedExplanationScore: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+      graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
+      graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
+      graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // GRAPH METADATA SUBGRAPH SCHEMA
@@ -532,17 +981,17 @@ export const GraphMetadataSubgraphSchema = z.object({
   isFeaturedSolution: z.boolean(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type GraphMetadataSubgraph = z.infer<typeof GraphMetadataSubgraphSchema>
+export type GraphMetadataSubgraph = z.infer<typeof GraphMetadataSubgraphSchema>;
 
 /////////////////////////////////////////
 // GRAPH METADATA SUBGRAPH PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const GraphMetadataSubgraphPartialSchema = GraphMetadataSubgraphSchema.partial()
+export const GraphMetadataSubgraphPartialSchema = GraphMetadataSubgraphSchema.partial();
 
-export type GraphMetadataSubgraphPartial = z.infer<typeof GraphMetadataSubgraphPartialSchema>
+export type GraphMetadataSubgraphPartial = z.infer<typeof GraphMetadataSubgraphPartialSchema>;
 
 // GRAPH METADATA SUBGRAPH RELATION SCHEMA
 //------------------------------------------------------
@@ -552,12 +1001,16 @@ export type GraphMetadataSubgraphRelations = {
   user: UserWithRelations;
 };
 
-export type GraphMetadataSubgraphWithRelations = z.infer<typeof GraphMetadataSubgraphSchema> & GraphMetadataSubgraphRelations
+export type GraphMetadataSubgraphWithRelations = z.infer<typeof GraphMetadataSubgraphSchema> &
+  GraphMetadataSubgraphRelations;
 
-export const GraphMetadataSubgraphWithRelationsSchema: z.ZodType<GraphMetadataSubgraphWithRelations> = GraphMetadataSubgraphSchema.merge(z.object({
-  graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema),
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const GraphMetadataSubgraphWithRelationsSchema: z.ZodType<GraphMetadataSubgraphWithRelations> =
+  GraphMetadataSubgraphSchema.merge(
+    z.object({
+      graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema),
+      user: z.lazy(() => UserWithRelationsSchema),
+    }),
+  );
 
 // GRAPH METADATA SUBGRAPH PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -567,19 +1020,29 @@ export type GraphMetadataSubgraphPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type GraphMetadataSubgraphPartialWithRelations = z.infer<typeof GraphMetadataSubgraphPartialSchema> & GraphMetadataSubgraphPartialRelations
+export type GraphMetadataSubgraphPartialWithRelations = z.infer<typeof GraphMetadataSubgraphPartialSchema> &
+  GraphMetadataSubgraphPartialRelations;
 
-export const GraphMetadataSubgraphPartialWithRelationsSchema: z.ZodType<GraphMetadataSubgraphPartialWithRelations> = GraphMetadataSubgraphPartialSchema.merge(z.object({
-  graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const GraphMetadataSubgraphPartialWithRelationsSchema: z.ZodType<GraphMetadataSubgraphPartialWithRelations> =
+  GraphMetadataSubgraphPartialSchema.merge(
+    z.object({
+      graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema),
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type GraphMetadataSubgraphWithPartialRelations = z.infer<typeof GraphMetadataSubgraphSchema> & GraphMetadataSubgraphPartialRelations
+export type GraphMetadataSubgraphWithPartialRelations = z.infer<typeof GraphMetadataSubgraphSchema> &
+  GraphMetadataSubgraphPartialRelations;
 
-export const GraphMetadataSubgraphWithPartialRelationsSchema: z.ZodType<GraphMetadataSubgraphWithPartialRelations> = GraphMetadataSubgraphSchema.merge(z.object({
-  graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const GraphMetadataSubgraphWithPartialRelationsSchema: z.ZodType<GraphMetadataSubgraphWithPartialRelations> =
+  GraphMetadataSubgraphSchema.merge(
+    z
+      .object({
+        graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema),
+        user: z.lazy(() => UserPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // GRAPH METADATA SCHEMA
@@ -597,17 +1060,17 @@ export const GraphMetadataSchema = z.object({
   userId: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type GraphMetadata = z.infer<typeof GraphMetadataSchema>
+export type GraphMetadata = z.infer<typeof GraphMetadataSchema>;
 
 /////////////////////////////////////////
 // GRAPH METADATA PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const GraphMetadataPartialSchema = GraphMetadataSchema.partial()
+export const GraphMetadataPartialSchema = GraphMetadataSchema.partial();
 
-export type GraphMetadataPartial = z.infer<typeof GraphMetadataPartialSchema>
+export type GraphMetadataPartial = z.infer<typeof GraphMetadataPartialSchema>;
 
 // GRAPH METADATA RELATION SCHEMA
 //------------------------------------------------------
@@ -618,13 +1081,15 @@ export type GraphMetadataRelations = {
   user?: UserWithRelations | null;
 };
 
-export type GraphMetadataWithRelations = z.infer<typeof GraphMetadataSchema> & GraphMetadataRelations
+export type GraphMetadataWithRelations = z.infer<typeof GraphMetadataSchema> & GraphMetadataRelations;
 
-export const GraphMetadataWithRelationsSchema: z.ZodType<GraphMetadataWithRelations> = GraphMetadataSchema.merge(z.object({
-  model: z.lazy(() => ModelWithRelationsSchema),
-  subgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
-  user: z.lazy(() => UserWithRelationsSchema).nullable(),
-}))
+export const GraphMetadataWithRelationsSchema: z.ZodType<GraphMetadataWithRelations> = GraphMetadataSchema.merge(
+  z.object({
+    model: z.lazy(() => ModelWithRelationsSchema),
+    subgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
+    user: z.lazy(() => UserWithRelationsSchema).nullable(),
+  }),
+);
 
 // GRAPH METADATA PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -635,21 +1100,30 @@ export type GraphMetadataPartialRelations = {
   user?: UserPartialWithRelations | null;
 };
 
-export type GraphMetadataPartialWithRelations = z.infer<typeof GraphMetadataPartialSchema> & GraphMetadataPartialRelations
+export type GraphMetadataPartialWithRelations = z.infer<typeof GraphMetadataPartialSchema> &
+  GraphMetadataPartialRelations;
 
-export const GraphMetadataPartialWithRelationsSchema: z.ZodType<GraphMetadataPartialWithRelations> = GraphMetadataPartialSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  subgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
-  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-})).partial()
+export const GraphMetadataPartialWithRelationsSchema: z.ZodType<GraphMetadataPartialWithRelations> =
+  GraphMetadataPartialSchema.merge(
+    z.object({
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      subgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+      user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+    }),
+  ).partial();
 
-export type GraphMetadataWithPartialRelations = z.infer<typeof GraphMetadataSchema> & GraphMetadataPartialRelations
+export type GraphMetadataWithPartialRelations = z.infer<typeof GraphMetadataSchema> & GraphMetadataPartialRelations;
 
-export const GraphMetadataWithPartialRelationsSchema: z.ZodType<GraphMetadataWithPartialRelations> = GraphMetadataSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  subgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
-  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-}).partial())
+export const GraphMetadataWithPartialRelationsSchema: z.ZodType<GraphMetadataWithPartialRelations> =
+  GraphMetadataSchema.merge(
+    z
+      .object({
+        model: z.lazy(() => ModelPartialWithRelationsSchema),
+        subgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+        user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // GRAPH METADATA DATA PUT REQUEST SCHEMA
@@ -662,17 +1136,17 @@ export const GraphMetadataDataPutRequestSchema = z.object({
   url: z.string(),
   userId: z.string(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type GraphMetadataDataPutRequest = z.infer<typeof GraphMetadataDataPutRequestSchema>
+export type GraphMetadataDataPutRequest = z.infer<typeof GraphMetadataDataPutRequestSchema>;
 
 /////////////////////////////////////////
 // GRAPH METADATA DATA PUT REQUEST PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const GraphMetadataDataPutRequestPartialSchema = GraphMetadataDataPutRequestSchema.partial()
+export const GraphMetadataDataPutRequestPartialSchema = GraphMetadataDataPutRequestSchema.partial();
 
-export type GraphMetadataDataPutRequestPartial = z.infer<typeof GraphMetadataDataPutRequestPartialSchema>
+export type GraphMetadataDataPutRequestPartial = z.infer<typeof GraphMetadataDataPutRequestPartialSchema>;
 
 // GRAPH METADATA DATA PUT REQUEST RELATION SCHEMA
 //------------------------------------------------------
@@ -681,11 +1155,15 @@ export type GraphMetadataDataPutRequestRelations = {
   user: UserWithRelations;
 };
 
-export type GraphMetadataDataPutRequestWithRelations = z.infer<typeof GraphMetadataDataPutRequestSchema> & GraphMetadataDataPutRequestRelations
+export type GraphMetadataDataPutRequestWithRelations = z.infer<typeof GraphMetadataDataPutRequestSchema> &
+  GraphMetadataDataPutRequestRelations;
 
-export const GraphMetadataDataPutRequestWithRelationsSchema: z.ZodType<GraphMetadataDataPutRequestWithRelations> = GraphMetadataDataPutRequestSchema.merge(z.object({
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const GraphMetadataDataPutRequestWithRelationsSchema: z.ZodType<GraphMetadataDataPutRequestWithRelations> =
+  GraphMetadataDataPutRequestSchema.merge(
+    z.object({
+      user: z.lazy(() => UserWithRelationsSchema),
+    }),
+  );
 
 // GRAPH METADATA DATA PUT REQUEST PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -694,17 +1172,27 @@ export type GraphMetadataDataPutRequestPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type GraphMetadataDataPutRequestPartialWithRelations = z.infer<typeof GraphMetadataDataPutRequestPartialSchema> & GraphMetadataDataPutRequestPartialRelations
+export type GraphMetadataDataPutRequestPartialWithRelations = z.infer<typeof GraphMetadataDataPutRequestPartialSchema> &
+  GraphMetadataDataPutRequestPartialRelations;
 
-export const GraphMetadataDataPutRequestPartialWithRelationsSchema: z.ZodType<GraphMetadataDataPutRequestPartialWithRelations> = GraphMetadataDataPutRequestPartialSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const GraphMetadataDataPutRequestPartialWithRelationsSchema: z.ZodType<GraphMetadataDataPutRequestPartialWithRelations> =
+  GraphMetadataDataPutRequestPartialSchema.merge(
+    z.object({
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type GraphMetadataDataPutRequestWithPartialRelations = z.infer<typeof GraphMetadataDataPutRequestSchema> & GraphMetadataDataPutRequestPartialRelations
+export type GraphMetadataDataPutRequestWithPartialRelations = z.infer<typeof GraphMetadataDataPutRequestSchema> &
+  GraphMetadataDataPutRequestPartialRelations;
 
-export const GraphMetadataDataPutRequestWithPartialRelationsSchema: z.ZodType<GraphMetadataDataPutRequestWithPartialRelations> = GraphMetadataDataPutRequestSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const GraphMetadataDataPutRequestWithPartialRelationsSchema: z.ZodType<GraphMetadataDataPutRequestWithPartialRelations> =
+  GraphMetadataDataPutRequestSchema.merge(
+    z
+      .object({
+        user: z.lazy(() => UserPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // LIST COMMENT SCHEMA
@@ -716,17 +1204,17 @@ export const ListCommentSchema = z.object({
   text: z.string(),
   userId: z.string(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type ListComment = z.infer<typeof ListCommentSchema>
+export type ListComment = z.infer<typeof ListCommentSchema>;
 
 /////////////////////////////////////////
 // LIST COMMENT PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ListCommentPartialSchema = ListCommentSchema.partial()
+export const ListCommentPartialSchema = ListCommentSchema.partial();
 
-export type ListCommentPartial = z.infer<typeof ListCommentPartialSchema>
+export type ListCommentPartial = z.infer<typeof ListCommentPartialSchema>;
 
 // LIST COMMENT RELATION SCHEMA
 //------------------------------------------------------
@@ -736,12 +1224,14 @@ export type ListCommentRelations = {
   list: ListWithRelations;
 };
 
-export type ListCommentWithRelations = z.infer<typeof ListCommentSchema> & ListCommentRelations
+export type ListCommentWithRelations = z.infer<typeof ListCommentSchema> & ListCommentRelations;
 
-export const ListCommentWithRelationsSchema: z.ZodType<ListCommentWithRelations> = ListCommentSchema.merge(z.object({
-  user: z.lazy(() => UserWithRelationsSchema),
-  list: z.lazy(() => ListWithRelationsSchema),
-}))
+export const ListCommentWithRelationsSchema: z.ZodType<ListCommentWithRelations> = ListCommentSchema.merge(
+  z.object({
+    user: z.lazy(() => UserWithRelationsSchema),
+    list: z.lazy(() => ListWithRelationsSchema),
+  }),
+);
 
 // LIST COMMENT PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -751,19 +1241,27 @@ export type ListCommentPartialRelations = {
   list?: ListPartialWithRelations;
 };
 
-export type ListCommentPartialWithRelations = z.infer<typeof ListCommentPartialSchema> & ListCommentPartialRelations
+export type ListCommentPartialWithRelations = z.infer<typeof ListCommentPartialSchema> & ListCommentPartialRelations;
 
-export const ListCommentPartialWithRelationsSchema: z.ZodType<ListCommentPartialWithRelations> = ListCommentPartialSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-  list: z.lazy(() => ListPartialWithRelationsSchema),
-})).partial()
+export const ListCommentPartialWithRelationsSchema: z.ZodType<ListCommentPartialWithRelations> =
+  ListCommentPartialSchema.merge(
+    z.object({
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+      list: z.lazy(() => ListPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type ListCommentWithPartialRelations = z.infer<typeof ListCommentSchema> & ListCommentPartialRelations
+export type ListCommentWithPartialRelations = z.infer<typeof ListCommentSchema> & ListCommentPartialRelations;
 
-export const ListCommentWithPartialRelationsSchema: z.ZodType<ListCommentWithPartialRelations> = ListCommentSchema.merge(z.object({
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-  list: z.lazy(() => ListPartialWithRelationsSchema),
-}).partial())
+export const ListCommentWithPartialRelationsSchema: z.ZodType<ListCommentWithPartialRelations> =
+  ListCommentSchema.merge(
+    z
+      .object({
+        user: z.lazy(() => UserPartialWithRelationsSchema),
+        list: z.lazy(() => ListPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // LIST SCHEMA
@@ -777,17 +1275,17 @@ export const ListSchema = z.object({
   userId: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type List = z.infer<typeof ListSchema>
+export type List = z.infer<typeof ListSchema>;
 
 /////////////////////////////////////////
 // LIST PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ListPartialSchema = ListSchema.partial()
+export const ListPartialSchema = ListSchema.partial();
 
-export type ListPartial = z.infer<typeof ListPartialSchema>
+export type ListPartial = z.infer<typeof ListPartialSchema>;
 
 // LIST RELATION SCHEMA
 //------------------------------------------------------
@@ -799,14 +1297,16 @@ export type ListRelations = {
   user: UserWithRelations;
 };
 
-export type ListWithRelations = z.infer<typeof ListSchema> & ListRelations
+export type ListWithRelations = z.infer<typeof ListSchema> & ListRelations;
 
-export const ListWithRelationsSchema: z.ZodType<ListWithRelations> = ListSchema.merge(z.object({
-  activations: z.lazy(() => ListsOnActivationsWithRelationsSchema).array(),
-  neurons: z.lazy(() => ListsOnNeuronsWithRelationsSchema).array(),
-  comments: z.lazy(() => ListCommentWithRelationsSchema).array(),
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const ListWithRelationsSchema: z.ZodType<ListWithRelations> = ListSchema.merge(
+  z.object({
+    activations: z.lazy(() => ListsOnActivationsWithRelationsSchema).array(),
+    neurons: z.lazy(() => ListsOnNeuronsWithRelationsSchema).array(),
+    comments: z.lazy(() => ListCommentWithRelationsSchema).array(),
+    user: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // LIST PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -818,23 +1318,29 @@ export type ListPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type ListPartialWithRelations = z.infer<typeof ListPartialSchema> & ListPartialRelations
+export type ListPartialWithRelations = z.infer<typeof ListPartialSchema> & ListPartialRelations;
 
-export const ListPartialWithRelationsSchema: z.ZodType<ListPartialWithRelations> = ListPartialSchema.merge(z.object({
-  activations: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
-  comments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const ListPartialWithRelationsSchema: z.ZodType<ListPartialWithRelations> = ListPartialSchema.merge(
+  z.object({
+    activations: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
+    neurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
+    comments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
+    user: z.lazy(() => UserPartialWithRelationsSchema),
+  }),
+).partial();
 
-export type ListWithPartialRelations = z.infer<typeof ListSchema> & ListPartialRelations
+export type ListWithPartialRelations = z.infer<typeof ListSchema> & ListPartialRelations;
 
-export const ListWithPartialRelationsSchema: z.ZodType<ListWithPartialRelations> = ListSchema.merge(z.object({
-  activations: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
-  comments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const ListWithPartialRelationsSchema: z.ZodType<ListWithPartialRelations> = ListSchema.merge(
+  z
+    .object({
+      activations: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
+      neurons: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
+      comments: z.lazy(() => ListCommentPartialWithRelationsSchema).array(),
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // LISTS ON NEURONS SCHEMA
@@ -848,17 +1354,17 @@ export const ListsOnNeuronsSchema = z.object({
   description: z.string().nullable(),
   addedAt: z.coerce.date(),
   userId: z.string(),
-})
+});
 
-export type ListsOnNeurons = z.infer<typeof ListsOnNeuronsSchema>
+export type ListsOnNeurons = z.infer<typeof ListsOnNeuronsSchema>;
 
 /////////////////////////////////////////
 // LISTS ON NEURONS PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ListsOnNeuronsPartialSchema = ListsOnNeuronsSchema.partial()
+export const ListsOnNeuronsPartialSchema = ListsOnNeuronsSchema.partial();
 
-export type ListsOnNeuronsPartial = z.infer<typeof ListsOnNeuronsPartialSchema>
+export type ListsOnNeuronsPartial = z.infer<typeof ListsOnNeuronsPartialSchema>;
 
 // LISTS ON NEURONS RELATION SCHEMA
 //------------------------------------------------------
@@ -869,13 +1375,15 @@ export type ListsOnNeuronsRelations = {
   user: UserWithRelations;
 };
 
-export type ListsOnNeuronsWithRelations = z.infer<typeof ListsOnNeuronsSchema> & ListsOnNeuronsRelations
+export type ListsOnNeuronsWithRelations = z.infer<typeof ListsOnNeuronsSchema> & ListsOnNeuronsRelations;
 
-export const ListsOnNeuronsWithRelationsSchema: z.ZodType<ListsOnNeuronsWithRelations> = ListsOnNeuronsSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronWithRelationsSchema),
-  list: z.lazy(() => ListWithRelationsSchema),
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const ListsOnNeuronsWithRelationsSchema: z.ZodType<ListsOnNeuronsWithRelations> = ListsOnNeuronsSchema.merge(
+  z.object({
+    neuron: z.lazy(() => NeuronWithRelationsSchema),
+    list: z.lazy(() => ListWithRelationsSchema),
+    user: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // LISTS ON NEURONS PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -886,21 +1394,30 @@ export type ListsOnNeuronsPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type ListsOnNeuronsPartialWithRelations = z.infer<typeof ListsOnNeuronsPartialSchema> & ListsOnNeuronsPartialRelations
+export type ListsOnNeuronsPartialWithRelations = z.infer<typeof ListsOnNeuronsPartialSchema> &
+  ListsOnNeuronsPartialRelations;
 
-export const ListsOnNeuronsPartialWithRelationsSchema: z.ZodType<ListsOnNeuronsPartialWithRelations> = ListsOnNeuronsPartialSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  list: z.lazy(() => ListPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const ListsOnNeuronsPartialWithRelationsSchema: z.ZodType<ListsOnNeuronsPartialWithRelations> =
+  ListsOnNeuronsPartialSchema.merge(
+    z.object({
+      neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+      list: z.lazy(() => ListPartialWithRelationsSchema),
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type ListsOnNeuronsWithPartialRelations = z.infer<typeof ListsOnNeuronsSchema> & ListsOnNeuronsPartialRelations
+export type ListsOnNeuronsWithPartialRelations = z.infer<typeof ListsOnNeuronsSchema> & ListsOnNeuronsPartialRelations;
 
-export const ListsOnNeuronsWithPartialRelationsSchema: z.ZodType<ListsOnNeuronsWithPartialRelations> = ListsOnNeuronsSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  list: z.lazy(() => ListPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const ListsOnNeuronsWithPartialRelationsSchema: z.ZodType<ListsOnNeuronsWithPartialRelations> =
+  ListsOnNeuronsSchema.merge(
+    z
+      .object({
+        neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+        list: z.lazy(() => ListPartialWithRelationsSchema),
+        user: z.lazy(() => UserPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // LISTS ON ACTIVATIONS SCHEMA
@@ -909,17 +1426,17 @@ export const ListsOnNeuronsWithPartialRelationsSchema: z.ZodType<ListsOnNeuronsW
 export const ListsOnActivationsSchema = z.object({
   activationId: z.string(),
   listId: z.string(),
-})
+});
 
-export type ListsOnActivations = z.infer<typeof ListsOnActivationsSchema>
+export type ListsOnActivations = z.infer<typeof ListsOnActivationsSchema>;
 
 /////////////////////////////////////////
 // LISTS ON ACTIVATIONS PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ListsOnActivationsPartialSchema = ListsOnActivationsSchema.partial()
+export const ListsOnActivationsPartialSchema = ListsOnActivationsSchema.partial();
 
-export type ListsOnActivationsPartial = z.infer<typeof ListsOnActivationsPartialSchema>
+export type ListsOnActivationsPartial = z.infer<typeof ListsOnActivationsPartialSchema>;
 
 // LISTS ON ACTIVATIONS RELATION SCHEMA
 //------------------------------------------------------
@@ -929,12 +1446,15 @@ export type ListsOnActivationsRelations = {
   list: ListWithRelations;
 };
 
-export type ListsOnActivationsWithRelations = z.infer<typeof ListsOnActivationsSchema> & ListsOnActivationsRelations
+export type ListsOnActivationsWithRelations = z.infer<typeof ListsOnActivationsSchema> & ListsOnActivationsRelations;
 
-export const ListsOnActivationsWithRelationsSchema: z.ZodType<ListsOnActivationsWithRelations> = ListsOnActivationsSchema.merge(z.object({
-  activation: z.lazy(() => ActivationWithRelationsSchema),
-  list: z.lazy(() => ListWithRelationsSchema),
-}))
+export const ListsOnActivationsWithRelationsSchema: z.ZodType<ListsOnActivationsWithRelations> =
+  ListsOnActivationsSchema.merge(
+    z.object({
+      activation: z.lazy(() => ActivationWithRelationsSchema),
+      list: z.lazy(() => ListWithRelationsSchema),
+    }),
+  );
 
 // LISTS ON ACTIVATIONS PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -944,19 +1464,29 @@ export type ListsOnActivationsPartialRelations = {
   list?: ListPartialWithRelations;
 };
 
-export type ListsOnActivationsPartialWithRelations = z.infer<typeof ListsOnActivationsPartialSchema> & ListsOnActivationsPartialRelations
+export type ListsOnActivationsPartialWithRelations = z.infer<typeof ListsOnActivationsPartialSchema> &
+  ListsOnActivationsPartialRelations;
 
-export const ListsOnActivationsPartialWithRelationsSchema: z.ZodType<ListsOnActivationsPartialWithRelations> = ListsOnActivationsPartialSchema.merge(z.object({
-  activation: z.lazy(() => ActivationPartialWithRelationsSchema),
-  list: z.lazy(() => ListPartialWithRelationsSchema),
-})).partial()
+export const ListsOnActivationsPartialWithRelationsSchema: z.ZodType<ListsOnActivationsPartialWithRelations> =
+  ListsOnActivationsPartialSchema.merge(
+    z.object({
+      activation: z.lazy(() => ActivationPartialWithRelationsSchema),
+      list: z.lazy(() => ListPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type ListsOnActivationsWithPartialRelations = z.infer<typeof ListsOnActivationsSchema> & ListsOnActivationsPartialRelations
+export type ListsOnActivationsWithPartialRelations = z.infer<typeof ListsOnActivationsSchema> &
+  ListsOnActivationsPartialRelations;
 
-export const ListsOnActivationsWithPartialRelationsSchema: z.ZodType<ListsOnActivationsWithPartialRelations> = ListsOnActivationsSchema.merge(z.object({
-  activation: z.lazy(() => ActivationPartialWithRelationsSchema),
-  list: z.lazy(() => ListPartialWithRelationsSchema),
-}).partial())
+export const ListsOnActivationsWithPartialRelationsSchema: z.ZodType<ListsOnActivationsWithPartialRelations> =
+  ListsOnActivationsSchema.merge(
+    z
+      .object({
+        activation: z.lazy(() => ActivationPartialWithRelationsSchema),
+        list: z.lazy(() => ListPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // VERIFICATION TOKEN SCHEMA
@@ -966,17 +1496,17 @@ export const VerificationTokenSchema = z.object({
   identifier: z.string(),
   token: z.string(),
   expires: z.coerce.date(),
-})
+});
 
-export type VerificationToken = z.infer<typeof VerificationTokenSchema>
+export type VerificationToken = z.infer<typeof VerificationTokenSchema>;
 
 /////////////////////////////////////////
 // VERIFICATION TOKEN PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const VerificationTokenPartialSchema = VerificationTokenSchema.partial()
+export const VerificationTokenPartialSchema = VerificationTokenSchema.partial();
 
-export type VerificationTokenPartial = z.infer<typeof VerificationTokenPartialSchema>
+export type VerificationTokenPartial = z.infer<typeof VerificationTokenPartialSchema>;
 
 /////////////////////////////////////////
 // MODEL SCHEMA
@@ -984,7 +1514,12 @@ export type VerificationTokenPartial = z.infer<typeof VerificationTokenPartialSc
 
 export const ModelSchema = z.object({
   visibility: VisibilitySchema,
-  id: z.string().regex(new RegExp(/^[a-zA-Z0-9-_]+$/), "Name should contain only numbers, letters, underscores, or dashes",).min(1).max(128).transform((val) => val.toLowerCase()),
+  id: z
+    .string()
+    .regex(new RegExp(/^[a-zA-Z0-9-_]+$/), 'Name should contain only numbers, letters, underscores, or dashes')
+    .min(1)
+    .max(128)
+    .transform((val) => val.toLowerCase()),
   displayNameShort: z.string(),
   displayName: z.string(),
   creatorId: z.string(),
@@ -1001,17 +1536,17 @@ export const ModelSchema = z.object({
   owner: z.string().trim().min(1),
   updatedAt: z.coerce.date(),
   website: z.string().url().nullable(),
-})
+});
 
-export type Model = z.infer<typeof ModelSchema>
+export type Model = z.infer<typeof ModelSchema>;
 
 /////////////////////////////////////////
 // MODEL PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ModelPartialSchema = ModelSchema.partial()
+export const ModelPartialSchema = ModelSchema.partial();
 
-export type ModelPartial = z.infer<typeof ModelPartialSchema>
+export type ModelPartial = z.infer<typeof ModelPartialSchema>;
 
 // MODEL RELATION SCHEMA
 //------------------------------------------------------
@@ -1031,22 +1566,24 @@ export type ModelRelations = {
   graphMetadata: GraphMetadataWithRelations[];
 };
 
-export type ModelWithRelations = z.infer<typeof ModelSchema> & ModelRelations
+export type ModelWithRelations = z.infer<typeof ModelSchema> & ModelRelations;
 
-export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSchema.merge(z.object({
-  defaultSourceSet: z.lazy(() => SourceSetWithRelationsSchema).nullable(),
-  defaultSource: z.lazy(() => SourceWithRelationsSchema).nullable(),
-  explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
-  creator: z.lazy(() => UserWithRelationsSchema),
-  neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
-  savedSearches: z.lazy(() => SavedSearchWithRelationsSchema).array(),
-  sourceSets: z.lazy(() => SourceSetWithRelationsSchema).array(),
-  steerOutputs: z.lazy(() => SteerOutputWithRelationsSchema).array(),
-  evals: z.lazy(() => EvalWithRelationsSchema).array(),
-  sourceInferenceHosts: z.lazy(() => InferenceHostSourceWithRelationsSchema).array(),
-  graphHostSources: z.lazy(() => GraphHostSourceWithRelationsSchema).array(),
-  graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
-}))
+export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSchema.merge(
+  z.object({
+    defaultSourceSet: z.lazy(() => SourceSetWithRelationsSchema).nullable(),
+    defaultSource: z.lazy(() => SourceWithRelationsSchema).nullable(),
+    explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+    creator: z.lazy(() => UserWithRelationsSchema),
+    neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
+    savedSearches: z.lazy(() => SavedSearchWithRelationsSchema).array(),
+    sourceSets: z.lazy(() => SourceSetWithRelationsSchema).array(),
+    steerOutputs: z.lazy(() => SteerOutputWithRelationsSchema).array(),
+    evals: z.lazy(() => EvalWithRelationsSchema).array(),
+    sourceInferenceHosts: z.lazy(() => InferenceHostSourceWithRelationsSchema).array(),
+    graphHostSources: z.lazy(() => GraphHostSourceWithRelationsSchema).array(),
+    graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
+  }),
+);
 
 // MODEL PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1066,39 +1603,45 @@ export type ModelPartialRelations = {
   graphMetadata?: GraphMetadataPartialWithRelations[];
 };
 
-export type ModelPartialWithRelations = z.infer<typeof ModelPartialSchema> & ModelPartialRelations
+export type ModelPartialWithRelations = z.infer<typeof ModelPartialSchema> & ModelPartialRelations;
 
-export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelations> = ModelPartialSchema.merge(z.object({
-  defaultSourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
-  defaultSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
-  sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
-  steerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
-  evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
-  sourceInferenceHosts: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema).array(),
-  graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
-  graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
-})).partial()
+export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelations> = ModelPartialSchema.merge(
+  z.object({
+    defaultSourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
+    defaultSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
+    explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+    creator: z.lazy(() => UserPartialWithRelationsSchema),
+    neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+    savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
+    sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
+    steerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
+    evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
+    sourceInferenceHosts: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema).array(),
+    graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
+    graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
+  }),
+).partial();
 
-export type ModelWithPartialRelations = z.infer<typeof ModelSchema> & ModelPartialRelations
+export type ModelWithPartialRelations = z.infer<typeof ModelSchema> & ModelPartialRelations;
 
-export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelations> = ModelSchema.merge(z.object({
-  defaultSourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
-  defaultSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
-  sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
-  steerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
-  evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
-  sourceInferenceHosts: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema).array(),
-  graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
-  graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
-}).partial())
+export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelations> = ModelSchema.merge(
+  z
+    .object({
+      defaultSourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
+      defaultSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
+      explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+      neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+      savedSearches: z.lazy(() => SavedSearchPartialWithRelationsSchema).array(),
+      sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
+      steerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
+      evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
+      sourceInferenceHosts: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema).array(),
+      graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
+      graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // GRAPH HOST SOURCE SCHEMA
@@ -1112,17 +1655,17 @@ export const GraphHostSourceSchema = z.object({
   modelId: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type GraphHostSource = z.infer<typeof GraphHostSourceSchema>
+export type GraphHostSource = z.infer<typeof GraphHostSourceSchema>;
 
 /////////////////////////////////////////
 // GRAPH HOST SOURCE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const GraphHostSourcePartialSchema = GraphHostSourceSchema.partial()
+export const GraphHostSourcePartialSchema = GraphHostSourceSchema.partial();
 
-export type GraphHostSourcePartial = z.infer<typeof GraphHostSourcePartialSchema>
+export type GraphHostSourcePartial = z.infer<typeof GraphHostSourcePartialSchema>;
 
 // GRAPH HOST SOURCE RELATION SCHEMA
 //------------------------------------------------------
@@ -1132,12 +1675,14 @@ export type GraphHostSourceRelations = {
   sourceSets: GraphHostSourceOnSourceSetWithRelations[];
 };
 
-export type GraphHostSourceWithRelations = z.infer<typeof GraphHostSourceSchema> & GraphHostSourceRelations
+export type GraphHostSourceWithRelations = z.infer<typeof GraphHostSourceSchema> & GraphHostSourceRelations;
 
-export const GraphHostSourceWithRelationsSchema: z.ZodType<GraphHostSourceWithRelations> = GraphHostSourceSchema.merge(z.object({
-  model: z.lazy(() => ModelWithRelationsSchema),
-  sourceSets: z.lazy(() => GraphHostSourceOnSourceSetWithRelationsSchema).array(),
-}))
+export const GraphHostSourceWithRelationsSchema: z.ZodType<GraphHostSourceWithRelations> = GraphHostSourceSchema.merge(
+  z.object({
+    model: z.lazy(() => ModelWithRelationsSchema),
+    sourceSets: z.lazy(() => GraphHostSourceOnSourceSetWithRelationsSchema).array(),
+  }),
+);
 
 // GRAPH HOST SOURCE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1147,19 +1692,29 @@ export type GraphHostSourcePartialRelations = {
   sourceSets?: GraphHostSourceOnSourceSetPartialWithRelations[];
 };
 
-export type GraphHostSourcePartialWithRelations = z.infer<typeof GraphHostSourcePartialSchema> & GraphHostSourcePartialRelations
+export type GraphHostSourcePartialWithRelations = z.infer<typeof GraphHostSourcePartialSchema> &
+  GraphHostSourcePartialRelations;
 
-export const GraphHostSourcePartialWithRelationsSchema: z.ZodType<GraphHostSourcePartialWithRelations> = GraphHostSourcePartialSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  sourceSets: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
-})).partial()
+export const GraphHostSourcePartialWithRelationsSchema: z.ZodType<GraphHostSourcePartialWithRelations> =
+  GraphHostSourcePartialSchema.merge(
+    z.object({
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      sourceSets: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type GraphHostSourceWithPartialRelations = z.infer<typeof GraphHostSourceSchema> & GraphHostSourcePartialRelations
+export type GraphHostSourceWithPartialRelations = z.infer<typeof GraphHostSourceSchema> &
+  GraphHostSourcePartialRelations;
 
-export const GraphHostSourceWithPartialRelationsSchema: z.ZodType<GraphHostSourceWithPartialRelations> = GraphHostSourceSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  sourceSets: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
-}).partial())
+export const GraphHostSourceWithPartialRelationsSchema: z.ZodType<GraphHostSourceWithPartialRelations> =
+  GraphHostSourceSchema.merge(
+    z
+      .object({
+        model: z.lazy(() => ModelPartialWithRelationsSchema),
+        sourceSets: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // GRAPH HOST SOURCE ON SOURCE SET SCHEMA
@@ -1169,17 +1724,17 @@ export const GraphHostSourceOnSourceSetSchema = z.object({
   sourceSetName: z.string(),
   sourceSetModelId: z.string(),
   graphHostSourceId: z.string(),
-})
+});
 
-export type GraphHostSourceOnSourceSet = z.infer<typeof GraphHostSourceOnSourceSetSchema>
+export type GraphHostSourceOnSourceSet = z.infer<typeof GraphHostSourceOnSourceSetSchema>;
 
 /////////////////////////////////////////
 // GRAPH HOST SOURCE ON SOURCE SET PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const GraphHostSourceOnSourceSetPartialSchema = GraphHostSourceOnSourceSetSchema.partial()
+export const GraphHostSourceOnSourceSetPartialSchema = GraphHostSourceOnSourceSetSchema.partial();
 
-export type GraphHostSourceOnSourceSetPartial = z.infer<typeof GraphHostSourceOnSourceSetPartialSchema>
+export type GraphHostSourceOnSourceSetPartial = z.infer<typeof GraphHostSourceOnSourceSetPartialSchema>;
 
 // GRAPH HOST SOURCE ON SOURCE SET RELATION SCHEMA
 //------------------------------------------------------
@@ -1189,12 +1744,16 @@ export type GraphHostSourceOnSourceSetRelations = {
   graphHostSource: GraphHostSourceWithRelations;
 };
 
-export type GraphHostSourceOnSourceSetWithRelations = z.infer<typeof GraphHostSourceOnSourceSetSchema> & GraphHostSourceOnSourceSetRelations
+export type GraphHostSourceOnSourceSetWithRelations = z.infer<typeof GraphHostSourceOnSourceSetSchema> &
+  GraphHostSourceOnSourceSetRelations;
 
-export const GraphHostSourceOnSourceSetWithRelationsSchema: z.ZodType<GraphHostSourceOnSourceSetWithRelations> = GraphHostSourceOnSourceSetSchema.merge(z.object({
-  sourceSet: z.lazy(() => SourceSetWithRelationsSchema),
-  graphHostSource: z.lazy(() => GraphHostSourceWithRelationsSchema),
-}))
+export const GraphHostSourceOnSourceSetWithRelationsSchema: z.ZodType<GraphHostSourceOnSourceSetWithRelations> =
+  GraphHostSourceOnSourceSetSchema.merge(
+    z.object({
+      sourceSet: z.lazy(() => SourceSetWithRelationsSchema),
+      graphHostSource: z.lazy(() => GraphHostSourceWithRelationsSchema),
+    }),
+  );
 
 // GRAPH HOST SOURCE ON SOURCE SET PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1204,19 +1763,29 @@ export type GraphHostSourceOnSourceSetPartialRelations = {
   graphHostSource?: GraphHostSourcePartialWithRelations;
 };
 
-export type GraphHostSourceOnSourceSetPartialWithRelations = z.infer<typeof GraphHostSourceOnSourceSetPartialSchema> & GraphHostSourceOnSourceSetPartialRelations
+export type GraphHostSourceOnSourceSetPartialWithRelations = z.infer<typeof GraphHostSourceOnSourceSetPartialSchema> &
+  GraphHostSourceOnSourceSetPartialRelations;
 
-export const GraphHostSourceOnSourceSetPartialWithRelationsSchema: z.ZodType<GraphHostSourceOnSourceSetPartialWithRelations> = GraphHostSourceOnSourceSetPartialSchema.merge(z.object({
-  sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema),
-  graphHostSource: z.lazy(() => GraphHostSourcePartialWithRelationsSchema),
-})).partial()
+export const GraphHostSourceOnSourceSetPartialWithRelationsSchema: z.ZodType<GraphHostSourceOnSourceSetPartialWithRelations> =
+  GraphHostSourceOnSourceSetPartialSchema.merge(
+    z.object({
+      sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema),
+      graphHostSource: z.lazy(() => GraphHostSourcePartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type GraphHostSourceOnSourceSetWithPartialRelations = z.infer<typeof GraphHostSourceOnSourceSetSchema> & GraphHostSourceOnSourceSetPartialRelations
+export type GraphHostSourceOnSourceSetWithPartialRelations = z.infer<typeof GraphHostSourceOnSourceSetSchema> &
+  GraphHostSourceOnSourceSetPartialRelations;
 
-export const GraphHostSourceOnSourceSetWithPartialRelationsSchema: z.ZodType<GraphHostSourceOnSourceSetWithPartialRelations> = GraphHostSourceOnSourceSetSchema.merge(z.object({
-  sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema),
-  graphHostSource: z.lazy(() => GraphHostSourcePartialWithRelationsSchema),
-}).partial())
+export const GraphHostSourceOnSourceSetWithPartialRelationsSchema: z.ZodType<GraphHostSourceOnSourceSetWithPartialRelations> =
+  GraphHostSourceOnSourceSetSchema.merge(
+    z
+      .object({
+        sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema),
+        graphHostSource: z.lazy(() => GraphHostSourcePartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // INFERENCE HOST SOURCE SCHEMA
@@ -1229,17 +1798,17 @@ export const InferenceHostSourceSchema = z.object({
   modelId: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type InferenceHostSource = z.infer<typeof InferenceHostSourceSchema>
+export type InferenceHostSource = z.infer<typeof InferenceHostSourceSchema>;
 
 /////////////////////////////////////////
 // INFERENCE HOST SOURCE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const InferenceHostSourcePartialSchema = InferenceHostSourceSchema.partial()
+export const InferenceHostSourcePartialSchema = InferenceHostSourceSchema.partial();
 
-export type InferenceHostSourcePartial = z.infer<typeof InferenceHostSourcePartialSchema>
+export type InferenceHostSourcePartial = z.infer<typeof InferenceHostSourcePartialSchema>;
 
 // INFERENCE HOST SOURCE RELATION SCHEMA
 //------------------------------------------------------
@@ -1249,12 +1818,15 @@ export type InferenceHostSourceRelations = {
   sources: InferenceHostSourceOnSourceWithRelations[];
 };
 
-export type InferenceHostSourceWithRelations = z.infer<typeof InferenceHostSourceSchema> & InferenceHostSourceRelations
+export type InferenceHostSourceWithRelations = z.infer<typeof InferenceHostSourceSchema> & InferenceHostSourceRelations;
 
-export const InferenceHostSourceWithRelationsSchema: z.ZodType<InferenceHostSourceWithRelations> = InferenceHostSourceSchema.merge(z.object({
-  model: z.lazy(() => ModelWithRelationsSchema),
-  sources: z.lazy(() => InferenceHostSourceOnSourceWithRelationsSchema).array(),
-}))
+export const InferenceHostSourceWithRelationsSchema: z.ZodType<InferenceHostSourceWithRelations> =
+  InferenceHostSourceSchema.merge(
+    z.object({
+      model: z.lazy(() => ModelWithRelationsSchema),
+      sources: z.lazy(() => InferenceHostSourceOnSourceWithRelationsSchema).array(),
+    }),
+  );
 
 // INFERENCE HOST SOURCE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1264,19 +1836,29 @@ export type InferenceHostSourcePartialRelations = {
   sources?: InferenceHostSourceOnSourcePartialWithRelations[];
 };
 
-export type InferenceHostSourcePartialWithRelations = z.infer<typeof InferenceHostSourcePartialSchema> & InferenceHostSourcePartialRelations
+export type InferenceHostSourcePartialWithRelations = z.infer<typeof InferenceHostSourcePartialSchema> &
+  InferenceHostSourcePartialRelations;
 
-export const InferenceHostSourcePartialWithRelationsSchema: z.ZodType<InferenceHostSourcePartialWithRelations> = InferenceHostSourcePartialSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  sources: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
-})).partial()
+export const InferenceHostSourcePartialWithRelationsSchema: z.ZodType<InferenceHostSourcePartialWithRelations> =
+  InferenceHostSourcePartialSchema.merge(
+    z.object({
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      sources: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type InferenceHostSourceWithPartialRelations = z.infer<typeof InferenceHostSourceSchema> & InferenceHostSourcePartialRelations
+export type InferenceHostSourceWithPartialRelations = z.infer<typeof InferenceHostSourceSchema> &
+  InferenceHostSourcePartialRelations;
 
-export const InferenceHostSourceWithPartialRelationsSchema: z.ZodType<InferenceHostSourceWithPartialRelations> = InferenceHostSourceSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  sources: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
-}).partial())
+export const InferenceHostSourceWithPartialRelationsSchema: z.ZodType<InferenceHostSourceWithPartialRelations> =
+  InferenceHostSourceSchema.merge(
+    z
+      .object({
+        model: z.lazy(() => ModelPartialWithRelationsSchema),
+        sources: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // INFERENCE HOST SOURCE ON SOURCE SCHEMA
@@ -1286,17 +1868,17 @@ export const InferenceHostSourceOnSourceSchema = z.object({
   sourceId: z.string(),
   sourceModelId: z.string(),
   inferenceHostId: z.string(),
-})
+});
 
-export type InferenceHostSourceOnSource = z.infer<typeof InferenceHostSourceOnSourceSchema>
+export type InferenceHostSourceOnSource = z.infer<typeof InferenceHostSourceOnSourceSchema>;
 
 /////////////////////////////////////////
 // INFERENCE HOST SOURCE ON SOURCE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const InferenceHostSourceOnSourcePartialSchema = InferenceHostSourceOnSourceSchema.partial()
+export const InferenceHostSourceOnSourcePartialSchema = InferenceHostSourceOnSourceSchema.partial();
 
-export type InferenceHostSourceOnSourcePartial = z.infer<typeof InferenceHostSourceOnSourcePartialSchema>
+export type InferenceHostSourceOnSourcePartial = z.infer<typeof InferenceHostSourceOnSourcePartialSchema>;
 
 // INFERENCE HOST SOURCE ON SOURCE RELATION SCHEMA
 //------------------------------------------------------
@@ -1306,12 +1888,16 @@ export type InferenceHostSourceOnSourceRelations = {
   inferenceHost: InferenceHostSourceWithRelations;
 };
 
-export type InferenceHostSourceOnSourceWithRelations = z.infer<typeof InferenceHostSourceOnSourceSchema> & InferenceHostSourceOnSourceRelations
+export type InferenceHostSourceOnSourceWithRelations = z.infer<typeof InferenceHostSourceOnSourceSchema> &
+  InferenceHostSourceOnSourceRelations;
 
-export const InferenceHostSourceOnSourceWithRelationsSchema: z.ZodType<InferenceHostSourceOnSourceWithRelations> = InferenceHostSourceOnSourceSchema.merge(z.object({
-  source: z.lazy(() => SourceWithRelationsSchema),
-  inferenceHost: z.lazy(() => InferenceHostSourceWithRelationsSchema),
-}))
+export const InferenceHostSourceOnSourceWithRelationsSchema: z.ZodType<InferenceHostSourceOnSourceWithRelations> =
+  InferenceHostSourceOnSourceSchema.merge(
+    z.object({
+      source: z.lazy(() => SourceWithRelationsSchema),
+      inferenceHost: z.lazy(() => InferenceHostSourceWithRelationsSchema),
+    }),
+  );
 
 // INFERENCE HOST SOURCE ON SOURCE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1321,19 +1907,29 @@ export type InferenceHostSourceOnSourcePartialRelations = {
   inferenceHost?: InferenceHostSourcePartialWithRelations;
 };
 
-export type InferenceHostSourceOnSourcePartialWithRelations = z.infer<typeof InferenceHostSourceOnSourcePartialSchema> & InferenceHostSourceOnSourcePartialRelations
+export type InferenceHostSourceOnSourcePartialWithRelations = z.infer<typeof InferenceHostSourceOnSourcePartialSchema> &
+  InferenceHostSourceOnSourcePartialRelations;
 
-export const InferenceHostSourceOnSourcePartialWithRelationsSchema: z.ZodType<InferenceHostSourceOnSourcePartialWithRelations> = InferenceHostSourceOnSourcePartialSchema.merge(z.object({
-  source: z.lazy(() => SourcePartialWithRelationsSchema),
-  inferenceHost: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema),
-})).partial()
+export const InferenceHostSourceOnSourcePartialWithRelationsSchema: z.ZodType<InferenceHostSourceOnSourcePartialWithRelations> =
+  InferenceHostSourceOnSourcePartialSchema.merge(
+    z.object({
+      source: z.lazy(() => SourcePartialWithRelationsSchema),
+      inferenceHost: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type InferenceHostSourceOnSourceWithPartialRelations = z.infer<typeof InferenceHostSourceOnSourceSchema> & InferenceHostSourceOnSourcePartialRelations
+export type InferenceHostSourceOnSourceWithPartialRelations = z.infer<typeof InferenceHostSourceOnSourceSchema> &
+  InferenceHostSourceOnSourcePartialRelations;
 
-export const InferenceHostSourceOnSourceWithPartialRelationsSchema: z.ZodType<InferenceHostSourceOnSourceWithPartialRelations> = InferenceHostSourceOnSourceSchema.merge(z.object({
-  source: z.lazy(() => SourcePartialWithRelationsSchema),
-  inferenceHost: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema),
-}).partial())
+export const InferenceHostSourceOnSourceWithPartialRelationsSchema: z.ZodType<InferenceHostSourceOnSourceWithPartialRelations> =
+  InferenceHostSourceOnSourceSchema.merge(
+    z
+      .object({
+        source: z.lazy(() => SourcePartialWithRelationsSchema),
+        inferenceHost: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // SOURCE SCHEMA
@@ -1363,17 +1959,17 @@ export const SourceSchema = z.object({
   cosSimMatchModelId: z.string().nullable(),
   cosSimMatchSourceId: z.string().nullable(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type Source = z.infer<typeof SourceSchema>
+export type Source = z.infer<typeof SourceSchema>;
 
 /////////////////////////////////////////
 // SOURCE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SourcePartialSchema = SourceSchema.partial()
+export const SourcePartialSchema = SourceSchema.partial();
 
-export type SourcePartial = z.infer<typeof SourcePartialSchema>
+export type SourcePartial = z.infer<typeof SourcePartialSchema>;
 
 // SOURCE RELATION SCHEMA
 //------------------------------------------------------
@@ -1389,20 +1985,22 @@ export type SourceRelations = {
   evals: EvalWithRelations[];
 };
 
-export type SourceWithRelations = Omit<z.infer<typeof SourceSchema>, "saelensConfig"> & {
+export type SourceWithRelations = Omit<z.infer<typeof SourceSchema>, 'saelensConfig'> & {
   saelensConfig?: NullableJsonInput;
-} & SourceRelations
+} & SourceRelations;
 
-export const SourceWithRelationsSchema: z.ZodType<SourceWithRelations> = SourceSchema.merge(z.object({
-  inferenceHosts: z.lazy(() => InferenceHostSourceOnSourceWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
-  defaultOfModel: z.lazy(() => ModelWithRelationsSchema).nullable(),
-  set: z.lazy(() => SourceSetWithRelationsSchema),
-  creator: z.lazy(() => UserWithRelationsSchema),
-  cosSimMatchSource: z.lazy(() => SourceWithRelationsSchema).nullable(),
-  matchedBySources: z.lazy(() => SourceWithRelationsSchema).array(),
-  evals: z.lazy(() => EvalWithRelationsSchema).array(),
-}))
+export const SourceWithRelationsSchema: z.ZodType<SourceWithRelations> = SourceSchema.merge(
+  z.object({
+    inferenceHosts: z.lazy(() => InferenceHostSourceOnSourceWithRelationsSchema).array(),
+    neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
+    defaultOfModel: z.lazy(() => ModelWithRelationsSchema).nullable(),
+    set: z.lazy(() => SourceSetWithRelationsSchema),
+    creator: z.lazy(() => UserWithRelationsSchema),
+    cosSimMatchSource: z.lazy(() => SourceWithRelationsSchema).nullable(),
+    matchedBySources: z.lazy(() => SourceWithRelationsSchema).array(),
+    evals: z.lazy(() => EvalWithRelationsSchema).array(),
+  }),
+);
 
 // SOURCE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1418,35 +2016,41 @@ export type SourcePartialRelations = {
   evals?: EvalPartialWithRelations[];
 };
 
-export type SourcePartialWithRelations = Omit<z.infer<typeof SourcePartialSchema>, "saelensConfig"> & {
+export type SourcePartialWithRelations = Omit<z.infer<typeof SourcePartialSchema>, 'saelensConfig'> & {
   saelensConfig?: NullableJsonInput;
-} & SourcePartialRelations
+} & SourcePartialRelations;
 
-export const SourcePartialWithRelationsSchema: z.ZodType<SourcePartialWithRelations> = SourcePartialSchema.merge(z.object({
-  inferenceHosts: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
-  set: z.lazy(() => SourceSetPartialWithRelationsSchema),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  cosSimMatchSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
-  matchedBySources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
-  evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
-})).partial()
+export const SourcePartialWithRelationsSchema: z.ZodType<SourcePartialWithRelations> = SourcePartialSchema.merge(
+  z.object({
+    inferenceHosts: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
+    neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+    defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
+    set: z.lazy(() => SourceSetPartialWithRelationsSchema),
+    creator: z.lazy(() => UserPartialWithRelationsSchema),
+    cosSimMatchSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
+    matchedBySources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
+    evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
+  }),
+).partial();
 
-export type SourceWithPartialRelations = Omit<z.infer<typeof SourceSchema>, "saelensConfig"> & {
+export type SourceWithPartialRelations = Omit<z.infer<typeof SourceSchema>, 'saelensConfig'> & {
   saelensConfig?: NullableJsonInput;
-} & SourcePartialRelations
+} & SourcePartialRelations;
 
-export const SourceWithPartialRelationsSchema: z.ZodType<SourceWithPartialRelations> = SourceSchema.merge(z.object({
-  inferenceHosts: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
-  set: z.lazy(() => SourceSetPartialWithRelationsSchema),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  cosSimMatchSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
-  matchedBySources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
-  evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
-}).partial())
+export const SourceWithPartialRelationsSchema: z.ZodType<SourceWithPartialRelations> = SourceSchema.merge(
+  z
+    .object({
+      inferenceHosts: z.lazy(() => InferenceHostSourceOnSourcePartialWithRelationsSchema).array(),
+      neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+      defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
+      set: z.lazy(() => SourceSetPartialWithRelationsSchema),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+      cosSimMatchSource: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
+      matchedBySources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
+      evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // SOURCE SET SCHEMA
@@ -1474,17 +2078,17 @@ export const SourceSetSchema = z.object({
   showHeadAttribution: z.boolean(),
   showUmap: z.boolean(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type SourceSet = z.infer<typeof SourceSetSchema>
+export type SourceSet = z.infer<typeof SourceSetSchema>;
 
 /////////////////////////////////////////
 // SOURCE SET PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SourceSetPartialSchema = SourceSetSchema.partial()
+export const SourceSetPartialSchema = SourceSetSchema.partial();
 
-export type SourceSetPartial = z.infer<typeof SourceSetPartialSchema>
+export type SourceSetPartial = z.infer<typeof SourceSetPartialSchema>;
 
 // SOURCE SET RELATION SCHEMA
 //------------------------------------------------------
@@ -1499,17 +2103,19 @@ export type SourceSetRelations = {
   defaultOfModel?: ModelWithRelations | null;
 };
 
-export type SourceSetWithRelations = z.infer<typeof SourceSetSchema> & SourceSetRelations
+export type SourceSetWithRelations = z.infer<typeof SourceSetSchema> & SourceSetRelations;
 
-export const SourceSetWithRelationsSchema: z.ZodType<SourceSetWithRelations> = SourceSetSchema.merge(z.object({
-  model: z.lazy(() => ModelWithRelationsSchema),
-  creator: z.lazy(() => UserWithRelationsSchema),
-  sources: z.lazy(() => SourceWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
-  releases: z.lazy(() => SourceReleaseWithRelationsSchema).nullable(),
-  graphHostSources: z.lazy(() => GraphHostSourceOnSourceSetWithRelationsSchema).array(),
-  defaultOfModel: z.lazy(() => ModelWithRelationsSchema).nullable(),
-}))
+export const SourceSetWithRelationsSchema: z.ZodType<SourceSetWithRelations> = SourceSetSchema.merge(
+  z.object({
+    model: z.lazy(() => ModelWithRelationsSchema),
+    creator: z.lazy(() => UserWithRelationsSchema),
+    sources: z.lazy(() => SourceWithRelationsSchema).array(),
+    neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
+    releases: z.lazy(() => SourceReleaseWithRelationsSchema).nullable(),
+    graphHostSources: z.lazy(() => GraphHostSourceOnSourceSetWithRelationsSchema).array(),
+    defaultOfModel: z.lazy(() => ModelWithRelationsSchema).nullable(),
+  }),
+);
 
 // SOURCE SET PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1524,29 +2130,36 @@ export type SourceSetPartialRelations = {
   defaultOfModel?: ModelPartialWithRelations | null;
 };
 
-export type SourceSetPartialWithRelations = z.infer<typeof SourceSetPartialSchema> & SourceSetPartialRelations
+export type SourceSetPartialWithRelations = z.infer<typeof SourceSetPartialSchema> & SourceSetPartialRelations;
 
-export const SourceSetPartialWithRelationsSchema: z.ZodType<SourceSetPartialWithRelations> = SourceSetPartialSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  releases: z.lazy(() => SourceReleasePartialWithRelationsSchema).nullable(),
-  graphHostSources: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
-  defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
-})).partial()
+export const SourceSetPartialWithRelationsSchema: z.ZodType<SourceSetPartialWithRelations> =
+  SourceSetPartialSchema.merge(
+    z.object({
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+      sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
+      neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+      releases: z.lazy(() => SourceReleasePartialWithRelationsSchema).nullable(),
+      graphHostSources: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
+      defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
+    }),
+  ).partial();
 
-export type SourceSetWithPartialRelations = z.infer<typeof SourceSetSchema> & SourceSetPartialRelations
+export type SourceSetWithPartialRelations = z.infer<typeof SourceSetSchema> & SourceSetPartialRelations;
 
-export const SourceSetWithPartialRelationsSchema: z.ZodType<SourceSetWithPartialRelations> = SourceSetSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
-  neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
-  releases: z.lazy(() => SourceReleasePartialWithRelationsSchema).nullable(),
-  graphHostSources: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
-  defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
-}).partial())
+export const SourceSetWithPartialRelationsSchema: z.ZodType<SourceSetWithPartialRelations> = SourceSetSchema.merge(
+  z
+    .object({
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+      sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
+      neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
+      releases: z.lazy(() => SourceReleasePartialWithRelationsSchema).nullable(),
+      graphHostSources: z.lazy(() => GraphHostSourceOnSourceSetPartialWithRelationsSchema).array(),
+      defaultOfModel: z.lazy(() => ModelPartialWithRelationsSchema).nullable(),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // SOURCE RELEASE SCHEMA
@@ -1568,17 +2181,17 @@ export const SourceReleaseSchema = z.object({
   defaultSourceId: z.string().nullable(),
   defaultUmapSourceIds: z.string().array(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type SourceRelease = z.infer<typeof SourceReleaseSchema>
+export type SourceRelease = z.infer<typeof SourceReleaseSchema>;
 
 /////////////////////////////////////////
 // SOURCE RELEASE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SourceReleasePartialSchema = SourceReleaseSchema.partial()
+export const SourceReleasePartialSchema = SourceReleaseSchema.partial();
 
-export type SourceReleasePartial = z.infer<typeof SourceReleasePartialSchema>
+export type SourceReleasePartial = z.infer<typeof SourceReleasePartialSchema>;
 
 // SOURCE RELEASE RELATION SCHEMA
 //------------------------------------------------------
@@ -1588,12 +2201,14 @@ export type SourceReleaseRelations = {
   creator: UserWithRelations;
 };
 
-export type SourceReleaseWithRelations = z.infer<typeof SourceReleaseSchema> & SourceReleaseRelations
+export type SourceReleaseWithRelations = z.infer<typeof SourceReleaseSchema> & SourceReleaseRelations;
 
-export const SourceReleaseWithRelationsSchema: z.ZodType<SourceReleaseWithRelations> = SourceReleaseSchema.merge(z.object({
-  sourceSets: z.lazy(() => SourceSetWithRelationsSchema).array(),
-  creator: z.lazy(() => UserWithRelationsSchema),
-}))
+export const SourceReleaseWithRelationsSchema: z.ZodType<SourceReleaseWithRelations> = SourceReleaseSchema.merge(
+  z.object({
+    sourceSets: z.lazy(() => SourceSetWithRelationsSchema).array(),
+    creator: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // SOURCE RELEASE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1603,19 +2218,28 @@ export type SourceReleasePartialRelations = {
   creator?: UserPartialWithRelations;
 };
 
-export type SourceReleasePartialWithRelations = z.infer<typeof SourceReleasePartialSchema> & SourceReleasePartialRelations
+export type SourceReleasePartialWithRelations = z.infer<typeof SourceReleasePartialSchema> &
+  SourceReleasePartialRelations;
 
-export const SourceReleasePartialWithRelationsSchema: z.ZodType<SourceReleasePartialWithRelations> = SourceReleasePartialSchema.merge(z.object({
-  sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const SourceReleasePartialWithRelationsSchema: z.ZodType<SourceReleasePartialWithRelations> =
+  SourceReleasePartialSchema.merge(
+    z.object({
+      sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type SourceReleaseWithPartialRelations = z.infer<typeof SourceReleaseSchema> & SourceReleasePartialRelations
+export type SourceReleaseWithPartialRelations = z.infer<typeof SourceReleaseSchema> & SourceReleasePartialRelations;
 
-export const SourceReleaseWithPartialRelationsSchema: z.ZodType<SourceReleaseWithPartialRelations> = SourceReleaseSchema.merge(z.object({
-  sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const SourceReleaseWithPartialRelationsSchema: z.ZodType<SourceReleaseWithPartialRelations> =
+  SourceReleaseSchema.merge(
+    z
+      .object({
+        sourceSets: z.lazy(() => SourceSetPartialWithRelationsSchema).array(),
+        creator: z.lazy(() => UserPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EVAL SCHEMA
@@ -1630,17 +2254,17 @@ export const EvalSchema = z.object({
   detailedMetrics: NullableJsonValue.optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type Eval = z.infer<typeof EvalSchema>
+export type Eval = z.infer<typeof EvalSchema>;
 
 /////////////////////////////////////////
 // EVAL PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const EvalPartialSchema = EvalSchema.partial()
+export const EvalPartialSchema = EvalSchema.partial();
 
-export type EvalPartial = z.infer<typeof EvalPartialSchema>
+export type EvalPartial = z.infer<typeof EvalPartialSchema>;
 
 // EVAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1651,15 +2275,17 @@ export type EvalRelations = {
   source: SourceWithRelations;
 };
 
-export type EvalWithRelations = Omit<z.infer<typeof EvalSchema>, "detailedMetrics"> & {
+export type EvalWithRelations = Omit<z.infer<typeof EvalSchema>, 'detailedMetrics'> & {
   detailedMetrics?: NullableJsonInput;
-} & EvalRelations
+} & EvalRelations;
 
-export const EvalWithRelationsSchema: z.ZodType<EvalWithRelations> = EvalSchema.merge(z.object({
-  type: z.lazy(() => EvalTypeWithRelationsSchema),
-  model: z.lazy(() => ModelWithRelationsSchema),
-  source: z.lazy(() => SourceWithRelationsSchema),
-}))
+export const EvalWithRelationsSchema: z.ZodType<EvalWithRelations> = EvalSchema.merge(
+  z.object({
+    type: z.lazy(() => EvalTypeWithRelationsSchema),
+    model: z.lazy(() => ModelWithRelationsSchema),
+    source: z.lazy(() => SourceWithRelationsSchema),
+  }),
+);
 
 // EVAL PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1670,25 +2296,31 @@ export type EvalPartialRelations = {
   source?: SourcePartialWithRelations;
 };
 
-export type EvalPartialWithRelations = Omit<z.infer<typeof EvalPartialSchema>, "detailedMetrics"> & {
+export type EvalPartialWithRelations = Omit<z.infer<typeof EvalPartialSchema>, 'detailedMetrics'> & {
   detailedMetrics?: NullableJsonInput;
-} & EvalPartialRelations
+} & EvalPartialRelations;
 
-export const EvalPartialWithRelationsSchema: z.ZodType<EvalPartialWithRelations> = EvalPartialSchema.merge(z.object({
-  type: z.lazy(() => EvalTypePartialWithRelationsSchema),
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  source: z.lazy(() => SourcePartialWithRelationsSchema),
-})).partial()
+export const EvalPartialWithRelationsSchema: z.ZodType<EvalPartialWithRelations> = EvalPartialSchema.merge(
+  z.object({
+    type: z.lazy(() => EvalTypePartialWithRelationsSchema),
+    model: z.lazy(() => ModelPartialWithRelationsSchema),
+    source: z.lazy(() => SourcePartialWithRelationsSchema),
+  }),
+).partial();
 
-export type EvalWithPartialRelations = Omit<z.infer<typeof EvalSchema>, "detailedMetrics"> & {
+export type EvalWithPartialRelations = Omit<z.infer<typeof EvalSchema>, 'detailedMetrics'> & {
   detailedMetrics?: NullableJsonInput;
-} & EvalPartialRelations
+} & EvalPartialRelations;
 
-export const EvalWithPartialRelationsSchema: z.ZodType<EvalWithPartialRelations> = EvalSchema.merge(z.object({
-  type: z.lazy(() => EvalTypePartialWithRelationsSchema),
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  source: z.lazy(() => SourcePartialWithRelationsSchema),
-}).partial())
+export const EvalWithPartialRelationsSchema: z.ZodType<EvalWithPartialRelations> = EvalSchema.merge(
+  z
+    .object({
+      type: z.lazy(() => EvalTypePartialWithRelationsSchema),
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      source: z.lazy(() => SourcePartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // EVAL TYPE SCHEMA
@@ -1704,17 +2336,17 @@ export const EvalTypeSchema = z.object({
   url: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type EvalType = z.infer<typeof EvalTypeSchema>
+export type EvalType = z.infer<typeof EvalTypeSchema>;
 
 /////////////////////////////////////////
 // EVAL TYPE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const EvalTypePartialSchema = EvalTypeSchema.partial()
+export const EvalTypePartialSchema = EvalTypeSchema.partial();
 
-export type EvalTypePartial = z.infer<typeof EvalTypePartialSchema>
+export type EvalTypePartial = z.infer<typeof EvalTypePartialSchema>;
 
 // EVAL TYPE RELATION SCHEMA
 //------------------------------------------------------
@@ -1723,11 +2355,13 @@ export type EvalTypeRelations = {
   evals: EvalWithRelations[];
 };
 
-export type EvalTypeWithRelations = z.infer<typeof EvalTypeSchema> & EvalTypeRelations
+export type EvalTypeWithRelations = z.infer<typeof EvalTypeSchema> & EvalTypeRelations;
 
-export const EvalTypeWithRelationsSchema: z.ZodType<EvalTypeWithRelations> = EvalTypeSchema.merge(z.object({
-  evals: z.lazy(() => EvalWithRelationsSchema).array(),
-}))
+export const EvalTypeWithRelationsSchema: z.ZodType<EvalTypeWithRelations> = EvalTypeSchema.merge(
+  z.object({
+    evals: z.lazy(() => EvalWithRelationsSchema).array(),
+  }),
+);
 
 // EVAL TYPE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1736,17 +2370,23 @@ export type EvalTypePartialRelations = {
   evals?: EvalPartialWithRelations[];
 };
 
-export type EvalTypePartialWithRelations = z.infer<typeof EvalTypePartialSchema> & EvalTypePartialRelations
+export type EvalTypePartialWithRelations = z.infer<typeof EvalTypePartialSchema> & EvalTypePartialRelations;
 
-export const EvalTypePartialWithRelationsSchema: z.ZodType<EvalTypePartialWithRelations> = EvalTypePartialSchema.merge(z.object({
-  evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
-})).partial()
+export const EvalTypePartialWithRelationsSchema: z.ZodType<EvalTypePartialWithRelations> = EvalTypePartialSchema.merge(
+  z.object({
+    evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
+  }),
+).partial();
 
-export type EvalTypeWithPartialRelations = z.infer<typeof EvalTypeSchema> & EvalTypePartialRelations
+export type EvalTypeWithPartialRelations = z.infer<typeof EvalTypeSchema> & EvalTypePartialRelations;
 
-export const EvalTypeWithPartialRelationsSchema: z.ZodType<EvalTypeWithPartialRelations> = EvalTypeSchema.merge(z.object({
-  evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
-}).partial())
+export const EvalTypeWithPartialRelationsSchema: z.ZodType<EvalTypeWithPartialRelations> = EvalTypeSchema.merge(
+  z
+    .object({
+      evals: z.lazy(() => EvalPartialWithRelationsSchema).array(),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // NEURON SCHEMA
@@ -1790,17 +2430,17 @@ export const NeuronSchema = z.object({
   umap_log_feature_sparsity: z.number().nullable(),
   umap_x: z.number().nullable(),
   umap_y: z.number().nullable(),
-})
+});
 
-export type Neuron = z.infer<typeof NeuronSchema>
+export type Neuron = z.infer<typeof NeuronSchema>;
 
 /////////////////////////////////////////
 // NEURON PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const NeuronPartialSchema = NeuronSchema.partial()
+export const NeuronPartialSchema = NeuronSchema.partial();
 
-export type NeuronPartial = z.infer<typeof NeuronPartialSchema>
+export type NeuronPartial = z.infer<typeof NeuronPartialSchema>;
 
 // NEURON RELATION SCHEMA
 //------------------------------------------------------
@@ -1818,20 +2458,22 @@ export type NeuronRelations = {
   steerOutputs: SteerOutputToNeuronWithRelations[];
 };
 
-export type NeuronWithRelations = z.infer<typeof NeuronSchema> & NeuronRelations
+export type NeuronWithRelations = z.infer<typeof NeuronSchema> & NeuronRelations;
 
-export const NeuronWithRelationsSchema: z.ZodType<NeuronWithRelations> = NeuronSchema.merge(z.object({
-  lists: z.lazy(() => ListsOnNeuronsWithRelationsSchema).array(),
-  source: z.lazy(() => SourceWithRelationsSchema).nullable(),
-  sourceSet: z.lazy(() => SourceSetWithRelationsSchema).nullable(),
-  creator: z.lazy(() => UserWithRelationsSchema).nullable(),
-  activations: z.lazy(() => ActivationWithRelationsSchema).array(),
-  explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
-  comments: z.lazy(() => CommentWithRelationsSchema).array(),
-  bookmarks: z.lazy(() => BookmarkWithRelationsSchema).array(),
-  model: z.lazy(() => ModelWithRelationsSchema),
-  steerOutputs: z.lazy(() => SteerOutputToNeuronWithRelationsSchema).array(),
-}))
+export const NeuronWithRelationsSchema: z.ZodType<NeuronWithRelations> = NeuronSchema.merge(
+  z.object({
+    lists: z.lazy(() => ListsOnNeuronsWithRelationsSchema).array(),
+    source: z.lazy(() => SourceWithRelationsSchema).nullable(),
+    sourceSet: z.lazy(() => SourceSetWithRelationsSchema).nullable(),
+    creator: z.lazy(() => UserWithRelationsSchema).nullable(),
+    activations: z.lazy(() => ActivationWithRelationsSchema).array(),
+    explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+    comments: z.lazy(() => CommentWithRelationsSchema).array(),
+    bookmarks: z.lazy(() => BookmarkWithRelationsSchema).array(),
+    model: z.lazy(() => ModelWithRelationsSchema),
+    steerOutputs: z.lazy(() => SteerOutputToNeuronWithRelationsSchema).array(),
+  }),
+);
 
 // NEURON PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1849,35 +2491,41 @@ export type NeuronPartialRelations = {
   steerOutputs?: SteerOutputToNeuronPartialWithRelations[];
 };
 
-export type NeuronPartialWithRelations = z.infer<typeof NeuronPartialSchema> & NeuronPartialRelations
+export type NeuronPartialWithRelations = z.infer<typeof NeuronPartialSchema> & NeuronPartialRelations;
 
-export const NeuronPartialWithRelationsSchema: z.ZodType<NeuronPartialWithRelations> = NeuronPartialSchema.merge(z.object({
-  lists: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
-  source: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
-  sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-  activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
-  bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  steerOutputs: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
-})).partial()
+export const NeuronPartialWithRelationsSchema: z.ZodType<NeuronPartialWithRelations> = NeuronPartialSchema.merge(
+  z.object({
+    lists: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
+    source: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
+    sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
+    creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+    activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
+    explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+    comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
+    bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
+    model: z.lazy(() => ModelPartialWithRelationsSchema),
+    steerOutputs: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
+  }),
+).partial();
 
-export type NeuronWithPartialRelations = z.infer<typeof NeuronSchema> & NeuronPartialRelations
+export type NeuronWithPartialRelations = z.infer<typeof NeuronSchema> & NeuronPartialRelations;
 
-export const NeuronWithPartialRelationsSchema: z.ZodType<NeuronWithPartialRelations> = NeuronSchema.merge(z.object({
-  lists: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
-  source: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
-  sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-  activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-  comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
-  bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  steerOutputs: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
-}).partial())
+export const NeuronWithPartialRelationsSchema: z.ZodType<NeuronWithPartialRelations> = NeuronSchema.merge(
+  z
+    .object({
+      lists: z.lazy(() => ListsOnNeuronsPartialWithRelationsSchema).array(),
+      source: z.lazy(() => SourcePartialWithRelationsSchema).nullable(),
+      sourceSet: z.lazy(() => SourceSetPartialWithRelationsSchema).nullable(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+      activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
+      explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+      comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
+      bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      steerOutputs: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // EXPLANATION SCHEMA
@@ -1902,17 +2550,17 @@ export const ExplanationSchema = z.object({
   explanationModelName: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type Explanation = z.infer<typeof ExplanationSchema>
+export type Explanation = z.infer<typeof ExplanationSchema>;
 
 /////////////////////////////////////////
 // EXPLANATION PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationPartialSchema = ExplanationSchema.partial()
+export const ExplanationPartialSchema = ExplanationSchema.partial();
 
-export type ExplanationPartial = z.infer<typeof ExplanationPartialSchema>
+export type ExplanationPartial = z.infer<typeof ExplanationPartialSchema>;
 
 // EXPLANATION RELATION SCHEMA
 //------------------------------------------------------
@@ -1929,19 +2577,21 @@ export type ExplanationRelations = {
   activationsV1: ExplanationActivationV1WithRelations[];
 };
 
-export type ExplanationWithRelations = z.infer<typeof ExplanationSchema> & ExplanationRelations
+export type ExplanationWithRelations = z.infer<typeof ExplanationSchema> & ExplanationRelations;
 
-export const ExplanationWithRelationsSchema: z.ZodType<ExplanationWithRelations> = ExplanationSchema.merge(z.object({
-  author: z.lazy(() => UserWithRelationsSchema),
-  triggeredByUser: z.lazy(() => UserWithRelationsSchema).nullable(),
-  model: z.lazy(() => ModelWithRelationsSchema),
-  neuron: z.lazy(() => NeuronWithRelationsSchema),
-  votes: z.lazy(() => VoteWithRelationsSchema).array(),
-  type: z.lazy(() => ExplanationTypeWithRelationsSchema).nullable(),
-  explanationModelType: z.lazy(() => ExplanationModelTypeWithRelationsSchema).nullable(),
-  scores: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
-  activationsV1: z.lazy(() => ExplanationActivationV1WithRelationsSchema).array(),
-}))
+export const ExplanationWithRelationsSchema: z.ZodType<ExplanationWithRelations> = ExplanationSchema.merge(
+  z.object({
+    author: z.lazy(() => UserWithRelationsSchema),
+    triggeredByUser: z.lazy(() => UserWithRelationsSchema).nullable(),
+    model: z.lazy(() => ModelWithRelationsSchema),
+    neuron: z.lazy(() => NeuronWithRelationsSchema),
+    votes: z.lazy(() => VoteWithRelationsSchema).array(),
+    type: z.lazy(() => ExplanationTypeWithRelationsSchema).nullable(),
+    explanationModelType: z.lazy(() => ExplanationModelTypeWithRelationsSchema).nullable(),
+    scores: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
+    activationsV1: z.lazy(() => ExplanationActivationV1WithRelationsSchema).array(),
+  }),
+);
 
 // EXPLANATION PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -1958,33 +2608,41 @@ export type ExplanationPartialRelations = {
   activationsV1?: ExplanationActivationV1PartialWithRelations[];
 };
 
-export type ExplanationPartialWithRelations = z.infer<typeof ExplanationPartialSchema> & ExplanationPartialRelations
+export type ExplanationPartialWithRelations = z.infer<typeof ExplanationPartialSchema> & ExplanationPartialRelations;
 
-export const ExplanationPartialWithRelationsSchema: z.ZodType<ExplanationPartialWithRelations> = ExplanationPartialSchema.merge(z.object({
-  author: z.lazy(() => UserPartialWithRelationsSchema),
-  triggeredByUser: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
-  type: z.lazy(() => ExplanationTypePartialWithRelationsSchema).nullable(),
-  explanationModelType: z.lazy(() => ExplanationModelTypePartialWithRelationsSchema).nullable(),
-  scores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-  activationsV1: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
-})).partial()
+export const ExplanationPartialWithRelationsSchema: z.ZodType<ExplanationPartialWithRelations> =
+  ExplanationPartialSchema.merge(
+    z.object({
+      author: z.lazy(() => UserPartialWithRelationsSchema),
+      triggeredByUser: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+      votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
+      type: z.lazy(() => ExplanationTypePartialWithRelationsSchema).nullable(),
+      explanationModelType: z.lazy(() => ExplanationModelTypePartialWithRelationsSchema).nullable(),
+      scores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+      activationsV1: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type ExplanationWithPartialRelations = z.infer<typeof ExplanationSchema> & ExplanationPartialRelations
+export type ExplanationWithPartialRelations = z.infer<typeof ExplanationSchema> & ExplanationPartialRelations;
 
-export const ExplanationWithPartialRelationsSchema: z.ZodType<ExplanationWithPartialRelations> = ExplanationSchema.merge(z.object({
-  author: z.lazy(() => UserPartialWithRelationsSchema),
-  triggeredByUser: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
-  type: z.lazy(() => ExplanationTypePartialWithRelationsSchema).nullable(),
-  explanationModelType: z.lazy(() => ExplanationModelTypePartialWithRelationsSchema).nullable(),
-  scores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-  activationsV1: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
-}).partial())
+export const ExplanationWithPartialRelationsSchema: z.ZodType<ExplanationWithPartialRelations> =
+  ExplanationSchema.merge(
+    z
+      .object({
+        author: z.lazy(() => UserPartialWithRelationsSchema),
+        triggeredByUser: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+        model: z.lazy(() => ModelPartialWithRelationsSchema),
+        neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+        votes: z.lazy(() => VotePartialWithRelationsSchema).array(),
+        type: z.lazy(() => ExplanationTypePartialWithRelationsSchema).nullable(),
+        explanationModelType: z.lazy(() => ExplanationModelTypePartialWithRelationsSchema).nullable(),
+        scores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+        activationsV1: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EXPLANATION MODEL SETTINGS SCHEMA
@@ -1996,17 +2654,17 @@ export const ExplanationModelSettingsSchema = z.object({
   maxTokens: z.number().int().nullable(),
   topP: z.number().nullable(),
   frequencyPenalty: z.number().nullable(),
-})
+});
 
-export type ExplanationModelSettings = z.infer<typeof ExplanationModelSettingsSchema>
+export type ExplanationModelSettings = z.infer<typeof ExplanationModelSettingsSchema>;
 
 /////////////////////////////////////////
 // EXPLANATION MODEL SETTINGS PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationModelSettingsPartialSchema = ExplanationModelSettingsSchema.partial()
+export const ExplanationModelSettingsPartialSchema = ExplanationModelSettingsSchema.partial();
 
-export type ExplanationModelSettingsPartial = z.infer<typeof ExplanationModelSettingsPartialSchema>
+export type ExplanationModelSettingsPartial = z.infer<typeof ExplanationModelSettingsPartialSchema>;
 
 // EXPLANATION MODEL SETTINGS RELATION SCHEMA
 //------------------------------------------------------
@@ -2015,11 +2673,15 @@ export type ExplanationModelSettingsRelations = {
   explanationTypes: ExplanationTypeWithRelations[];
 };
 
-export type ExplanationModelSettingsWithRelations = z.infer<typeof ExplanationModelSettingsSchema> & ExplanationModelSettingsRelations
+export type ExplanationModelSettingsWithRelations = z.infer<typeof ExplanationModelSettingsSchema> &
+  ExplanationModelSettingsRelations;
 
-export const ExplanationModelSettingsWithRelationsSchema: z.ZodType<ExplanationModelSettingsWithRelations> = ExplanationModelSettingsSchema.merge(z.object({
-  explanationTypes: z.lazy(() => ExplanationTypeWithRelationsSchema).array(),
-}))
+export const ExplanationModelSettingsWithRelationsSchema: z.ZodType<ExplanationModelSettingsWithRelations> =
+  ExplanationModelSettingsSchema.merge(
+    z.object({
+      explanationTypes: z.lazy(() => ExplanationTypeWithRelationsSchema).array(),
+    }),
+  );
 
 // EXPLANATION MODEL SETTINGS PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2028,17 +2690,27 @@ export type ExplanationModelSettingsPartialRelations = {
   explanationTypes?: ExplanationTypePartialWithRelations[];
 };
 
-export type ExplanationModelSettingsPartialWithRelations = z.infer<typeof ExplanationModelSettingsPartialSchema> & ExplanationModelSettingsPartialRelations
+export type ExplanationModelSettingsPartialWithRelations = z.infer<typeof ExplanationModelSettingsPartialSchema> &
+  ExplanationModelSettingsPartialRelations;
 
-export const ExplanationModelSettingsPartialWithRelationsSchema: z.ZodType<ExplanationModelSettingsPartialWithRelations> = ExplanationModelSettingsPartialSchema.merge(z.object({
-  explanationTypes: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
-})).partial()
+export const ExplanationModelSettingsPartialWithRelationsSchema: z.ZodType<ExplanationModelSettingsPartialWithRelations> =
+  ExplanationModelSettingsPartialSchema.merge(
+    z.object({
+      explanationTypes: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type ExplanationModelSettingsWithPartialRelations = z.infer<typeof ExplanationModelSettingsSchema> & ExplanationModelSettingsPartialRelations
+export type ExplanationModelSettingsWithPartialRelations = z.infer<typeof ExplanationModelSettingsSchema> &
+  ExplanationModelSettingsPartialRelations;
 
-export const ExplanationModelSettingsWithPartialRelationsSchema: z.ZodType<ExplanationModelSettingsWithPartialRelations> = ExplanationModelSettingsSchema.merge(z.object({
-  explanationTypes: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
-}).partial())
+export const ExplanationModelSettingsWithPartialRelationsSchema: z.ZodType<ExplanationModelSettingsWithPartialRelations> =
+  ExplanationModelSettingsSchema.merge(
+    z
+      .object({
+        explanationTypes: z.lazy(() => ExplanationTypePartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EXPLANATION MODEL TYPE SCHEMA
@@ -2054,17 +2726,17 @@ export const ExplanationModelTypeSchema = z.object({
   creatorName: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type ExplanationModelType = z.infer<typeof ExplanationModelTypeSchema>
+export type ExplanationModelType = z.infer<typeof ExplanationModelTypeSchema>;
 
 /////////////////////////////////////////
 // EXPLANATION MODEL TYPE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationModelTypePartialSchema = ExplanationModelTypeSchema.partial()
+export const ExplanationModelTypePartialSchema = ExplanationModelTypeSchema.partial();
 
-export type ExplanationModelTypePartial = z.infer<typeof ExplanationModelTypePartialSchema>
+export type ExplanationModelTypePartial = z.infer<typeof ExplanationModelTypePartialSchema>;
 
 // EXPLANATION MODEL TYPE RELATION SCHEMA
 //------------------------------------------------------
@@ -2073,11 +2745,15 @@ export type ExplanationModelTypeRelations = {
   explanations: ExplanationWithRelations[];
 };
 
-export type ExplanationModelTypeWithRelations = z.infer<typeof ExplanationModelTypeSchema> & ExplanationModelTypeRelations
+export type ExplanationModelTypeWithRelations = z.infer<typeof ExplanationModelTypeSchema> &
+  ExplanationModelTypeRelations;
 
-export const ExplanationModelTypeWithRelationsSchema: z.ZodType<ExplanationModelTypeWithRelations> = ExplanationModelTypeSchema.merge(z.object({
-  explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
-}))
+export const ExplanationModelTypeWithRelationsSchema: z.ZodType<ExplanationModelTypeWithRelations> =
+  ExplanationModelTypeSchema.merge(
+    z.object({
+      explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+    }),
+  );
 
 // EXPLANATION MODEL TYPE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2086,17 +2762,27 @@ export type ExplanationModelTypePartialRelations = {
   explanations?: ExplanationPartialWithRelations[];
 };
 
-export type ExplanationModelTypePartialWithRelations = z.infer<typeof ExplanationModelTypePartialSchema> & ExplanationModelTypePartialRelations
+export type ExplanationModelTypePartialWithRelations = z.infer<typeof ExplanationModelTypePartialSchema> &
+  ExplanationModelTypePartialRelations;
 
-export const ExplanationModelTypePartialWithRelationsSchema: z.ZodType<ExplanationModelTypePartialWithRelations> = ExplanationModelTypePartialSchema.merge(z.object({
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-})).partial()
+export const ExplanationModelTypePartialWithRelationsSchema: z.ZodType<ExplanationModelTypePartialWithRelations> =
+  ExplanationModelTypePartialSchema.merge(
+    z.object({
+      explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type ExplanationModelTypeWithPartialRelations = z.infer<typeof ExplanationModelTypeSchema> & ExplanationModelTypePartialRelations
+export type ExplanationModelTypeWithPartialRelations = z.infer<typeof ExplanationModelTypeSchema> &
+  ExplanationModelTypePartialRelations;
 
-export const ExplanationModelTypeWithPartialRelationsSchema: z.ZodType<ExplanationModelTypeWithPartialRelations> = ExplanationModelTypeSchema.merge(z.object({
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-}).partial())
+export const ExplanationModelTypeWithPartialRelationsSchema: z.ZodType<ExplanationModelTypeWithPartialRelations> =
+  ExplanationModelTypeSchema.merge(
+    z
+      .object({
+        explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EXPLANATION TYPE SCHEMA
@@ -2115,17 +2801,17 @@ export const ExplanationTypeSchema = z.object({
   creatorId: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type ExplanationType = z.infer<typeof ExplanationTypeSchema>
+export type ExplanationType = z.infer<typeof ExplanationTypeSchema>;
 
 /////////////////////////////////////////
 // EXPLANATION TYPE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationTypePartialSchema = ExplanationTypeSchema.partial()
+export const ExplanationTypePartialSchema = ExplanationTypeSchema.partial();
 
-export type ExplanationTypePartial = z.infer<typeof ExplanationTypePartialSchema>
+export type ExplanationTypePartial = z.infer<typeof ExplanationTypePartialSchema>;
 
 // EXPLANATION TYPE RELATION SCHEMA
 //------------------------------------------------------
@@ -2136,13 +2822,15 @@ export type ExplanationTypeRelations = {
   explanations: ExplanationWithRelations[];
 };
 
-export type ExplanationTypeWithRelations = z.infer<typeof ExplanationTypeSchema> & ExplanationTypeRelations
+export type ExplanationTypeWithRelations = z.infer<typeof ExplanationTypeSchema> & ExplanationTypeRelations;
 
-export const ExplanationTypeWithRelationsSchema: z.ZodType<ExplanationTypeWithRelations> = ExplanationTypeSchema.merge(z.object({
-  explainerModelSettings: z.lazy(() => ExplanationModelSettingsWithRelationsSchema).nullable(),
-  creator: z.lazy(() => UserWithRelationsSchema),
-  explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
-}))
+export const ExplanationTypeWithRelationsSchema: z.ZodType<ExplanationTypeWithRelations> = ExplanationTypeSchema.merge(
+  z.object({
+    explainerModelSettings: z.lazy(() => ExplanationModelSettingsWithRelationsSchema).nullable(),
+    creator: z.lazy(() => UserWithRelationsSchema),
+    explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+  }),
+);
 
 // EXPLANATION TYPE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2153,21 +2841,31 @@ export type ExplanationTypePartialRelations = {
   explanations?: ExplanationPartialWithRelations[];
 };
 
-export type ExplanationTypePartialWithRelations = z.infer<typeof ExplanationTypePartialSchema> & ExplanationTypePartialRelations
+export type ExplanationTypePartialWithRelations = z.infer<typeof ExplanationTypePartialSchema> &
+  ExplanationTypePartialRelations;
 
-export const ExplanationTypePartialWithRelationsSchema: z.ZodType<ExplanationTypePartialWithRelations> = ExplanationTypePartialSchema.merge(z.object({
-  explainerModelSettings: z.lazy(() => ExplanationModelSettingsPartialWithRelationsSchema).nullable(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-})).partial()
+export const ExplanationTypePartialWithRelationsSchema: z.ZodType<ExplanationTypePartialWithRelations> =
+  ExplanationTypePartialSchema.merge(
+    z.object({
+      explainerModelSettings: z.lazy(() => ExplanationModelSettingsPartialWithRelationsSchema).nullable(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+      explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type ExplanationTypeWithPartialRelations = z.infer<typeof ExplanationTypeSchema> & ExplanationTypePartialRelations
+export type ExplanationTypeWithPartialRelations = z.infer<typeof ExplanationTypeSchema> &
+  ExplanationTypePartialRelations;
 
-export const ExplanationTypeWithPartialRelationsSchema: z.ZodType<ExplanationTypeWithPartialRelations> = ExplanationTypeSchema.merge(z.object({
-  explainerModelSettings: z.lazy(() => ExplanationModelSettingsPartialWithRelationsSchema).nullable(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
-}).partial())
+export const ExplanationTypeWithPartialRelationsSchema: z.ZodType<ExplanationTypeWithPartialRelations> =
+  ExplanationTypeSchema.merge(
+    z
+      .object({
+        explainerModelSettings: z.lazy(() => ExplanationModelSettingsPartialWithRelationsSchema).nullable(),
+        creator: z.lazy(() => UserPartialWithRelationsSchema),
+        explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EXPLANATION SCORE SCHEMA
@@ -2182,17 +2880,17 @@ export const ExplanationScoreSchema = z.object({
   explanationScoreModelName: z.string(),
   jsonDetails: z.string(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type ExplanationScore = z.infer<typeof ExplanationScoreSchema>
+export type ExplanationScore = z.infer<typeof ExplanationScoreSchema>;
 
 /////////////////////////////////////////
 // EXPLANATION SCORE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationScorePartialSchema = ExplanationScoreSchema.partial()
+export const ExplanationScorePartialSchema = ExplanationScoreSchema.partial();
 
-export type ExplanationScorePartial = z.infer<typeof ExplanationScorePartialSchema>
+export type ExplanationScorePartial = z.infer<typeof ExplanationScorePartialSchema>;
 
 // EXPLANATION SCORE RELATION SCHEMA
 //------------------------------------------------------
@@ -2204,14 +2902,17 @@ export type ExplanationScoreRelations = {
   explanationScoreModel: ExplanationScoreModelWithRelations;
 };
 
-export type ExplanationScoreWithRelations = z.infer<typeof ExplanationScoreSchema> & ExplanationScoreRelations
+export type ExplanationScoreWithRelations = z.infer<typeof ExplanationScoreSchema> & ExplanationScoreRelations;
 
-export const ExplanationScoreWithRelationsSchema: z.ZodType<ExplanationScoreWithRelations> = ExplanationScoreSchema.merge(z.object({
-  initiatedByUser: z.lazy(() => UserWithRelationsSchema),
-  explanation: z.lazy(() => ExplanationWithRelationsSchema),
-  explanationScoreType: z.lazy(() => ExplanationScoreTypeWithRelationsSchema),
-  explanationScoreModel: z.lazy(() => ExplanationScoreModelWithRelationsSchema),
-}))
+export const ExplanationScoreWithRelationsSchema: z.ZodType<ExplanationScoreWithRelations> =
+  ExplanationScoreSchema.merge(
+    z.object({
+      initiatedByUser: z.lazy(() => UserWithRelationsSchema),
+      explanation: z.lazy(() => ExplanationWithRelationsSchema),
+      explanationScoreType: z.lazy(() => ExplanationScoreTypeWithRelationsSchema),
+      explanationScoreModel: z.lazy(() => ExplanationScoreModelWithRelationsSchema),
+    }),
+  );
 
 // EXPLANATION SCORE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2223,23 +2924,33 @@ export type ExplanationScorePartialRelations = {
   explanationScoreModel?: ExplanationScoreModelPartialWithRelations;
 };
 
-export type ExplanationScorePartialWithRelations = z.infer<typeof ExplanationScorePartialSchema> & ExplanationScorePartialRelations
+export type ExplanationScorePartialWithRelations = z.infer<typeof ExplanationScorePartialSchema> &
+  ExplanationScorePartialRelations;
 
-export const ExplanationScorePartialWithRelationsSchema: z.ZodType<ExplanationScorePartialWithRelations> = ExplanationScorePartialSchema.merge(z.object({
-  initiatedByUser: z.lazy(() => UserPartialWithRelationsSchema),
-  explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
-  explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema),
-  explanationScoreModel: z.lazy(() => ExplanationScoreModelPartialWithRelationsSchema),
-})).partial()
+export const ExplanationScorePartialWithRelationsSchema: z.ZodType<ExplanationScorePartialWithRelations> =
+  ExplanationScorePartialSchema.merge(
+    z.object({
+      initiatedByUser: z.lazy(() => UserPartialWithRelationsSchema),
+      explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
+      explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema),
+      explanationScoreModel: z.lazy(() => ExplanationScoreModelPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type ExplanationScoreWithPartialRelations = z.infer<typeof ExplanationScoreSchema> & ExplanationScorePartialRelations
+export type ExplanationScoreWithPartialRelations = z.infer<typeof ExplanationScoreSchema> &
+  ExplanationScorePartialRelations;
 
-export const ExplanationScoreWithPartialRelationsSchema: z.ZodType<ExplanationScoreWithPartialRelations> = ExplanationScoreSchema.merge(z.object({
-  initiatedByUser: z.lazy(() => UserPartialWithRelationsSchema),
-  explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
-  explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema),
-  explanationScoreModel: z.lazy(() => ExplanationScoreModelPartialWithRelationsSchema),
-}).partial())
+export const ExplanationScoreWithPartialRelationsSchema: z.ZodType<ExplanationScoreWithPartialRelations> =
+  ExplanationScoreSchema.merge(
+    z
+      .object({
+        initiatedByUser: z.lazy(() => UserPartialWithRelationsSchema),
+        explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
+        explanationScoreType: z.lazy(() => ExplanationScoreTypePartialWithRelationsSchema),
+        explanationScoreModel: z.lazy(() => ExplanationScoreModelPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EXPLANATION SCORE TYPE SCHEMA
@@ -2259,17 +2970,17 @@ export const ExplanationScoreTypeSchema = z.object({
   creatorId: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type ExplanationScoreType = z.infer<typeof ExplanationScoreTypeSchema>
+export type ExplanationScoreType = z.infer<typeof ExplanationScoreTypeSchema>;
 
 /////////////////////////////////////////
 // EXPLANATION SCORE TYPE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationScoreTypePartialSchema = ExplanationScoreTypeSchema.partial()
+export const ExplanationScoreTypePartialSchema = ExplanationScoreTypeSchema.partial();
 
-export type ExplanationScoreTypePartial = z.infer<typeof ExplanationScoreTypePartialSchema>
+export type ExplanationScoreTypePartial = z.infer<typeof ExplanationScoreTypePartialSchema>;
 
 // EXPLANATION SCORE TYPE RELATION SCHEMA
 //------------------------------------------------------
@@ -2279,12 +2990,16 @@ export type ExplanationScoreTypeRelations = {
   creator: UserWithRelations;
 };
 
-export type ExplanationScoreTypeWithRelations = z.infer<typeof ExplanationScoreTypeSchema> & ExplanationScoreTypeRelations
+export type ExplanationScoreTypeWithRelations = z.infer<typeof ExplanationScoreTypeSchema> &
+  ExplanationScoreTypeRelations;
 
-export const ExplanationScoreTypeWithRelationsSchema: z.ZodType<ExplanationScoreTypeWithRelations> = ExplanationScoreTypeSchema.merge(z.object({
-  explanationScores: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
-  creator: z.lazy(() => UserWithRelationsSchema),
-}))
+export const ExplanationScoreTypeWithRelationsSchema: z.ZodType<ExplanationScoreTypeWithRelations> =
+  ExplanationScoreTypeSchema.merge(
+    z.object({
+      explanationScores: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
+      creator: z.lazy(() => UserWithRelationsSchema),
+    }),
+  );
 
 // EXPLANATION SCORE TYPE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2294,19 +3009,29 @@ export type ExplanationScoreTypePartialRelations = {
   creator?: UserPartialWithRelations;
 };
 
-export type ExplanationScoreTypePartialWithRelations = z.infer<typeof ExplanationScoreTypePartialSchema> & ExplanationScoreTypePartialRelations
+export type ExplanationScoreTypePartialWithRelations = z.infer<typeof ExplanationScoreTypePartialSchema> &
+  ExplanationScoreTypePartialRelations;
 
-export const ExplanationScoreTypePartialWithRelationsSchema: z.ZodType<ExplanationScoreTypePartialWithRelations> = ExplanationScoreTypePartialSchema.merge(z.object({
-  explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const ExplanationScoreTypePartialWithRelationsSchema: z.ZodType<ExplanationScoreTypePartialWithRelations> =
+  ExplanationScoreTypePartialSchema.merge(
+    z.object({
+      explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type ExplanationScoreTypeWithPartialRelations = z.infer<typeof ExplanationScoreTypeSchema> & ExplanationScoreTypePartialRelations
+export type ExplanationScoreTypeWithPartialRelations = z.infer<typeof ExplanationScoreTypeSchema> &
+  ExplanationScoreTypePartialRelations;
 
-export const ExplanationScoreTypeWithPartialRelationsSchema: z.ZodType<ExplanationScoreTypeWithPartialRelations> = ExplanationScoreTypeSchema.merge(z.object({
-  explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const ExplanationScoreTypeWithPartialRelationsSchema: z.ZodType<ExplanationScoreTypeWithPartialRelations> =
+  ExplanationScoreTypeSchema.merge(
+    z
+      .object({
+        explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+        creator: z.lazy(() => UserPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EXPLANATION SCORE MODEL SCHEMA
@@ -2322,17 +3047,17 @@ export const ExplanationScoreModelSchema = z.object({
   creatorName: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type ExplanationScoreModel = z.infer<typeof ExplanationScoreModelSchema>
+export type ExplanationScoreModel = z.infer<typeof ExplanationScoreModelSchema>;
 
 /////////////////////////////////////////
 // EXPLANATION SCORE MODEL PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationScoreModelPartialSchema = ExplanationScoreModelSchema.partial()
+export const ExplanationScoreModelPartialSchema = ExplanationScoreModelSchema.partial();
 
-export type ExplanationScoreModelPartial = z.infer<typeof ExplanationScoreModelPartialSchema>
+export type ExplanationScoreModelPartial = z.infer<typeof ExplanationScoreModelPartialSchema>;
 
 // EXPLANATION SCORE MODEL RELATION SCHEMA
 //------------------------------------------------------
@@ -2341,11 +3066,15 @@ export type ExplanationScoreModelRelations = {
   explanationScores: ExplanationScoreWithRelations[];
 };
 
-export type ExplanationScoreModelWithRelations = z.infer<typeof ExplanationScoreModelSchema> & ExplanationScoreModelRelations
+export type ExplanationScoreModelWithRelations = z.infer<typeof ExplanationScoreModelSchema> &
+  ExplanationScoreModelRelations;
 
-export const ExplanationScoreModelWithRelationsSchema: z.ZodType<ExplanationScoreModelWithRelations> = ExplanationScoreModelSchema.merge(z.object({
-  explanationScores: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
-}))
+export const ExplanationScoreModelWithRelationsSchema: z.ZodType<ExplanationScoreModelWithRelations> =
+  ExplanationScoreModelSchema.merge(
+    z.object({
+      explanationScores: z.lazy(() => ExplanationScoreWithRelationsSchema).array(),
+    }),
+  );
 
 // EXPLANATION SCORE MODEL PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2354,17 +3083,27 @@ export type ExplanationScoreModelPartialRelations = {
   explanationScores?: ExplanationScorePartialWithRelations[];
 };
 
-export type ExplanationScoreModelPartialWithRelations = z.infer<typeof ExplanationScoreModelPartialSchema> & ExplanationScoreModelPartialRelations
+export type ExplanationScoreModelPartialWithRelations = z.infer<typeof ExplanationScoreModelPartialSchema> &
+  ExplanationScoreModelPartialRelations;
 
-export const ExplanationScoreModelPartialWithRelationsSchema: z.ZodType<ExplanationScoreModelPartialWithRelations> = ExplanationScoreModelPartialSchema.merge(z.object({
-  explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-})).partial()
+export const ExplanationScoreModelPartialWithRelationsSchema: z.ZodType<ExplanationScoreModelPartialWithRelations> =
+  ExplanationScoreModelPartialSchema.merge(
+    z.object({
+      explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type ExplanationScoreModelWithPartialRelations = z.infer<typeof ExplanationScoreModelSchema> & ExplanationScoreModelPartialRelations
+export type ExplanationScoreModelWithPartialRelations = z.infer<typeof ExplanationScoreModelSchema> &
+  ExplanationScoreModelPartialRelations;
 
-export const ExplanationScoreModelWithPartialRelationsSchema: z.ZodType<ExplanationScoreModelWithPartialRelations> = ExplanationScoreModelSchema.merge(z.object({
-  explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
-}).partial())
+export const ExplanationScoreModelWithPartialRelationsSchema: z.ZodType<ExplanationScoreModelWithPartialRelations> =
+  ExplanationScoreModelSchema.merge(
+    z
+      .object({
+        explanationScores: z.lazy(() => ExplanationScorePartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // EXPLANATION ACTIVATION V 1 SCHEMA
@@ -2380,17 +3119,17 @@ export const ExplanationActivationV1Schema = z.object({
   scorerAutoInterpModel: z.string().nullable(),
   version: z.number().int(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type ExplanationActivationV1 = z.infer<typeof ExplanationActivationV1Schema>
+export type ExplanationActivationV1 = z.infer<typeof ExplanationActivationV1Schema>;
 
 /////////////////////////////////////////
 // EXPLANATION ACTIVATION V 1 PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ExplanationActivationV1PartialSchema = ExplanationActivationV1Schema.partial()
+export const ExplanationActivationV1PartialSchema = ExplanationActivationV1Schema.partial();
 
-export type ExplanationActivationV1Partial = z.infer<typeof ExplanationActivationV1PartialSchema>
+export type ExplanationActivationV1Partial = z.infer<typeof ExplanationActivationV1PartialSchema>;
 
 // EXPLANATION ACTIVATION V 1 RELATION SCHEMA
 //------------------------------------------------------
@@ -2401,13 +3140,17 @@ export type ExplanationActivationV1Relations = {
   scorer?: UserWithRelations | null;
 };
 
-export type ExplanationActivationV1WithRelations = z.infer<typeof ExplanationActivationV1Schema> & ExplanationActivationV1Relations
+export type ExplanationActivationV1WithRelations = z.infer<typeof ExplanationActivationV1Schema> &
+  ExplanationActivationV1Relations;
 
-export const ExplanationActivationV1WithRelationsSchema: z.ZodType<ExplanationActivationV1WithRelations> = ExplanationActivationV1Schema.merge(z.object({
-  explanation: z.lazy(() => ExplanationWithRelationsSchema),
-  activation: z.lazy(() => ActivationWithRelationsSchema),
-  scorer: z.lazy(() => UserWithRelationsSchema).nullable(),
-}))
+export const ExplanationActivationV1WithRelationsSchema: z.ZodType<ExplanationActivationV1WithRelations> =
+  ExplanationActivationV1Schema.merge(
+    z.object({
+      explanation: z.lazy(() => ExplanationWithRelationsSchema),
+      activation: z.lazy(() => ActivationWithRelationsSchema),
+      scorer: z.lazy(() => UserWithRelationsSchema).nullable(),
+    }),
+  );
 
 // EXPLANATION ACTIVATION V 1 PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2418,21 +3161,31 @@ export type ExplanationActivationV1PartialRelations = {
   scorer?: UserPartialWithRelations | null;
 };
 
-export type ExplanationActivationV1PartialWithRelations = z.infer<typeof ExplanationActivationV1PartialSchema> & ExplanationActivationV1PartialRelations
+export type ExplanationActivationV1PartialWithRelations = z.infer<typeof ExplanationActivationV1PartialSchema> &
+  ExplanationActivationV1PartialRelations;
 
-export const ExplanationActivationV1PartialWithRelationsSchema: z.ZodType<ExplanationActivationV1PartialWithRelations> = ExplanationActivationV1PartialSchema.merge(z.object({
-  explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
-  activation: z.lazy(() => ActivationPartialWithRelationsSchema),
-  scorer: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-})).partial()
+export const ExplanationActivationV1PartialWithRelationsSchema: z.ZodType<ExplanationActivationV1PartialWithRelations> =
+  ExplanationActivationV1PartialSchema.merge(
+    z.object({
+      explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
+      activation: z.lazy(() => ActivationPartialWithRelationsSchema),
+      scorer: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+    }),
+  ).partial();
 
-export type ExplanationActivationV1WithPartialRelations = z.infer<typeof ExplanationActivationV1Schema> & ExplanationActivationV1PartialRelations
+export type ExplanationActivationV1WithPartialRelations = z.infer<typeof ExplanationActivationV1Schema> &
+  ExplanationActivationV1PartialRelations;
 
-export const ExplanationActivationV1WithPartialRelationsSchema: z.ZodType<ExplanationActivationV1WithPartialRelations> = ExplanationActivationV1Schema.merge(z.object({
-  explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
-  activation: z.lazy(() => ActivationPartialWithRelationsSchema),
-  scorer: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-}).partial())
+export const ExplanationActivationV1WithPartialRelationsSchema: z.ZodType<ExplanationActivationV1WithPartialRelations> =
+  ExplanationActivationV1Schema.merge(
+    z
+      .object({
+        explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
+        activation: z.lazy(() => ActivationPartialWithRelationsSchema),
+        scorer: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // VOTE SCHEMA
@@ -2446,17 +3199,17 @@ export const VoteSchema = z.object({
   explanationId: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-})
+});
 
-export type Vote = z.infer<typeof VoteSchema>
+export type Vote = z.infer<typeof VoteSchema>;
 
 /////////////////////////////////////////
 // VOTE PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const VotePartialSchema = VoteSchema.partial()
+export const VotePartialSchema = VoteSchema.partial();
 
-export type VotePartial = z.infer<typeof VotePartialSchema>
+export type VotePartial = z.infer<typeof VotePartialSchema>;
 
 // VOTE RELATION SCHEMA
 //------------------------------------------------------
@@ -2466,12 +3219,14 @@ export type VoteRelations = {
   voter: UserWithRelations;
 };
 
-export type VoteWithRelations = z.infer<typeof VoteSchema> & VoteRelations
+export type VoteWithRelations = z.infer<typeof VoteSchema> & VoteRelations;
 
-export const VoteWithRelationsSchema: z.ZodType<VoteWithRelations> = VoteSchema.merge(z.object({
-  explanation: z.lazy(() => ExplanationWithRelationsSchema),
-  voter: z.lazy(() => UserWithRelationsSchema),
-}))
+export const VoteWithRelationsSchema: z.ZodType<VoteWithRelations> = VoteSchema.merge(
+  z.object({
+    explanation: z.lazy(() => ExplanationWithRelationsSchema),
+    voter: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // VOTE PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2481,19 +3236,25 @@ export type VotePartialRelations = {
   voter?: UserPartialWithRelations;
 };
 
-export type VotePartialWithRelations = z.infer<typeof VotePartialSchema> & VotePartialRelations
+export type VotePartialWithRelations = z.infer<typeof VotePartialSchema> & VotePartialRelations;
 
-export const VotePartialWithRelationsSchema: z.ZodType<VotePartialWithRelations> = VotePartialSchema.merge(z.object({
-  explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
-  voter: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const VotePartialWithRelationsSchema: z.ZodType<VotePartialWithRelations> = VotePartialSchema.merge(
+  z.object({
+    explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
+    voter: z.lazy(() => UserPartialWithRelationsSchema),
+  }),
+).partial();
 
-export type VoteWithPartialRelations = z.infer<typeof VoteSchema> & VotePartialRelations
+export type VoteWithPartialRelations = z.infer<typeof VoteSchema> & VotePartialRelations;
 
-export const VoteWithPartialRelationsSchema: z.ZodType<VoteWithPartialRelations> = VoteSchema.merge(z.object({
-  explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
-  voter: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const VoteWithPartialRelationsSchema: z.ZodType<VoteWithPartialRelations> = VoteSchema.merge(
+  z
+    .object({
+      explanation: z.lazy(() => ExplanationPartialWithRelationsSchema),
+      voter: z.lazy(() => UserPartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // ACTIVATION SCHEMA
@@ -2522,17 +3283,17 @@ export const ActivationSchema = z.object({
   binMax: z.number().nullable(),
   binContains: z.number().nullable(),
   qualifyingTokenIndex: z.number().int().nullable(),
-})
+});
 
-export type Activation = z.infer<typeof ActivationSchema>
+export type Activation = z.infer<typeof ActivationSchema>;
 
 /////////////////////////////////////////
 // ACTIVATION PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ActivationPartialSchema = ActivationSchema.partial()
+export const ActivationPartialSchema = ActivationSchema.partial();
 
-export type ActivationPartial = z.infer<typeof ActivationPartialSchema>
+export type ActivationPartial = z.infer<typeof ActivationPartialSchema>;
 
 // ACTIVATION RELATION SCHEMA
 //------------------------------------------------------
@@ -2545,15 +3306,17 @@ export type ActivationRelations = {
   lists: ListsOnActivationsWithRelations[];
 };
 
-export type ActivationWithRelations = z.infer<typeof ActivationSchema> & ActivationRelations
+export type ActivationWithRelations = z.infer<typeof ActivationSchema> & ActivationRelations;
 
-export const ActivationWithRelationsSchema: z.ZodType<ActivationWithRelations> = ActivationSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronWithRelationsSchema),
-  explanations: z.lazy(() => ExplanationActivationV1WithRelationsSchema).array(),
-  savedSearch: z.lazy(() => SavedSearchActivationWithRelationsSchema).array(),
-  creator: z.lazy(() => UserWithRelationsSchema),
-  lists: z.lazy(() => ListsOnActivationsWithRelationsSchema).array(),
-}))
+export const ActivationWithRelationsSchema: z.ZodType<ActivationWithRelations> = ActivationSchema.merge(
+  z.object({
+    neuron: z.lazy(() => NeuronWithRelationsSchema),
+    explanations: z.lazy(() => ExplanationActivationV1WithRelationsSchema).array(),
+    savedSearch: z.lazy(() => SavedSearchActivationWithRelationsSchema).array(),
+    creator: z.lazy(() => UserWithRelationsSchema),
+    lists: z.lazy(() => ListsOnActivationsWithRelationsSchema).array(),
+  }),
+);
 
 // ACTIVATION PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2566,25 +3329,32 @@ export type ActivationPartialRelations = {
   lists?: ListsOnActivationsPartialWithRelations[];
 };
 
-export type ActivationPartialWithRelations = z.infer<typeof ActivationPartialSchema> & ActivationPartialRelations
+export type ActivationPartialWithRelations = z.infer<typeof ActivationPartialSchema> & ActivationPartialRelations;
 
-export const ActivationPartialWithRelationsSchema: z.ZodType<ActivationPartialWithRelations> = ActivationPartialSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  explanations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
-  savedSearch: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  lists: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
-})).partial()
+export const ActivationPartialWithRelationsSchema: z.ZodType<ActivationPartialWithRelations> =
+  ActivationPartialSchema.merge(
+    z.object({
+      neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+      explanations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
+      savedSearch: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+      lists: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type ActivationWithPartialRelations = z.infer<typeof ActivationSchema> & ActivationPartialRelations
+export type ActivationWithPartialRelations = z.infer<typeof ActivationSchema> & ActivationPartialRelations;
 
-export const ActivationWithPartialRelationsSchema: z.ZodType<ActivationWithPartialRelations> = ActivationSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  explanations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
-  savedSearch: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema),
-  lists: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
-}).partial())
+export const ActivationWithPartialRelationsSchema: z.ZodType<ActivationWithPartialRelations> = ActivationSchema.merge(
+  z
+    .object({
+      neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+      explanations: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
+      savedSearch: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema),
+      lists: z.lazy(() => ListsOnActivationsPartialWithRelationsSchema).array(),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // COMMENT SCHEMA
@@ -2598,17 +3368,17 @@ export const CommentSchema = z.object({
   text: z.string(),
   userId: z.string(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type Comment = z.infer<typeof CommentSchema>
+export type Comment = z.infer<typeof CommentSchema>;
 
 /////////////////////////////////////////
 // COMMENT PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const CommentPartialSchema = CommentSchema.partial()
+export const CommentPartialSchema = CommentSchema.partial();
 
-export type CommentPartial = z.infer<typeof CommentPartialSchema>
+export type CommentPartial = z.infer<typeof CommentPartialSchema>;
 
 // COMMENT RELATION SCHEMA
 //------------------------------------------------------
@@ -2618,12 +3388,14 @@ export type CommentRelations = {
   user: UserWithRelations;
 };
 
-export type CommentWithRelations = z.infer<typeof CommentSchema> & CommentRelations
+export type CommentWithRelations = z.infer<typeof CommentSchema> & CommentRelations;
 
-export const CommentWithRelationsSchema: z.ZodType<CommentWithRelations> = CommentSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronWithRelationsSchema),
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const CommentWithRelationsSchema: z.ZodType<CommentWithRelations> = CommentSchema.merge(
+  z.object({
+    neuron: z.lazy(() => NeuronWithRelationsSchema),
+    user: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // COMMENT PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2633,19 +3405,25 @@ export type CommentPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type CommentPartialWithRelations = z.infer<typeof CommentPartialSchema> & CommentPartialRelations
+export type CommentPartialWithRelations = z.infer<typeof CommentPartialSchema> & CommentPartialRelations;
 
-export const CommentPartialWithRelationsSchema: z.ZodType<CommentPartialWithRelations> = CommentPartialSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const CommentPartialWithRelationsSchema: z.ZodType<CommentPartialWithRelations> = CommentPartialSchema.merge(
+  z.object({
+    neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+    user: z.lazy(() => UserPartialWithRelationsSchema),
+  }),
+).partial();
 
-export type CommentWithPartialRelations = z.infer<typeof CommentSchema> & CommentPartialRelations
+export type CommentWithPartialRelations = z.infer<typeof CommentSchema> & CommentPartialRelations;
 
-export const CommentWithPartialRelationsSchema: z.ZodType<CommentWithPartialRelations> = CommentSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const CommentWithPartialRelationsSchema: z.ZodType<CommentWithPartialRelations> = CommentSchema.merge(
+  z
+    .object({
+      neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // BOOKMARK SCHEMA
@@ -2658,17 +3436,17 @@ export const BookmarkSchema = z.object({
   index: z.string(),
   userId: z.string(),
   createdAt: z.coerce.date(),
-})
+});
 
-export type Bookmark = z.infer<typeof BookmarkSchema>
+export type Bookmark = z.infer<typeof BookmarkSchema>;
 
 /////////////////////////////////////////
 // BOOKMARK PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const BookmarkPartialSchema = BookmarkSchema.partial()
+export const BookmarkPartialSchema = BookmarkSchema.partial();
 
-export type BookmarkPartial = z.infer<typeof BookmarkPartialSchema>
+export type BookmarkPartial = z.infer<typeof BookmarkPartialSchema>;
 
 // BOOKMARK RELATION SCHEMA
 //------------------------------------------------------
@@ -2678,12 +3456,14 @@ export type BookmarkRelations = {
   user: UserWithRelations;
 };
 
-export type BookmarkWithRelations = z.infer<typeof BookmarkSchema> & BookmarkRelations
+export type BookmarkWithRelations = z.infer<typeof BookmarkSchema> & BookmarkRelations;
 
-export const BookmarkWithRelationsSchema: z.ZodType<BookmarkWithRelations> = BookmarkSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronWithRelationsSchema),
-  user: z.lazy(() => UserWithRelationsSchema),
-}))
+export const BookmarkWithRelationsSchema: z.ZodType<BookmarkWithRelations> = BookmarkSchema.merge(
+  z.object({
+    neuron: z.lazy(() => NeuronWithRelationsSchema),
+    user: z.lazy(() => UserWithRelationsSchema),
+  }),
+);
 
 // BOOKMARK PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2693,19 +3473,25 @@ export type BookmarkPartialRelations = {
   user?: UserPartialWithRelations;
 };
 
-export type BookmarkPartialWithRelations = z.infer<typeof BookmarkPartialSchema> & BookmarkPartialRelations
+export type BookmarkPartialWithRelations = z.infer<typeof BookmarkPartialSchema> & BookmarkPartialRelations;
 
-export const BookmarkPartialWithRelationsSchema: z.ZodType<BookmarkPartialWithRelations> = BookmarkPartialSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-})).partial()
+export const BookmarkPartialWithRelationsSchema: z.ZodType<BookmarkPartialWithRelations> = BookmarkPartialSchema.merge(
+  z.object({
+    neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+    user: z.lazy(() => UserPartialWithRelationsSchema),
+  }),
+).partial();
 
-export type BookmarkWithPartialRelations = z.infer<typeof BookmarkSchema> & BookmarkPartialRelations
+export type BookmarkWithPartialRelations = z.infer<typeof BookmarkSchema> & BookmarkPartialRelations;
 
-export const BookmarkWithPartialRelationsSchema: z.ZodType<BookmarkWithPartialRelations> = BookmarkSchema.merge(z.object({
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-  user: z.lazy(() => UserPartialWithRelationsSchema),
-}).partial())
+export const BookmarkWithPartialRelationsSchema: z.ZodType<BookmarkWithPartialRelations> = BookmarkSchema.merge(
+  z
+    .object({
+      neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+      user: z.lazy(() => UserPartialWithRelationsSchema),
+    })
+    .partial(),
+);
 
 /////////////////////////////////////////
 // SAVED SEARCH SCHEMA
@@ -2726,17 +3512,17 @@ export const SavedSearchSchema = z.object({
   counts: z.string(),
   numResults: z.number().int(),
   densityThreshold: z.number(),
-})
+});
 
-export type SavedSearch = z.infer<typeof SavedSearchSchema>
+export type SavedSearch = z.infer<typeof SavedSearchSchema>;
 
 /////////////////////////////////////////
 // SAVED SEARCH PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SavedSearchPartialSchema = SavedSearchSchema.partial()
+export const SavedSearchPartialSchema = SavedSearchSchema.partial();
 
-export type SavedSearchPartial = z.infer<typeof SavedSearchPartialSchema>
+export type SavedSearchPartial = z.infer<typeof SavedSearchPartialSchema>;
 
 // SAVED SEARCH RELATION SCHEMA
 //------------------------------------------------------
@@ -2747,13 +3533,15 @@ export type SavedSearchRelations = {
   user?: UserWithRelations | null;
 };
 
-export type SavedSearchWithRelations = z.infer<typeof SavedSearchSchema> & SavedSearchRelations
+export type SavedSearchWithRelations = z.infer<typeof SavedSearchSchema> & SavedSearchRelations;
 
-export const SavedSearchWithRelationsSchema: z.ZodType<SavedSearchWithRelations> = SavedSearchSchema.merge(z.object({
-  model: z.lazy(() => ModelWithRelationsSchema),
-  activations: z.lazy(() => SavedSearchActivationWithRelationsSchema).array(),
-  user: z.lazy(() => UserWithRelationsSchema).nullable(),
-}))
+export const SavedSearchWithRelationsSchema: z.ZodType<SavedSearchWithRelations> = SavedSearchSchema.merge(
+  z.object({
+    model: z.lazy(() => ModelWithRelationsSchema),
+    activations: z.lazy(() => SavedSearchActivationWithRelationsSchema).array(),
+    user: z.lazy(() => UserWithRelationsSchema).nullable(),
+  }),
+);
 
 // SAVED SEARCH PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2764,21 +3552,29 @@ export type SavedSearchPartialRelations = {
   user?: UserPartialWithRelations | null;
 };
 
-export type SavedSearchPartialWithRelations = z.infer<typeof SavedSearchPartialSchema> & SavedSearchPartialRelations
+export type SavedSearchPartialWithRelations = z.infer<typeof SavedSearchPartialSchema> & SavedSearchPartialRelations;
 
-export const SavedSearchPartialWithRelationsSchema: z.ZodType<SavedSearchPartialWithRelations> = SavedSearchPartialSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  activations: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
-  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-})).partial()
+export const SavedSearchPartialWithRelationsSchema: z.ZodType<SavedSearchPartialWithRelations> =
+  SavedSearchPartialSchema.merge(
+    z.object({
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      activations: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
+      user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+    }),
+  ).partial();
 
-export type SavedSearchWithPartialRelations = z.infer<typeof SavedSearchSchema> & SavedSearchPartialRelations
+export type SavedSearchWithPartialRelations = z.infer<typeof SavedSearchSchema> & SavedSearchPartialRelations;
 
-export const SavedSearchWithPartialRelationsSchema: z.ZodType<SavedSearchWithPartialRelations> = SavedSearchSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  activations: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
-  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-}).partial())
+export const SavedSearchWithPartialRelationsSchema: z.ZodType<SavedSearchWithPartialRelations> =
+  SavedSearchSchema.merge(
+    z
+      .object({
+        model: z.lazy(() => ModelPartialWithRelationsSchema),
+        activations: z.lazy(() => SavedSearchActivationPartialWithRelationsSchema).array(),
+        user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // SAVED SEARCH ACTIVATION SCHEMA
@@ -2788,17 +3584,17 @@ export const SavedSearchActivationSchema = z.object({
   savedSearchId: z.string(),
   activationId: z.string(),
   order: z.number().int(),
-})
+});
 
-export type SavedSearchActivation = z.infer<typeof SavedSearchActivationSchema>
+export type SavedSearchActivation = z.infer<typeof SavedSearchActivationSchema>;
 
 /////////////////////////////////////////
 // SAVED SEARCH ACTIVATION PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SavedSearchActivationPartialSchema = SavedSearchActivationSchema.partial()
+export const SavedSearchActivationPartialSchema = SavedSearchActivationSchema.partial();
 
-export type SavedSearchActivationPartial = z.infer<typeof SavedSearchActivationPartialSchema>
+export type SavedSearchActivationPartial = z.infer<typeof SavedSearchActivationPartialSchema>;
 
 // SAVED SEARCH ACTIVATION RELATION SCHEMA
 //------------------------------------------------------
@@ -2808,12 +3604,16 @@ export type SavedSearchActivationRelations = {
   activation: ActivationWithRelations;
 };
 
-export type SavedSearchActivationWithRelations = z.infer<typeof SavedSearchActivationSchema> & SavedSearchActivationRelations
+export type SavedSearchActivationWithRelations = z.infer<typeof SavedSearchActivationSchema> &
+  SavedSearchActivationRelations;
 
-export const SavedSearchActivationWithRelationsSchema: z.ZodType<SavedSearchActivationWithRelations> = SavedSearchActivationSchema.merge(z.object({
-  savedSearch: z.lazy(() => SavedSearchWithRelationsSchema),
-  activation: z.lazy(() => ActivationWithRelationsSchema),
-}))
+export const SavedSearchActivationWithRelationsSchema: z.ZodType<SavedSearchActivationWithRelations> =
+  SavedSearchActivationSchema.merge(
+    z.object({
+      savedSearch: z.lazy(() => SavedSearchWithRelationsSchema),
+      activation: z.lazy(() => ActivationWithRelationsSchema),
+    }),
+  );
 
 // SAVED SEARCH ACTIVATION PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2823,19 +3623,29 @@ export type SavedSearchActivationPartialRelations = {
   activation?: ActivationPartialWithRelations;
 };
 
-export type SavedSearchActivationPartialWithRelations = z.infer<typeof SavedSearchActivationPartialSchema> & SavedSearchActivationPartialRelations
+export type SavedSearchActivationPartialWithRelations = z.infer<typeof SavedSearchActivationPartialSchema> &
+  SavedSearchActivationPartialRelations;
 
-export const SavedSearchActivationPartialWithRelationsSchema: z.ZodType<SavedSearchActivationPartialWithRelations> = SavedSearchActivationPartialSchema.merge(z.object({
-  savedSearch: z.lazy(() => SavedSearchPartialWithRelationsSchema),
-  activation: z.lazy(() => ActivationPartialWithRelationsSchema),
-})).partial()
+export const SavedSearchActivationPartialWithRelationsSchema: z.ZodType<SavedSearchActivationPartialWithRelations> =
+  SavedSearchActivationPartialSchema.merge(
+    z.object({
+      savedSearch: z.lazy(() => SavedSearchPartialWithRelationsSchema),
+      activation: z.lazy(() => ActivationPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type SavedSearchActivationWithPartialRelations = z.infer<typeof SavedSearchActivationSchema> & SavedSearchActivationPartialRelations
+export type SavedSearchActivationWithPartialRelations = z.infer<typeof SavedSearchActivationSchema> &
+  SavedSearchActivationPartialRelations;
 
-export const SavedSearchActivationWithPartialRelationsSchema: z.ZodType<SavedSearchActivationWithPartialRelations> = SavedSearchActivationSchema.merge(z.object({
-  savedSearch: z.lazy(() => SavedSearchPartialWithRelationsSchema),
-  activation: z.lazy(() => ActivationPartialWithRelationsSchema),
-}).partial())
+export const SavedSearchActivationWithPartialRelationsSchema: z.ZodType<SavedSearchActivationWithPartialRelations> =
+  SavedSearchActivationSchema.merge(
+    z
+      .object({
+        savedSearch: z.lazy(() => SavedSearchPartialWithRelationsSchema),
+        activation: z.lazy(() => ActivationPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // STEER OUTPUT TO NEURON SCHEMA
@@ -2847,17 +3657,17 @@ export const SteerOutputToNeuronSchema = z.object({
   index: z.string(),
   strength: z.number(),
   steerOutputId: z.string(),
-})
+});
 
-export type SteerOutputToNeuron = z.infer<typeof SteerOutputToNeuronSchema>
+export type SteerOutputToNeuron = z.infer<typeof SteerOutputToNeuronSchema>;
 
 /////////////////////////////////////////
 // STEER OUTPUT TO NEURON PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SteerOutputToNeuronPartialSchema = SteerOutputToNeuronSchema.partial()
+export const SteerOutputToNeuronPartialSchema = SteerOutputToNeuronSchema.partial();
 
-export type SteerOutputToNeuronPartial = z.infer<typeof SteerOutputToNeuronPartialSchema>
+export type SteerOutputToNeuronPartial = z.infer<typeof SteerOutputToNeuronPartialSchema>;
 
 // STEER OUTPUT TO NEURON RELATION SCHEMA
 //------------------------------------------------------
@@ -2867,12 +3677,15 @@ export type SteerOutputToNeuronRelations = {
   neuron: NeuronWithRelations;
 };
 
-export type SteerOutputToNeuronWithRelations = z.infer<typeof SteerOutputToNeuronSchema> & SteerOutputToNeuronRelations
+export type SteerOutputToNeuronWithRelations = z.infer<typeof SteerOutputToNeuronSchema> & SteerOutputToNeuronRelations;
 
-export const SteerOutputToNeuronWithRelationsSchema: z.ZodType<SteerOutputToNeuronWithRelations> = SteerOutputToNeuronSchema.merge(z.object({
-  steerOutput: z.lazy(() => SteerOutputWithRelationsSchema),
-  neuron: z.lazy(() => NeuronWithRelationsSchema),
-}))
+export const SteerOutputToNeuronWithRelationsSchema: z.ZodType<SteerOutputToNeuronWithRelations> =
+  SteerOutputToNeuronSchema.merge(
+    z.object({
+      steerOutput: z.lazy(() => SteerOutputWithRelationsSchema),
+      neuron: z.lazy(() => NeuronWithRelationsSchema),
+    }),
+  );
 
 // STEER OUTPUT TO NEURON PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2882,19 +3695,29 @@ export type SteerOutputToNeuronPartialRelations = {
   neuron?: NeuronPartialWithRelations;
 };
 
-export type SteerOutputToNeuronPartialWithRelations = z.infer<typeof SteerOutputToNeuronPartialSchema> & SteerOutputToNeuronPartialRelations
+export type SteerOutputToNeuronPartialWithRelations = z.infer<typeof SteerOutputToNeuronPartialSchema> &
+  SteerOutputToNeuronPartialRelations;
 
-export const SteerOutputToNeuronPartialWithRelationsSchema: z.ZodType<SteerOutputToNeuronPartialWithRelations> = SteerOutputToNeuronPartialSchema.merge(z.object({
-  steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema),
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-})).partial()
+export const SteerOutputToNeuronPartialWithRelationsSchema: z.ZodType<SteerOutputToNeuronPartialWithRelations> =
+  SteerOutputToNeuronPartialSchema.merge(
+    z.object({
+      steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema),
+      neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+    }),
+  ).partial();
 
-export type SteerOutputToNeuronWithPartialRelations = z.infer<typeof SteerOutputToNeuronSchema> & SteerOutputToNeuronPartialRelations
+export type SteerOutputToNeuronWithPartialRelations = z.infer<typeof SteerOutputToNeuronSchema> &
+  SteerOutputToNeuronPartialRelations;
 
-export const SteerOutputToNeuronWithPartialRelationsSchema: z.ZodType<SteerOutputToNeuronWithPartialRelations> = SteerOutputToNeuronSchema.merge(z.object({
-  steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema),
-  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
-}).partial())
+export const SteerOutputToNeuronWithPartialRelationsSchema: z.ZodType<SteerOutputToNeuronWithPartialRelations> =
+  SteerOutputToNeuronSchema.merge(
+    z
+      .object({
+        steerOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema),
+        neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+      })
+      .partial(),
+  );
 
 /////////////////////////////////////////
 // STEER OUTPUT SCHEMA
@@ -2921,17 +3744,17 @@ export const SteerOutputSchema = z.object({
   logprobs: z.string().nullable(),
   connectedDefaultOutputId: z.string().nullable(),
   connectedSteerOutputIds: z.string().array(),
-})
+});
 
-export type SteerOutput = z.infer<typeof SteerOutputSchema>
+export type SteerOutput = z.infer<typeof SteerOutputSchema>;
 
 /////////////////////////////////////////
 // STEER OUTPUT PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const SteerOutputPartialSchema = SteerOutputSchema.partial()
+export const SteerOutputPartialSchema = SteerOutputSchema.partial();
 
-export type SteerOutputPartial = z.infer<typeof SteerOutputPartialSchema>
+export type SteerOutputPartial = z.infer<typeof SteerOutputPartialSchema>;
 
 // STEER OUTPUT RELATION SCHEMA
 //------------------------------------------------------
@@ -2944,15 +3767,17 @@ export type SteerOutputRelations = {
   connectedSteerOutputs: SteerOutputWithRelations[];
 };
 
-export type SteerOutputWithRelations = z.infer<typeof SteerOutputSchema> & SteerOutputRelations
+export type SteerOutputWithRelations = z.infer<typeof SteerOutputSchema> & SteerOutputRelations;
 
-export const SteerOutputWithRelationsSchema: z.ZodType<SteerOutputWithRelations> = SteerOutputSchema.merge(z.object({
-  model: z.lazy(() => ModelWithRelationsSchema),
-  toNeurons: z.lazy(() => SteerOutputToNeuronWithRelationsSchema).array(),
-  creator: z.lazy(() => UserWithRelationsSchema).nullable(),
-  connectedDefaultOutput: z.lazy(() => SteerOutputWithRelationsSchema).nullable(),
-  connectedSteerOutputs: z.lazy(() => SteerOutputWithRelationsSchema).array(),
-}))
+export const SteerOutputWithRelationsSchema: z.ZodType<SteerOutputWithRelations> = SteerOutputSchema.merge(
+  z.object({
+    model: z.lazy(() => ModelWithRelationsSchema),
+    toNeurons: z.lazy(() => SteerOutputToNeuronWithRelationsSchema).array(),
+    creator: z.lazy(() => UserWithRelationsSchema).nullable(),
+    connectedDefaultOutput: z.lazy(() => SteerOutputWithRelationsSchema).nullable(),
+    connectedSteerOutputs: z.lazy(() => SteerOutputWithRelationsSchema).array(),
+  }),
+);
 
 // STEER OUTPUT PARTIAL RELATION SCHEMA
 //------------------------------------------------------
@@ -2965,22 +3790,30 @@ export type SteerOutputPartialRelations = {
   connectedSteerOutputs?: SteerOutputPartialWithRelations[];
 };
 
-export type SteerOutputPartialWithRelations = z.infer<typeof SteerOutputPartialSchema> & SteerOutputPartialRelations
+export type SteerOutputPartialWithRelations = z.infer<typeof SteerOutputPartialSchema> & SteerOutputPartialRelations;
 
-export const SteerOutputPartialWithRelationsSchema: z.ZodType<SteerOutputPartialWithRelations> = SteerOutputPartialSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  toNeurons: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-  connectedDefaultOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).nullable(),
-  connectedSteerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
-})).partial()
+export const SteerOutputPartialWithRelationsSchema: z.ZodType<SteerOutputPartialWithRelations> =
+  SteerOutputPartialSchema.merge(
+    z.object({
+      model: z.lazy(() => ModelPartialWithRelationsSchema),
+      toNeurons: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
+      creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+      connectedDefaultOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).nullable(),
+      connectedSteerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
+    }),
+  ).partial();
 
-export type SteerOutputWithPartialRelations = z.infer<typeof SteerOutputSchema> & SteerOutputPartialRelations
+export type SteerOutputWithPartialRelations = z.infer<typeof SteerOutputSchema> & SteerOutputPartialRelations;
 
-export const SteerOutputWithPartialRelationsSchema: z.ZodType<SteerOutputWithPartialRelations> = SteerOutputSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  toNeurons: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
-  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
-  connectedDefaultOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).nullable(),
-  connectedSteerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
-}).partial())
+export const SteerOutputWithPartialRelationsSchema: z.ZodType<SteerOutputWithPartialRelations> =
+  SteerOutputSchema.merge(
+    z
+      .object({
+        model: z.lazy(() => ModelPartialWithRelationsSchema),
+        toNeurons: z.lazy(() => SteerOutputToNeuronPartialWithRelationsSchema).array(),
+        creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+        connectedDefaultOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).nullable(),
+        connectedSteerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
+      })
+      .partial(),
+  );

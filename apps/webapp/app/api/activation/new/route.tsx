@@ -1,7 +1,8 @@
 import { assertUserCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
+import { RequestOptionalUser } from '@/lib/types/auth';
 import { getActivationForFeature } from '@/lib/utils/inference';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
 /**

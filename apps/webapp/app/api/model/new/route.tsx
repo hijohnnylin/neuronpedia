@@ -1,5 +1,6 @@
 import { createModel, getModelById } from '@/lib/db/model';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import { Visibility } from '@prisma/client';
 import { NextResponse } from 'next/server';
 

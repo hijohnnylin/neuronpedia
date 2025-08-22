@@ -1,4 +1,4 @@
-import { ASSET_BASE_URL } from '@/lib/env';
+import { ASSET_BASE_URL } from '@/lib/constants';
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { modelIdToModelDisplayName } from '../[modelId]/graph/utils';

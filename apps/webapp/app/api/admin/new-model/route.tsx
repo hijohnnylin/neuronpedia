@@ -1,6 +1,7 @@
-import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
+import { createModelAdmin } from '@/lib/db/model';
+import { RequestAuthedAdminUser } from '@/lib/types/auth';
+import { withAuthedAdminUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
-import { createModelAdmin } from '../../../../lib/db/model';
 
 type ModelToCreate = {
   id: string;

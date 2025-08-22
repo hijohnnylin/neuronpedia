@@ -1,11 +1,11 @@
 import { prisma } from '@/lib/db';
 import { InferenceHostSource, InferenceHostSourceOnSource } from '@prisma/client';
-import { IS_DOCKER_COMPOSE, USE_LOCALHOST_INFERENCE } from '../env';
-import { AuthenticatedUser } from '../with-user';
+import { env } from '../env';
+import { AuthenticatedUser } from '../types/auth';
 import { getSourceInferenceHosts } from './source';
 import { userCanAccessModelAndSourceSet } from './userCanAccess';
 
-export const LOCALHOST_INFERENCE_HOST = IS_DOCKER_COMPOSE ? 'http://inference:5002' : 'http://127.0.0.1:5002';
+export const LOCALHOST_INFERENCE_HOST = env.IS_DOCKER_COMPOSE ? 'http://inference:5002' : 'http://127.0.0.1:5002';
 
 export const createInferenceHostSource = async (input: InferenceHostSource) =>
   prisma.inferenceHostSource.create({
@@ -60,7 +60,7 @@ export const getOneRandomServerHostForSourceSet = async (
     return null;
   }
 
-  if (USE_LOCALHOST_INFERENCE) {
+  if (env.USE_LOCALHOST_INFERENCE) {
     return LOCALHOST_INFERENCE_HOST;
   }
 
@@ -79,7 +79,7 @@ export const getOneRandomServerHostForSource = async (
   sourceId: string,
   user: AuthenticatedUser | null = null,
 ) => {
-  if (USE_LOCALHOST_INFERENCE) {
+  if (env.USE_LOCALHOST_INFERENCE) {
     return LOCALHOST_INFERENCE_HOST;
   }
 
@@ -92,7 +92,7 @@ export const getOneRandomServerHostForSource = async (
   return hosts[randomIndex].inferenceHost.hostUrl;
 };
 export const getOneRandomServerHostForModel = async (modelId: string) => {
-  if (USE_LOCALHOST_INFERENCE) {
+  if (env.USE_LOCALHOST_INFERENCE) {
     return LOCALHOST_INFERENCE_HOST;
   }
 
@@ -107,7 +107,7 @@ export const getOneRandomServerHostForModel = async (modelId: string) => {
   return hosts[0];
 };
 export const getTwoRandomServerHostsForModel = async (modelId: string) => {
-  if (USE_LOCALHOST_INFERENCE) {
+  if (env.USE_LOCALHOST_INFERENCE) {
     return [LOCALHOST_INFERENCE_HOST, LOCALHOST_INFERENCE_HOST];
   }
 
@@ -136,7 +136,7 @@ export const getTwoRandomServerHostsForSourceSet = async (
   sourceSetName: string,
   user: AuthenticatedUser | null = null,
 ) => {
-  if (USE_LOCALHOST_INFERENCE) {
+  if (env.USE_LOCALHOST_INFERENCE) {
     return [LOCALHOST_INFERENCE_HOST, LOCALHOST_INFERENCE_HOST];
   }
 

@@ -6,7 +6,8 @@ import {
 } from '@/lib/db/explanation-type';
 import { getGlobalModels } from '@/lib/db/model';
 import { getGlobalSourceReleases } from '@/lib/db/source';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { RequestOptionalUser } from '@/lib/types/auth';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
 export const POST = withOptionalUser(async (request: RequestOptionalUser) => {

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { AuthenticatedUser } from '../with-user';
+import { AuthenticatedUser } from '../types/auth';
 import { assertUserCanAccessModelAndSource } from './userCanAccess';
 
 export const getCommentsByUser = async (user: AuthenticatedUser) =>

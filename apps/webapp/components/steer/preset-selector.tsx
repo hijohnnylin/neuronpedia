@@ -1,5 +1,5 @@
 import { Button } from '@/components/shadcn/button';
-import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
+import { env } from '@/lib/env';
 import { FeaturePreset, SteerFeature } from '@/lib/utils/steer';
 import { X } from 'lucide-react';
 import { LoadingSquare } from '../svg/loading-square';
@@ -74,7 +74,7 @@ export default function SteerPresetSelector({
                 <X className="h-4 w-4 text-red-700" />
               </Button>
             )}
-            {preset.exampleSteerOutputId && IS_ACTUALLY_NEURONPEDIA_ORG && (
+            {preset.exampleSteerOutputId && env.IS_ACTUALLY_NEURONPEDIA_ORG && (
               <Button
                 variant="outline"
                 className={`px-3 py-0 text-[10px] leading-tight ${

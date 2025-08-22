@@ -4,14 +4,7 @@ import InferenceActivationAllProvider from '@/components/provider/inference-acti
 import RandomFeatureLink from '@/components/random-feature-link';
 import { Button } from '@/components/shadcn/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
-import {
-  DEFAULT_MODELID,
-  DEFAULT_SOURCE,
-  DEMO_MODE,
-  IS_LOCALHOST,
-  NEXT_PUBLIC_URL,
-  SITE_NAME_VERCEL_DEPLOY,
-} from '@/lib/env';
+import { env } from '@/lib/env';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
@@ -52,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: '%s ｜ Neuronpedia',
       default: 'Neuronpedia',
     },
-    metadataBase: new URL(NEXT_PUBLIC_URL),
+    metadataBase: new URL(env.NEXT_PUBLIC_URL),
     description,
     openGraph: {
       title: {
@@ -60,7 +53,7 @@ export async function generateMetadata(): Promise<Metadata> {
         default: 'Neuronpedia',
       },
       description,
-      url: NEXT_PUBLIC_URL,
+      url: env.NEXT_PUBLIC_URL,
       siteName: 'Neuronpedia',
       locale: 'en_US',
       type: 'website',
@@ -75,8 +68,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default function Page() {
   return (
-    <div className="flex w-full select-none flex-col items-center justify-center bg-slate-100 px-0 pt-8 sm:mt-0 sm:px-0">
-      {IS_LOCALHOST && !DEMO_MODE && (
+    <div className="flex w-full cursor-default select-none flex-col items-center justify-center bg-slate-100 px-0 pt-8 sm:mt-0 sm:px-0">
+      {env.IS_LOCALHOST && !env.DEMO_MODE && (
         <div className="mb-4 flex w-full max-w-screen-sm flex-col items-center justify-center gap-2 rounded-lg border bg-white px-8 py-4 shadow-sm">
           <div className="text-xs font-bold text-slate-400">You are running a local instance of Neuronpedia.</div>
           <div className="text-sm text-slate-700">Would you like to go to the Admin panel to import sources/SAEs?</div>
@@ -202,8 +195,10 @@ export default function Page() {
       <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 bg-slate-100 px-0 py-8 sm:mb-10 sm:mt-0 sm:flex-col sm:gap-y-1.5 sm:px-3 sm:py-6 sm:pt-2">
         <div className="mb-2 mt-0 flex flex-col items-center justify-center text-center text-sm sm:text-base">
           <div className="text-lg font-medium text-slate-800 sm:text-xl">
-            {SITE_NAME_VERCEL_DEPLOY ? (
-              <div className="pb-1 text-4xl font-semibold text-[#7B3F00]">{SITE_NAME_VERCEL_DEPLOY}</div>
+            {env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY ? (
+              <div className="pb-1 text-4xl font-semibold text-[#7B3F00]">
+                {env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY}
+              </div>
             ) : (
               <>
                 Neuronpedia is an{' '}
@@ -230,7 +225,7 @@ export default function Page() {
             )}
           </div>
           <div className="mt-1 text-sm font-normal text-slate-600 sm:text-base">
-            {SITE_NAME_VERCEL_DEPLOY ? (
+            {env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY ? (
               <div className="leading-relaxed">
                 Welcome to your very own Neuronpedia instance.
                 <br />
@@ -305,7 +300,19 @@ export default function Page() {
           />
         </a>
         <a
-          href={`${NEXT_PUBLIC_URL}/gemma-scope`}
+          href="https://www.anthropic.com/research/open-source-circuit-tracing"
+          target="_blank"
+          className="flex flex-row items-center justify-center"
+          rel="noreferrer"
+        >
+          <img
+            src="/usedby/anthropic.png"
+            className="h-[17px] opacity-55 grayscale hover:opacity-100 hover:grayscale-0"
+            alt="Anthropic"
+          />
+        </a>
+        <a
+          href={`${env.NEXT_PUBLIC_URL}/gemma-scope`}
           target="_blank"
           className="flex flex-row items-center justify-center"
           rel="noreferrer"
@@ -317,7 +324,7 @@ export default function Page() {
           />
         </a>
         <a
-          href={`${NEXT_PUBLIC_URL}/llama-scope`}
+          href={`${env.NEXT_PUBLIC_URL}/llama-scope`}
           target="_blank"
           className="flex flex-row items-center justify-center"
           rel="noreferrer"
@@ -329,7 +336,7 @@ export default function Page() {
           />
         </a>
         <a
-          href={`${NEXT_PUBLIC_URL}/gpt2sm-apollojt`}
+          href={`${env.NEXT_PUBLIC_URL}/gpt2sm-apollojt`}
           target="_blank"
           className="flex flex-row items-center justify-center"
           rel="noreferrer"
@@ -348,7 +355,7 @@ export default function Page() {
           />
         </a> */}
         <a
-          href={`${NEXT_PUBLIC_URL}/llama3.1-8b-eleuther_gp`}
+          href={`${env.NEXT_PUBLIC_URL}/llama3.1-8b-eleuther_gp`}
           target="_blank"
           className="flex flex-row items-center justify-center"
           rel="noreferrer"
@@ -429,24 +436,31 @@ export default function Page() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col items-start justify-start gap-x-3 pl-10">
-                <JumpToSAE modelId={DEFAULT_MODELID || ''} layer={DEFAULT_SOURCE || ''} modelOnSeparateRow />
+                <JumpToSAE
+                  modelId={env.NEXT_PUBLIC_DEFAULT_MODELID || ''}
+                  layer={env.NEXT_PUBLIC_DEFAULT_SOURCE || ''}
+                  modelOnSeparateRow
+                />
                 <div className="mt-4 flex w-full cursor-pointer flex-col items-start justify-start border-t border-b-slate-100 pt-4 text-sm font-medium text-sky-700 outline-none">
                   <div className="text-[10px] font-medium uppercase text-slate-500">Jump to Feature</div>
                   <FeatureSelector
                     showModel
                     openInNewTab={false}
-                    defaultModelId={DEFAULT_MODELID || ''}
-                    defaultSourceSet={getSourceSetNameFromSource(DEFAULT_SOURCE || '')}
+                    defaultModelId={env.NEXT_PUBLIC_DEFAULT_MODELID || ''}
+                    defaultSourceSet={getSourceSetNameFromSource(env.NEXT_PUBLIC_DEFAULT_SOURCE || '')}
                     defaultIndex="0"
                     filterToPublic
                     modelOnSeparateRow
                     autoFocus={false}
                   />
                 </div>
-                {DEFAULT_MODELID && DEFAULT_SOURCE && (
+                {env.NEXT_PUBLIC_DEFAULT_MODELID && env.NEXT_PUBLIC_DEFAULT_SOURCE && (
                   <div className="mt-4 flex w-full flex-col border-t pt-4">
                     <div className="mb-1 font-sans text-[9px] font-medium uppercase text-slate-500">Jump to Random</div>
-                    <RandomFeatureLink modelId={DEFAULT_MODELID || ''} source={DEFAULT_SOURCE || ''} />
+                    <RandomFeatureLink
+                      modelId={env.NEXT_PUBLIC_DEFAULT_MODELID || ''}
+                      source={env.NEXT_PUBLIC_DEFAULT_SOURCE || ''}
+                    />
                   </div>
                 )}
               </CardContent>

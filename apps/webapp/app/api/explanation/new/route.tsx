@@ -2,7 +2,8 @@
 
 // TODO: Bring back this endpoint but simplify (just explanation, no scoring)
 
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { array, number, object, string } from 'yup';
 

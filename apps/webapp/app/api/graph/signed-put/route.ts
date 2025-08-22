@@ -1,8 +1,9 @@
 import { MAX_GRAPH_UPLOAD_SIZE_BYTES, NP_GRAPH_BUCKET } from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
 import { getUserByName } from '@/lib/db/user';
+import { RequestAuthedUser } from '@/lib/types/auth';
 import { GRAPH_S3_USER_GRAPHS_DIR, MAX_PUT_REQUESTS_PER_DAY } from '@/lib/utils/graph';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { withAuthedUser } from '@/lib/with-user';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { headers } from 'next/headers';

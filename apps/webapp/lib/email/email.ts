@@ -4,29 +4,23 @@ import _ from 'lodash';
 import mjml2html from 'mjml';
 import path from 'path';
 import { Resend } from 'resend';
-import {
-  AWS_ACCESS_KEY_ID,
-  AWS_SECRET_ACCESS_KEY,
-  CONTACT_EMAIL_ADDRESS,
-  NEXT_PUBLIC_URL,
-  RESEND_EMAIL_API_KEY,
-} from '../env';
+import { env } from '../env';
 
 const { htmlToText } = require('html-to-text');
 
 let awsSesClient: SESv2Client;
 let resendClient: Resend;
 
-if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
+if (env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY) {
   awsSesClient = new SESv2Client({
     region: 'us-east-1',
     credentials: {
-      accessKeyId: AWS_ACCESS_KEY_ID,
-      secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      accessKeyId: env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
     },
   });
-} else if (RESEND_EMAIL_API_KEY) {
-  resendClient = new Resend(RESEND_EMAIL_API_KEY);
+} else if (env.RESEND_EMAIL_API_KEY) {
+  resendClient = new Resend(env.RESEND_EMAIL_API_KEY);
 }
 
 export const EMAIL_TEMPLATES_PATH = '/lib/email';
@@ -52,13 +46,13 @@ export const sendEmail = async (
   // try aws first
   if (awsSesClient) {
     const command = new SendEmailCommand({
-      FromEmailAddress: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
-      FeedbackForwardingEmailAddress: CONTACT_EMAIL_ADDRESS,
+      FromEmailAddress: `Neuronpedia <${env.NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS}>`,
+      FeedbackForwardingEmailAddress: env.NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS,
       ConfigurationSetName: 'Neuronpedia',
       Destination: {
         ToAddresses: [emailAddress],
       },
-      ReplyToAddresses: [CONTACT_EMAIL_ADDRESS],
+      ReplyToAddresses: [env.NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS],
       Content: {
         Simple: {
           Subject: {
@@ -76,7 +70,7 @@ export const sendEmail = async (
             ? [
                 {
                   Name: 'List-Unsubscribe',
-                  Value: `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
+                  Value: `<${env.NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
                 },
               ]
             : [],
@@ -89,14 +83,14 @@ export const sendEmail = async (
     }
   } else if (resendClient) {
     const result = await resendClient.emails.send({
-      from: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
+      from: `Neuronpedia <${env.NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS}>`,
       to: emailAddress,
       subject,
       html,
       text: htmlToText(html),
       headers: unsubscribeCode
         ? {
-            'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
+            'List-Unsubscribe': `<${env.NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
           }
         : {},
     });
@@ -105,7 +99,7 @@ export const sendEmail = async (
     }
   } else {
     console.error(
-      'No email provider defined. Set either AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY or RESEND_EMAIL_API_KEY',
+      'No email provider defined. Set either env.AWS_ACCESS_KEY_ID and env.AWS_SECRET_ACCESS_KEY or env.RESEND_EMAIL_API_KEY',
     );
   }
 };
@@ -179,7 +173,7 @@ export const sendWelcomeEmail = async (emailAddress: string, unsubscribeCode: st
   const templatedHtml = await mjml2html(mjml);
   const compiled = _.template(templatedHtml.html);
   const html = compiled({
-    unsubscribe_link: `${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}`,
+    unsubscribe_link: `${env.NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}`,
   });
   await sendEmail(emailAddress, unsubscribeCode, subject, html);
 };

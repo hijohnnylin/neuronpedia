@@ -1,11 +1,11 @@
 import { authOptions } from '@/app/api/auth/[...nextauth]/authOptions';
 import { GraphProvider } from '@/components/provider/graph-provider';
 import { GraphStateProvider } from '@/components/provider/graph-state-provider';
+import { ASSET_BASE_URL } from '@/lib/constants';
 import { prisma } from '@/lib/db';
 import { getModelById } from '@/lib/db/model';
-import { ASSET_BASE_URL } from '@/lib/env';
 import { Metadata } from 'next';
-import { getServerSession } from 'next-auth/next';
+import { getServerSession, Session } from 'next-auth';
 import { notFound } from 'next/navigation';
 import {
   ADDITIONAL_MODELS_TO_LOAD,
@@ -123,7 +123,7 @@ export default async function Page({
   };
 }) {
   const { modelId } = params;
-  const session = await getServerSession(authOptions);
+  const session: Session | null = await getServerSession(authOptions);
 
   const embedParam = searchParams.embed as string | undefined;
   const embed = embedParam === 'true';
@@ -155,8 +155,7 @@ export default async function Page({
   }
 
   // always get the user's graphMetadatas from our database
-  const graphMetadatas =
-    session && session.user && session.user.id ? await getGraphMetadataWithUser({ userId: session.user.id }) : [];
+  const graphMetadatas = session?.user?.id ? await getGraphMetadataWithUser({ userId: session.user.id }) : [];
 
   // add those graphmetadatas to the modelIdToGraphMetadatasMap too
   graphMetadatas.forEach((graphMetadata) => {

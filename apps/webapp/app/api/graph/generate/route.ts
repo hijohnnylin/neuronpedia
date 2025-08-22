@@ -5,7 +5,8 @@ import {
   NP_GRAPH_BUCKET,
 } from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
-import { USE_RUNPOD_GRAPH } from '@/lib/env';
+import { env } from '@/lib/env';
+import { RequestOptionalUser } from '@/lib/types/auth';
 import {
   checkRunpodQueueJobs,
   generateGraphAndUploadToS3,
@@ -18,7 +19,7 @@ import {
   MAX_RUNPOD_JOBS_IN_QUEUE,
   RUNPOD_BUSY_ERROR,
 } from '@/lib/utils/graph';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import Ajv from 'ajv';
@@ -264,7 +265,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     });
 
     // check the queue
-    if (USE_RUNPOD_GRAPH) {
+    if (env.USE_RUNPOD_GRAPH) {
       const queueNumber = await checkRunpodQueueJobs();
       if (queueNumber > MAX_RUNPOD_JOBS_IN_QUEUE) {
         // console.log('larger than queue but continuing');

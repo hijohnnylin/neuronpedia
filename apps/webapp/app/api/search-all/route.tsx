@@ -8,13 +8,10 @@ import { prisma } from '@/lib/db';
 import { createInferenceActivationsAndReturn } from '@/lib/db/activation';
 import { getNeuronsForSearcher } from '@/lib/db/neuron';
 import { assertUserCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
-import {
-  DEMO_MODE,
-  INFERENCE_ACTIVATION_USER_ID_DO_NOT_INCLUDE_IN_PUBLIC_ACTIVATIONS,
-  PUBLIC_ACTIVATIONS_USER_IDS,
-} from '@/lib/env';
+import { env } from '@/lib/env';
+import { RequestOptionalUser } from '@/lib/types/auth';
 import { runInferenceActivationAll } from '@/lib/utils/inference';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { ActivationAllPost200Response } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 
@@ -181,7 +178,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
                     take: 1,
                     where: {
                       creatorId: {
-                        in: PUBLIC_ACTIVATIONS_USER_IDS,
+                        in: env.PUBLIC_ACTIVATIONS_USER_IDS,
                       },
                     },
                   },
@@ -326,7 +323,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       var userIdForSearch = request.user.id;
     } else {
       // eslint-disable-next-line
-      var userIdForSearch = INFERENCE_ACTIVATION_USER_ID_DO_NOT_INCLUDE_IN_PUBLIC_ACTIVATIONS;
+      var userIdForSearch = env.INFERENCE_ACTIVATION_USER_ID;
     }
 
     // create all the activations first
@@ -389,7 +386,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       });
     });
 
-    if (DEMO_MODE) {
+    if (env.DEMO_MODE) {
       console.log('skipping saved search creation in demo mode');
     } else {
       // eslint-disable-next-line

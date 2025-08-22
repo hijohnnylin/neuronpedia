@@ -1,10 +1,11 @@
 /* eslint-disable no-useless-escape */
 
+import { OPENROUTER_BASE_URL } from '@/lib/constants';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { AutoInterpModelType, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import { AutoInterpModelType } from '../utils/autointerp';
 import {
   makeAnthropicMessage,
   makeGeminiMessage,

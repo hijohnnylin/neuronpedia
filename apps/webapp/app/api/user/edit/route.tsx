@@ -1,5 +1,6 @@
 import { updateUserAccount } from '@/lib/db/user';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 

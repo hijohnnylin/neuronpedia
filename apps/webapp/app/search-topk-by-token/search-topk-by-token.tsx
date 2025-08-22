@@ -5,7 +5,7 @@ import ModelSelector from '@/components/feature-selector/model-selector';
 import SourceSetSelector from '@/components/feature-selector/sourceset-selector';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
-import { DEFAULT_MODELID, DEFAULT_SOURCE, DEFAULT_SOURCESET, NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH } from '@/lib/env';
+import { env } from '@/lib/env';
 import useWindowSize from '@/lib/hooks/use-window-size';
 import { SearchTopKResult } from '@/lib/utils/inference';
 import { INFERENCE_EXAMPLE_TEXTS } from '@/lib/utils/inference-example-texts';
@@ -56,11 +56,11 @@ export default function SearchTopkByToken({
   // Use a ref to track initialization state - won't trigger re-renders
   const isInitializedRef = useRef(false);
 
-  const [modelId, setModelId] = useState(initialModelId || DEFAULT_MODELID);
+  const [modelId, setModelId] = useState(initialModelId || env.NEXT_PUBLIC_DEFAULT_MODELID);
   const [sourceSet, setSourceSet] = useState<string>(
-    initialSource ? getSourceSetNameFromSource(initialSource) : DEFAULT_SOURCESET,
+    initialSource ? getSourceSetNameFromSource(initialSource) : env.NEXT_PUBLIC_DEFAULT_SOURCESET,
   );
-  const [source, setSource] = useState<string>(initialSource || DEFAULT_SOURCE);
+  const [source, setSource] = useState<string>(initialSource || env.NEXT_PUBLIC_DEFAULT_SOURCE);
   const [searchQuery, setSearchQuery] = useState<string>(initialText || '');
   const [topkResult, setTopkResult] = useState<SearchTopKResult | undefined>();
   const [topkFeatures, setTopkFeatures] = useState<TopKFeature[] | undefined>(undefined);
@@ -98,9 +98,9 @@ export default function SearchTopkByToken({
     setLockedTokenPosition(-1);
     setHoveredTokenPosition(-1);
     setSearchQuery(textToUse);
-    if (textToUse.length > NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH) {
+    if (textToUse.length > env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH) {
       alert(
-        `We currently support a maximum of ${NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH} characters in a search query. Your query is ${textToUse.length} characters long.`,
+        `We currently support a maximum of ${env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH} characters in a search query. Your query is ${textToUse.length} characters long.`,
       );
       setIsSearching(false);
       return;

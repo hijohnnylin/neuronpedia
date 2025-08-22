@@ -1,5 +1,6 @@
 import { deleteNeuron } from '@/lib/db/neuron';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';
 

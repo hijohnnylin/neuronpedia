@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { ModelWithRelations } from '@/prisma/generated/zod';
 import AvailableResourcesTable from './table';
 
@@ -32,7 +32,7 @@ export default async function AvailableResourcesPage() {
       <div className="w-full text-center text-sm text-slate-500">
         The following are the public models and sources that are available for{' '}
         <a
-          href={`${NEXT_PUBLIC_URL}/api-doc`}
+          href={`${env.NEXT_PUBLIC_URL}/api-doc`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sky-700 underline"

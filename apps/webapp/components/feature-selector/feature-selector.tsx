@@ -1,6 +1,6 @@
 'use client';
 
-import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
+import { env } from '@/lib/env';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next-nprogress-bar';
 import Link from 'next/link';
@@ -43,8 +43,8 @@ export default function FeatureSelector({
   exclusiveCallback?: boolean;
 }) {
   const { getSourceSetsForModelId, getFirstSourceForSourceSet, globalModels, getDefaultModel } = useGlobalContext();
-  const [modelId, setModelId] = useState(defaultModelId || getDefaultModel()?.id || DEFAULT_MODELID);
-  const [sourceSet, setSourceSet] = useState(defaultSourceSet || DEFAULT_SOURCESET);
+  const [modelId, setModelId] = useState(defaultModelId || getDefaultModel()?.id || env.NEXT_PUBLIC_DEFAULT_MODELID);
+  const [sourceSet, setSourceSet] = useState(defaultSourceSet || env.NEXT_PUBLIC_DEFAULT_SOURCESET);
   const [source, setSource] = useState(defaultSource);
   const [index, setIndex] = useState<string | undefined>(defaultIndex);
   const router = useRouter();

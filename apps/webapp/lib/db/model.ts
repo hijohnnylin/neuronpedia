@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { AuthenticatedUser } from '@/lib/with-user';
+import { AuthenticatedUser } from '@/lib/types/auth';
 import { Model, Visibility } from '@prisma/client';
 import { AllowUnlistedFor, userCanAccessClause } from './userCanAccess';
 

@@ -1,7 +1,7 @@
 import { NeuronPartial } from '@/prisma/generated/zod';
 import { Model } from '@prisma/client';
 import { NPSteerMethod } from 'neuronpedia-inference-client';
-import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '../env';
+import { env } from '../env';
 
 export const STEER_N_COMPLETION_TOKENS = 64;
 export const STEER_N_COMPLETION_TOKENS_GRAPH = 10;
@@ -36,7 +36,7 @@ export const STEER_FREEZE_ATTENTION = true;
 export const STEER_N_LOGPROBS = 5;
 
 export function replaceSteerModelIdIfNeeded(modelId: string) {
-  if (STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(modelId)) {
+  if (env.NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(modelId)) {
     // Only remove -it if it's at the end of the string
     return modelId.endsWith('-it') ? modelId.slice(0, -3) : modelId;
   }

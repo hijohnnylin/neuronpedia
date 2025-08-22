@@ -1,11 +1,5 @@
 import { ANT_MODEL_ID_TO_NEURONPEDIA_MODEL_ID } from '@/app/[modelId]/graph/utils';
-import {
-  GRAPH_RUNPOD_SECRET,
-  GRAPH_RUNPOD_SERVER,
-  GRAPH_SERVER_SECRET,
-  USE_LOCALHOST_GRAPH,
-  USE_RUNPOD_GRAPH,
-} from '@/lib/env';
+import { env } from '@/lib/env';
 import * as yup from 'yup';
 import { getGraphRunpodServerUrlForModel, getGraphServerUrlForModel } from '../db/graph-host-source';
 import {
@@ -101,9 +95,9 @@ export const graphGenerateSchemaClient = yup.object({
 });
 
 export const checkRunpodQueueJobs = async () => {
-  const response = await fetch(`${GRAPH_RUNPOD_SERVER}/health`, {
+  const response = await fetch(`${env.GRAPH_RUNPOD_SERVER}/health`, {
     headers: {
-      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+      Authorization: `Bearer ${env.GRAPH_RUNPOD_SECRET}`,
     },
   });
 
@@ -147,12 +141,12 @@ export const getGraphTokenize = async (
     desired_logit_prob: desiredLogitProb,
     request_type: 'forward_pass',
   };
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     response = await fetch(`${getGraphRunpodServerUrlForModel(modelId)}/runsync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+        Authorization: `Bearer ${env.GRAPH_RUNPOD_SECRET}`,
       },
       body: JSON.stringify({
         input: body,
@@ -160,12 +154,12 @@ export const getGraphTokenize = async (
     });
   } else {
     response = await fetch(
-      `${USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : getGraphServerUrlForModel(modelId)}/forward-pass`,
+      `${env.USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : getGraphServerUrlForModel(modelId)}/forward-pass`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-secret-key': GRAPH_SERVER_SECRET,
+          'x-secret-key': env.GRAPH_SERVER_SECRET,
         },
         body: JSON.stringify(body),
       },
@@ -180,7 +174,7 @@ export const getGraphTokenize = async (
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
   }
 
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     json = json.output;
   }
 
@@ -227,12 +221,12 @@ export const generateGraphAndUploadToS3 = async (
     signed_url: signedUrl,
     user_id: userId,
   };
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     response = await fetch(`${getGraphRunpodServerUrlForModel(modelId)}/runsync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+        Authorization: `Bearer ${env.GRAPH_RUNPOD_SECRET}`,
       },
       body: JSON.stringify({
         input: body,
@@ -241,12 +235,12 @@ export const generateGraphAndUploadToS3 = async (
   } else {
     console.log('body', body);
     response = await fetch(
-      `${USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : getGraphServerUrlForModel(modelId)}/generate-graph`,
+      `${env.USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : getGraphServerUrlForModel(modelId)}/generate-graph`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-secret-key': GRAPH_SERVER_SECRET,
+          'x-secret-key': env.GRAPH_SERVER_SECRET,
         },
         body: JSON.stringify(body),
       },
@@ -363,12 +357,12 @@ export const steerLogits = async (
     seed,
     steered_output_only: steeredOutputOnly,
   };
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     response = await fetch(`${getGraphRunpodServerUrlForModel(modelId)}/runsync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+        Authorization: `Bearer ${env.GRAPH_RUNPOD_SECRET}`,
       },
       body: JSON.stringify({
         input: body,
@@ -376,12 +370,12 @@ export const steerLogits = async (
     });
   } else {
     response = await fetch(
-      `${USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : getGraphServerUrlForModel(modelId)}/steer`,
+      `${env.USE_LOCALHOST_GRAPH ? 'http://127.0.0.1:5004' : getGraphServerUrlForModel(modelId)}/steer`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-secret-key': GRAPH_SERVER_SECRET,
+          'x-secret-key': env.GRAPH_SERVER_SECRET,
         },
         body: JSON.stringify(body),
       },
@@ -396,7 +390,7 @@ export const steerLogits = async (
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
   }
 
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     json = json.output;
   }
 
