@@ -223,3 +223,22 @@ def get_sae_lens_ids_from_neuronpedia_id(
     sae_lens_release = tmp_df.release.values[0]
     sae_lens_id = tmp_df.sae_lens_id.values[0]
     return sae_lens_release, sae_lens_id
+
+# Model name mapping for TransformerLens compatibility
+# Maps Neuronpedia model IDs to TransformerLens model IDs
+TLENS_MODEL_NAME_MAPPING = {
+    "gpt2-small": "gpt2",
+    # Add other mappings as needed
+}
+
+def get_tlens_model_name(model_id: str) -> str:
+    """
+    Convert Neuronpedia model ID to TransformerLens model ID if mapping exists.
+    
+    Args:
+        model_id: The Neuronpedia model ID (e.g., "gpt2-small")
+        
+    Returns:
+        The TransformerLens model ID (e.g., "gpt2")
+    """
+    return TLENS_MODEL_NAME_MAPPING.get(model_id, model_id)

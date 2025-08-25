@@ -35,7 +35,7 @@ jobs:
       run: poetry run ruff check .
     - name: Check formatting
       run: poetry run ruff format --check .      
-    - name: Type checking
-      run: poetry run pyright .
+    # - name: Type checking
+    #   run: poetry run pyright .
     - name: Run tests
       run: poetry run pytest

@@ -15,6 +15,7 @@ from neuronpedia_inference_client.models.activation_single_post_request import (
     ActivationSinglePostRequest,
 )
 from transformer_lens import ActivationCache, HookedTransformer
+from transformer_lens.model_bridge.bridge import TransformerBridge
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
@@ -72,7 +73,7 @@ async def activation_single(
             prompt,
             prepend_bos=prepend_bos,
             truncate=False,
-        )[0]
+        )     
 
         if len(tokens) > config.token_limit:
             logger.error(
@@ -158,7 +159,7 @@ def get_layer_num_from_sae_id(sae_id: str) -> int:
 
 
 def process_activations(
-    model: HookedTransformer, layer: str, index: int, tokens: torch.Tensor
+    model: TransformerBridge, layer: str, index: int, tokens: torch.Tensor
 ) -> ActivationSinglePost200ResponseActivation:
     sae_manager = SAEManager.get_instance()
     _, cache = model.run_with_cache(tokens)

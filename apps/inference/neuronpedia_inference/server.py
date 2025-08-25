@@ -14,12 +14,11 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from transformer_lens import HookedTransformer
+from transformer_lens.model_bridge import TransformerBridge
 from transformer_lens.hook_points import HookPoint
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from neuronpedia_inference.args import list_available_options, parse_env_and_args
-from neuronpedia_inference.config import Config, get_saelens_neuronpedia_directory_df
+from neuronpedia_inference.config import Config, get_saelens_neuronpedia_directory_df, get_tlens_model_name
 from neuronpedia_inference.endpoints.activation.all import (
     router as activation_all_router,
 )
@@ -112,7 +111,7 @@ async def initialize(
         # Validate inputs
         df = get_saelens_neuronpedia_directory_df()
         models = df["model"].unique()
-        sae_sets = df["neuronpedia_set"].unique()
+        sae_sets = df["neuronpedia_set"].unique()        
         if args.model_id not in models:
             logger.error(
                 f"Error: Invalid model_id '{args.model_id}'. Use --list_models to see available options."
@@ -163,27 +162,16 @@ async def initialize(
         Config._instance = config
 
         logger.info("Loading model...")
-
-        hf_model = None
-        hf_tokenizer = None
-        if custom_hf_model_id is not None:
-            logger.info("Loading custom HF model: %s", custom_hf_model_id)
-            hf_model = AutoModelForCausalLM.from_pretrained(
-                custom_hf_model_id,
-                torch_dtype=STR_TO_DTYPE[config.model_dtype],
-            )
-            hf_tokenizer = AutoTokenizer.from_pretrained(custom_hf_model_id)
-
-        model = HookedTransformer.from_pretrained_no_processing(
-            (config.override_model_id if config.override_model_id else config.model_id),
-            device=args.device,
-            dtype=STR_TO_DTYPE[config.model_dtype],
-            n_devices=device_count,
-            hf_model=hf_model,
-            **({"hf_config": hf_model.config} if hf_model else {}),
-            tokenizer=hf_tokenizer,
-            **config.model_kwargs,
-        )
+                
+        # Get the model name to use, applying TransformerLens mapping if needed
+        model_name_to_load = config.override_model_id if config.override_model_id else config.model_id
+        transformerlens_model_name = get_tlens_model_name(model_name_to_load)
+        
+        logger.info(f"Loading model: {model_name_to_load} -> {transformerlens_model_name}")
+        
+        model = TransformerBridge.boot_transformers(model_name=transformerlens_model_name,
+                                                    device=args.device,
+                                                    dtype=STR_TO_DTYPE[config.model_dtype])
 
         # add hook_in to mlp for transcoders
         def add_hook_in_to_mlp(mlp):  # type: ignore
@@ -192,8 +180,7 @@ async def initialize(
             mlp.forward = lambda x: original_forward(mlp.hook_in(x))
 
         for block in model.blocks:
-            add_hook_in_to_mlp(block.mlp)
-        model.setup()
+            add_hook_in_to_mlp(block.mlp)        
 
         Model._instance = model
         config.set_num_layers(model.cfg.n_layers)
