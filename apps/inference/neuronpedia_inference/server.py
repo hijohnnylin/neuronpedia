@@ -14,9 +14,10 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from transformer_lens import HookedTransformer
-from transformer_lens.hook_points import HookPoint
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformer_lens.model_bridge import TransformerBridge
+from transformer_lens.hook_points import HookPoint
+from transformer_lens import HookedTransformer
 
 from neuronpedia_inference.args import list_available_options, parse_env_and_args
 from neuronpedia_inference.config import Config, get_saelens_neuronpedia_directory_df
@@ -100,7 +101,7 @@ app.include_router(v1_router)
 async def health_check():
     return {"status": "healthy"}
 
-
+OLD_LOADING_MECHANISM = False
 @app.post("/initialize")
 async def initialize(
     custom_hf_model_id: str | None = None,
@@ -112,7 +113,7 @@ async def initialize(
         # Validate inputs
         df = get_saelens_neuronpedia_directory_df()
         models = df["model"].unique()
-        sae_sets = df["neuronpedia_set"].unique()
+        sae_sets = df["neuronpedia_set"].unique()           
         if args.model_id not in models:
             logger.error(
                 f"Error: Invalid model_id '{args.model_id}'. Use --list_models to see available options."
@@ -164,37 +165,36 @@ async def initialize(
 
         logger.info("Loading model...")
 
-        hf_model = None
-        hf_tokenizer = None
-        if custom_hf_model_id is not None:
-            logger.info("Loading custom HF model: %s", custom_hf_model_id)
-            hf_model = AutoModelForCausalLM.from_pretrained(
-                custom_hf_model_id,
-                torch_dtype=STR_TO_DTYPE[config.model_dtype],
+        if OLD_LOADING_MECHANISM == True:
+            hf_model = None
+            hf_tokenizer = None
+            if custom_hf_model_id is not None:
+                logger.info("Loading custom HF model: %s", custom_hf_model_id)
+                hf_model = AutoModelForCausalLM.from_pretrained(
+                    custom_hf_model_id,
+                    torch_dtype=STR_TO_DTYPE[config.model_dtype],
+                )
+                hf_tokenizer = AutoTokenizer.from_pretrained(custom_hf_model_id)
+
+            model = HookedTransformer.from_pretrained_no_processing(
+                (config.override_model_id if config.override_model_id else config.model_id),
+                device=args.device,
+                dtype=STR_TO_DTYPE[config.model_dtype],
+                n_devices=device_count,
+                hf_model=hf_model,
+                **({"hf_config": hf_model.config} if hf_model else {}),
+                tokenizer=hf_tokenizer,
+                **config.model_kwargs,
             )
-            hf_tokenizer = AutoTokenizer.from_pretrained(custom_hf_model_id)
-
-        model = HookedTransformer.from_pretrained_no_processing(
-            (config.override_model_id if config.override_model_id else config.model_id),
-            device=args.device,
-            dtype=STR_TO_DTYPE[config.model_dtype],
-            n_devices=device_count,
-            hf_model=hf_model,
-            **({"hf_config": hf_model.config} if hf_model else {}),
-            tokenizer=hf_tokenizer,
-            **config.model_kwargs,
-        )
-
-        # add hook_in to mlp for transcoders
-        def add_hook_in_to_mlp(mlp):  # type: ignore
-            mlp.hook_in = HookPoint()
-            original_forward = mlp.forward
-            mlp.forward = lambda x: original_forward(mlp.hook_in(x))
-
-        for block in model.blocks:
-            add_hook_in_to_mlp(block.mlp)
-        model.setup()
-
+        else:
+                
+            # Load the model utilizing the new transformerlens bridge    
+            model = TransformerBridge.boot_transformers(model_name=config.override_model_id if config.override_model_id else config.model_id,
+                                                        device=args.device,
+                                                        dtype=STR_TO_DTYPE[config.model_dtype])
+        
+            # Enable compatibility mode for legacy HookedTransformer components/hooks
+            model.enable_compatibility_mode()
         Model._instance = model
         config.set_num_layers(model.cfg.n_layers)
 

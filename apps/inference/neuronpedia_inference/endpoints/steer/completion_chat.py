@@ -17,7 +17,7 @@ from neuronpedia_inference_client.models.steer_completion_chat_post200_response 
 from neuronpedia_inference_client.models.steer_completion_chat_post_request import (
     SteerCompletionChatPostRequest,
 )
-from transformer_lens import HookedTransformer
+from transformer_lens.model_bridge.bridge import TransformerBridge
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.inference_utils.steering import (
@@ -424,7 +424,7 @@ def make_steer_completion_chat_response(
     steer_types: list[NPSteerType],
     steered_result: str,
     default_result: str,
-    model: HookedTransformer,
+    model: TransformerBridge,
     promptTokenized: torch.Tensor,
     promptChat: list[NPSteerChatMessage],
     custom_hf_model_id: str | None = None,

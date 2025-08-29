@@ -147,7 +147,7 @@ def test_completion_steered_with_vectors_additive(client: TestClient):
 
     expected_steered_output = "Hello, world!!!!!!!!!!!"
     expected_default_output = "Hello, world!\n\nI'm a programmer and I'm a"
-
+        
     assert outputs_by_type[NPSteerType.STEERED] == expected_steered_output
     assert outputs_by_type[NPSteerType.DEFAULT] == expected_default_output
 

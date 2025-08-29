@@ -6,7 +6,7 @@ import torch
 from neuronpedia_inference_client.models.np_logprob import NPLogprob
 from neuronpedia_inference_client.models.np_logprob_top import NPLogprobTop
 from psutil import Process
-from transformer_lens import HookedTransformer
+from transformer_lens.model_bridge.bridge import TransformerBridge
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def get_device():
 def make_logprob_from_logits(
     result: torch.Tensor,
     logits: torch.Tensor,
-    model: HookedTransformer,
+    model: TransformerBridge,
     n_logprobs: int = 10,
 ) -> NPLogprob:
     # Note: logits from generate_stream with return_logits=True has shape [batch_size, 1, vocab_size]

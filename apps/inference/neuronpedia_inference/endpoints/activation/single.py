@@ -14,7 +14,8 @@ from neuronpedia_inference_client.models.activation_single_post200_response_acti
 from neuronpedia_inference_client.models.activation_single_post_request import (
     ActivationSinglePostRequest,
 )
-from transformer_lens import ActivationCache, HookedTransformer
+from transformer_lens import ActivationCache
+from transformer_lens.model_bridge.bridge import TransformerBridge
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
@@ -72,7 +73,7 @@ async def activation_single(
             prompt,
             prepend_bos=prepend_bos,
             truncate=False,
-        )[0]
+        )
 
         if len(tokens) > config.token_limit:
             logger.error(
@@ -112,7 +113,7 @@ async def activation_single(
             prompt,
             prepend_bos=prepend_bos,
             truncate=False,
-        )[0]
+        )
         if len(tokens) > config.token_limit:
             logger.error(
                 "Text too long: %s tokens, max is %s",
@@ -158,7 +159,7 @@ def get_layer_num_from_sae_id(sae_id: str) -> int:
 
 
 def process_activations(
-    model: HookedTransformer, layer: str, index: int, tokens: torch.Tensor
+    model: TransformerBridge, layer: str, index: int, tokens: torch.Tensor
 ) -> ActivationSinglePost200ResponseActivation:
     sae_manager = SAEManager.get_instance()
     _, cache = model.run_with_cache(tokens)
@@ -174,6 +175,7 @@ def process_activations(
             cache,
             hook_name,
             index,
+            sae_manager.device,
         )
     raise ValueError(f"Invalid layer: {layer}")
 
@@ -200,9 +202,10 @@ def process_feature_activations(
     cache: ActivationCache | dict[str, torch.Tensor],
     hook_name: str,
     index: int,
+    device: str,
 ) -> ActivationSinglePost200ResponseActivation:
     if sae_type == "saelens-1":
-        return process_saelens_activations(sae, cache, hook_name, index)
+        return process_saelens_activations(sae, cache, hook_name, index, device)
     raise ValueError(f"Unsupported SAE type: {sae_type}")
 
 
@@ -211,8 +214,9 @@ def process_saelens_activations(
     cache: ActivationCache | dict[str, torch.Tensor],
     hook_name: str,
     index: int,
-) -> ActivationSinglePost200ResponseActivation:
-    feature_acts = sae.encode(cache[hook_name])
+    device: str,
+) -> ActivationSinglePost200ResponseActivation:        
+    feature_acts = sae.encode(cache[hook_name].to(device))
     values = torch.transpose(feature_acts.squeeze(0), 0, 1)[index].detach().tolist()
     max_value = max(values)
     return ActivationSinglePost200ResponseActivation(
@@ -246,14 +250,14 @@ def process_vector_activations(
 
 
 def calculate_dfa(
-    model: HookedTransformer,
+    model: TransformerBridge,
     sae: Any,
     layer_num: int,
     index: int,
     max_value_index: int,
     tokens: torch.Tensor,
-) -> dict[str, list[float] | int | float]:
-    _, cache = model.run_with_cache(tokens)
+) -> dict[str, list[float] | int | float]:    
+    _, cache = model.run_with_cache(tokens)    
     v = cache["v", layer_num]  # [batch, src_pos, n_heads, d_head]
     attn_weights = cache["pattern", layer_num]  # [batch, n_heads, dest_pos, src_pos]
 

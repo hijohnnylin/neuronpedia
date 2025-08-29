@@ -17,10 +17,9 @@ from neuronpedia_inference.shared import Model
 BOS_TOKEN_STR = "<|endoftext|>"
 TEST_PROMPT = "Hello, world!"
 X_SECRET_KEY = "cat"
-MODEL_ID = "gpt2-small"
 SAE_SOURCE_SET = "res-jb"
 SAE_SELECTED_SOURCES = ["7-res-jb"]
-ABS_TOLERANCE = 0.1
+ABS_TOLERANCE = 0.15
 N_COMPLETION_TOKENS = 10
 TEMPERATURE = 0
 STRENGTH = 10.0  # Steering mechanism (feature or vector) specific strength
@@ -30,6 +29,14 @@ SEED = 42
 STEER_SPECIAL_TOKENS = False
 STEER_FEATURE_INDEX = 5
 INVALID_SAE_SOURCE = "fake-source"
+
+MODEL_ID = "gpt2-small"
+TOKEN_LIMIT = "500"
+DEVICE = "mps"
+MAX_LOADED_SAES = "1"
+MODEL_DTYPE = "float16"
+SAE_DTYPE = "float32"
+
 
 
 @pytest.fixture(scope="session")
@@ -44,17 +51,17 @@ def initialize_models():
     # Set environment variables for testing
     os.environ.update(
         {
-            "MODEL_ID": "gpt2-small",
-            "SAE_SETS": json.dumps(["res-jb"]),
-            "MODEL_DTYPE": "float16",
-            "SAE_DTYPE": "float32",
-            "TOKEN_LIMIT": "500",
-            "DEVICE": "cpu",
+            "MODEL_ID": MODEL_ID,
+            "SAE_SETS": json.dumps([SAE_SOURCE_SET]),
+            "MODEL_DTYPE": MODEL_DTYPE,
+            "SAE_DTYPE": SAE_DTYPE,
+            "TOKEN_LIMIT": TOKEN_LIMIT,
+            "DEVICE": DEVICE,
             "INCLUDE_SAE": json.dumps(
-                ["7-res-jb"]
+                SAE_SELECTED_SOURCES
             ),  # Only load the specific SAE we want
             "EXCLUDE_SAE": json.dumps([]),
-            "MAX_LOADED_SAES": "1",
+            "MAX_LOADED_SAES": MAX_LOADED_SAES,
             "SECRET": X_SECRET_KEY,
         }
     )

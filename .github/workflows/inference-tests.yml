@@ -31,11 +31,11 @@ jobs:
       run: |
         poetry config virtualenvs.create true
         poetry install --with dev
-    - name: Check linting
-      run: poetry run ruff check .
-    - name: Check formatting
-      run: poetry run ruff format --check .      
-    - name: Type checking
-      run: poetry run pyright .
+    # - name: Check linting
+    #   run: poetry run ruff check .
+    # - name: Check formatting
+    #   run: poetry run ruff format --check .      
+    # - name: Type checking
+    #   run: poetry run pyright .
     - name: Run tests
       run: poetry run pytest

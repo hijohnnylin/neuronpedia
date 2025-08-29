@@ -205,7 +205,7 @@ async def run_batched_generate(
             NPSteerType.STEERED in steer_types and NPSteerType.DEFAULT in steer_types
         )
 
-        tokenized = model.to_tokens(prompt)[0]
+        tokenized = model.to_tokens(prompt)
         logger.info(f"Tokenized input device: {tokenized.device}")
 
         if generate_both:
@@ -241,13 +241,13 @@ async def run_batched_generate(
                     for i, (result, logits) in enumerate(
                         model.generate_stream(
                             stop_at_eos=(model.cfg.device != "mps"),
-                            input=tokenized.unsqueeze(0),
+                            input=prompt,
                             do_sample=True,
                             max_tokens_per_yield=TOKENS_PER_YIELD,
                             return_logits=True,
                             **kwargs,
                         )
-                    ):
+                    ):                        
                         to_append = ""
                         if i == 0:
                             to_append = model.to_string(result[0][1:])  # type: ignore
@@ -304,7 +304,7 @@ async def run_batched_generate(
                 for i, (result, logits) in enumerate(
                     model.generate_stream(
                         stop_at_eos=(model.cfg.device != "mps"),
-                        input=tokenized.unsqueeze(0),
+                        input=prompt,
                         do_sample=True,
                         max_tokens_per_yield=TOKENS_PER_YIELD,
                         return_logits=True,
