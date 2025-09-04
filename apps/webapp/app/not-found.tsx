@@ -1,4 +1,4 @@
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 
 export default function NotFound() {
   return (
@@ -10,12 +10,12 @@ export default function NotFound() {
             If you are trying to access a specific model, source/SAE, or feature, check available public models/sources
             (including which ones have inference enabled) at{' '}
             <a
-              href={`https://${NEXT_PUBLIC_URL}/available-resources`}
+              href={`https://${env.NEXT_PUBLIC_URL}/available-resources`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sky-700 hover:underline"
             >
-              {NEXT_PUBLIC_URL}/available-resources
+              {env.NEXT_PUBLIC_URL}/available-resources
             </a>
           </div>
         </div>

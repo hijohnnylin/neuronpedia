@@ -3,7 +3,7 @@
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { Button } from '@/components/shadcn/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/shadcn/dialog';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { DownloadIcon, Info } from 'lucide-react';
 import { CLTGraph, CLTGraphQParams } from './graph-types';
 
@@ -44,7 +44,7 @@ export default function GraphInfoModal({ cltGraph, selectedMetadataGraph }: Grap
 
         // add current window url to metadata
         const location = window.location.href;
-        const sourceSetUrl = `${NEXT_PUBLIC_URL}/${selectedMetadataGraph.modelId}/${selectedMetadataGraph.sourceSetName}`;
+        const sourceSetUrl = `${env.NEXT_PUBLIC_URL}/${selectedMetadataGraph.modelId}/${selectedMetadataGraph.sourceSetName}`;
         if (data.metadata.info) {
           data.metadata.info.neuronpedia_link = location;
           data.metadata.info.neuronpedia_source_set = sourceSetUrl;

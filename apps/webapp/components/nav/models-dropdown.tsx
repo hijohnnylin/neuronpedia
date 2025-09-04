@@ -1,7 +1,7 @@
 'use client';
 
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { IS_LOCALHOST } from '@/lib/env';
+import { env } from '@/lib/env';
 import * as Select from '@radix-ui/react-select';
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { useRouter } from 'next-nprogress-bar';
@@ -67,8 +67,8 @@ export default function ModelsDropdown({ isInBreadcrumb = false }: { isInBreadcr
               ))}
             {!isInBreadcrumb && (
               <Link
-                href={IS_LOCALHOST ? '/model/new' : 'https://forms.gle/Yg51TYFutJysiyDP7'}
-                target={IS_LOCALHOST ? undefined : '_blank'}
+                href={env.IS_LOCALHOST ? '/model/new' : 'https://forms.gle/Yg51TYFutJysiyDP7'}
+                target={env.IS_LOCALHOST ? undefined : '_blank'}
                 rel="noreferrer"
                 className="col-span-2 flex h-9 flex-row items-center justify-center gap-x-0.5 rounded bg-white px-3 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
               >

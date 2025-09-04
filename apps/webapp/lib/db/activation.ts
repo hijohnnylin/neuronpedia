@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
+import { AuthenticatedUser } from '@/lib/types/auth';
 import { getSourceSetNameFromSource } from '../utils/source';
-import { AuthenticatedUser } from '../with-user';
 import { getVector } from './neuron';
 import { assertUserCanAccessModelAndSource, assertUserCanAccessModelAndSourceSet } from './userCanAccess';
 

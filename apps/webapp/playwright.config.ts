@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import { defineConfig, devices } from 'node_modules/@playwright/test';
 import path from 'path';
-import { IS_DOCKER_COMPOSE } from './lib/env';
+import { env } from './lib/env';
 
 const envPath = path.resolve(__dirname, '.env.playwright');
 if (fs.existsSync(envPath)) {
@@ -29,7 +29,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: IS_DOCKER_COMPOSE ? 'http://webapp:3000' : 'http://localhost:3000',
+    baseURL: env.IS_DOCKER_COMPOSE ? 'http://webapp:3000' : 'http://localhost:3000',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',

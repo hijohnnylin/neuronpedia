@@ -1,15 +1,9 @@
+import { env } from '@/lib/env';
+import { AuthenticatedUser } from '@/lib/types/auth';
 import { prisma } from '../db';
-import {
-  GRAPH_RUNPOD_SECRET,
-  GRAPH_SERVER_SECRET,
-  IS_DOCKER_COMPOSE,
-  USE_LOCALHOST_GRAPH,
-  USE_RUNPOD_GRAPH,
-} from '../env';
-import { AuthenticatedUser } from '../with-user';
 import { userCanAccessModelAndSourceSet } from './userCanAccess';
 
-export const LOCALHOST_GRAPH_HOST = IS_DOCKER_COMPOSE ? 'http://graph:5004' : 'http://127.0.0.1:5004';
+export const LOCALHOST_GRAPH_HOST = env.IS_DOCKER_COMPOSE ? 'http://graph:5004' : 'http://127.0.0.1:5004';
 
 export const getSourceSetGraphHosts = async (
   modelId: string,
@@ -59,20 +53,20 @@ export const getGraphServerRunpodHostForSourceSet = async (
 };
 
 export const getAuthHeaderForGraphServerRequest = () => {
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     return {
-      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+      Authorization: `Bearer ${env.GRAPH_RUNPOD_SECRET}`,
       'x-secret-key': '',
     };
   }
   return {
     Authorization: '',
-    'x-secret-key': GRAPH_SERVER_SECRET,
+    'x-secret-key': env.GRAPH_SERVER_SECRET,
   };
 };
 
 export const wrapRequestBodyForRunpodIfNeeded = (body: any) => {
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     return {
       input: body,
     };
@@ -81,10 +75,10 @@ export const wrapRequestBodyForRunpodIfNeeded = (body: any) => {
 };
 
 export const getGraphServerRequestUrlForSourceSet = async (modelId: string, sourceSetName: string, action: string) => {
-  if (USE_LOCALHOST_GRAPH) {
+  if (env.USE_LOCALHOST_GRAPH) {
     return `${LOCALHOST_GRAPH_HOST}/${action}`;
   }
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     // for runpod the action is in the body
     return `${await getGraphServerRunpodHostForSourceSet(modelId, sourceSetName)}/runsync`;
   }

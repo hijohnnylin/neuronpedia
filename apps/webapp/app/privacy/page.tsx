@@ -1,4 +1,4 @@
-import { CONTACT_EMAIL_ADDRESS } from '@/lib/env';
+import { env } from '@/lib/env';
 
 export default function Privacy() {
   return (
@@ -66,7 +66,7 @@ export default function Privacy() {
         public username may be publicly credited with that contribution. You may change your username at any time. If
         you wish to delete your data, you can simply{' '}
         <a
-          href={`mailto:${CONTACT_EMAIL_ADDRESS}?subject=Deletion%20Request&body=Hey%2C%0D%0A%0D%0APlease%20delete%20my%20account.%0D%0AThe%20email%20associated%20with%20my%20account%20is%3A%20%5Bthis%20should%20match%20the%20address%20you're%20emailing%20from%5D%0D%0AMy%20username%20is%3A%20%5Busername%5D%0D%0A%0D%0AThank%20you!%0D%0A`}
+          href={`mailto:${env.NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS}?subject=Deletion%20Request&body=Hey%2C%0D%0A%0D%0APlease%20delete%20my%20account.%0D%0AThe%20email%20associated%20with%20my%20account%20is%3A%20%5Bthis%20should%20match%20the%20address%20you're%20emailing%20from%5D%0D%0AMy%20username%20is%3A%20%5Busername%5D%0D%0A%0D%0AThank%20you!%0D%0A`}
           className="text-sky-500"
         >
           email us your deletion request

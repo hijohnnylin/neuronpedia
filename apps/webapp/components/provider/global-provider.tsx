@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-shadow */
 
-import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '@/lib/env';
+import { env } from '@/lib/env';
 import { formatToGlobalModels } from '@/lib/utils/general';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import {
@@ -214,7 +214,7 @@ export default function GlobalProvider({
   };
 
   const getInferenceEnabledForModel = (modelId: string) => {
-    if (STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(modelId)) {
+    if (env.NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(modelId)) {
       return true;
     }
     const model = globalModels[modelId];

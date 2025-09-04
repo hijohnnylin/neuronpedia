@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { UserSecretType } from '@prisma/client';
-import { ANTHROPIC_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY } from '../env';
-import { AuthenticatedUser } from '../with-user';
+import { env } from '../env';
+import { AuthenticatedUser } from '../types/auth';
 import { getUserByName } from './user';
 
 export const getUserSecret = async (username: string, type: UserSecretType) =>
@@ -51,15 +51,15 @@ export const getAutoInterpKeyToUse = async (type: UserSecretType, user: Authenti
   const authedUser = await getUserByName(user.name);
   if (authedUser.canTriggerExplanations) {
     if (type === UserSecretType.OPENAI) {
-      return OPENAI_API_KEY;
+      return env.OPENAI_API_KEY;
     }
     if (type === UserSecretType.GOOGLE) {
-      return GEMINI_API_KEY;
+      return env.GEMINI_API_KEY;
     }
     if (type === UserSecretType.ANTHROPIC) {
-      return ANTHROPIC_API_KEY;
+      return env.ANTHROPIC_API_KEY;
     }
-    return OPENROUTER_API_KEY;
+    return env.OPENROUTER_API_KEY;
   }
   const secret = await getUserSecret(user.name, type);
   return secret?.value;

@@ -1,6 +1,6 @@
 'use client';
 
-import { IS_ACTUALLY_NEURONPEDIA_ORG, NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -13,7 +13,7 @@ export default function Footer() {
   return (
     <div className="hidden w-full flex-row items-center justify-between gap-x-5 bg-slate-50 px-5 py-1 text-[11px] text-slate-400 sm:flex">
       <div className="-mt-1.5 hidden flex-row items-center justify-center sm:flex">
-        {IS_ACTUALLY_NEURONPEDIA_ORG ? (
+        {env.IS_ACTUALLY_NEURONPEDIA_ORG ? (
           <iframe
             title="Neuronpedia Status"
             src="https://status.neuronpedia.org/badge?theme=light"
@@ -24,7 +24,7 @@ export default function Footer() {
             scrolling="no"
           />
         ) : (
-          <div className="">{NEXT_PUBLIC_URL}</div>
+          <div className="">{env.NEXT_PUBLIC_URL}</div>
         )}
       </div>
       <div className="flex flex-1 flex-row items-center justify-end gap-x-3 sm:gap-x-5">

@@ -3,7 +3,7 @@
 // this isn't officially supported yet
 
 import ModelSelector from '@/components/feature-selector/model-selector';
-import { IS_LOCALHOST } from '@/lib/env';
+import { env } from '@/lib/env';
 import { SourceSet } from '@prisma/client';
 import { useState } from 'react';
 
@@ -46,7 +46,7 @@ export default function NewSourceSetForm() {
     window.location.href = `/${sae.modelId}/${sae.name}`;
   };
 
-  return IS_LOCALHOST ? (
+  return env.IS_LOCALHOST ? (
     <div className="w-full max-w-xl px-5 xl:px-0">
       <h1 className="mt-0 text-center text-xl font-medium text-slate-800">Add SAE Set</h1>
       <div className="mt-2 text-sm">

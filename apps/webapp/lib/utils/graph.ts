@@ -1,4 +1,4 @@
-import { GRAPH_RUNPOD_SECRET, USE_RUNPOD_GRAPH } from '@/lib/env';
+import { env } from '@/lib/env';
 import * as yup from 'yup';
 import {
   getAuthHeaderForGraphServerRequest,
@@ -101,7 +101,7 @@ export const graphGenerateSchemaClient = yup.object({
 export const checkRunpodQueueJobs = async (host: string) => {
   const response = await fetch(`${host}/health`, {
     headers: {
-      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
+      Authorization: `Bearer ${env.GRAPH_RUNPOD_SECRET}`,
     },
   });
 
@@ -164,7 +164,7 @@ export const getGraphTokenize = async (
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
   }
 
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     json = json.output;
   }
 
@@ -352,7 +352,7 @@ export const steerLogits = async (
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
   }
 
-  if (USE_RUNPOD_GRAPH) {
+  if (env.USE_RUNPOD_GRAPH) {
     json = json.output;
   }
 

@@ -2,7 +2,7 @@
 
 // TODO: not actually used (and api prevents public use)
 
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { ModelPartialSchema } from 'prisma/generated/zod';
 import { useState } from 'react';
 
@@ -59,7 +59,7 @@ export default function NewModelForm() {
         <label htmlFor="id" className="mt-5 block">
           <div className="text-slate-700">Model ID (Lowercased Letters, Numbers, Hyphens, and Underscores)</div>
           <div className="font-mono text-xs font-bold text-slate-400">
-            {NEXT_PUBLIC_URL}/{modelId || '[Model-ID]'}
+            {env.NEXT_PUBLIC_URL}/{modelId || '[Model-ID]'}
           </div>
           <input
             type="text"
@@ -120,7 +120,7 @@ export default function NewModelForm() {
         {modelId.length > 0 && (
           <div className="pt-5">
             Your model will be created at:
-            <br /> {`${NEXT_PUBLIC_URL}/${modelId}`}
+            <br /> {`${env.NEXT_PUBLIC_URL}/${modelId}`}
           </div>
         )}
         <div className="pt-5 text-center">

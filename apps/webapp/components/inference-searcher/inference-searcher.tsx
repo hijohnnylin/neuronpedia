@@ -9,7 +9,7 @@ import {
   useInferenceActivationAllContext,
 } from '@/components/provider/inference-activation-all-provider';
 import { Button } from '@/components/shadcn/button';
-import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
+import { env } from '@/lib/env';
 import { BOS_TOKENS, replaceHtmlAnomalies } from '@/lib/utils/activations';
 import {
   getAdditionalInfoFromSource,
@@ -66,8 +66,10 @@ export default function InferenceSearcher({
   } = useInferenceActivationAllContext();
   const { getSourcesForSourceSet, getDefaultModel, globalModels } = useGlobalContext();
   const [sortIndexes, setSortIndexes] = useState<number[]>(initialSortIndexes || []);
-  const [modelId, setModelId] = useState(initialModelId || DEFAULT_MODELID || getDefaultModel()?.id || DEFAULT_MODELID);
-  const [sourceSet, setSourceSet] = useState(initialSourceSet || DEFAULT_SOURCESET);
+  const [modelId, setModelId] = useState(
+    initialModelId || env.NEXT_PUBLIC_DEFAULT_MODELID || getDefaultModel()?.id || env.NEXT_PUBLIC_DEFAULT_MODELID,
+  );
+  const [sourceSet, setSourceSet] = useState(initialSourceSet || env.NEXT_PUBLIC_DEFAULT_SOURCESET);
   const [selectedLayers, setSelectedLayers] = useState<string[] | undefined>(initialSelectedLayers);
   const [ignoreBos, setIgnoreBos] = useState(initialIgnoreBos !== undefined ? initialIgnoreBos : true);
   const [hideDense, setHideDense] = useState(true);
@@ -108,7 +110,7 @@ export default function InferenceSearcher({
       setSourceSet(newSourceSet.name);
       setAvailableLayers(getSourcesForSourceSet(newModelId, newSourceSet.name, false, true, false));
     } else {
-      setSourceSet(DEFAULT_SOURCESET);
+      setSourceSet(env.NEXT_PUBLIC_DEFAULT_SOURCESET);
       setAvailableLayers([]);
     }
     setSelectedLayers([]);

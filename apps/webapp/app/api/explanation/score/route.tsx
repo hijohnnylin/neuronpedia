@@ -2,12 +2,13 @@ import { prisma } from '@/lib/db';
 import { getAutoInterpKeyToUse } from '@/lib/db/userSecret';
 import { generateScoreEleuther } from '@/lib/external/autointerp-scorer-eleuther';
 import { generateScoreRecallAlt } from '@/lib/external/autointerp-scorer-recall-json';
+import { RequestAuthedUser } from '@/lib/types/auth';
 import {
   ERROR_RECALL_ALT_FAILED,
   ERROR_REQUIRES_OPENROUTER,
   requiresOpenRouterForExplanationScoreType,
 } from '@/lib/utils/autointerp';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { withAuthedUser } from '@/lib/with-user';
 import { UserSecretType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';

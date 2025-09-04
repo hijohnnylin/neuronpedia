@@ -2,7 +2,7 @@
 
 import CustomTooltip from '@/components/custom-tooltip';
 import { Button } from '@/components/shadcn/button';
-import { CONTACT_EMAIL_ADDRESS, NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { getLayerNumFromSource } from '@/lib/utils/source';
 import { ModelWithRelations } from '@/prisma/generated/zod';
 import { InfoIcon } from 'lucide-react';
@@ -17,7 +17,7 @@ export default function AvailableResourcesTable({ models }: { models: ModelWithR
       <div className="w-full text-center text-sm text-slate-500">
         The following are the public models and sources that are available for{' '}
         <a
-          href={`${NEXT_PUBLIC_URL}/api-doc`}
+          href={`${env.NEXT_PUBLIC_URL}/api-doc`}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sky-700 underline"
@@ -91,7 +91,7 @@ export default function AvailableResourcesTable({ models }: { models: ModelWithR
                               <a
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                href={`${NEXT_PUBLIC_URL}/${model.id}`}
+                                href={`${env.NEXT_PUBLIC_URL}/${model.id}`}
                                 className="font-mono text-sky-700 hover:underline"
                               >
                                 {model.id}
@@ -109,7 +109,7 @@ export default function AvailableResourcesTable({ models }: { models: ModelWithR
                               <a
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                href={`${NEXT_PUBLIC_URL}/${model.id}/${source.id}`}
+                                href={`${env.NEXT_PUBLIC_URL}/${model.id}/${source.id}`}
                                 className="font-mono text-sky-700 hover:underline"
                               >
                                 {source.id}
@@ -126,7 +126,7 @@ export default function AvailableResourcesTable({ models }: { models: ModelWithR
                                     size="xs"
                                     onClick={() => {
                                       window.open(
-                                        `mailto:${CONTACT_EMAIL_ADDRESS}?subject=Request%20Inference%20for%20${model.id}%20${source.id}&body=I'd%20like%20to%20request%20inference%20for%20the%20${model.id}%20${source.id}%20source.%20Thanks!`,
+                                        `mailto:${env.NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS}?subject=Request%20Inference%20for%20${model.id}%20${source.id}&body=I'd%20like%20to%20request%20inference%20for%20the%20${model.id}%20${source.id}%20source.%20Thanks!`,
                                         '_blank',
                                       );
                                     }}

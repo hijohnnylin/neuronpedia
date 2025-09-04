@@ -1,4 +1,4 @@
-import { ASSET_BASE_URL } from '@/lib/env';
+import { ASSET_BASE_URL } from '@/lib/constants';
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ANTHROPIC_MODEL_TO_DISPLAY_NAME, DEFAULT_GRAPH_MODEL_ID } from '../[modelId]/graph/utils';

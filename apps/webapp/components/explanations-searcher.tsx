@@ -9,7 +9,7 @@ import PanelLoader from '@/components/panel-loader';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/shadcn/tabs';
-import { DEFAULT_MODELID, DEFAULT_RELEASE_NAME, DEFAULT_SOURCESET, IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
+import { env } from '@/lib/env';
 import { replaceHtmlAnomalies } from '@/lib/utils/activations';
 import { EXPLANATIONTYPE_HUMAN } from '@/lib/utils/autointerp';
 import { SearchExplanationsResponse, SearchExplanationsType } from '@/lib/utils/general';
@@ -87,21 +87,23 @@ export default function ExplanationsSearcher({
     setFeatureModalFeature,
     setFeatureModalOpen,
   } = useGlobalContext();
-  const [modelId, setModelId] = useState(initialModelId || DEFAULT_MODELID || getDefaultModel()?.id || DEFAULT_MODELID);
+  const [modelId, setModelId] = useState(
+    initialModelId || env.NEXT_PUBLIC_DEFAULT_MODELID || getDefaultModel()?.id || env.NEXT_PUBLIC_DEFAULT_MODELID,
+  );
   const [sourceSet, setSourceSet] = useState(
     initialSourceSetName ||
       (modelId
         ? getSourceSetsForModelId(modelId).length > 0
           ? getSourceSetsForModelId(modelId)[0].name
-          : DEFAULT_SOURCESET
-        : DEFAULT_SOURCESET),
+          : env.NEXT_PUBLIC_DEFAULT_SOURCESET
+        : env.NEXT_PUBLIC_DEFAULT_SOURCESET),
   );
   const [selectedLayers, setSelectedLayers] = useState<string[] | undefined>(initialSelectedLayers);
   const [needsReloadSearch, setNeedsReloadSearch] = useState(false);
   const [showDashboards, setShowDashboards] = useState(true);
   const [selectedTab, setSelectedTab] = useState<SearchExplanationsType>(defaultTab);
   const [selectedRelease, setSelectedRelease] = useState<string>(
-    initialReleaseName || filterToRelease || DEFAULT_RELEASE_NAME,
+    initialReleaseName || filterToRelease || env.NEXT_PUBLIC_DEFAULT_RELEASE_NAME,
   );
   const [loadedResults, setLoadedResults] = useState<ExplanationWithPartialRelations[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -345,7 +347,7 @@ export default function ExplanationsSearcher({
             <TabsContent value={SearchExplanationsType.BY_ALL} className="mb-4">
               <div className="flex flex-col items-center justify-center">
                 <p className="mt-3 text-center text-sm font-medium text-slate-400">
-                  {!IS_ACTUALLY_NEURONPEDIA_ORG
+                  {!env.IS_ACTUALLY_NEURONPEDIA_ORG
                     ? 'Search all features across all loaded models'
                     : 'Search 50,000,000+ features across 7 models'}
                 </p>

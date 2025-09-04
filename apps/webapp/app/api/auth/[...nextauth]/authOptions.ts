@@ -1,18 +1,10 @@
 import { prisma } from '@/lib/db';
-// eslint-disable-next-line import/no-cycle
 import CustomPrismaAdapterForNextAuth from '@/lib/db/custom-prisma-adapter';
 import { sendLoginEmail, sendWelcomeEmail } from '@/lib/email/email';
-import {
-  APPLE_CLIENT_ID,
-  APPLE_CLIENT_SECRET,
-  GITHUB_ID,
-  GITHUB_SECRET,
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-} from '@/lib/env';
+import { env } from '@/lib/env';
 import { User, UserSecretType } from '@prisma/client';
 import crypto from 'crypto';
-import type { NextAuthOptions } from 'next-auth/index';
+import type { NextAuthOptions } from 'next-auth';
 import AppleProvider from 'next-auth/providers/apple';
 import Email from 'next-auth/providers/email';
 import GithubProvider, { GithubProfile } from 'next-auth/providers/github';
@@ -34,12 +26,12 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     AppleProvider({
-      clientId: APPLE_CLIENT_ID,
-      clientSecret: APPLE_CLIENT_SECRET,
+      clientId: env.APPLE_CLIENT_ID,
+      clientSecret: env.APPLE_CLIENT_SECRET,
     }),
     GoogleProvider({
-      clientId: GOOGLE_CLIENT_ID,
-      clientSecret: GOOGLE_CLIENT_SECRET,
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
       authorization: {
         params: {
           prompt: 'consent',
@@ -49,8 +41,8 @@ export const authOptions: NextAuthOptions = {
       },
     }),
     GithubProvider({
-      clientId: GITHUB_ID,
-      clientSecret: GITHUB_SECRET,
+      clientId: env.GITHUB_ID,
+      clientSecret: env.GITHUB_SECRET,
       profile(profile: GithubProfile) {
         return {
           id: profile.id.toString(),

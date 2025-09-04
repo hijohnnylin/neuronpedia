@@ -7,7 +7,8 @@ import { prisma } from '@/lib/db';
 import { getModelById } from '@/lib/db/model';
 import { neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { ERROR_NOT_FOUND_MESSAGE } from '@/lib/db/userCanAccess';
-import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
+import { AuthenticatedUser, RequestOptionalUser } from '@/lib/types/auth';
 import { steerCompletionChat } from '@/lib/utils/inference';
 import {
   ChatMessage,
@@ -21,7 +22,7 @@ import {
   STEER_TEMPERATURE_MAX,
   SteerFeature,
 } from '@/lib/utils/steer';
-import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { SteerOutputToNeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { SteerOutputType } from '@prisma/client';
 import { EventSourceMessage } from 'eventsource-parser';
@@ -143,7 +144,7 @@ async function saveSteerChatOutput(
       toReturnResult.id = dbResult.id;
       console.log(`steer saved: ${dbResult.id}`);
       // eslint-disable-next-line no-param-reassign
-      toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${dbResult.id}`;
+      toReturnResult.shareUrl = `${env.NEXT_PUBLIC_URL}/steer/${dbResult.id}`;
     }
 
     // update saved steered output with connected default output id
@@ -297,7 +298,7 @@ async function* generateResponse(
 
   // Save final results after all streams are complete
   if (streamProcessors.every((processor) => processor.done)) {
-    if (DEMO_MODE) {
+    if (env.DEMO_MODE) {
       console.log('skipping saveSteerChatOutput in demo mode');
     } else {
       toReturnResult = await saveSteerChatOutput(
@@ -748,7 +749,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         logprobs: savedSteerSteeredOutputs[0].logprobs ? JSON.parse(savedSteerSteeredOutputs[0].logprobs) : null,
       };
       toReturnResult.id = savedSteerSteeredOutputs[0].id;
-      toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${savedSteerSteeredOutputs[0].id}`;
+      toReturnResult.shareUrl = `${env.NEXT_PUBLIC_URL}/steer/${savedSteerSteeredOutputs[0].id}`;
 
       steerTypesToRun = steerTypesToRun.filter((type) => type !== SteerOutputType.STEERED);
     }

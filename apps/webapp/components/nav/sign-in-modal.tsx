@@ -1,7 +1,7 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import Modal from '@/components/sign-in-modal/modal';
 import Github from '@/components/svg/github';
-import { NEXT_PUBLIC_ENABLE_SIGNIN } from '@/lib/env';
+import { env } from '@/lib/env';
 import emailSpellChecker from '@zootools/email-spell-checker';
 import { Mail } from 'lucide-react';
 import { signIn } from 'next-auth/react';
@@ -61,7 +61,7 @@ function SignInModal() {
             </a>
             .
           </p>
-          {!NEXT_PUBLIC_ENABLE_SIGNIN ? (
+          {!env.NEXT_PUBLIC_ENABLE_SIGNIN ? (
             <div className="py-3 text-center">Not Yet Available</div>
           ) : (
             <>

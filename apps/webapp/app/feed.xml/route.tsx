@@ -1,11 +1,12 @@
 import { getPostsMetaData } from '@/app/blog/blog-util';
-import { ASSET_BASE_URL, NEXT_PUBLIC_URL } from '@/lib/env';
+import { ASSET_BASE_URL } from '@/lib/constants';
+import { env } from '@/lib/env';
 import RSS from 'rss';
 
 export async function GET() {
   const blogPosts = await getPostsMetaData();
 
-  const siteUrl = process.env.NODE_ENV === 'production' ? NEXT_PUBLIC_URL : 'http://localhost:3000';
+  const siteUrl = env.NODE_ENV === 'production' ? env.NEXT_PUBLIC_URL : 'http://localhost:3000';
 
   const feedOptions = {
     title: 'The Residual Stream',

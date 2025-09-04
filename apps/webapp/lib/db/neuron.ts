@@ -2,11 +2,11 @@ import { prisma } from '@/lib/db';
 import { Neuron } from '@prisma/client';
 import { ActivationAllPost200Response, ActivationTopkByTokenPost200Response } from 'neuronpedia-inference-client';
 import { NeuronWithPartialRelations } from 'prisma/generated/zod';
-import { PUBLIC_ACTIVATIONS_USER_IDS } from '../env';
+import { env } from '../env';
+import { AuthenticatedUser } from '../types/auth';
 import { EXPLANATIONTYPE_HUMAN } from '../utils/autointerp';
 import { NeuronIdentifier } from '../utils/neuron-identifier';
 import { getSourceSetNameFromSource, isNeuronLayerSource, NEURONS_SOURCESET } from '../utils/source';
-import { AuthenticatedUser } from '../with-user';
 import {
   assertUserCanAccessModel,
   assertUserCanAccessModelAndSource,
@@ -183,7 +183,7 @@ export const getNeurons = async (
       activations: {
         where: {
           creatorId: {
-            in: PUBLIC_ACTIVATIONS_USER_IDS,
+            in: env.PUBLIC_ACTIVATIONS_USER_IDS,
           },
         },
         ...(actsToReturn ? { take: actsToReturn, orderBy: { maxValue: 'desc' } } : {}),
@@ -259,8 +259,8 @@ export const getNeuronOptimized = async (
       creatorId: {
         in:
           neuronResult?.hasVector && neuronResult?.creatorId
-            ? [neuronResult.creatorId].concat(PUBLIC_ACTIVATIONS_USER_IDS)
-            : PUBLIC_ACTIVATIONS_USER_IDS,
+            ? [neuronResult.creatorId].concat(env.PUBLIC_ACTIVATIONS_USER_IDS)
+            : env.PUBLIC_ACTIVATIONS_USER_IDS,
       },
     },
     orderBy: {
@@ -366,7 +366,7 @@ export const getNeuronsForSearcher = async (
         take: 1,
         where: {
           creatorId: {
-            in: PUBLIC_ACTIVATIONS_USER_IDS,
+            in: env.PUBLIC_ACTIVATIONS_USER_IDS,
           },
         },
       },
@@ -461,7 +461,7 @@ export const getNeuronsOffset = async (
         },
         where: {
           creatorId: {
-            in: PUBLIC_ACTIVATIONS_USER_IDS,
+            in: env.PUBLIC_ACTIVATIONS_USER_IDS,
           },
         },
       },
@@ -492,7 +492,7 @@ export const getNeuronsForQuickList = async (features: NeuronIdentifier[], user:
       activations: {
         where: {
           creatorId: {
-            in: PUBLIC_ACTIVATIONS_USER_IDS,
+            in: env.PUBLIC_ACTIVATIONS_USER_IDS,
           },
         },
         include: {
@@ -567,7 +567,7 @@ export const dangerousGetNeuronRangeInternalUseOnly = async (
       activations: {
         where: {
           creatorId: {
-            in: PUBLIC_ACTIVATIONS_USER_IDS,
+            in: env.PUBLIC_ACTIVATIONS_USER_IDS,
           },
         },
         select: {

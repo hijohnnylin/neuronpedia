@@ -2,6 +2,7 @@ import Navbar from '@/components/nav/navbar';
 import AuthProvider from '@/components/provider/auth-provider';
 import { Providers } from '@/components/provider/providers';
 import Toast from '@/components/toast';
+import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/auth/utils';
 import {
   getExplanationModels,
   getExplanationScoreModelTypes,
@@ -9,8 +10,7 @@ import {
   getExplanationTypes,
 } from '@/lib/db/explanation-type';
 import { getGlobalSourceReleases } from '@/lib/db/source';
-import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
-import { ENABLE_VERCEL_ANALYTICS, NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { formatToGlobalModels } from '@/lib/utils/general';
 import { Analytics } from '@vercel/analytics/react';
 import { Metadata } from 'next';
@@ -38,14 +38,14 @@ export async function generateMetadata(): Promise<Metadata> {
       template: '%s ｜ Neuronpedia',
       default: 'Neuronpedia',
     },
-    metadataBase: new URL(NEXT_PUBLIC_URL),
+    metadataBase: new URL(env.NEXT_PUBLIC_URL),
     description,
     openGraph: {
       title: {
         template: '%s',
         default: 'Neuronpedia',
       },
-      url: NEXT_PUBLIC_URL,
+      url: env.NEXT_PUBLIC_URL,
       siteName: 'Neuronpedia',
       locale: 'en_US',
       type: 'website',
@@ -111,7 +111,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {children}
             </main>
             {!isEmbed && <Footer />}
-            {ENABLE_VERCEL_ANALYTICS && <Analytics />}
+            {env.ENABLE_VERCEL_ANALYTICS && <Analytics />}
           </Providers>
         </AuthProvider>
       </body>

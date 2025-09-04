@@ -1,4 +1,4 @@
-import { ASSET_BASE_URL } from '@/lib/env';
+import { ASSET_BASE_URL } from '@/lib/constants';
 import Image from 'next/image';
 
 export default function BlogSidebar() {

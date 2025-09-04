@@ -1,6 +1,7 @@
+import { RequestOptionalUser } from '@/lib/types/auth';
 import { getCosSimForFeature } from '@/lib/utils/inference';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import * as yup from 'yup';
 
