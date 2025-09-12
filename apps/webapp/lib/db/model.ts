@@ -3,6 +3,11 @@ import { AuthenticatedUser } from '@/lib/with-user';
 import { Model, Visibility } from '@prisma/client';
 import { AllowUnlistedFor, userCanAccessClause } from './userCanAccess';
 
+export const REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT = {
+  'llama31-8b-it': 'llama3.1-8b-it',
+  'qwen25-7b-it': 'qwen2.5-7b-it',
+};
+
 // for globalModels, return unlisted to everyone, but filter them out in the UI
 export const getGlobalModels = async (user?: AuthenticatedUser | null) => {
   const query = {
