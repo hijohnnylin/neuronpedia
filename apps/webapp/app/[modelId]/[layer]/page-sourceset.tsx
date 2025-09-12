@@ -53,12 +53,12 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
       )}
 
       <div className="flex w-full flex-row items-center justify-center border-b border-slate-200 py-6">
-        <div className="flex w-full max-w-screen-lg flex-row items-center justify-between">
+        <div className="flex w-full max-w-screen-lg flex-col items-center justify-between gap-y-3 sm:flex-row">
           <div className="flex flex-col items-start">
             {sourceSet.visibility !== Visibility.PUBLIC && (
               <div className="pb-1">{getVisibilityBadge(sourceSet.visibility)}</div>
             )}
-            <div className="text-2xl font-bold text-slate-900">
+            <div className="text-lg font-bold text-slate-900 sm:text-2xl">
               {sourceSet.modelId} · {sourceSet.name}
             </div>
             <div className="mt-2 flex flex-row items-center gap-x-2 text-sm font-normal text-slate-500">

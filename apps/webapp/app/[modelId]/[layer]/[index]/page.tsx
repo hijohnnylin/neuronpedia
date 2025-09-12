@@ -45,7 +45,8 @@ export default async function Page({
     const redirectToSteer = searchParams.redirectToSteer === 'true';
     if (redirectToSteer) {
       const strength = searchParams.strength ? (searchParams.strength as string) : 10;
-      const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/steer?embed=true&source=${params.layer}&index=${params.index}&strength=${strength}`;
+      const steerId = searchParams.saved ? (searchParams.saved as string) : null;
+      const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/steer?embed=true&source=${params.layer}&index=${params.index}&hideInitialSettingsOnMobile=true&strength=${strength}${steerId ? `&saved=${steerId}` : ''}`;
       redirect(redirectUrl);
     } else {
       const queryString = new URLSearchParams(searchParams as Record<string, string>).toString();
