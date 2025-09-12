@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
 
 @dataclass
@@ -37,6 +37,8 @@ class Feature:
     logits_hist_data_bar_heights: List[float] = field(default_factory=list)
     logits_hist_data_bar_values: List[float] = field(default_factory=list)
     decoder_weights_dist: List[float] = field(default_factory=list)
+
+    sourceSetName: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict):

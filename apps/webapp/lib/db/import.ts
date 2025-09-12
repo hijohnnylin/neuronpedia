@@ -63,6 +63,9 @@ export async function importConfigFromS3() {
 export async function importJsonlString(tableName: string, jsonlData: string) {
   let pool;
   let client;
+  // replace all \u0000 with ' ' because it's not supported by postgres
+  // eslint-disable-next-line no-param-reassign
+  jsonlData = jsonlData.replaceAll('\\u0000', ' ');
   try {
     try {
       pool = new Pool({

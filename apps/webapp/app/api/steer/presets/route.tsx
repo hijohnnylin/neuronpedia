@@ -557,6 +557,60 @@ const FEATURE_PRESETS: {
       exampleSteerOutputId: 'cm7cqpgik00op1q95y5lukh3r',
     },
   ],
+  'llama3.1-8b-it': [
+    {
+      name: '🤡 Nonsense/Absurdity',
+      features: [
+        {
+          modelId: 'llama3.1-8b-it',
+          layer: '11-resid-post-aa',
+          index: 110281,
+          explanation: 'nonsense/absurdity',
+          strength: 7.9,
+        },
+      ],
+      exampleSteerOutputId: 'cmfgcgpd90027kenxaxva1w2k',
+    },
+    {
+      name: '◀️ Opposite/Disobedience',
+      features: [
+        {
+          modelId: 'llama3.1-8b-it',
+          layer: '11-resid-post-aa',
+          index: 33274,
+          explanation: 'opposite/disobedience',
+          strength: 7.1,
+        },
+      ],
+      exampleSteerOutputId: 'cmfgc8btg0017kenx4zsszyuq',
+    },
+    {
+      name: '😈 Evil Persona',
+      features: [
+        {
+          modelId: 'llama3.1-8b-it',
+          layer: '11-resid-post-aa',
+          index: 87027,
+          explanation: 'evil persona',
+          strength: 7.9,
+        },
+      ],
+      exampleSteerOutputId: 'cmfgc088v000jkenxcs1zkwgc',
+    },
+    {
+      name: '👹 Manipulation',
+      features: [
+        {
+          modelId: 'llama3.1-8b-it',
+          layer: '11-resid-post-aa',
+          index: 16205,
+          explanation: 'psychological manipulation',
+          strength: 7,
+        },
+      ],
+      exampleSteerOutputId: 'cmfgc48qk000zkenx5a8lzlvq',
+    },
+  ],
 };
 
 const DEFAULT_SELECTED_FEATURES: {

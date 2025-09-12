@@ -171,6 +171,8 @@ async def call_autointerp_openai_for_activations(
     )
     override_api_key = GEMINI_API_KEY if is_gemini_model(EXPLAINER_MODEL_NAME) else None
 
+    global FAILED_FEATURE_INDEXES_OUTPUT
+
     try:
         activationRecords = []
 
@@ -288,7 +290,7 @@ async def call_autointerp_openai_for_activations(
                 print(f"Exception message: {str(e)}")
                 import traceback
 
-                # print(f"Traceback: {traceback.format_exc()}")
+                print(f"Traceback: {traceback.format_exc()}")
                 raise  # Re-raise to be caught by the outer try-except block
 
     except Exception as e:
@@ -298,11 +300,14 @@ async def call_autointerp_openai_for_activations(
             print(f"=== Explain Error, skipping index {feature_index} ===")
             print(e)
 
-        # print this at the end
-        global FAILED_FEATURE_INDEXES_OUTPUT
+        # processed at the end
         FAILED_FEATURE_INDEXES_OUTPUT.append(feature_index)
         return
-    assert len(explanations) == 1
+
+    if len(explanations) == 0:
+        FAILED_FEATURE_INDEXES_OUTPUT.append(feature_index)
+        return
+
     explanation = explanations[0]
     if explanation.endswith("."):
         explanation = explanation[:-1]
@@ -326,22 +331,24 @@ async def call_autointerp_openai_for_activations(
         )
         if len(explanation.strip()) == 0:
             # top activating token is empty, skip this feature
+            FAILED_FEATURE_INDEXES_OUTPUT.append(feature_index)
             pass
-        queuedToSave.append(
-            Explanation(
-                id=CUID_GENERATOR.generate(),
-                modelId=top_activation.modelId,
-                layer=top_activation.layer,
-                index=str(feature_index),
-                description=explanation,
-                typeName=EXPLAINER_TYPE_NAME,
-                explanationModelName=EXPLAINER_MODEL_NAME,
-                authorId=UPLOAD_EXPLANATION_AUTHORID or "",
+        else:
+            queuedToSave.append(
+                Explanation(
+                    id=CUID_GENERATOR.generate(),
+                    modelId=top_activation.modelId,
+                    layer=top_activation.layer,
+                    index=str(feature_index),
+                    description=explanation,
+                    typeName=EXPLAINER_TYPE_NAME,
+                    explanationModelName=EXPLAINER_MODEL_NAME,
+                    authorId=UPLOAD_EXPLANATION_AUTHORID or "",
+                )
             )
-        )
-        # print(
-        #     f"Using top activation token {explanation} for feature index {feature_index}\n"
-        # )
+            # print(
+            #     f"Using top activation token {explanation} for feature index {feature_index}\n"
+            # )
     else:
         queuedToSave.append(
             Explanation(

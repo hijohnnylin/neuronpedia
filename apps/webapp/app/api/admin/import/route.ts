@@ -21,11 +21,17 @@ function enqueueProgress(controller: ReadableStreamDefaultController, progress: 
   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress, progressText })}\n\n`));
 }
 
+enum ExplanationImportType {
+  TRUE = 'true',
+  ONLY = 'only',
+  FALSE = 'false',
+}
+
 export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
   const { searchParams } = new URL(request.url);
   const modelId = searchParams.get('modelId');
   const sourceId = searchParams.get('sourceId');
-  const explanationsOnly = searchParams.get('explanationsOnly') === 'true';
+  const explanations = searchParams.get('explanations') || ExplanationImportType.TRUE;
   if (!modelId || !sourceId) {
     return NextResponse.json({ error: 'modelId and sourceId are required query parameters' }, { status: 400 });
   }
@@ -49,7 +55,7 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
 
         await importConfigFromS3();
 
-        if (!explanationsOnly) {
+        if (explanations !== ExplanationImportType.ONLY) {
           enqueueProgress(controller, 0.25, '(1 of 4) Importing Metadata...');
           /* RELEASE */
           try {
@@ -185,45 +191,47 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
           }
         }
 
-        /* EXPLANATIONS */
-        const explanationsPaths = await getFilesInPath(`${path}/explanations/`, '.jsonl.gz');
-        let accumulatedLines: string[] = [];
-        // Since inserts are expensive, we batch them to avoid duplicated overhead (rebuilding the HNSW index each time)
-        // PROTIP: Run SELECT pg_prewarm('"Explanation_embedding_idx"'); before doing this for significant speedups!
-        // This assumes that you have a high shared_buffer (and that this index fits in it)
-        const batchSize = 10000;
+        if (explanations === ExplanationImportType.TRUE || explanations === ExplanationImportType.ONLY) {
+          /* EXPLANATIONS */
+          const explanationsPaths = await getFilesInPath(`${path}/explanations/`, '.jsonl.gz');
+          let accumulatedLines: string[] = [];
+          // Since inserts are expensive, we batch them to avoid duplicated overhead (rebuilding the HNSW index each time)
+          // PROTIP: Run SELECT pg_prewarm('"Explanation_embedding_idx"'); before doing this for significant speedups!
+          // This assumes that you have a high shared_buffer (and that this index fits in it)
+          const batchSize = 10000;
 
-        for (const [index, explanationsPath] of explanationsPaths.entries()) {
-          enqueueProgress(controller, index / explanationsPaths.length, `(4 of 4) Importing Explanations...`);
-          console.log('Importing explanations from', explanationsPath);
-          const explanationsJsonlString = await downloadAndDecompressFile(explanationsPath);
-          const lines = explanationsJsonlString.trim().split('\n');
+          for (const [index, explanationsPath] of explanationsPaths.entries()) {
+            enqueueProgress(controller, index / explanationsPaths.length, `(4 of 4) Importing Explanations...`);
+            console.log('Importing explanations from', explanationsPath);
+            const explanationsJsonlString = await downloadAndDecompressFile(explanationsPath);
+            const lines = explanationsJsonlString.trim().split('\n');
 
-          for (const line of lines) {
-            if (line.trim()) {
-              accumulatedLines.push(line);
-            }
+            for (const line of lines) {
+              if (line.trim()) {
+                accumulatedLines.push(line);
+              }
 
-            if (accumulatedLines.length >= batchSize) {
-              const startTime = new Date();
-              const batchJsonlString = accumulatedLines.join('\n');
-              await importJsonlString('Explanation', batchJsonlString);
-              const endTime = new Date();
-              const duration = (endTime.getTime() - startTime.getTime()) / 1000; // in seconds
-              console.log(`Imported batch of ${accumulatedLines.length} lines. Duration: ${duration} seconds`);
-              accumulatedLines = [];
+              if (accumulatedLines.length >= batchSize) {
+                const startTime = new Date();
+                const batchJsonlString = accumulatedLines.join('\n');
+                await importJsonlString('Explanation', batchJsonlString);
+                const endTime = new Date();
+                const duration = (endTime.getTime() - startTime.getTime()) / 1000; // in seconds
+                console.log(`Imported batch of ${accumulatedLines.length} lines. Duration: ${duration} seconds`);
+                accumulatedLines = [];
+              }
             }
           }
-        }
 
-        // Import any remaining lines
-        if (accumulatedLines.length > 0) {
-          const startTime = new Date();
-          const remainingJsonlString = accumulatedLines.join('\n');
-          await importJsonlString('Explanation', remainingJsonlString);
-          const endTime = new Date();
-          const duration = (endTime.getTime() - startTime.getTime()) / 1000; // in seconds
-          console.log(`Imported final batch of ${accumulatedLines.length} lines. Duration: ${duration} seconds`);
+          // Import any remaining lines
+          if (accumulatedLines.length > 0) {
+            const startTime = new Date();
+            const remainingJsonlString = accumulatedLines.join('\n');
+            await importJsonlString('Explanation', remainingJsonlString);
+            const endTime = new Date();
+            const duration = (endTime.getTime() - startTime.getTime()) / 1000; // in seconds
+            console.log(`Imported final batch of ${accumulatedLines.length} lines. Duration: ${duration} seconds`);
+          }
         }
 
         controller.enqueue(encoder.encode('event: complete\ndata: {}\n\n'));

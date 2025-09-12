@@ -47,7 +47,7 @@ export default function ModelSelector({
             position="popper"
             align="center"
             sideOffset={3}
-            className="z-30 max-h-[400px] cursor-pointer overflow-hidden rounded-md border-slate-300 bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+            className="z-30 max-h-[400px] cursor-pointer overflow-hidden rounded-md border-slate-300 bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] sm:max-h-[500px]"
           >
             <Select.ScrollUpButton className="flex justify-center border-b text-slate-600">
               <ChevronUpIcon />

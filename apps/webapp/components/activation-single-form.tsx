@@ -14,6 +14,8 @@ import { useEffect, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 import { Button } from './shadcn/button';
 
+const DEFAULT_STEER_MULTIPLIER = 3;
+
 export default function ActivationSingleForm({
   neuron,
   overallMaxValue,
@@ -174,7 +176,10 @@ export default function ActivationSingleForm({
               className="flex h-auto flex-col gap-y-0.5 border-emerald-700 px-2.5 text-[11px] text-xs font-medium text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
               variant="outline"
               onClick={() => {
-                window.open(`/${neuron.modelId}/steer?source=${neuron.layer}&index=${neuron.index}`, '_blank');
+                window.open(
+                  `/${neuron.modelId}/steer?source=${neuron.layer}&index=${neuron.index}${neuron.activations && neuron.activations.length > 0 ? `&strength=${neuron.activations?.[0]?.maxValue ? ((neuron.activations?.[0]?.maxValue || 0) * DEFAULT_STEER_MULTIPLIER).toFixed(1) : 10}` : ''}`,
+                  '_blank',
+                );
               }}
             >
               <Joystick className="h-4 w-4" /> Steer
