@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db';
-import { DEFAULT_CREATOR_USER_ID } from '@/lib/env';
+import { env } from '@/lib/env';
+import { RequestAuthedAdminUser } from '@/lib/types/auth';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
-import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
+import { withAuthedAdminUser } from '@/lib/with-user';
 import { Visibility } from '@prisma/client';
 import { NextResponse } from 'next/server';
 
@@ -47,7 +48,7 @@ export const POST = withAuthedAdminUser(async (request: RequestAuthedAdminUser) 
             name: getSourceSetNameFromSource(evalUpload.sourceId),
             description: '',
             creatorName: '',
-            creatorId: DEFAULT_CREATOR_USER_ID,
+            creatorId: env.DEFAULT_CREATOR_USER_ID,
             hasDashboards: false,
             releaseName: SAEBENCH_RELEASE_NAME,
             visibility: Visibility.PUBLIC,
@@ -73,7 +74,7 @@ export const POST = withAuthedAdminUser(async (request: RequestAuthedAdminUser) 
           modelId: evalUpload.modelId,
           id: evalUpload.sourceId,
           setName: getSourceSetNameFromSource(evalUpload.sourceId),
-          creatorId: DEFAULT_CREATOR_USER_ID,
+          creatorId: env.DEFAULT_CREATOR_USER_ID,
           hasDashboards: false,
           saelensConfig: evalUpload.saelensConfig,
           hfFolderId: evalUpload.hfFolderId,

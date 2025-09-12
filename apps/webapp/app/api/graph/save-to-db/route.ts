@@ -6,8 +6,9 @@ import {
 } from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
 import { getUserByName } from '@/lib/db/user';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { env } from '@/lib/env';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import Ajv from 'ajv';
 import { NextResponse } from 'next/server';
 import { object, string } from 'yup';
@@ -89,7 +90,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
 
       return NextResponse.json(
         {
-          error: `Invalid graph format. Use the validator to check your graph json: ${NEXT_PUBLIC_URL}/graph/validator`,
+          error: `Invalid graph format. Use the validator to check your graph json: ${env.NEXT_PUBLIC_URL}/graph/validator`,
           details: errors,
         },
         { status: 400 },

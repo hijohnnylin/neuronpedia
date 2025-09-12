@@ -5,7 +5,7 @@ import FeatureStats from '@/components/feature-stats';
 import PanelLoader from '@/components/panel-loader';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { deleteFeatureFromUmapMap, UmapListItem, useUmapContext } from '@/components/provider/umap-provider';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
 import * as Popover from '@radix-ui/react-popover';
 import { Field, Form, Formik } from 'formik';
@@ -84,7 +84,7 @@ export default function UmapSelectedItem({
         className={`mb-1 mt-0 flex w-full shrink-0 cursor-pointer flex-row items-start gap-x-1 overflow-x-scroll whitespace-nowrap rounded-t bg-slate-200 py-[6px] text-center font-mono text-[9px] font-medium leading-none text-slate-700 group-hover:bg-sky-200 group-hover:text-sky-700 ${
           isHovered && 'bg-sky-200 text-sky-700'
         } sm:py-2 sm:text-[10px]`}
-        href={`${NEXT_PUBLIC_URL}/${neuron?.modelId}/${neuron?.layer}/${neuron?.index}`}
+        href={`${env.NEXT_PUBLIC_URL}/${neuron?.modelId}/${neuron?.layer}/${neuron?.index}`}
         target="_blank"
         rel="noreferrer"
       >

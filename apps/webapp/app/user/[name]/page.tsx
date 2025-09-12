@@ -2,8 +2,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/shadcn/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/shadcn/tabs';
+import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/auth/utils';
 import { getBookmarksByUserWithExplanations } from '@/lib/db/bookmark';
-import { getUserByNameForPublicProfile, makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
+import { getUserByNameForPublicProfile } from '@/lib/db/user';
 import { Bot } from 'lucide-react';
 import { notFound } from 'next/navigation';
 

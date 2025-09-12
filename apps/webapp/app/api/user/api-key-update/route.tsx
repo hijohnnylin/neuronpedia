@@ -1,12 +1,12 @@
+import { OPENROUTER_BASE_URL } from '@/lib/constants';
 import { removeUserSecret, updateUserSecret } from '@/lib/db/userSecret';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { UserSecretType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
   const body = await request.json();

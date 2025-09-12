@@ -8,7 +8,7 @@ import InferenceSearcher from '@/components/inference-searcher/inference-searche
 import JumpToSAE from '@/components/jump-to-sae';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import RandomReleaseFeature from '@/components/random-release-feature';
-import { DEFAULT_MODELID, DEFAULT_SOURCE, DEMO_MODE, IS_LOCALHOST } from '@/lib/env';
+import { env } from '@/lib/env';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { SourceReleaseWithPartialRelations } from '@/prisma/generated/zod';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -26,17 +26,19 @@ export default function NavBarButtons() {
   const { getSourceSetsForModelId, globalModels, releases, getDefaultModel, getFirstSourceForSourceSet } =
     useGlobalContext();
   const [jumpToOpen, setJumpToOpen] = useState(false);
-  const [jumpToModelModelId, setJumpToModelModelId] = useState(DEFAULT_MODELID || getDefaultModel()?.id || '');
+  const [jumpToModelModelId, setJumpToModelModelId] = useState(
+    env.NEXT_PUBLIC_DEFAULT_MODELID || getDefaultModel()?.id || '',
+  );
 
   const defaultSource =
-    DEFAULT_SOURCE ||
+    env.NEXT_PUBLIC_DEFAULT_SOURCE ||
     (getSourceSetsForModelId(jumpToModelModelId, true).length > 0
       ? getFirstSourceForSourceSet(jumpToModelModelId, getSourceSetsForModelId(jumpToModelModelId, true)[0].name)
       : '');
 
   return (
     <>
-      {IS_LOCALHOST && !DEMO_MODE && (
+      {env.IS_LOCALHOST && !env.DEMO_MODE && (
         <Link
           className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
           href="/admin"
@@ -335,8 +337,8 @@ export default function NavBarButtons() {
                 }),
               )}
               <Link
-                href={IS_LOCALHOST ? '/sae/new' : 'https://forms.gle/Yg51TYFutJysiyDP7'}
-                target={IS_LOCALHOST ? undefined : '_blank'}
+                href={env.IS_LOCALHOST ? 'env./sae/new' : 'https://forms.gle/Yg51TYFutJysiyDP7'}
+                target={env.IS_LOCALHOST ? undefined : '_blank'}
                 prefetch={false}
                 rel="noreferrer"
                 className="col-span-2 flex h-10 flex-row items-center justify-center gap-x-0.5 rounded bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-100"
@@ -371,7 +373,7 @@ export default function NavBarButtons() {
         Steer
       </Link>
 
-      {!DEMO_MODE && (
+      {!env.DEMO_MODE && (
         <Link
           href="/sae-bench"
           prefetch={false}

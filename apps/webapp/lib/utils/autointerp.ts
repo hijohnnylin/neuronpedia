@@ -1,17 +1,17 @@
+import { env } from '@/lib/env';
 import { UserSecretType } from '@prisma/client';
 import { BASE_PATH, Configuration, DefaultApi } from 'neuronpedia-autointerp-client';
-import { AUTOINTERP_SERVER, AUTOINTERP_SERVER_SECRET, IS_DOCKER_COMPOSE, USE_LOCALHOST_AUTOINTERP } from '../env';
 
 export const AUTOINTERP_SERVER_API = new DefaultApi(
   new Configuration({
     basePath:
-      (USE_LOCALHOST_AUTOINTERP
-        ? IS_DOCKER_COMPOSE
+      (env.USE_LOCALHOST_AUTOINTERP
+        ? env.IS_DOCKER_COMPOSE
           ? 'http://autointerp:5003'
           : 'http://127.0.0.1:5003'
-        : AUTOINTERP_SERVER) + BASE_PATH,
+        : env.AUTOINTERP_SERVER) + BASE_PATH,
     headers: {
-      'X-SECRET-KEY': AUTOINTERP_SERVER_SECRET,
+      'X-SECRET-KEY': env.AUTOINTERP_SERVER_SECRET,
     },
   }),
 );
@@ -61,7 +61,7 @@ export function getKeyTypeForAutoInterpModelType(modelType: AutoInterpModelType)
   }
   return UserSecretType.OPENROUTER;
 }
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
 export function requiresOpenRouterForExplanationType(explanationType: string) {
   return explanationType === 'eleuther_acts_top20';
 }

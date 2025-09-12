@@ -1,5 +1,6 @@
 import { getUmapExplanations } from '@/lib/db/explanation';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { RequestOptionalUser } from '@/lib/types/auth';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
 export const POST = withOptionalUser(async (request: RequestOptionalUser) => {

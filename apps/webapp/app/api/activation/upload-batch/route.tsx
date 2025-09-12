@@ -1,5 +1,6 @@
 import { createActivationsForVector } from '@/lib/db/activation';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { array, number, object, string } from 'yup';
 

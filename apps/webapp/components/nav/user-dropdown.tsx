@@ -54,7 +54,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   prefetch={false}
                   href={`/user/${user?.name || name}/lists`}
                   className="relative flex w-full items-center justify-center space-x-2 rounded-md p-2 text-left text-sm outline-none ring-0 transition-all duration-75 hover:bg-slate-100 sm:justify-start"
-                  >
+                >
                   <LayoutList className="h-4 w-4" />
                   <p className="text-base sm:text-sm">My Lists</p>
                 </Link>
@@ -62,7 +62,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   prefetch={false}
                   href={`/user/${user?.name || name}/vectors`}
                   className="relative flex w-full items-center justify-center space-x-2 rounded-md p-2 text-left text-sm outline-none ring-0 transition-all duration-75 hover:bg-slate-100 sm:justify-start"
-                  >
+                >
                   <MoveUpLeft className="h-4 w-4" />
                   <p className="text-base sm:text-sm">My Vectors</p>
                 </Link>

@@ -1,6 +1,7 @@
 import { getModelById } from '@/lib/db/model';
+import { RequestOptionalUser } from '@/lib/types/auth';
 import { SteerLogitsRequestSchema, steerLogits } from '@/lib/utils/graph';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
 // for now this just uses the graph server, but we should merge it with the inference server later on to be consistent

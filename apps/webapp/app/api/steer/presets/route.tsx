@@ -1,7 +1,8 @@
 import { getModelById } from '@/lib/db/model';
 import { getVectorsForModelAndUser } from '@/lib/db/neuron';
+import { RequestOptionalUser } from '@/lib/types/auth';
 import { FeaturePreset, SteerFeature, SteerPreset } from '@/lib/utils/steer';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';
 

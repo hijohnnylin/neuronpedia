@@ -1,8 +1,8 @@
 import { replaceHtmlAnomalies } from '@/lib/utils/activations';
-import { MessageParam } from '@anthropic-ai/sdk/resources';
+import { MessageParam } from '@anthropic-ai/sdk/resources/messages.mjs';
 import { Content } from '@google/generative-ai';
 import { Activation } from '@prisma/client';
-import { ChatCompletionMessageParam } from 'openai/resources';
+import { ChatCompletionMessageParam } from 'openai/resources/index.mjs';
 
 export function makeOaiMessage(role: 'user' | 'system' | 'assistant', content: string): ChatCompletionMessageParam {
   return {

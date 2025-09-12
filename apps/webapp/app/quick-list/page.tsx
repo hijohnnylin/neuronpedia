@@ -1,10 +1,10 @@
 // TODO: better error handling
 
 import UmapProvider from '@/components/provider/umap-provider';
+import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/auth/utils';
 import { getNeuronsForQuickList } from '@/lib/db/neuron';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
 import { notFound } from 'next/navigation';
-import { makeAuthedUserFromSessionOrReturnNull } from '../../lib/db/user';
 import QuickList from './quick-list';
 
 export default async function Page({

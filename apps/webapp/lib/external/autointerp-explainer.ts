@@ -1,8 +1,9 @@
+import { OPENROUTER_BASE_URL } from '@/lib/constants';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { AutoInterpModelType, isReasoningModel, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import { AutoInterpModelType, isReasoningModel } from '../utils/autointerp';
 import { makeAnthropicMessage, makeGeminiMessage, makeOAIactivation, makeOaiMessage } from './autointerp-shared';
 
 const systemMessage = `We're studying neurons in a neural network. Each neuron looks for some particular thing in a short document. Look at the parts of the document the neuron activates for and summarize in a single sentence what the neuron is looking for. Don't list examples of words.

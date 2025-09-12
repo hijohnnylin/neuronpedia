@@ -7,6 +7,7 @@ import { generateExplanationOaiAttentionHead } from '@/lib/external/autointerp-e
 import { generateExplanationEleutherActsTop20 } from '@/lib/external/autointerp-explainer-eleuther';
 import { generateExplanationNpMaxActLogits } from '@/lib/external/autointerp-explainer-logits';
 import { getExplanationEmbeddingSql } from '@/lib/external/embedding';
+import { RequestAuthedUser } from '@/lib/types/auth';
 import {
   ERROR_NO_AUTOINTERP_KEY,
   ERROR_REQUIRES_OPENROUTER,
@@ -14,7 +15,7 @@ import {
   getKeyTypeForAutoInterpModelType,
   requiresOpenRouterForExplanationType,
 } from '@/lib/utils/autointerp';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { withAuthedUser } from '@/lib/with-user';
 import { UserSecretType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { boolean, number, object, string, ValidationError } from 'yup';
@@ -130,7 +131,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     // ensure that the scorer model type is supported and user has a key for it
     // if modelType is unknown (eg llama) we use openrouter
     const explainerModelType = getAutoInterpModelTypeFromModelId(explanationModel.name || '');
-    let explainerKey: string | null = null;
+    let explainerKey = null;
     let explainerKeyType: UserSecretType = getKeyTypeForAutoInterpModelType(explainerModelType);
     let key = await getAutoInterpKeyToUse(explainerKeyType, user);
     console.log(`explainerKeyType: ${explainerKeyType}`);

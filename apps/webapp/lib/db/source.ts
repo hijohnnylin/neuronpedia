@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/db';
+import { AuthenticatedUser } from '@/lib/types/auth';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
-import { AuthenticatedUser } from '@/lib/with-user';
 import { Source, SourceRelease, SourceSet, Visibility } from '@prisma/client';
-import { DEFAULT_CREATOR_USER_ID } from '../env';
+import { env } from '../env';
 
 import {
   AllowUnlistedFor,
@@ -158,7 +158,7 @@ export const upsertSourceForVector = async (
         modelId,
         name: sourceSetName,
         description: 'Default',
-        creatorId: DEFAULT_CREATOR_USER_ID,
+        creatorId: env.DEFAULT_CREATOR_USER_ID,
         creatorName: 'Neuronpedia',
         visibility: Visibility.UNLISTED,
       },
@@ -181,7 +181,7 @@ export const upsertSourceForVector = async (
       modelId,
       id: `${layerNumber}-${sourceSetName}`,
       setName: sourceSetName,
-      creatorId: DEFAULT_CREATOR_USER_ID,
+      creatorId: env.DEFAULT_CREATOR_USER_ID,
       visibility: Visibility.UNLISTED,
     },
   });

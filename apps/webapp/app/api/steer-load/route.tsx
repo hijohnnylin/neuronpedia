@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { env } from '@/lib/env';
+import { RequestOptionalUser } from '@/lib/types/auth';
+import { withOptionalUser } from '@/lib/with-user';
 import { SteerOutputType } from '@prisma/client';
 import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
@@ -99,7 +100,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     };
 
     toReturnResult.id = savedSteerSteeredOutput.id;
-    toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${savedSteerSteeredOutput.id}`;
+    toReturnResult.shareUrl = `${env.NEXT_PUBLIC_URL}/steer/${savedSteerSteeredOutput.id}`;
 
     return NextResponse.json(toReturnResult);
   } catch (error) {

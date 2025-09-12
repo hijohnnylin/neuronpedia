@@ -1,9 +1,10 @@
 import { MAX_EXPLANATION_SEARCH_RESULTS, searchExplanationsAllVec } from '@/lib/db/explanation';
 import { getNeurons } from '@/lib/db/neuron';
 import { getExplanationEmbeddingSql } from '@/lib/external/embedding';
+import { RequestOptionalUser } from '@/lib/types/auth';
 import { SearchExplanationsResponse } from '@/lib/utils/general';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { number, object, string, ValidationError } from 'yup';
 

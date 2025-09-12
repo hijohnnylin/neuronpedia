@@ -1,4 +1,4 @@
-import { ASSET_BASE_URL } from '@/lib/env';
+import { ASSET_BASE_URL } from '@/lib/constants';
 import fs from 'fs';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import path from 'path';

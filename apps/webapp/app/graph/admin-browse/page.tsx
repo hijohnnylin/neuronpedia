@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { GRAPH_ADMIN_BROWSE_KEY, NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { notFound } from 'next/navigation';
 
 export default async function Page({
@@ -10,7 +10,7 @@ export default async function Page({
   };
 }) {
   // Check that the browse key is correct
-  if (searchParams.key !== GRAPH_ADMIN_BROWSE_KEY) {
+  if (searchParams.key !== env.GRAPH_ADMIN_BROWSE_KEY) {
     notFound();
   }
 
@@ -49,7 +49,7 @@ export default async function Page({
                 </td>
                 <td className="max-w-48 overflow-x-hidden truncate whitespace-nowrap px-6 py-4 text-sm font-medium text-sky-600">
                   <a
-                    href={`${NEXT_PUBLIC_URL}/${metadata.modelId}/graph?slug=${metadata.slug}`}
+                    href={`${env.NEXT_PUBLIC_URL}/${metadata.modelId}/graph?slug=${metadata.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:underline"

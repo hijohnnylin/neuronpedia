@@ -4,7 +4,7 @@
 // eslint-disable-next-line
 import ActivationItem from '@/components/activation-item';
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { BOS_TOKENS } from '@/lib/utils/activations';
 import { Activation } from '@prisma/client';
 import copy from 'copy-to-clipboard';
@@ -224,7 +224,7 @@ export default function ActivationSingleForm({
                     className="my-1 ml-3 flex w-[72px] cursor-pointer flex-row items-center justify-center gap-x-0.5 whitespace-pre rounded bg-slate-200 px-2 py-1.5 text-[9px] font-medium text-slate-600 hover:bg-slate-300 sm:px-2.5 sm:py-1.5 sm:text-[10.5px]"
                     title="Share Custom Activation Test Result"
                     onClick={() => {
-                      const url = `${NEXT_PUBLIC_URL}/${neuron.modelId}/${neuron.layer}/${
+                      const url = `${env.NEXT_PUBLIC_URL}/${neuron.modelId}/${neuron.layer}/${
                         neuron.index
                       }?defaulttesttext=${encodeURIComponent(activationResult.tokens.join(''))}`;
                       copy(url);

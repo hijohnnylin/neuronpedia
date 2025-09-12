@@ -1,8 +1,9 @@
+import { OPENROUTER_BASE_URL } from '@/lib/constants';
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, Neuron, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { AutoInterpModelType, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import { AutoInterpModelType } from '../utils/autointerp';
 import { makeAnthropicMessage, makeGeminiMessage, makeOaiMessage } from './autointerp-shared';
 
 const TOKENS_AROUND_MAX_ACTIVATING_TOKEN = 24;

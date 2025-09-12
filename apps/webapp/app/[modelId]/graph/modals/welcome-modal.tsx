@@ -8,7 +8,7 @@ import { useGraphModalContext } from '@/components/provider/graph-modal-provider
 
 import { Button } from '@/components/shadcn/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
-import { ASSET_BASE_URL } from '@/lib/env';
+import { ASSET_BASE_URL } from '@/lib/constants';
 import { MagicWandIcon } from '@radix-ui/react-icons';
 import { BookOpen, ChevronRight, Circle, GithubIcon, NewspaperIcon, NotebookIcon } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';

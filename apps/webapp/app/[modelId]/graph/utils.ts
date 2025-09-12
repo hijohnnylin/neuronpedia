@@ -1,5 +1,5 @@
 import ATTRIBUTION_GRAPH_SCHEMA from '@/app/api/graph/graph-schema.json';
-import { DEFAULT_CREATOR_USER_ID, NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { GraphMetadata } from '@/prisma/generated/zod';
 import cuid from 'cuid';
 import d3 from './d3-jetpack';
@@ -182,7 +182,7 @@ export function makeGraphPublicAccessGraphUri(modelId: string, slug: string) {
 }
 
 export function makeGraphPublicAccessGraphUrl(modelId: string, slug: string) {
-  return `${NEXT_PUBLIC_URL}${makeGraphPublicAccessGraphUri(modelId, slug)}`;
+  return `${env.NEXT_PUBLIC_URL}${makeGraphPublicAccessGraphUri(modelId, slug)}`;
 }
 
 export function nodeTypeHasFeatureDetail(node: CLTGraphNode): boolean {
@@ -210,7 +210,7 @@ export async function getGraphMetadatasFromBucket(baseUrl: string): Promise<Mode
     prompt: graph.prompt,
     titlePrefix: graph.title_prefix,
     url: `${baseUrl}/graph_data/${graph.slug}.json`,
-    userId: DEFAULT_CREATOR_USER_ID,
+    userId: env.DEFAULT_CREATOR_USER_ID,
     id: cuid(),
     createdAt: new Date(),
     updatedAt: new Date(),

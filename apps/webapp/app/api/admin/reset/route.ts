@@ -1,8 +1,8 @@
-import { IS_LOCALHOST } from '@/lib/env';
+import { env } from '@/lib/env';
 import { NextResponse } from 'next/server';
 
 export async function POST() {
-  if (!IS_LOCALHOST) {
+  if (!env.IS_LOCALHOST) {
     return NextResponse.json({ error: 'This route is only available on localhost or to admin users' }, { status: 400 });
   }
 

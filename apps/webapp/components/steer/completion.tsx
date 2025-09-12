@@ -3,7 +3,7 @@
 import { SteerResult } from '@/app/api/steer/route';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
-import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
+import { env } from '@/lib/env';
 import { STEER_MAX_PROMPT_CHARS, SteerFeature } from '@/lib/utils/steer';
 import copy from 'copy-to-clipboard';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
@@ -134,7 +134,7 @@ export default function SteerCompletion({
       if (!response || !response.body) {
         if (response.status === 404) {
           alert(
-            !IS_ACTUALLY_NEURONPEDIA_ORG
+            !env.IS_ACTUALLY_NEURONPEDIA_ORG
               ? 'Unable to steer with the selected feature. Did you check if you downloaded/imported this SAE?'
               : 'Unable to steer with the selected feature - it was not found.',
           );

@@ -7,6 +7,7 @@
 
 import { getTransformerLensModelIdIfExists } from '@/lib/db/model';
 import { getNeuronOnly } from '@/lib/db/neuron';
+import { AuthenticatedUser } from '@/lib/types/auth';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import {
   ChatMessage,
@@ -15,7 +16,6 @@ import {
   STEER_N_LOGPROBS,
   SteerFeature,
 } from '@/lib/utils/steer';
-import { AuthenticatedUser } from '@/lib/with-user';
 import { NeuronPartial, NeuronPartialWithRelations } from '@/prisma/generated/zod';
 import { SteerOutputType } from '@prisma/client';
 import {
@@ -38,15 +38,15 @@ import {
   getTwoRandomServerHostsForSourceSet,
   LOCALHOST_INFERENCE_HOST,
 } from '../db/inference-host-source';
-import { INFERENCE_SERVER_SECRET, USE_LOCALHOST_INFERENCE } from '../env';
+import { env } from '../env';
 import { NeuronIdentifier } from './neuron-identifier';
 
 export const makeInferenceServerApiWithServerHost = (serverHost: string) =>
   new DefaultApi(
     new Configuration({
-      basePath: (USE_LOCALHOST_INFERENCE ? LOCALHOST_INFERENCE_HOST : serverHost) + BASE_PATH,
+      basePath: (env.USE_LOCALHOST_INFERENCE ? LOCALHOST_INFERENCE_HOST : serverHost) + BASE_PATH,
       headers: {
-        'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
+        'X-SECRET-KEY': env.INFERENCE_SERVER_SECRET,
       },
     }),
   );
@@ -268,7 +268,7 @@ export const steerCompletion = async (
     cache: 'no-cache',
     headers: {
       'Content-Type': 'application/json',
-      'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
+      'X-SECRET-KEY': env.INFERENCE_SERVER_SECRET,
     },
     body: JSON.stringify({
       types: steerTypesToRun,
@@ -356,7 +356,7 @@ export const steerCompletionChat = async (
           cache: 'no-cache',
           headers: {
             'Content-Type': 'application/json',
-            'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
+            'X-SECRET-KEY': env.INFERENCE_SERVER_SECRET,
           },
           body: JSON.stringify({
             types: [type === SteerOutputType.DEFAULT ? NPSteerType.Default : NPSteerType.Steered],

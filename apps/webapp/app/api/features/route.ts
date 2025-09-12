@@ -1,6 +1,7 @@
 import { getNeurons } from '@/lib/db/neuron';
+import { RequestOptionalUser } from '@/lib/types/auth';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { array, number, object, string, ValidationError } from 'yup';
 

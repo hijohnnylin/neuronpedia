@@ -2,10 +2,10 @@
 /* eslint no-nested-ternary: 0 */
 /* eslint react/no-array-index-key: 0 */
 
+import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/auth/utils';
 import { getNeuronOptimized } from '@/lib/db/neuron';
 import { getSourceSet } from '@/lib/db/source';
-import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { makeActivationBackgroundColorWithDFA, replaceHtmlAnomalies } from '@/lib/utils/activations';
 import { Activation } from '@prisma/client';
 import { notFound } from 'next/navigation';
@@ -352,7 +352,7 @@ export default async function Image({ params }: { params: { modelId: string; lay
           })}
         </div>
         <div tw="absolute flex flex-row justify-end bottom-0 text-slate-400 right-0 pb-2 pr-3 leading-none">
-          {NEXT_PUBLIC_URL}/{currentNeuron.modelId}/{currentNeuron.layer}/{currentNeuron.index}
+          {env.NEXT_PUBLIC_URL}/{currentNeuron.modelId}/{currentNeuron.layer}/{currentNeuron.index}
         </div>
       </div>
     ),

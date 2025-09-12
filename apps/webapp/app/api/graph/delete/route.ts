@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { RequestAuthedUser } from '@/lib/types/auth';
+import { withAuthedUser } from '@/lib/with-user';
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';

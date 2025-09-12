@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { Activation, Explanation, ExplanationModelType } from '@prisma/client';
+import { AuthenticatedUser } from '../types/auth';
 import { AUTOINTERP_SERVER_API } from '../utils/autointerp';
-import { AuthenticatedUser } from '../with-user';
 
 const ELEUTHER_EMBEDDING_MODEL_NAME = 'stella_en_400m_v5';
 

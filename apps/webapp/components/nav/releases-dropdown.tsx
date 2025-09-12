@@ -1,7 +1,7 @@
 'use client';
 
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { IS_LOCALHOST } from '@/lib/env';
+import { env } from '@/lib/env';
 import { UNNAMED_AUTHOR_NAME } from '@/lib/utils/general';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { StarFilledIcon } from '@radix-ui/react-icons';
@@ -68,9 +68,9 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
             ))}
           {!breadcrumb && (
             <Link
-              href={IS_LOCALHOST ? '/sae/new' : 'https://forms.gle/Yg51TYFutJysiyDP7'}
+              href={env.IS_LOCALHOST ? '/sae/new' : 'https://forms.gle/Yg51TYFutJysiyDP7'}
               prefetch={false}
-              target={IS_LOCALHOST ? undefined : '_blank'}
+              target={env.IS_LOCALHOST ? undefined : '_blank'}
               rel="noreferrer"
               className="col-span-2 flex h-9 flex-row items-center justify-center gap-x-0.5 rounded bg-white px-3 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
             >

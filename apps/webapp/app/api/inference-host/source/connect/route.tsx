@@ -1,5 +1,6 @@
 import { createInferenceHostSource, getInferenceHostSourceById } from '@/lib/db/inference-host-source';
-import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
+import { RequestAuthedAdminUser } from '@/lib/types/auth';
+import { withAuthedAdminUser } from '@/lib/with-user';
 import { InferenceHostSourceSchema } from '@/prisma/generated/zod';
 import { NextResponse } from 'next/server';
 

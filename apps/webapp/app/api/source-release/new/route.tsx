@@ -1,5 +1,6 @@
 import { createSourceRelease } from '@/lib/db/source';
-import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
+import { RequestAuthedAdminUser } from '@/lib/types/auth';
+import { withAuthedAdminUser } from '@/lib/with-user';
 import { SourceReleaseSchema } from '@/prisma/generated/zod';
 import { Visibility } from '@prisma/client';
 import { NextResponse } from 'next/server';

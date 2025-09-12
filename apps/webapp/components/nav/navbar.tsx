@@ -1,7 +1,7 @@
 'use client';
 
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { DEMO_MODE, IS_LOCALHOST, NEXT_PUBLIC_ENABLE_SIGNIN, SITE_NAME_VERCEL_DEPLOY } from '@/lib/env';
+import { env } from '@/lib/env';
 import { Session } from 'next-auth';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -47,7 +47,7 @@ export default function NavBar({ session }: { session: Session | null }) {
         <div className="relative flex h-12 items-center justify-between sm:mx-auto sm:h-12">
           <div className="flex flex-row gap-8 sm:mt-0">
             <Link href="/#" className="flex items-center justify-center text-base sm:text-[16px]">
-              {!SITE_NAME_VERCEL_DEPLOY && (
+              {!env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY && (
                 <div className="mr-1.5 h-6 w-6 sm:h-5 sm:w-5">
                   <Image
                     src="/logo.png"
@@ -58,15 +58,15 @@ export default function NavBar({ session }: { session: Session | null }) {
                   />
                 </div>
               )}
-              {SITE_NAME_VERCEL_DEPLOY ? (
-                <p className="ml-1.5 font-medium text-[#7B3F00] sm:mt-0">{SITE_NAME_VERCEL_DEPLOY}</p>
+              {env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY ? (
+                <p className="ml-1.5 font-medium text-[#7B3F00] sm:mt-0">{env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY}</p>
               ) : (
                 <p className="font-normal text-sky-800 sm:mt-0">
                   Neuronpedia
                   {pathname.endsWith('/graph') ? <span className="hidden sm:inline"> - Circuit Tracer</span> : ''}
                 </p>
               )}
-              {DEMO_MODE ? (
+              {env.DEMO_MODE ? (
                 <CustomTooltip
                   trigger={
                     <div className="ml-1.5 flex h-5 items-center justify-center rounded bg-emerald-600 px-2 text-[9px] font-bold leading-none text-white">
@@ -76,7 +76,7 @@ export default function NavBar({ session }: { session: Session | null }) {
                 >
                   <div>This is a mode that demonstrates hosting Neuronpedia publicly. It has read-only access.</div>
                 </CustomTooltip>
-              ) : IS_LOCALHOST ? (
+              ) : env.IS_LOCALHOST ? (
                 <CustomTooltip
                   trigger={
                     <div className="ml-1.5 flex h-5 items-center justify-center rounded bg-emerald-600 px-2 text-[9px] font-bold leading-none text-white">
@@ -99,7 +99,7 @@ export default function NavBar({ session }: { session: Session | null }) {
 
             {session ? (
               <UserDropdown session={session} />
-            ) : NEXT_PUBLIC_ENABLE_SIGNIN ? (
+            ) : env.NEXT_PUBLIC_ENABLE_SIGNIN ? (
               <>
                 <button
                   type="button"

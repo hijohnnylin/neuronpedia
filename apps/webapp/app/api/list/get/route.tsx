@@ -1,5 +1,6 @@
 import { getListWithDetails } from '@/lib/db/list';
-import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { RequestOptionalUser } from '@/lib/types/auth';
+import { withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
 /**

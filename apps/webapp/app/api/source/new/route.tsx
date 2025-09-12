@@ -1,5 +1,6 @@
 import { createSource } from '@/lib/db/source';
-import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
+import { RequestAuthedAdminUser } from '@/lib/types/auth';
+import { withAuthedAdminUser } from '@/lib/with-user';
 import { SourceSchema } from '@/prisma/generated/zod';
 import { JsonObject } from '@prisma/client/runtime/library';
 import { NextResponse } from 'next/server';

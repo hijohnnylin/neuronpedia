@@ -8,7 +8,7 @@ import SearchTopkByTokenPane from '@/components/panes/search-topk-by-token-pane'
 import UmapPane from '@/components/panes/umap-pane';
 import { BreadcrumbItem, BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
 import { getVisibilityBadge } from '@/components/visibility-badge';
-import { DEMO_MODE } from '@/lib/env';
+import { env } from '@/lib/env';
 import { getLayerNumAsStringFromSource } from '@/lib/utils/source';
 import {
   EvalWithPartialRelations,
@@ -166,7 +166,7 @@ export default function PageSource({ source }: { source: SourceWithRelations }) 
             />
           )}
 
-          {!DEMO_MODE && (
+          {!env.DEMO_MODE && (
             <SAEEvalsPane
               sae={source as SourceWithPartialRelations}
               evals={source.evals as EvalWithPartialRelations[]}

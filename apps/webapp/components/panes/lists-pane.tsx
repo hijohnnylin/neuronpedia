@@ -77,9 +77,7 @@ export default function ListsPane({
   }
 
   return (
-    <div
-      className="relative mb-0 mt-2 hidden flex-col rounded-lg border border-slate-200 bg-white text-xs shadow transition-all sm:mt-3 sm:flex"
-    >
+    <div className="relative mb-0 mt-2 hidden flex-col rounded-lg border border-slate-200 bg-white text-xs shadow transition-all sm:mt-3 sm:flex">
       {currentNeuron && currentNeuron.lists && currentNeuron?.lists?.length > 0 ? (
         <div className="flex flex-col gap-y-1 px-5 pb-4 pt-3">
           {currentNeuron?.lists?.map((list) => (

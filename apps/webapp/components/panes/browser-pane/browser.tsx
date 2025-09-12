@@ -11,7 +11,7 @@ import FeatureStats from '@/components/feature-stats';
 import PanelLoader from '@/components/panel-loader';
 import { useFeatureContext } from '@/components/provider/feature-provider';
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { DEFAULT_SOURCESET } from '@/lib/env';
+import { env } from '@/lib/env';
 import { getFirstSourceSetForModel } from '@/lib/utils/source';
 import { Visibility } from '@prisma/client';
 import Link from 'next/link';
@@ -89,7 +89,7 @@ export default function Browser({
         setLayer(getFirstSourceForSourceSet(newModelId, newSourceSet.name));
       }
     } else {
-      setSourceSet(DEFAULT_SOURCESET);
+      setSourceSet(env.NEXT_PUBLIC_DEFAULT_SOURCESET);
     }
   };
 

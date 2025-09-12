@@ -1,5 +1,6 @@
 import { createNeurons } from '@/lib/db/neuron';
-import { RequestAuthedAdminUser, withAuthedAdminUser } from '@/lib/with-user';
+import { RequestAuthedAdminUser } from '@/lib/types/auth';
+import { withAuthedAdminUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
 type SkippedData = {

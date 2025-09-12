@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { AuthenticatedUser } from '../with-user';
+import { AuthenticatedUser } from '@/lib/types/auth';
 import { assertUserCanAccessModelAndSource } from './userCanAccess';
 
 export const createBookmark = async (modelId: string, layer: string, index: string, user: AuthenticatedUser) => {

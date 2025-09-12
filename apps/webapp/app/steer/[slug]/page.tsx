@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '@/lib/env';
+import { env } from '@/lib/env';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 // this page url is formatted as: /steer/[steer-model] or /steer/[steer-output-id]
@@ -11,7 +11,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
     },
   });
   // CASE: this is /steer/[steer-model-id] - redirect to the new steer page
-  if (isInferenceEnabledModel || STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(params.slug)) {
+  if (isInferenceEnabledModel || env.NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(params.slug)) {
     permanentRedirect(`/${params.slug}/steer`);
   } else {
     // CASE: this is /steer/[steerOutputId] - redirect to the new steer page and load the steer

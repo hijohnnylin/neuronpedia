@@ -1,6 +1,7 @@
 import { addNeuronsToList } from '@/lib/db/list';
+import { RequestAuthedUser } from '@/lib/types/auth';
 import { ListNeuronToAdd } from '@/lib/utils/list';
-import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
+import { withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
 export const maxDuration = 15;

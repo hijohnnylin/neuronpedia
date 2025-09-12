@@ -1,12 +1,12 @@
 'use client';
 
-import { DEFAULT_MODELID } from '@/lib/env';
+import { env } from '@/lib/env';
 import * as Select from '@radix-ui/react-select';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { useGlobalContext } from '../provider/global-provider';
 
 export default function ModelSelector({
-  modelId = DEFAULT_MODELID,
+  modelId = env.NEXT_PUBLIC_DEFAULT_MODELID,
   modelIdChangedCallback,
   filterToInferenceEnabled = false,
   filterToRelease,

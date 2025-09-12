@@ -6,7 +6,7 @@ import ActivationItem from '@/components/activation-item';
 import PanelLoader from '@/components/panel-loader';
 import { deleteFeatureFromUmapMap, UmapListItem, useUmapContext } from '@/components/provider/umap-provider';
 import UmapSelectedItem from '@/components/umap/umap-selected-item';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { useScreenSize } from '@/lib/hooks/use-screen-size';
 import { MAX_LIST_FEATURES_FOR_TEST_TEXT, MAX_LIST_TEST_TEXT_LENGTH_CHARS } from '@/lib/utils/list';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
@@ -628,7 +628,7 @@ export default function List({ listId }: { listId: string }) {
                 onClick={(e) => {
                   e.preventDefault();
                   copy(
-                    `<iframe src="${NEXT_PUBLIC_URL}/list/${list.id}?embed=true" title="Neuronpedia" style="height: 400px; width: 540px;"></iframe>`,
+                    `<iframe src="${env.NEXT_PUBLIC_URL}/list/${list.id}?embed=true" title="Neuronpedia" style="height: 400px; width: 540px;"></iframe>`,
                   );
                   alert('Copied iFrame embed code to clipboard.');
                 }}
@@ -642,7 +642,7 @@ export default function List({ listId }: { listId: string }) {
                 className="flex h-7 flex-row items-center justify-center gap-x-1.5 rounded bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-300 active:bg-sky-300 sm:text-[11px]"
                 onClick={(e) => {
                   e.preventDefault();
-                  copy(`${NEXT_PUBLIC_URL}/list/${list.id}?embed=true`);
+                  copy(`${env.NEXT_PUBLIC_URL}/list/${list.id}?embed=true`);
                   alert('Copied embed link to clipboard.');
                 }}
               >

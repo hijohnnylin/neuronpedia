@@ -1,4 +1,4 @@
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import * as Checkbox from '@radix-ui/react-checkbox';
 import copy from 'copy-to-clipboard';
 import { Check, Copy, HelpCircle } from 'lucide-react';
@@ -119,7 +119,7 @@ export default function EmbedsPane({
             <textarea
               disabled
               className="disabled form-input block h-8 w-full resize-none whitespace-pre-wrap break-words rounded-md border-0 bg-slate-100 px-2.5 py-[5px] font-mono text-[8px] leading-normal text-slate-500 outline-none focus:outline-none focus:ring-0"
-              value={`<iframe src=${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
+              value={`<iframe src=${env.NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
                 currentNeuron?.index
               }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                 embedPlotsChecked ? 'true' : 'false'
@@ -134,7 +134,7 @@ export default function EmbedsPane({
               onClick={(e) => {
                 e.preventDefault();
                 copy(
-                  `<iframe src=${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
+                  `<iframe src=${env.NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
                     currentNeuron?.index
                   }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                     embedPlotsChecked ? 'true' : 'false'
@@ -158,7 +158,7 @@ export default function EmbedsPane({
             <textarea
               disabled
               className="disabled form-input block h-8 w-full resize-none whitespace-pre-wrap break-words rounded-md border-0 bg-slate-100 px-2.5 py-[5px] font-mono text-[8px] leading-normal text-slate-500 outline-none focus:outline-none focus:ring-0"
-              value={`${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
+              value={`${env.NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
                 currentNeuron?.index
               }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                 embedPlotsChecked ? 'true' : 'false'
@@ -173,7 +173,7 @@ export default function EmbedsPane({
               onClick={(e) => {
                 e.preventDefault();
                 copy(
-                  `${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
+                  `${env.NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
                     currentNeuron?.index
                   }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                     embedPlotsChecked ? 'true' : 'false'

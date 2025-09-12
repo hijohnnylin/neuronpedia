@@ -5,7 +5,7 @@ import { useGraphModalContext } from '@/components/provider/graph-modal-provider
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import { LoadingSquare } from '@/components/svg/loading-square';
-import { NEXT_PUBLIC_URL } from '@/lib/env';
+import { env } from '@/lib/env';
 import { GraphMetadataSubgraph, GraphMetadataSubgraphWithPartialRelations } from '@/prisma/generated/zod';
 import copy from 'copy-to-clipboard';
 import { Field, Form, Formik } from 'formik';
@@ -159,7 +159,7 @@ export default function SaveSubgraphModal() {
 
   // Show success view if subgraph was saved
   if (savedSubgraph) {
-    const subgraphUrl = `${NEXT_PUBLIC_URL}/${savedSubgraph.modelId}/graph?slug=${savedSubgraph.slug}&subgraph=${savedSubgraph.subgraphId}`;
+    const subgraphUrl = `${env.NEXT_PUBLIC_URL}/${savedSubgraph.modelId}/graph?slug=${savedSubgraph.slug}&subgraph=${savedSubgraph.subgraphId}`;
 
     return (
       <Dialog
