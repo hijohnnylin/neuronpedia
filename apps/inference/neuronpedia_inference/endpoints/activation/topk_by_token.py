@@ -44,7 +44,9 @@ async def activation_topk_by_token(
 
     sae = sae_manager.get_sae(source)
 
-    prepend_bos = sae.cfg.metadata.prepend_bos or model.cfg.tokenizer_prepends_bos
+    prepend_bos = True # sae.cfg.metadata.prepend_bos or model.cfg.tokenizer_prepends_bos
+    if request.prompt.startswith("<|begin_of_text|>"):
+        prepend_bos = False
 
     tokens = model.to_tokens(
         prompt,
@@ -91,16 +93,19 @@ async def activation_topk_by_token(
     for token_idx, (token, values, indices) in enumerate(
         zip(str_tokens, top_k_values, top_k_indices)
     ):
-        token_result = ActivationTopkByTokenPost200ResponseResultsInner(
-            token=token,  # type: ignore
-            token_position=token_idx,
-            top_features=[
+        top_features = [
                 ActivationTopkByTokenPost200ResponseResultsInnerTopFeaturesInner(
                     feature_index=int(idx.item()),
                     activation_value=float(val.item()),
                 )
                 for val, idx in zip(values, indices)
-            ],
+            ]
+        if token_idx <= 0:
+            top_features = []
+        token_result = ActivationTopkByTokenPost200ResponseResultsInner(
+            token=token,  # type: ignore
+            token_position=token_idx,
+            top_features=top_features,
         )
         results.append(token_result)
 
@@ -127,4 +132,8 @@ def get_activations_by_index(
     feature_activation_data = (
         SAEManager.get_instance().get_sae(selected_layer).encode(activation_data)
     )
+    # shape of feature_activation_data is torch.Size([1, 7, 131072]) [ 1, num_tokens, num_features ]
+    # bos is true here
+    feature_activation_data[:, :1] = 0
+
     return torch.transpose(feature_activation_data.squeeze(0), 0, 1)

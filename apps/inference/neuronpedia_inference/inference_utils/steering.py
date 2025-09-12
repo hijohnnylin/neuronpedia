@@ -153,6 +153,55 @@ def convert_to_chat_array(
                             )
                         )
 
+    # handle llama3.1-8b-instruct
+    elif hasattr(tokenizer, 'name_or_path') and tokenizer.name_or_path == "meta-llama/Llama-3.1-8B-Instruct":
+        # Handle Llama 3.1 format with <|start_header_id|> and <|end_header_id|>
+        # Token IDs: 128006 = <|start_header_id|>, 128007 = <|end_header_id|>
+        in_header = False
+        header_tokens = []
+        
+        for token in tokens:
+            if token == tokenizer.bos_token_id:
+                continue
+            if token == tokenizer.eos_token_id:
+                continue
+            if token == 128006:  # <|start_header_id|>
+                in_header = True
+                header_tokens = []
+                # Add any accumulated content before starting new role
+                if current_role and current_content:
+                    conversation.append(
+                        NPSteerChatMessage(
+                            role=current_role,
+                            content=tokenizer.decode(current_content).strip(),
+                        )
+                    )
+                    current_content = []
+                continue
+            elif token == 128007:  # <|end_header_id|>
+                if in_header and header_tokens:
+                    current_role = tokenizer.decode(header_tokens).strip()
+                in_header = False
+                header_tokens = []
+                continue
+            elif in_header:
+                header_tokens.append(token)
+            elif token == 128011:  # Legacy user token
+                current_role = "user"
+            elif token == 128012:  # Legacy assistant token
+                current_role = "assistant"
+            else:
+                current_content.append(token)
+        
+        # Add final message if exists
+        if current_role and current_content:
+            conversation.append(
+                NPSteerChatMessage(
+                    role=current_role,
+                    content=tokenizer.decode(current_content).strip(),
+                )
+            )
+
     # only other one right now is Gemma 2 Instruct (2B and 9B)
     else:
         # Get special token IDs directly from the tokenizer

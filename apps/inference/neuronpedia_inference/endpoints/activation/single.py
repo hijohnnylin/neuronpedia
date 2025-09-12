@@ -66,7 +66,10 @@ async def activation_single(
 
         # TODO: we assume that if either SAE or model prepends bos, then we should prepend bos
         # this is not exactly correct, but sometimes the SAE doesn't have the prepend_bos flag set
-        prepend_bos = sae.cfg.metadata.prepend_bos or model.cfg.tokenizer_prepends_bos
+        prepend_bos = True # sae.cfg.metadata.prepend_bos or model.cfg.tokenizer_prepends_bos
+
+        if prompt.startswith("<|begin_of_text|>"):
+            prepend_bos = False
 
         tokens = model.to_tokens(
             prompt,
@@ -107,7 +110,10 @@ async def activation_single(
     else:
         vector = request.vector
         hook = request.hook
-        prepend_bos = model.cfg.tokenizer_prepends_bos
+        prepend_bos = True
+        if str_tokens[0] == "<|begin_of_text|>":
+            prepend_bos = False
+
         tokens = model.to_tokens(
             prompt,
             prepend_bos=prepend_bos,
@@ -129,6 +135,12 @@ async def activation_single(
         str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
         _, cache = model.run_with_cache(tokens)
         result = process_vector_activations(vector, cache, hook, sae_manager.device)  # type: ignore
+
+    # if first token is <|begin_of_text|>, set the first token to 0
+    if str_tokens[0] == "<|begin_of_text|>":
+        result.values[0] = 0
+        result.max_value = max(result.values)
+        result.max_value_index = result.values.index(result.max_value)
 
     logger.info("Returning result: %s", result)
 
