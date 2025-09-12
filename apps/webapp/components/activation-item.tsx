@@ -13,7 +13,7 @@ import { ActivationPartialWithRelations } from 'prisma/generated/zod';
 import { useEffect, useState } from 'react';
 import ActivationItemTokenTooltip from './activation-item-token-tooltip';
 
-const ACTIVATION_MAX_COPY_TOKENS = 128;
+const ACTIVATION_MAX_COPY_TOKENS = 512;
 const DFA_TARGET_TOKEN_CLASSNAME = 'border-2 border-orange-400';
 const DFA_SOURCE_TOKEN_CLASSNAME = 'border-2 border-emerald-400';
 const REGULAR_TOKEN_CLASSNAME = 'border-2 border-transparent hover:bg-slate-200';

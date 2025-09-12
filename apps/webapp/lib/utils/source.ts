@@ -110,9 +110,9 @@ export function getDefaultSourceSetAndSourceForRelease(release: SourceReleaseWit
   let defaultSource: SourceWithPartialRelations | undefined;
 
   if (release.defaultSourceSetName) {
-    defaultSourceSet = release.sourceSets?.find(
-      (ss) => ss.name === release.defaultSourceSetName,
-    ) as SourceSetWithPartialRelations;
+    defaultSourceSet = release.sourceSets
+      ?.sort((a, b) => a.modelId?.localeCompare(b.modelId || '') || 0)
+      .find((ss) => ss.name === release.defaultSourceSetName) as SourceSetWithPartialRelations;
     if (release.defaultSourceId) {
       defaultSource = defaultSourceSet?.sources?.find(
         (s) => s.id === release.defaultSourceId,

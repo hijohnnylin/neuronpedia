@@ -24,7 +24,7 @@ pytest = "^8.1.1"
 huggingface-hub = "^0.34.0"
 huggingface = "^0.0.1"
 pandas = "^2.2.2"
-sae-lens = "^6.9.0"
+sae-lens = "^6.12.1"
 fastapi = "^0.115.6"
 uvicorn = "^0.34.0"
 sentry-sdk = {extras = ["fastapi"], version = "^2.20.0"}
