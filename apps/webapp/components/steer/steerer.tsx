@@ -45,12 +45,14 @@ export default function Steerer({
   initialIndex,
   initialStrength,
   initialSavedId,
+  hideInitialSettingsOnMobile = false,
 }: {
   initialModelId: string;
   initialSource?: string;
   initialIndex?: string;
   initialStrength?: string;
   initialSavedId?: string;
+  hideInitialSettingsOnMobile?: boolean;
 }) {
   const {
     globalModels,
@@ -95,7 +97,9 @@ export default function Steerer({
   const [showSearch, setShowSearch] = useState(false);
   const [showAddFeature, setShowAddFeature] = useState(false);
   const [showAddVector, setShowAddVector] = useState(false);
-  const [showSettingsOnMobile, setShowSettingsOnMobile] = useState(initialSavedId === undefined);
+  const [showSettingsOnMobile, setShowSettingsOnMobile] = useState(
+    initialSavedId === undefined && !hideInitialSettingsOnMobile,
+  );
   const [model, setModel] = useState<Model | null>(null);
   const [loadingPresets, setLoadingPresets] = useState(false);
   const isMount = useIsMount();

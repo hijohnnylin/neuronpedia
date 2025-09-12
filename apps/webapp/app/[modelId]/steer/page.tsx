@@ -8,7 +8,13 @@ export default async function Page({
   searchParams,
 }: {
   params: { modelId: string };
-  searchParams: { saved?: string; source?: string; index?: string; strength?: string };
+  searchParams: {
+    saved?: string;
+    source?: string;
+    index?: string;
+    strength?: string;
+    hideInitialSettingsOnMobile?: string;
+  };
 }) {
   // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
   if (params.modelId in REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT) {
@@ -25,6 +31,7 @@ export default async function Page({
         initialSource={searchParams.source}
         initialIndex={searchParams.index}
         initialStrength={searchParams.strength}
+        hideInitialSettingsOnMobile={searchParams.hideInitialSettingsOnMobile === 'true'}
       />
     </div>
   );
