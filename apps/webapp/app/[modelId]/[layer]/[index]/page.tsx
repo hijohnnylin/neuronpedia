@@ -2,8 +2,14 @@ import { getNeuronOptimized, neuronExistsAndUserHasAccess } from '@/lib/db/neuro
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import FeatureDashboard from './feature-dashboard';
+
+// TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
+export const REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT = {
+  'llama31-8b-it': 'llama3.1-8b-it',
+  'qwen25-7b-it': 'qwen2.5-7b-it',
+};
 
 export async function generateMetadata({
   params,
@@ -38,6 +44,15 @@ export default async function Page({
   const embedExplanation = searchParams.embedexplanation !== 'false'; // default embed auto interp
   const embedTest = searchParams.embedtest !== 'false'; // default embed test
   const defaultTestText = searchParams.defaulttesttext ? (searchParams.defaulttesttext as string) : undefined;
+
+  // remove this hack once we fix on LW
+  if (params.modelId in REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT) {
+    // redirect to the new model id
+    const queryString = new URLSearchParams(searchParams as Record<string, string>).toString();
+    const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/${params.layer}/${params.index}${queryString ? `?${queryString}` : ''}`;
+    redirect(redirectUrl);
+  }
+
   const { modelId } = params;
   let neuron: NeuronWithPartialRelations | null = null;
 
