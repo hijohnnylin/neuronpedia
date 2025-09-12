@@ -42,6 +42,16 @@ export default async function Page({
 
   // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
   if (params.modelId in REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT) {
+    const redirectToSteer = searchParams.redirectToSteer === 'true';
+    if (redirectToSteer) {
+      const strength = searchParams.strength ? (searchParams.strength as string) : 10;
+      const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/steer?source=${params.layer}&index=${params.index}&strength=${strength}`;
+      redirect(redirectUrl);
+    } else {
+      const queryString = new URLSearchParams(searchParams as Record<string, string>).toString();
+      const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/${params.layer}/${params.index}${queryString ? `?${queryString}` : ''}`;
+      redirect(redirectUrl);
+    }
     // redirect to the new model id
     const queryString = new URLSearchParams(searchParams as Record<string, string>).toString();
     const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/${params.layer}/${params.index}${queryString ? `?${queryString}` : ''}`;
