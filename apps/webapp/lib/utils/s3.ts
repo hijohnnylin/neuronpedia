@@ -80,7 +80,11 @@ export async function getS3ModelsToSources() {
   return s3modelToSources;
 }
 
-export async function getFilesInPath(path: string, filterByFileSuffix?: string): Promise<string[]> {
+export async function getFilesInPath(
+  path: string,
+  filterByFileSuffix?: string,
+  includeSubdirectories: boolean = true,
+): Promise<string[]> {
   const response = await anonymousS3Client.send(
     new ListObjectsV2Command({
       Bucket: DATASET_BUCKET,
@@ -90,6 +94,7 @@ export async function getFilesInPath(path: string, filterByFileSuffix?: string):
   const files =
     response.Contents?.map((content) => content.Key || '')
       .filter(Boolean)
+      .filter((file) => (includeSubdirectories ? true : !file.includes('/')))
       .filter((file) => (filterByFileSuffix ? file.endsWith(filterByFileSuffix) : true)) || [];
   console.log('Files in path', files);
   return files;

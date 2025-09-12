@@ -177,7 +177,7 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
           }
 
           /* ACTIVATIONS */
-          const activationsPaths = await getFilesInPath(`${path}/activations`, '.jsonl.gz');
+          const activationsPaths = await getFilesInPath(`${path}/activations`, '.jsonl.gz', false);
           for (const [index, activationsPath] of activationsPaths.entries()) {
             enqueueProgress(controller, index / activationsPaths.length, `(3 of 4) Importing Activations...`);
             console.log('Importing activations from', activationsPath);
