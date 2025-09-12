@@ -88,6 +88,9 @@ GEMINI_VERTEX = True
 #  - for a normal macbook pro, 50-100 is a ok number
 #  - for a machine with a beefier network card/memory, can go up to 300
 #  - you may need to experiment to find the max number for your machine (you'll see timeout errors)
+# consider setting these on your machine for higher performance
+# ulimit -n 32768
+# sudo sysctl -w net.inet.tcp.sendspace=2097152 net.inet.tcp.recvspace=2097152
 AUTOINTERP_BATCH_SIZE = 128
 
 # overridden by command line arguments
@@ -647,7 +650,8 @@ def main(
         f"{len(FAILED_FEATURE_INDEXES_OUTPUT)} indexes failed to auto-interp: {FAILED_FEATURE_INDEXES_OUTPUT}"
     )
     print(f"Writing failed indexes to {failed_file_path}")
-    with open(failed_file_path, "w") as f:
+    mode = "w" if only_failed_features else "a"
+    with open(failed_file_path, mode) as f:
         for index in FAILED_FEATURE_INDEXES_OUTPUT:
             f.write(f"{index}\n")
 
