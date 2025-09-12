@@ -71,6 +71,19 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+export const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || '';
+
+export const OPENAI_DEPLOYMENT_NAME = process.env.OPENAI_DEPLOYMENT_NAME || 'gpt-4o-mini';
+export const AZURE_API_VERSION = process.env.AZURE_API_VERSION || '2024-02-01';
+export const AZURE_OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT || '';
+
+export const USE_OPENAI = process.env.USE_OPENAI || 'true';
+export const USE_AZURE_OPENAI = process.env.USE_AZURE_OPENAI || 'false';
+export const USE_OPENROUTER = process.env.USE_OPENROUTER || 'false';
+
+if (!USE_OPENAI && !USE_AZURE_OPENAI && !USE_OPENROUTER) {
+  throw Error('At least one provider must be configured. Please enable one of the following: USE_OPENAI, USE_AZURE_OPENAI, USE_OPENROUTER');
+}
 
 // Sentry (Crash Reporting - Used by Sentry, not by us directly)
 // export const SENTRY_DSN = process.env.SENTRY_DSN || '';

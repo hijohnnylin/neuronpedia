@@ -1,5 +1,5 @@
-import OpenAI from 'openai';
 import pgvector from 'pgvector';
+import { getOpenAIClient } from '../openai';
 
 const VALID_EMBEDDING_MODELS = ['text-embedding-3-large'];
 
@@ -11,9 +11,9 @@ export async function getOAIEmbedding(embeddingModel: string, dimensions: number
   if (Array.isArray(text) && text.length === 0) {
     return [];
   }
-  const openai = new OpenAI();
+  const openAIClient = getOpenAIClient();
   // TODO: this fails silently when the key is invalid
-  const response = await openai.embeddings.create({
+  const response = await openAIClient.createEmbedding({
     input: text,
     model: embeddingModel,
     dimensions,

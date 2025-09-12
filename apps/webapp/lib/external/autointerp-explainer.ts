@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, UserSecretType } from '@prisma/client';
-import OpenAI from 'openai';
-import { AutoInterpModelType, isReasoningModel, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import { OpenAIClient } from '../openai';
+import { AutoInterpModelType, isReasoningModel } from '../utils/autointerp';
 import { makeAnthropicMessage, makeGeminiMessage, makeOAIactivation, makeOaiMessage } from './autointerp-shared';
 
 const systemMessage = `We're studying neurons in a neural network. Each neuron looks for some particular thing in a short document. Look at the parts of the document the neuron activates for and summarize in a single sentence what the neuron is looking for. Don't list examples of words.
@@ -240,8 +240,8 @@ ${
 Explanation of neuron 4 behavior: the main thing this neuron does is find`;
 
   if (explainerModelType === AutoInterpModelType.OPENAI || explainerKeyType === UserSecretType.OPENROUTER) {
-    const openai = new OpenAI({
-      baseURL: explainerKeyType === UserSecretType.OPENROUTER ? OPENROUTER_BASE_URL : undefined,
+    const openai = new OpenAIClient({
+      provider: explainerKeyType === UserSecretType.OPENROUTER ? 'openrouter' : 'openai',
       apiKey: explainerKey,
     });
     const messages = [
@@ -255,7 +255,7 @@ Explanation of neuron 4 behavior: the main thing this neuron does is find`;
       makeOaiMessage('user', newMessage),
     ];
     try {
-      const chatCompletion = await openai.chat.completions.create({
+      const chatCompletion = await openai.createChatCompletion({
         messages,
         model:
           explanationModelOpenRouterId && explainerKeyType === UserSecretType.OPENROUTER
