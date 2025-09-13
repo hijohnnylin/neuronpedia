@@ -121,7 +121,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       );
     }
 
-    // if exists, return error (only if it's not the same user)
+    // if graph slug exists, return error (only if it's not the same user)
     const existingGraph = await prisma.graphMetadata.findUnique({
       where: {
         modelId_slug: {
@@ -137,6 +137,28 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       );
     }
 
+    // if graph has a sourceSetName we recognize, then include that in the upsert
+    let sourceSetName = null;
+    if (graph.metadata.info?.neuronpedia_source_set) {
+      sourceSetName = graph.metadata.info.neuronpedia_source_set;
+      // if the sourceSetName has /, take the part after the last /
+      if (sourceSetName.includes('/')) {
+        sourceSetName = sourceSetName.split('/').pop() || sourceSetName;
+      }
+      // check the database for it
+      const existingSourceSet = await prisma.sourceSet.findUnique({
+        where: {
+          modelId_name: {
+            modelId: graph.metadata.scan,
+            name: sourceSetName,
+          },
+        },
+      });
+      if (existingSourceSet) {
+        sourceSetName = existingSourceSet.name;
+      }
+    }
+
     // graph is valid, save it to the database
     await prisma.graphMetadata.upsert({
       where: {
@@ -148,6 +170,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       update: {
         userId,
         modelId: graph.metadata.scan,
+        sourceSetName,
         slug: graph.metadata.slug,
         titlePrefix: '',
         promptTokens: graph.metadata.prompt_tokens,
@@ -158,6 +181,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       create: {
         userId,
         modelId: graph.metadata.scan,
+        sourceSetName,
         slug: graph.metadata.slug,
         titlePrefix: '',
         promptTokens: graph.metadata.prompt_tokens,
