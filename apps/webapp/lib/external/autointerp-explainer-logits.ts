@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, Neuron, UserSecretType } from '@prisma/client';
-import { OpenAIClient } from '../openai';
-import { AutoInterpModelType } from '../utils/autointerp';
+import OpenAI from 'openai';
+import { AutoInterpModelType, OPENROUTER_BASE_URL } from '../utils/autointerp';
 import { makeAnthropicMessage, makeGeminiMessage, makeOaiMessage } from './autointerp-shared';
 
 const TOKENS_AROUND_MAX_ACTIVATING_TOKEN = 24;
@@ -372,10 +372,9 @@ ${formatTopActivatingTexts(activations)}
 Explanation of neuron 5 behavior: `;
 
   console.log(newMessage);
-  // TODO If both OpenAI and OpenRouter are configured, OpenRouter will always take precedence. If this is intentional, it should be well documented and more clearly articulated to the user
   if (explainerModelType === AutoInterpModelType.OPENAI || explainerKeyType === UserSecretType.OPENROUTER) {
-    const openai = new OpenAIClient({
-      provider: explainerKeyType === UserSecretType.OPENROUTER ? 'openrouter' : 'openai',
+    const openai = new OpenAI({
+      baseURL: explainerKeyType === UserSecretType.OPENROUTER ? OPENROUTER_BASE_URL : undefined,
       apiKey: explainerKey,
     });
     const messages = [
@@ -391,7 +390,7 @@ Explanation of neuron 5 behavior: `;
       makeOaiMessage('user', newMessage),
     ];
     try {
-      const chatCompletion = await openai.createChatCompletion({
+      const chatCompletion = await openai.chat.completions.create({
         messages,
         model:
           explanationModelOpenRouterId && explainerKeyType === UserSecretType.OPENROUTER

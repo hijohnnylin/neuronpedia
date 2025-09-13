@@ -3,10 +3,12 @@
 import { prisma } from '@/lib/db';
 import { ActivationPartial } from '@/prisma/generated/zod';
 import { Activation, Explanation } from '@prisma/client';
-import { getOpenAIClient } from '../openai';
+import OpenAI from 'openai';
 import { AutoInterpModelType, getAutoInterpModelTypeFromModelId } from '../utils/autointerp';
 import { AuthenticatedUser } from '../with-user';
 import { makeOaiMessage } from './autointerp-shared';
+
+const openai = new OpenAI();
 
 // only submit tokens within 8 tokens of the top activating token
 const TRIM_TO_RANGE_OF_TOP_ACT = 100;
@@ -92,10 +94,8 @@ Explanation: terms related to cats
       makeOaiMessage('assistant', secondAssistantMessage),
       makeOaiMessage('user', thirdUserMessage),
     ];
-    // TODO this is hardcoded to always use the OpenAI provider with the admin's API key. Should this be moved to a BYO key workflow like the other 'lib/external/autointerp*.ts' services?
-    const openAIClient = getOpenAIClient();
 
-    const chatCompletion = await openAIClient.createChatCompletion({
+    const chatCompletion = await openai.chat.completions.create({
       messages,
       model: scorerModel,
       max_tokens: 50,

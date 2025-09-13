@@ -1,8 +1,8 @@
 import { prisma } from '@/lib/db';
 import { ActivationPartial } from '@/prisma/generated/zod';
 import { Activation, Explanation, ExplanationScoreModel, UserSecretType } from '@prisma/client';
-import { OpenAIClient } from '../openai';
-import { ERROR_RECALL_ALT_FAILED } from '../utils/autointerp';
+import OpenAI from 'openai';
+import { ERROR_RECALL_ALT_FAILED, OPENROUTER_BASE_URL } from '../utils/autointerp';
 import { AuthenticatedUser } from '../with-user';
 import { makeOaiMessage } from './autointerp-shared';
 
@@ -169,8 +169,8 @@ Only respond with in JSON with the format {"match": true, "reason": [reason why 
   // console.log(
   //   "explanationScoreModelOpenRouterId: " + explanationScoreModelOpenRouterId,
   // );
-  const openai = new OpenAIClient({
-    provider: scorerKeyType === UserSecretType.OPENROUTER ? 'openrouter' : 'openai',
+  const openai = new OpenAI({
+    baseURL: scorerKeyType === UserSecretType.OPENROUTER ? OPENROUTER_BASE_URL : undefined,
     apiKey: scorerKey,
   });
   const messages = [
@@ -183,7 +183,7 @@ Only respond with in JSON with the format {"match": true, "reason": [reason why 
   ];
   const rawMessages = JSON.stringify(messages);
   try {
-    const chatCompletion = await openai.createChatCompletion({
+    const chatCompletion = await openai.chat.completions.create({
       messages,
       model: explanationScoreModelOpenRouterId || scorerModel,
       max_tokens: 5000,
