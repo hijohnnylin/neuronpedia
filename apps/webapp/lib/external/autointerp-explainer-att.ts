@@ -166,10 +166,9 @@ Activations:`;
   }
   newMessage += `
 Explanation of attention head 5 behavior: this attention head`;
-  // TODO If both OpenAI and OpenRouter are configured, OpenRouter will always take precedence. If this is intentional, it should be well documented and more clearly articulated to the user
   if (explainerModelType === AutoInterpModelType.OPENAI || explainerKeyType === UserSecretType.OPENROUTER) {
     const openai = new OpenAI({
-      baseURL: UserSecretType.OPENROUTER ? OPENROUTER_BASE_URL : undefined,
+      baseURL: explainerKeyType === UserSecretType.OPENROUTER ? OPENROUTER_BASE_URL : undefined,
       apiKey: explainerKey,
     });
 

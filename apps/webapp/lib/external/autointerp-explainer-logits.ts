@@ -80,7 +80,8 @@ I enjoy watching movies with my family.
 Explanation of neuron 1 behavior: `;
 
 const firstAssistantMessage = `Method 1 fails: MAX_ACTIVATING_TOKENS (She, enjoy) are not similar tokens.
-Method 2 succeeds: All TOKENS_AFTER_MAX_ACTIVATING_TOKEN have a pattern in common: they all start with "w". Explanation: say "w" words`;
+Method 2 succeeds: All TOKENS_AFTER_MAX_ACTIVATING_TOKEN have a pattern in common: they all start with "w".
+Explanation: say "w" words`;
 
 const secondUserMessage = `
 
@@ -372,6 +373,7 @@ ${formatTopActivatingTexts(activations)}
 Explanation of neuron 5 behavior: `;
 
   console.log(newMessage);
+
   if (explainerModelType === AutoInterpModelType.OPENAI || explainerKeyType === UserSecretType.OPENROUTER) {
     const openai = new OpenAI({
       baseURL: explainerKeyType === UserSecretType.OPENROUTER ? OPENROUTER_BASE_URL : undefined,

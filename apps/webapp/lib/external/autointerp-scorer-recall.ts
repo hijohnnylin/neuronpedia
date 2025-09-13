@@ -94,7 +94,6 @@ Explanation: terms related to cats
       makeOaiMessage('assistant', secondAssistantMessage),
       makeOaiMessage('user', thirdUserMessage),
     ];
-
     const chatCompletion = await openai.chat.completions.create({
       messages,
       model: scorerModel,
