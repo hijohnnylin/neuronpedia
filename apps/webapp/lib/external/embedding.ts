@@ -1,5 +1,5 @@
 import pgvector from 'pgvector';
-import { getOpenAIClient } from '../openai';
+import { getOpenAIClient } from '../openai-client';
 
 const VALID_EMBEDDING_MODELS = ['text-embedding-3-large'];
 
@@ -13,7 +13,7 @@ export async function getOAIEmbedding(embeddingModel: string, dimensions: number
   }
   const openAIClient = getOpenAIClient();
   // TODO: this fails silently when the key is invalid
-  const response = await openAIClient.createEmbedding({
+  const response = await openAIClient.embeddings.create({
     input: text,
     model: embeddingModel,
     dimensions,

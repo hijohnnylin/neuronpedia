@@ -1,4 +1,5 @@
 import { config } from 'dotenv';
+import { z } from 'zod';
 
 // If it's not undefined, then it's a one click deploy. It doesn't matter what the value itself is.
 // Also, if it's one-click-deploy on Vercel, we always use the demo environment variables.
@@ -73,17 +74,11 @@ export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
 export const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || '';
 
-export const OPENAI_DEPLOYMENT_NAME = process.env.OPENAI_DEPLOYMENT_NAME || 'gpt-4o-mini';
-export const AZURE_API_VERSION = process.env.AZURE_API_VERSION || '2024-02-01';
 export const AZURE_OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT || '';
 
-export const USE_OPENAI = process.env.USE_OPENAI || 'true';
-export const USE_AZURE_OPENAI = process.env.USE_AZURE_OPENAI || 'false';
-export const USE_OPENROUTER = process.env.USE_OPENROUTER || 'false';
-
-if (!USE_OPENAI && !USE_AZURE_OPENAI && !USE_OPENROUTER) {
-  throw Error('At least one provider must be configured. Please enable one of the following: USE_OPENAI, USE_AZURE_OPENAI, USE_OPENROUTER');
-}
+// Embedding Provider Configuration
+const EmbeddingProviderSchema = z.enum(['openai', 'azure', 'openrouter']);
+export const EMBEDDING_PROVIDER = EmbeddingProviderSchema.parse(process.env.EMBEDDING_PROVIDER || 'openai');
 
 // Sentry (Crash Reporting - Used by Sentry, not by us directly)
 // export const SENTRY_DSN = process.env.SENTRY_DSN || '';
