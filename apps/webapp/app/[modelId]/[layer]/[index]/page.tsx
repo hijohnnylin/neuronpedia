@@ -53,10 +53,6 @@ export default async function Page({
       const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/${params.layer}/${params.index}${queryString ? `?${queryString}` : ''}`;
       redirect(redirectUrl);
     }
-    // redirect to the new model id
-    const queryString = new URLSearchParams(searchParams as Record<string, string>).toString();
-    const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/${params.layer}/${params.index}${queryString ? `?${queryString}` : ''}`;
-    redirect(redirectUrl);
   }
 
   const { modelId } = params;
