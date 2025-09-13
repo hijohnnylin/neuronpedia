@@ -3,8 +3,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, UserSecretType } from '@prisma/client';
-import { OpenAIClient } from '../openai';
-import { AutoInterpModelType } from '../utils/autointerp';
+import OpenAI from 'openai';
+import { AutoInterpModelType, OPENROUTER_BASE_URL } from '../utils/autointerp';
 import {
   makeAnthropicMessage,
   makeGeminiMessage,
@@ -168,8 +168,8 @@ Activations:`;
 Explanation of attention head 5 behavior: this attention head`;
   // TODO If both OpenAI and OpenRouter are configured, OpenRouter will always take precedence. If this is intentional, it should be well documented and more clearly articulated to the user
   if (explainerModelType === AutoInterpModelType.OPENAI || explainerKeyType === UserSecretType.OPENROUTER) {
-    const openai = new OpenAIClient({
-      provider: UserSecretType.OPENROUTER ? 'openrouter' : 'openai',
+    const openai = new OpenAI({
+      baseURL: UserSecretType.OPENROUTER ? OPENROUTER_BASE_URL : undefined,
       apiKey: explainerKey,
     });
 
@@ -186,7 +186,7 @@ Explanation of attention head 5 behavior: this attention head`;
       makeOaiMessage('user', newMessage),
     ];
     try {
-      const chatCompletion = await openai.createChatCompletion({
+      const chatCompletion = await openai.chat.completions.create({
         messages,
         model:
           (explainerKeyType === UserSecretType.OPENROUTER ? explanationModelOpenRouterId : explanationModel.name) || '',
