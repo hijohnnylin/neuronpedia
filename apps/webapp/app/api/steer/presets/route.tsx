@@ -585,17 +585,17 @@ const FEATURE_PRESETS: {
       exampleSteerOutputId: 'cmfgc8btg0017kenx4zsszyuq',
     },
     {
-      name: '😈 Evil Persona',
+      name: '😈 Evil Persona (Reverse)',
       features: [
         {
           modelId: 'llama3.1-8b-it',
           layer: '11-resid-post-aa',
           index: 87027,
-          explanation: 'evil persona',
-          strength: 7.9,
+          explanation: 'evil/jailbroken persona',
+          strength: -3.5,
         },
       ],
-      exampleSteerOutputId: 'cmfgc088v000jkenxcs1zkwgc',
+      exampleSteerOutputId: 'cmfj115t6001dwwl29cexrixq',
     },
     {
       name: '👹 Manipulation',
