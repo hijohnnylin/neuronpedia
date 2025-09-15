@@ -490,7 +490,7 @@ export default function ExplanationsSearcher({
                       setFieldValue('searchQuery', e.target.value);
                     }}
                     required
-                    placeholder={`Search for anything (eg 'cats', 'blue', 'joyful')`}
+                    placeholder={`Search for anything (eg 'dogs', 'blue', 'joyful')`}
                     className="mt-0 max-w-sm flex-1 resize-none rounded-md border border-slate-300 px-3 py-2.5 text-center text-xs font-medium text-slate-800 placeholder-slate-400 shadow-sm transition-all focus:border-sky-700 focus:outline-none focus:ring-0 disabled:bg-slate-200 sm:text-[14px]"
                   />
                   <Button
