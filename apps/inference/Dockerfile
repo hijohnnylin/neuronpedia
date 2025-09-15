@@ -31,6 +31,11 @@ WORKDIR /app
 
 ENV HOST=0.0.0.0
 
+# Optional custom CA bundle file support
+ARG CUSTOM_CA_BUNDLE
+# Copy the CA bundle file if provided, otherwise copy nothing (using .nocustomca as a no-op)
+COPY ${CUSTOM_CA_BUNDLE:-.nocustomca} /tmp/ca-bundle-temp
+
 # Ignore hash sum mismatch for apt-get
 RUN echo "Acquire::http::Pipeline-Depth 0;" > /etc/apt/apt.conf.d/99custom && \
     echo "Acquire::http::No-Cache true;" >> /etc/apt/apt.conf.d/99custom && \
@@ -42,13 +47,36 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     make \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Set up CA certificates and environment if bundle was provided
+RUN if [ -f /tmp/ca-bundle-temp ] && [ "${CUSTOM_CA_BUNDLE}" != ".nocustomca" ]; then \
+    mkdir -p /usr/local/share/ca-certificates && \
+    mv /tmp/ca-bundle-temp /usr/local/share/ca-certificates/custom-ca.crt && \
+    cat /usr/local/share/ca-certificates/custom-ca.crt >> /etc/ssl/certs/ca-certificates.crt && \
+    update-ca-certificates; \
+    else \
+    rm -f /tmp/ca-bundle-temp; \
+    fi
+
+# Set SSL environment variables if CA bundle was provided
+ENV SSL_CERT_FILE=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
+ENV REQUESTS_CA_BUNDLE=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
+ENV CURL_CA_BUNDLE=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
+ENV GIT_SSL_CAINFO=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
 
 # Install poetry
 RUN pip install poetry
 
 ENV POETRY_VIRTUALENVS_CREATE=false
 RUN poetry config virtualenvs.create false
+
+# Configure poetry/pip to use custom CA if provided
+RUN if [ -n "${CUSTOM_CA_BUNDLE}" ] && [ "${CUSTOM_CA_BUNDLE}" != ".nocustomca" ]; then \
+    pip config set global.cert /etc/ssl/certs/ca-certificates.crt && \
+    poetry config certificates.default.cert /etc/ssl/certs/ca-certificates.crt; \
+    fi
 
 # Copy the client package first
 COPY packages/python/neuronpedia-inference-client /app/packages/python/neuronpedia-inference-client/
