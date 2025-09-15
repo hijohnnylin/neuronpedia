@@ -72,11 +72,10 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+
+// These keys are used to use OpenAI embedding via OpenAI, Azure, or OpenRouter. By default we use OpenAI directly and the AZURE fields can be kept blank.
 export const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || '';
-
 export const AZURE_OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT || '';
-
-// Embedding Provider Configuration
 const EmbeddingProviderSchema = z.enum(['openai', 'azure', 'openrouter']);
 export const EMBEDDING_PROVIDER = EmbeddingProviderSchema.parse(process.env.EMBEDDING_PROVIDER || 'openai');
 
