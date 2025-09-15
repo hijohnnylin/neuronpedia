@@ -9,7 +9,7 @@ services:
       target: runner
       args:
         ENV_FILE: ${ENV_FILE:-.env.localhost}
-        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-./docker/.nocustomca}
+        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.nocustomca}
     ports:
       - "3000:3000"
     env_file:
@@ -26,7 +26,7 @@ services:
       target: db-init
       args:
         ENV_FILE: ${ENV_FILE:-.env.localhost}
-        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.docker/.nocustomca}
+        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.nocustomca}
     restart: "no"
     environment:
       - POSTGRES_URL_NON_POOLING=${POSTGRES_URL_NON_POOLING}
@@ -67,7 +67,7 @@ services:
         BUILD_TYPE: ${BUILD_TYPE:-nocuda} # Use nocuda by default, override with BUILD_TYPE=cuda
         CUDA_VERSION: "12.1.0"
         UBUNTU_VERSION: "22.04"
-        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-./docker/.nocustomca}
+        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.nocustomca}
     ports:
       - "5002:5002"
     env_file:
