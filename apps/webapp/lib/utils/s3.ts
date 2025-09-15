@@ -94,7 +94,13 @@ export async function getFilesInPath(
   const files =
     response.Contents?.map((content) => content.Key || '')
       .filter(Boolean)
-      .filter((file) => (includeSubdirectories ? true : !file.includes('/')))
+      .filter((file) => {
+        if (includeSubdirectories) return true;
+        // Extract the part of the path after the prefix, truncating the first slash. eg "v1/activations/batch-1.json.gz" -> "/batch-1.json.gz" -> "batch-1.json.jz"
+        const relativePath = file.substring(path.length).substring(1);
+        // if it still has a slash, it's in a subdirectory
+        return !relativePath.includes('/');
+      })
       .filter((file) => (filterByFileSuffix ? file.endsWith(filterByFileSuffix) : true)) || [];
   console.log('Files in path', files);
   return files;
