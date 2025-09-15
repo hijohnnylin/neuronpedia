@@ -60,9 +60,8 @@ RUN chmod +x ./init.sh
 ARG ENV_FILE=.env.localhost
 COPY ${ENV_FILE} .env
 
-# Build with environment variables loaded from dotenv
-# Force regenerate Prisma client with correct binary target
-RUN bash -c 'set -a && source .env && set +a && npx prisma generate && npm run build'
+# Build without database operations - only generate Prisma client and build Next.js
+RUN bash -c 'set -a && source .env && set +a && npm run build:simple'
 
 ###############################################################################################
 # Database initialization image (has access to ts-node and dev dependencies)
