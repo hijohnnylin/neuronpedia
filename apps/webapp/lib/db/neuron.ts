@@ -5,7 +5,7 @@ import { NeuronWithPartialRelations } from 'prisma/generated/zod';
 import { PUBLIC_ACTIVATIONS_USER_IDS } from '../env';
 import { EXPLANATIONTYPE_HUMAN } from '../utils/autointerp';
 import { NeuronIdentifier } from '../utils/neuron-identifier';
-import { getSourceSetNameFromSource, isNeuronLayerSource, NEURONS_SOURCESET } from '../utils/source';
+import { getSourceSetNameFromSource } from '../utils/source';
 import { AuthenticatedUser } from '../with-user';
 import {
   assertUserCanAccessModel,
@@ -20,40 +20,41 @@ const NEURONS_TO_LOAD_PER_REQUEST = 25;
 // more efficent checking
 export const filterToUserCanAccessNeurons = async (
   features: NeuronIdentifier[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   user: AuthenticatedUser | null = null,
-) => {
-  const alreadyCheckedAndAllowed: { modelId: string; sourceSet: string }[] = [];
-  // filter features to unique modelId/sourceSet
-  const uniqueFeatures = features.filter(
-    (feature, index, self) =>
-      index === self.findIndex((t) => t.modelId === feature.modelId && t.layer === feature.layer),
-  );
-  console.log('length of unique features', uniqueFeatures.length);
+) =>
+  // const alreadyCheckedAndAllowed: { modelId: string; sourceSet: string }[] = [];
+  // // filter features to unique modelId/sourceSet
+  // const uniqueFeatures = features.filter(
+  //   (feature, index, self) =>
+  //     index === self.findIndex((t) => t.modelId === feature.modelId && t.layer === feature.layer),
+  // );
+  // console.log('length of unique features', uniqueFeatures.length);
   // check each of these feature in parallel with await Promise.all userCanAccessModelAndSourceSet
-  const startTime = Date.now();
-  await Promise.all(
-    uniqueFeatures.map(async (feature) => {
-      const sourceSetName = isNeuronLayerSource(feature.layer)
-        ? NEURONS_SOURCESET
-        : getSourceSetNameFromSource(feature.layer);
-      const canAccess = await userCanAccessModelAndSourceSet(feature.modelId, sourceSetName, user, true);
-      if (canAccess) {
-        alreadyCheckedAndAllowed.push({ modelId: feature.modelId, sourceSet: sourceSetName });
-      }
-    }),
-  );
-  const endTime = Date.now();
-  console.log(`Time taken to check access for ${uniqueFeatures.length} unique features: ${endTime - startTime}ms`);
+  // const startTime = Date.now();
+  // await Promise.all(
+  //   uniqueFeatures.map(async (feature) => {
+  //     const sourceSetName = isNeuronLayerSource(feature.layer)
+  //       ? NEURONS_SOURCESET
+  //       : getSourceSetNameFromSource(feature.layer);
+  //     const canAccess = await userCanAccessModelAndSourceSet(feature.modelId, sourceSetName, user, true);
+  //     if (canAccess) {
+  //       alreadyCheckedAndAllowed.push({ modelId: feature.modelId, sourceSet: sourceSetName });
+  //     }
+  //   }),
+  // );
+  // const endTime = Date.now();
+  // console.log(`Time taken to check access for ${uniqueFeatures.length} unique features: ${endTime - startTime}ms`);
   // now filter features to only the ones that are allowed
-  const allowedFeatures = features.filter((feature) => {
-    // check if each feature has layer and index that are in a pair in alreadyCheckedAndAllowed
-    const sourceSetName = isNeuronLayerSource(feature.layer)
-      ? NEURONS_SOURCESET
-      : getSourceSetNameFromSource(feature.layer);
-    return alreadyCheckedAndAllowed.some((n) => n.modelId === feature.modelId && n.sourceSet === sourceSetName);
-  });
-  return allowedFeatures;
-};
+  // const allowedFeatures = features.filter((feature) => {
+  //   // check if each feature has layer and index that are in a pair in alreadyCheckedAndAllowed
+  //   const sourceSetName = isNeuronLayerSource(feature.layer)
+  //     ? NEURONS_SOURCESET
+  //     : getSourceSetNameFromSource(feature.layer);
+  //   return alreadyCheckedAndAllowed.some((n) => n.modelId === feature.modelId && n.sourceSet === sourceSetName);
+  // });
+  // return allowedFeatures;
+  features;
 
 export const upsertVector = async (
   modelId: string,
