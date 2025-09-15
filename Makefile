@@ -222,7 +222,7 @@ reset-docker-data: ## Reset Docker Data - this deletes your local database!
 		exit 1; \
 	fi
 	@echo "Resetting Docker data..."
-	docker compose -f docker/compose.yaml down -v
+	ENV_FILE=../.env.localhost docker compose -f docker/compose.yaml down -v
 
 graph-localhost-install: ## Graph: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the graph server dependencies for development in the localhost environment..."
