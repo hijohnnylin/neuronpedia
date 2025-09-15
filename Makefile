@@ -125,6 +125,7 @@ inference-localhost-install: ## Inference: Localhost Environment - Install Depen
 
 inference-localhost-build: ## Inference: Localhost Environment - Build
 	@echo "Building the inference server for the localhost environment..."
+	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) \
 	ENV_FILE=../.env.localhost \
 		BUILD_TYPE=$(BUILD_TYPE) \
 		docker compose \

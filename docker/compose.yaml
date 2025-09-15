@@ -67,6 +67,7 @@ services:
         BUILD_TYPE: ${BUILD_TYPE:-nocuda} # Use nocuda by default, override with BUILD_TYPE=cuda
         CUDA_VERSION: "12.1.0"
         UBUNTU_VERSION: "22.04"
+        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-./docker/.nocustomca}
     ports:
       - "5002:5002"
     env_file:
