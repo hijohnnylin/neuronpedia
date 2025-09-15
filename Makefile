@@ -134,7 +134,7 @@ inference-localhost-build: ## Inference: Localhost Environment - Build
 		build inference
 
 inference-localhost-build-gpu: ## Inference: Localhost Environment - Build (CUDA). Usage: make inference-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
-	$(MAKE) inference-localhost-build BUILD_TYPE=cuda
+	$(MAKE) inference-localhost-build BUILD_TYPE=cuda CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE)
 
 inference-localhost-dev: ## Inference: Localhost Environment - Run (Development Build). Usage: make inference-localhost-dev [MODEL_SOURCESET=gpt2-small.res-jb] [AUTORELOAD=1]
 	@echo "Bringing up the inference server for development in the localhost environment..."
