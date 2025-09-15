@@ -585,7 +585,7 @@ const FEATURE_PRESETS: {
       exampleSteerOutputId: 'cmfgc8btg0017kenx4zsszyuq',
     },
     {
-      name: '😈 Evil Persona (Reverse)',
+      name: '😈➡️😇 Evil Persona (Reverse)',
       features: [
         {
           modelId: 'llama3.1-8b-it',
