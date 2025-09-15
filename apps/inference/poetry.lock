@@ -3084,14 +3084,14 @@ files = [
 
 [[package]]
 name = "sae-lens"
-version = "6.9.0"
+version = "6.12.1"
 description = "Training and Analyzing Sparse Autoencoders (SAEs)"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "sae_lens-6.9.0-py3-none-any.whl", hash = "sha256:dbbf9cc0d0ccc149e542ba9e3d00c2b03a98f32a9487c777f0fd56b6a3efb4a1"},
-    {file = "sae_lens-6.9.0.tar.gz", hash = "sha256:d4fba5e090fcc6bcf09ce75fa76e52f9a097fd0a5e8052b589415e235906c2a3"},
+    {file = "sae_lens-6.12.1-py3-none-any.whl", hash = "sha256:e14c44801af5dc2031b74f18b7d62c5be9cbf273f6ef7edbfde0dcdabfc8b77d"},
+    {file = "sae_lens-6.12.1.tar.gz", hash = "sha256:ef232348d52686e12ec08b140f9ff28d55d378c569164e522069aecc344be390"},
 ]
 
 [package.dependencies]
@@ -4581,4 +4581,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "567c3b3c58b1c1f53ae426a0fcf8c8761f8d9693d682aa6560fc594b08688eb4"
+content-hash = "83b40dc0c77f546c68277bbb8e0eb7e3d437b85f337d35a1f319075dde9857cb"
