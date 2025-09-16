@@ -162,13 +162,36 @@ function computeGraphScoresFromGraphData(
   };
 }
 
+console.log('Worker script loaded');
+
 self.onmessage = (ev: MessageEvent) => {
+  console.log('Worker received message:', ev.data ? 'has data' : 'null data');
+
   try {
-    const { requestId, graph, pinnedIds } = ev.data as { requestId: number; graph: WorkerGraph; pinnedIds: string[] };
+    // Handle Chrome's stricter Web Worker message handling
+    if (!ev.data) {
+      // Chrome may send null data during worker initialization - ignore these messages
+      return;
+    }
+
+    const data = ev.data;
+
+    // Validate that we have the expected message structure
+    if (typeof data !== 'object' || !data.hasOwnProperty('graph') || !data.hasOwnProperty('requestId')) {
+      console.error('Worker: Invalid message format', data);
+      // @ts-ignore
+      self.postMessage({ error: 'Invalid message format received by worker' });
+      return;
+    }
+
+    console.log('Worker: starting computation');
+    const { requestId, graph, pinnedIds } = data as { requestId: number; graph: WorkerGraph; pinnedIds: string[] };
     const scores = computeGraphScoresFromGraphData(graph, pinnedIds);
+    console.log('Worker: computation complete, sending results:', scores);
     // @ts-ignore
     self.postMessage({ requestId, ...scores });
   } catch (err) {
+    console.error('Worker error:', err);
     // @ts-ignore
     self.postMessage({ error: (err as Error)?.message || 'Unknown worker error' });
   }
