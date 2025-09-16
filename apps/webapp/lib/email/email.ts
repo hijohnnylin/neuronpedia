@@ -2,31 +2,49 @@ import { SendEmailCommand, SESv2Client } from '@aws-sdk/client-sesv2';
 import { promises as fs } from 'fs';
 import _ from 'lodash';
 import mjml2html from 'mjml';
+import * as nodemailer from 'nodemailer';
 import path from 'path';
 import { Resend } from 'resend';
 import {
   AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY,
   CONTACT_EMAIL_ADDRESS,
+  EMAIL_SENDING_PROVIDER,
   NEXT_PUBLIC_URL,
   RESEND_EMAIL_API_KEY,
+  SMTP_SERVER_HOST,
+  SMTP_SERVER_PORT,
 } from '../env';
 
 const { htmlToText } = require('html-to-text');
 
 let awsSesClient: SESv2Client;
 let resendClient: Resend;
+let smtpTransporter: nodemailer.Transporter;
 
-if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
-  awsSesClient = new SESv2Client({
-    region: 'us-east-1',
-    credentials: {
-      accessKeyId: AWS_ACCESS_KEY_ID,
-      secretAccessKey: AWS_SECRET_ACCESS_KEY,
-    },
-  });
-} else if (RESEND_EMAIL_API_KEY) {
-  resendClient = new Resend(RESEND_EMAIL_API_KEY);
+switch (EMAIL_SENDING_PROVIDER) {
+  case 'aws':
+    awsSesClient = new SESv2Client({
+      region: 'us-east-1',
+      credentials: {
+        accessKeyId: AWS_ACCESS_KEY_ID,
+        secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      },
+    });
+    break;
+  case 'resend':
+    resendClient = new Resend(RESEND_EMAIL_API_KEY);
+    break;
+  case 'smtp':
+    smtpTransporter = nodemailer.createTransport({
+      host: SMTP_SERVER_HOST,
+      port: Number(SMTP_SERVER_PORT),
+      secure: false,
+      requireTLS: true,
+    });
+    break;
+  default:
+    console.error('No email provider defined. Set EMAIL_SENDING_PROVIDER');
 }
 
 export const EMAIL_TEMPLATES_PATH = '/lib/email';
@@ -49,64 +67,89 @@ export const sendEmail = async (
   subject: string,
   html: string,
 ) => {
-  // try aws first
-  if (awsSesClient) {
-    const command = new SendEmailCommand({
-      FromEmailAddress: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
-      FeedbackForwardingEmailAddress: CONTACT_EMAIL_ADDRESS,
-      ConfigurationSetName: 'Neuronpedia',
-      Destination: {
-        ToAddresses: [emailAddress],
-      },
-      ReplyToAddresses: [CONTACT_EMAIL_ADDRESS],
-      Content: {
-        Simple: {
-          Subject: {
-            Data: subject,
-          },
-          Body: {
-            Html: {
-              Data: html,
-            },
-            Text: {
-              Data: htmlToText(html),
-            },
-          },
-          Headers: unsubscribeCode
-            ? [
-                {
-                  Name: 'List-Unsubscribe',
-                  Value: `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
-                },
-              ]
-            : [],
+  switch (EMAIL_SENDING_PROVIDER) {
+    case 'aws': {
+      const command = new SendEmailCommand({
+        FromEmailAddress: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
+        FeedbackForwardingEmailAddress: CONTACT_EMAIL_ADDRESS,
+        ConfigurationSetName: 'Neuronpedia',
+        Destination: {
+          ToAddresses: [emailAddress],
         },
-      },
-    });
-    const result = await awsSesClient.send(command);
-    if (result.$metadata.httpStatusCode !== 200) {
-      console.error('Email failed to send', result);
+        ReplyToAddresses: [CONTACT_EMAIL_ADDRESS],
+        Content: {
+          Simple: {
+            Subject: {
+              Data: subject,
+            },
+            Body: {
+              Html: {
+                Data: html,
+              },
+              Text: {
+                Data: htmlToText(html),
+              },
+            },
+            Headers: unsubscribeCode
+              ? [
+                  {
+                    Name: 'List-Unsubscribe',
+                    Value: `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
+                  },
+                ]
+              : [],
+          },
+        },
+      });
+      const awsResult = await awsSesClient.send(command);
+      if (awsResult.$metadata.httpStatusCode !== 200) {
+        console.error('Email failed to send', awsResult);
+      }
+      break;
     }
-  } else if (resendClient) {
-    const result = await resendClient.emails.send({
-      from: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
-      to: emailAddress,
-      subject,
-      html,
-      text: htmlToText(html),
-      headers: unsubscribeCode
-        ? {
-            'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
-          }
-        : {},
-    });
-    if (result.error) {
-      console.error('Resend email failed to send', result);
+
+    case 'resend': {
+      const resendDotComResult = await resendClient.emails.send({
+        from: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
+        to: emailAddress,
+        subject,
+        html,
+        text: htmlToText(html),
+        headers: unsubscribeCode
+          ? {
+              'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
+            }
+          : {},
+      });
+      if (resendDotComResult.error) {
+        console.error('Resend email failed to send', resendDotComResult);
+      }
+      break;
     }
-  } else {
-    console.error(
-      'No email provider defined. Set either AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY or RESEND_EMAIL_API_KEY',
-    );
+
+    case 'smtp': {
+      try {
+        const mailOptions: nodemailer.SendMailOptions = {
+          from: `Neuronpedia <${CONTACT_EMAIL_ADDRESS}>`,
+          to: emailAddress,
+          subject,
+          html,
+          text: htmlToText(html),
+          headers: unsubscribeCode
+            ? {
+                'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
+              }
+            : undefined,
+        };
+        await smtpTransporter.sendMail(mailOptions);
+      } catch (error) {
+        console.error('SMTP email failed to send', error);
+      }
+      break;
+    }
+
+    default:
+      console.error('No email provider defined. Set EMAIL_SENDING_PROVIDER');
   }
 };
 
