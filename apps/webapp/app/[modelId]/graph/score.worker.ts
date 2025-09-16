@@ -174,9 +174,10 @@ self.onmessage = (ev: MessageEvent) => {
       return;
     }
 
-    const data = ev.data;
+    const { data } = ev;
 
     // Validate that we have the expected message structure
+    // eslint-disable-next-line no-prototype-builtins
     if (typeof data !== 'object' || !data.hasOwnProperty('graph') || !data.hasOwnProperty('requestId')) {
       console.error('Worker: Invalid message format', data);
       // @ts-ignore

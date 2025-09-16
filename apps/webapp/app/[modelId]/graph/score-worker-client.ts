@@ -25,6 +25,7 @@ export async function computeGraphScoresInWorker(
     // Add timeout to prevent hanging if worker never responds with valid data
     const timeout = setTimeout(() => {
       // @ts-ignore
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       worker.removeEventListener('message', handleMessage as EventListener);
       // eslint-disable-next-line @typescript-eslint/no-use-before-define
       worker.removeEventListener('error', handleError as EventListener);
@@ -34,7 +35,7 @@ export async function computeGraphScoresInWorker(
 
     function handleMessage(ev: MessageEvent) {
       console.log('Client received message from worker:', ev.data);
-      const data = ev.data;
+      const { data } = ev;
 
       // Handle case where ev.data is null or undefined
       if (!data) {
@@ -81,6 +82,7 @@ export async function computeGraphScoresInWorker(
     worker.addEventListener('error', handleError as EventListener);
 
     // Send the graph data directly
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     sendGraphData();
 
     function sendGraphData() {
@@ -120,7 +122,7 @@ export async function computeGraphScoresInWorker(
           console.log('Message data serialization test: OK');
         } catch (serializationErr) {
           console.error('Message serialization failed:', serializationErr);
-          throw new Error('Cannot serialize graph data for worker: ' + (serializationErr as Error).message);
+          throw new Error(`Cannot serialize graph data for worker: ${(serializationErr as Error).message}`);
         }
 
         worker.postMessage(messageData);
