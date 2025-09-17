@@ -226,7 +226,7 @@ reset-docker-data: ## Reset Docker Data - this deletes your local database!
 
 graph-localhost-install: ## Graph: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the graph server dependencies for development in the localhost environment..."
-	cd apps/graph && \	
+	cd apps/graph && \
 	poetry lock && poetry install
 
 
