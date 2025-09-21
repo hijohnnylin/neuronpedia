@@ -579,6 +579,6 @@ The instructions below demonstrate how to download the `gpt2-small`@`10-res-jb` 
 
 ### Why an OpenAI API Key Is Needed for Search Explanations
 
-In the webapp, the `search explanations` feature requires you to set an `OPENAI_API_KEY`. Otherwise you will get no search results.
+In the webapp, the `Search Explanations` feature requires you to set an `OPENAI_API_KEY`. Otherwise you will get no search results.
 
 This is because the `search explanations` functionality searches for features by semantic similarity. If you search `cat`, it will also return `feline`, `tabby`, `animal`, etc. To do this, it needs to calculate the embedding for your input `cat`. We use openai's embedding api (specifically, `text-embedding-3-large` with `dimension: 256`) to calculate the embeddings.
