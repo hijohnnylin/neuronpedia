@@ -5,10 +5,14 @@ import { sendLoginEmail, sendWelcomeEmail } from '@/lib/email/email';
 import {
   APPLE_CLIENT_ID,
   APPLE_CLIENT_SECRET,
+  CONTACT_EMAIL_ADDRESS,
+  EMAIL_SENDING_PROVIDER,
   GITHUB_ID,
   GITHUB_SECRET,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
+  SMTP_SERVER_HOST,
+  SMTP_SERVER_PORT,
 } from '@/lib/env';
 import { User, UserSecretType } from '@prisma/client';
 import crypto from 'crypto';
@@ -62,22 +66,36 @@ export const authOptions: NextAuthOptions = {
       },
     }),
     // https://github.com/nextauthjs/next-auth/issues/4965
-    Email({
-      generateVerificationToken() {
-        const random = crypto.getRandomValues(new Uint8Array(8));
-        return Buffer.from(random).toString('hex').slice(0, 6);
-      },
-      async sendVerificationRequest(params) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { identifier, provider, token, theme } = params;
+    Email(
+      EMAIL_SENDING_PROVIDER === 'smtp'
+        ? {
+            // Use NextAuth's built-in SMTP handling
+            server: {
+              host: SMTP_SERVER_HOST,
+              port: Number(SMTP_SERVER_PORT),
+              secure: false,
+              requireTLS: true,
+            },
+            from: CONTACT_EMAIL_ADDRESS,
+          }
+        : {
+            // Use custom handling for AWS/Resend
+            generateVerificationToken() {
+              const random = crypto.getRandomValues(new Uint8Array(8));
+              return Buffer.from(random).toString('hex').slice(0, 6);
+            },
+            async sendVerificationRequest(params) {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const { identifier } = params;
 
-        const url = new URL(params.url);
-        // url.searchParams.delete("token") // uncomment if you want the user to type this manually
-        const signInURL = new URL(`/auth/email?${url.searchParams}`, url.origin);
+              const url = new URL(params.url);
+              // url.searchParams.delete("token") // uncomment if you want the user to type this manually
+              const signInURL = new URL(`/auth/email?${url.searchParams}`, url.origin);
 
-        await sendLoginEmail(identifier, signInURL.toString());
-      },
-    }),
+              await sendLoginEmail(identifier, signInURL.toString());
+            },
+          },
+    ),
   ],
   events: {
     async createUser(message) {
