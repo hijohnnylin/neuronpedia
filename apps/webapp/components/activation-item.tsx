@@ -21,7 +21,7 @@ export const CENTER_ME_CLASSNAME = 'center-me';
 
 // TODO: support more types
 const START_TOKEN = ['<|start|>', '<|begin_of_text|>', '<|start_header_id|>', '<start_of_turn>', '<|im_start|>'];
-const END_TOKEN = ['<|end|>', '<|eot_id|>'];
+const END_TOKEN = ['<|end|>', '<|eot_id|>', '<|im_end|>'];
 const MESSAGE_TOKEN = ['<|message|>', '<|end_header_id|>'];
 const CHANNEL_TOKEN = '<|channel|>';
 
