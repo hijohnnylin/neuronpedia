@@ -461,6 +461,9 @@ async def start(activations_dir: str):
                     )[:MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE]
 
                     # enqueue it
+                    # if features_by_index doesn't have "index", skip
+                    if index not in features_by_index:
+                        continue
                     task = asyncio.create_task(
                         enqueue_autointerp_openai_task_with_activations(
                             activations_by_index[index],
@@ -559,18 +562,7 @@ def main(
             "GEMINI_API_KEY is not set even though you're using a Gemini model"
         )
 
-    global \
-        FAILED_FEATURE_INDEXES_QUEUED, \
-        INPUT_DIR_WITH_SOURCE_EXPORTS, \
-        START_INDEX, \
-        END_INDEX, \
-        EXPLAINER_MODEL_NAME, \
-        EXPLAINER_TYPE_NAME, \
-        MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE, \
-        AUTOINTERP_BATCH_SIZE, \
-        EXPLANATIONS_OUTPUT_DIR, \
-        GZIP_OUTPUT, \
-        IGNORE_FIRST_N_TOKENS
+    global FAILED_FEATURE_INDEXES_QUEUED, INPUT_DIR_WITH_SOURCE_EXPORTS, START_INDEX, END_INDEX, EXPLAINER_MODEL_NAME, EXPLAINER_TYPE_NAME, MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE, AUTOINTERP_BATCH_SIZE, EXPLANATIONS_OUTPUT_DIR, GZIP_OUTPUT, IGNORE_FIRST_N_TOKENS
     INPUT_DIR_WITH_SOURCE_EXPORTS = input_dir_with_source_exports
     if not os.path.exists(INPUT_DIR_WITH_SOURCE_EXPORTS):
         raise ValueError(
