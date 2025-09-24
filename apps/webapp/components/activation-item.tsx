@@ -19,6 +19,12 @@ const DFA_SOURCE_TOKEN_CLASSNAME = 'border-2 border-emerald-400';
 const REGULAR_TOKEN_CLASSNAME = 'border-2 border-transparent hover:bg-slate-200';
 export const CENTER_ME_CLASSNAME = 'center-me';
 
+// TODO: support more types
+const START_TOKEN = ['<|start|>', '<|begin_of_text|>', '<|start_header_id|>', '<start_of_turn>', '<|im_start|>'];
+const END_TOKEN = ['<|end|>', '<|eot_id|>'];
+const MESSAGE_TOKEN = ['<|message|>', '<|end_header_id|>'];
+const CHANNEL_TOKEN = '<|channel|>';
+
 export default function ActivationItem({
   activation,
   // only use this if you want the activation colors to be relative to other activations in a list
@@ -38,6 +44,7 @@ export default function ActivationItem({
   overrideLeading = 'leading-none sm:leading-tight',
   overrideTextColor = 'text-slate-600',
   className,
+  showRawTokens = true,
 }: {
   activation: ActivationPartialWithRelations;
   overallMaxActivationValueInList?: number;
@@ -54,6 +61,7 @@ export default function ActivationItem({
   overrideLeading?: string;
   overrideTextColor?: string;
   className?: string;
+  showRawTokens?: boolean;
 }) {
   const [currentRange, setCurrentRange] = useState(tokensToDisplayAroundMaxActToken);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -87,6 +95,35 @@ export default function ActivationItem({
     return tokenIndex > maxIndex - currentRange && tokenIndex < maxIndex + currentRange;
   }
 
+  function hasNextToken(tokenIndex: number) {
+    return tokenIndex < (activation.tokens?.length || 0) - 1;
+  }
+
+  function nextTokenIsMessageEndOrChannelToken(tokenIndex: number) {
+    return (
+      hasNextToken(tokenIndex) &&
+      (MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
+        END_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || ''))
+    );
+  }
+
+  function tokenIsRoleToken(tokenIndex: number) {
+    return (
+      tokenIndex > 0 &&
+      START_TOKEN.includes(activation.tokens?.[tokenIndex - 1] || '') &&
+      (END_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
+        MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
+        ((activation.modelId === 'gemma-2-2b-it' || activation.modelId === 'gemma-2-9b-it') &&
+          activation.tokens?.[tokenIndex + 1] === '\n') ||
+        (activation.modelId === 'qwen2.5-7b-it' && activation.tokens?.[tokenIndex + 1] === '\n') ||
+        CHANNEL_TOKEN === activation.tokens?.[tokenIndex + 1])
+    );
+  }
+
+  function prevTokenIsChannelToken(tokenIndex: number) {
+    return tokenIndex > 0 && activation.tokens?.[tokenIndex - 1] === CHANNEL_TOKEN;
+  }
+
   function shouldShowToken(tokenIndex: number) {
     if (!activation.tokens) {
       return false;
@@ -114,15 +151,33 @@ export default function ActivationItem({
     if (toReturn === true && firstTokenShown === -1) {
       firstTokenShown = tokenIndex;
     }
+
+    // if we're not showing raw tokens (eg we should hide special tokens for chat/etc), then hide depending on what token this is and what tokens are around it
+    if (!showRawTokens) {
+      if (
+        START_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
+        END_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
+        MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
+        activation.tokens?.[tokenIndex] === CHANNEL_TOKEN
+      ) {
+        return false;
+      }
+    }
+
     return toReturn;
   }
 
   return (
-    <div className={cn('flex w-full flex-row items-center justify-start gap-x-2', className)}>
+    <div
+      className={cn(
+        `flex w-full flex-row ${isExpanded || tokensToDisplayAroundMaxActToken > 100 ? 'items-start' : 'items-center'} justify-start gap-x-2`,
+        className,
+      )}
+    >
       {showTopActivationToken && (
         <div className="flex flex-row items-center gap-x-1.5">
           {dfa && (
-            <div className="hidden items-center justify-center gap-y-0.5 whitespace-nowrap pr-1 text-center font-mono text-[10px] leading-normal text-slate-600 sm:flex sm:w-16 sm:flex-col">
+            <div className="hidden items-center justify-start gap-y-0.5 whitespace-nowrap pr-1 text-center font-mono text-[10px] leading-normal text-slate-600 sm:flex sm:w-16 sm:flex-col">
               <div className="rounded bg-slate-100 px-1.5 font-bold">
                 {activation.tokens && replaceHtmlAnomalies(activation.tokens[maxDfaTokenIndex])}
               </div>
@@ -131,7 +186,7 @@ export default function ActivationItem({
               )}
             </div>
           )}
-          <div className="hidden items-center justify-center gap-y-0.5 whitespace-nowrap pr-1 text-center font-mono text-[10px] leading-normal text-slate-600 sm:flex sm:w-16 sm:flex-col">
+          <div className="hidden items-center justify-start gap-y-0.5 whitespace-nowrap py-1 pr-1 text-center font-mono text-[10px] leading-normal text-slate-600 sm:flex sm:w-16 sm:flex-col">
             <div className="rounded bg-slate-100 px-1.5 font-bold">
               {activation.tokens && replaceHtmlAnomalies(activation.tokens[maxActivationTokenIndex])}
             </div>
@@ -147,7 +202,7 @@ export default function ActivationItem({
           dfaSplit === true &&
           currentRange === ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[0].size &&
           'flex w-full flex-row items-center overflow-hidden'
-        } ${overrideLeading}`}
+        } ${!showRawTokens && 'sm:ml-2.5'} ${overrideLeading}`}
         onClick={() => {
           if (enableExpanding) {
             setIsExpanded(!isExpanded);
@@ -181,7 +236,7 @@ export default function ActivationItem({
                                 : activation.lossValues[tokenIndex] < 0
                                   ? 'border-b-blue-400'
                                   : '')
-                            } ${overrideTextColor} ${overrideTextSize} `}
+                            } ${!showRawTokens && tokenIsRoleToken(tokenIndex) && '-ml-2 mr-1 mt-1 rounded bg-slate-300'} ${!showRawTokens && prevTokenIsChannelToken(tokenIndex) && 'mt-1 rounded bg-slate-200'} ${overrideTextColor} ${overrideTextSize} `}
                             style={{
                               backgroundImage: dfaSplit
                                 ? makeActivationBackgroundColorWithDFA(
@@ -208,8 +263,9 @@ export default function ActivationItem({
                           dfaMaxIndex={dfaMaxIndex}
                         />
                       </Tooltip.Root>
-                      {(token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
-                        showLineBreaks && <br />}
+                      {((!showRawTokens && nextTokenIsMessageEndOrChannelToken(tokenIndex)) ||
+                        ((token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
+                          showLineBreaks)) && <br />}
                     </Tooltip.Provider>
                   </span>
                 );
@@ -276,7 +332,7 @@ export default function ActivationItem({
                               : activation.lossValues[tokenIndex] < 0
                                 ? 'border-b-blue-400'
                                 : '')
-                          } ${overrideTextColor} ${overrideTextSize} `}
+                          } ${!showRawTokens && tokenIsRoleToken(tokenIndex) && '-ml-2 mr-1 mt-1 rounded bg-slate-300'} ${!showRawTokens && prevTokenIsChannelToken(tokenIndex) && 'mt-1 rounded bg-slate-200'} ${overrideTextColor} ${overrideTextSize} `}
                           style={{
                             backgroundImage: makeActivationBackgroundColorWithDFA(
                               overallMaxActivationValueInList,
@@ -297,8 +353,9 @@ export default function ActivationItem({
                         dfaMaxIndex={dfaMaxIndex}
                       />
                     </Tooltip.Root>
-                    {(token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
-                      showLineBreaks && <br />}
+                    {((!showRawTokens && nextTokenIsMessageEndOrChannelToken(tokenIndex)) ||
+                      ((token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
+                        showLineBreaks)) && <br />}
                   </Tooltip.Provider>
                 </span>
               );
