@@ -111,7 +111,7 @@ async def activation_single(
         vector = request.vector
         hook = request.hook
         prepend_bos = True
-        if str_tokens[0] == "<|begin_of_text|>":
+        if prompt.startswith("<|begin_of_text|>"):
             prepend_bos = False
 
         tokens = model.to_tokens(
@@ -214,6 +214,7 @@ def process_feature_activations(
     index: int,
 ) -> ActivationSinglePost200ResponseActivation:
     if sae_type == "saelens-1":
+        print(f"Processing SAE lens 1 activations for {hook_name} at index {index}")
         return process_saelens_activations(sae, cache, hook_name, index)
     raise ValueError(f"Unsupported SAE type: {sae_type}")
 
