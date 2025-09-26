@@ -4,10 +4,6 @@ set -a
 source .env
 set +a
 
-# Wait for database to be ready and run database operations at runtime
-echo "Waiting for database and running Prisma db push..."
-./node_modules/.bin/prisma db push
-
-# Start the Next.js application
+# Start the Next.js application (database operations handled by db-init container)
 echo "Starting Next.js application..."
 node server.js
