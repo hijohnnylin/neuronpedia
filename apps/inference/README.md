@@ -13,6 +13,7 @@
   - [get activations for a single feature and prompt](#get-activations-for-a-single-feature-and-prompt)
   - [get activations from one or more layers/sources/SAEs for a prompt](#get-activations-from-one-or-more-layerssourcessaes-for-a-prompt)
   - [get cosine similarities](#get-cosine-similarities)
+  - [steering chat example gemma-2-2b-it (returns dog)](#steering-chat-example-gemma-2-2b-it-returns-dog)
   - [steering example gpt2-small res-jb](#steering-example-gpt2-small-res-jb)
 - [Testing, Linting, and Formatting](#testing-linting-and-formatting)
 
@@ -199,7 +200,6 @@ curl -X POST http://127.0.0.1:5002/v1/activation/all \
 }'
 ```
 
-
 ### get cosine similarities
 
 ```bash
@@ -215,6 +215,49 @@ curl -X POST http://127.0.0.1:5002/v1/util/sae-topk-by-decoder-cossim \
     "source": "20-gemmascope-res-16k",
     "num_results": 10
   }'
+```
+
+### steering chat example gemma-2-2b-it (returns dog)
+
+```
+poetry run python start.py \
+  --model_id gemma-2-2b \
+  --override_model_id gemma-2-2b-it \
+  --sae_sets gemmascope-res-16k \
+  --model_dtype bfloat16 \
+  --sae_dtype bfloat16
+```
+
+```
+curl -X POST http://127.0.0.1:5002/v1/steer/completion-chat \
+  -H "Content-Type: application/json" \
+  -d '{
+     "prompt": [{
+      "role": "user",
+      "content": "Hi, what are you?"
+     }],
+     "model": "gemma-2-2b-it",
+     "features": [
+       {
+         "model": "gemma-2-2b-it",
+         "source": "20-gemmascope-res-16k",
+         "index": 12082,
+         "strength": 300
+       }
+     ],
+     "types": [
+       "STEERED",
+       "DEFAULT"
+     ],
+     "n_completion_tokens": 16,
+     "temperature": 0,
+     "strength_multiplier": 1,
+     "freq_penalty": 0,
+     "seed": 16,
+     "steer_special_tokens": true,
+     "steer_method": "SIMPLE_ADDITIVE",
+     "normalize_steering": false
+   }'
 ```
 
 ### steering example gpt2-small res-jb

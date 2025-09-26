@@ -303,10 +303,15 @@ class OrthogonalProjector:
             ValueError: If projection computation fails or results in inf/nan
         """
         if self._P is None:
-            self.steering_vector = torch.matmul(
-                self.steering_vector, self.steering_vector.T
-            )
-            self._P = self.steering_vector
+            # Compute the squared norm of the steering vector
+            v_norm_squared = torch.sum(self.steering_vector * self.steering_vector)
+            
+            # Check for zero norm to avoid division by zero
+            if v_norm_squared == 0:
+                raise ValueError("Cannot create projection matrix from zero vector")
+            
+            # Compute the projection matrix: P = vv^T / ||v||^2
+            self._P = torch.matmul(self.steering_vector, self.steering_vector.T) / v_norm_squared
 
             if not torch.isfinite(self._P).all():
                 raise ValueError("Projection matrix contains inf or nan values")
