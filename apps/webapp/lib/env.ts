@@ -52,14 +52,21 @@ export const PUBLIC_ACTIVATIONS_USER_IDS = process.env.PUBLIC_ACTIVATIONS_USER_I
   : ['cljj57d3c000076ei38vwnv35', 'clkht01d40000jv08hvalcvly'];
 
 // Email
-// For email sending providers, choose EITHER AWS SES or Resend.com.
+// For email sending providers, choose either AWS SES, Resend.com, or set custom SMTP server settings.
 // Resend is easier to set up, but AWS is more reliable.
 // If both are defined, AWS will be used.
+// If you have access to a preexisting SMTP server, then setting custom settings will be easier.
+// Note that SMTP authentication is not supported at the time.
+const EmailProviderSchema = z.enum(['aws', 'resend', 'smtp']);
+export const EMAIL_SENDING_PROVIDER = EmailProviderSchema.parse(process.env.EMAIL_SENDING_PROVIDER || 'smtp');
 // AWS
 export const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || '';
 export const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || '';
 // Resend
 export const RESEND_EMAIL_API_KEY = process.env.RESEND_EMAIL_API_KEY || '';
+// Custom SMTP settings
+export const SMTP_SERVER_HOST = process.env.SMTP_SERVER_HOST || '';
+export const SMTP_SERVER_PORT = process.env.SMTP_SERVER_PORT || 25;
 
 // External Services
 // AI API Keys (Mostly for auto-interp for whitelisted accounts)
