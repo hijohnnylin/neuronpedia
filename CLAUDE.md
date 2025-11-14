@@ -28,9 +28,9 @@ Neuronpedia is an open-source interpretability platform for neural networks. It'
 ### Architecture Principles
 
 - **Service Independence**: Each service can run standalone and be independently deployed
-- **Schema-Driven Development**: OpenAPI schemas define service contracts
+- **Schema-Driven Development**: OpenAPI schemas define inference and autointerp service contracts
 - **Type Safety**: Strict TypeScript and Python type checking throughout
-- **Monorepo Structure**: Shared schemas and generated clients in `packages/`
+- **Monorepo Structure**: Shared schemas and generated clients in `packages/` (for inference/autointerp)
 
 ## Repository Structure
 
@@ -59,14 +59,14 @@ neuronpedia/
 │   │   ├── inference-server.yaml
 │   │   └── autointerp-server.yaml
 │   └── Makefile                   # Schema generation commands
-├── packages/                      # Generated clients
-│   ├── typescript/                # TypeScript clients
-│   │   ├── neuronpedia-inference-client/
-│   │   └── neuronpedia-autointerp-client/
+├── packages/                      # Generated and SDK clients
+│   ├── typescript/                # Generated TypeScript clients
+│   │   ├── neuronpedia-inference-client/    # Generated from OpenAPI
+│   │   └── neuronpedia-autointerp-client/   # Generated from OpenAPI
 │   └── python/                    # Python clients
-│       ├── neuronpedia-inference-client/
-│       ├── neuronpedia-autointerp-client/
-│       └── neuronpedia-webapp-client/
+│       ├── neuronpedia-inference-client/    # Generated from OpenAPI
+│       ├── neuronpedia-autointerp-client/   # Generated from OpenAPI
+│       └── neuronpedia-webapp-client/       # Manual SDK for Neuronpedia API
 ├── utils/                         # Utility scripts
 │   └── neuronpedia-utils/         # Batch processing, data conversion
 ├── k8s/                          # Kubernetes configurations
@@ -79,7 +79,7 @@ neuronpedia/
 ### Webapp (TypeScript/React)
 - **Framework**: Next.js 14 (App Router)
 - **UI**: React 18, Radix UI, TailwindCSS
-- **State**: TanStack Query (React Query)
+- **State**: React Context API, useState/useEffect (minimal TanStack Query usage)
 - **Forms**: Formik, Yup validation
 - **Database**: Prisma ORM + PostgreSQL
 - **Auth**: NextAuth.js
@@ -489,18 +489,34 @@ npx prisma studio
 
 ### Webapp Patterns
 
-**Data Fetching with React Query**:
+**Data Fetching (Primary Pattern)**:
 ```typescript
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 
-export function useFeatureData(modelId: string, featureId: string) {
-  return useQuery({
-    queryKey: ['feature', modelId, featureId],
-    queryFn: () => fetchFeature(modelId, featureId),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  })
+export function MyComponent() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch('/api/my-endpoint')
+        const result = await response.json()
+        setData(result)
+      } catch (error) {
+        console.error('Failed to fetch:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  // Use data...
 }
 ```
+
+**Note**: While TanStack Query is installed, the codebase primarily uses useState/useEffect with fetch() for data fetching. Context API is used for global state (see `components/provider/global-provider.tsx`).
 
 **API Routes**:
 ```typescript
@@ -599,11 +615,14 @@ def process_data(input: str) -> dict:
 
 ### Schema and Types
 
-- `schemas/openapi/` - OpenAPI schema definitions
+- `schemas/openapi/` - OpenAPI schema definitions (inference & autointerp only)
 - `apps/webapp/prisma/schema.prisma` - Database schema
 - `apps/webapp/types/` - TypeScript type definitions
-- `packages/typescript/` - Generated TypeScript clients
-- `packages/python/` - Generated Python clients
+- `packages/typescript/neuronpedia-inference-client/` - Generated TypeScript client for inference
+- `packages/typescript/neuronpedia-autointerp-client/` - Generated TypeScript client for autointerp
+- `packages/python/neuronpedia-inference-client/` - Generated Python client for inference
+- `packages/python/neuronpedia-autointerp-client/` - Generated Python client for autointerp
+- `packages/python/neuronpedia-webapp-client/` - Manual Python SDK for Neuronpedia API
 
 ### Key Source Directories
 
@@ -686,6 +705,21 @@ cd apps/inference && poetry run python start.py
 cd apps/autointerp && poetry run python server.py
 ```
 
+## Important Notes
+
+### Python Webapp Client vs Generated Clients
+
+The `packages/python/neuronpedia-webapp-client/` is **NOT** a generated client. It's a manually written Python SDK that provides a convenient interface for interacting with the Neuronpedia public API. It includes classes like:
+- `NPVector` - For uploading and steering with custom vectors
+- `SAEFeature` - For retrieving SAE feature data
+- `NPList` - For working with feature lists
+
+This is separate from the **generated** clients (`neuronpedia-inference-client` and `neuronpedia-autointerp-client`) which are auto-generated from OpenAPI schemas.
+
+### Data Fetching in Webapp
+
+While TanStack Query is installed and configured, the codebase primarily uses the traditional React pattern of `useState`/`useEffect` with `fetch()` for data fetching. The main state management is done through React Context API (see `components/provider/` directory).
+
 ## Additional Resources
 
 - [Main README](README.md) - Setup instructions and architecture
@@ -693,6 +727,7 @@ cd apps/autointerp && poetry run python server.py
 - [OpenAPI Workflow](schemas/README.md) - Schema-driven development
 - [Inference Server README](apps/inference/README.md)
 - [Autointerp Server README](apps/autointerp/README.md)
+- [Python Webapp Client README](packages/python/neuronpedia-webapp-client/README.md) - Manual Python SDK
 - [Neuronpedia Blog](https://neuronpedia.org/blog) - Updates and announcements
 
 ---
