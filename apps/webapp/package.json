@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "prisma generate && next dev",
+    "dev": "next dev",
+    "dev:generate": "prisma generate && next dev",
     "dev:localhost": "env-cmd -f .env.localhost --use-shell \"prisma generate && next dev\"",
     "dev:remote": "env-cmd -f .env.remote --use-shell \"prisma generate && next dev\"",
     "dev:demo": "env-cmd -f .env.demo --use-shell \"prisma generate && next dev\"",
