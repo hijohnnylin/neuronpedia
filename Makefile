@@ -1,6 +1,9 @@
 # Default to nocuda
 BUILD_TYPE ?= nocuda
 
+# optional build argument, useful for zero trust environments
+CUSTOM_CA_BUNDLE ?= .nocustomca
+
 help:  ## Show available commands
 	@echo "\n\033[1;35mThe pattern for commands is generally 'make [app]-[environment]-[action]''.\nFor example, 'make webapp-demo-build' will _build_ the _webapp for the demo environment.\033[0m"
 	@awk 'BEGIN {FS = ":.*## "; printf "\n"} /^[a-zA-Z_-]+:.*## / { printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -54,8 +57,7 @@ webapp-demo-check: ## Webapp: Public Demo Environment - Check Config
 	@echo "Printing the webapp configuration - this is useful to see if your environment variables are set correctly."
 	ENV_FILE=../.env.demo docker compose -f docker/compose.yaml config webapp
 
-CUSTOM_CA_BUNDLE ?= .nocustomca
-webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Build)
+webapp-localhost-prod-build: ## Webapp: Localhost Environment - Build (Production Build)
 	@echo "Building the webapp for connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -67,7 +69,7 @@ webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Bui
 	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) ENV_FILE=../.env.localhost \
 		docker compose -f docker/compose.yaml build webapp db-init postgres
 
-webapp-localhost-run: ## Webapp: Localhost Environment - Run (Production Build)
+webapp-localhost-prod-run: ## Webapp: Localhost Environment - Run (Production Run)
 	@echo "Bringing up the webapp and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -90,7 +92,24 @@ webapp-localhost-install: ## Webapp: Localhost Environment - Install Dependencie
 	cd apps/webapp && \
 	npm install
 	
-webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
+webapp-localhost-dev-build: ## Webapp: Localhost Environment - Run (Development Build)
+	@echo "Bringing up the webapp for development and connecting to the localhost database..."
+	@if ! which docker > /dev/null 2>&1; then \
+		echo "Error: Docker is not installed. Please install Docker first."; \
+		exit 1; \
+	fi
+	@if [ "$(CUSTOM_CA_BUNDLE)" != ".nocustomca" ]; then \
+		echo "Using custom CA bundle: $(CUSTOM_CA_BUNDLE)"; \
+	fi
+	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) \
+	ENV_FILE=../.env.localhost docker compose \
+		-f docker/compose.yaml \
+		-f docker/compose.webapp.dev.yaml \
+		--env-file .env.localhost \
+		--env-file .env \
+		build webapp db-init postgres
+
+webapp-localhost-dev-run: ## Webapp: Localhost Environment - Run (Development Run)
 	@echo "Bringing up the webapp for development and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
