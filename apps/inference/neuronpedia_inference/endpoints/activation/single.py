@@ -5,6 +5,11 @@ import einops
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
+
+# from transformer_lens.model_bridge import TransformerBridge
+from neuronpedia_inference.config import Config
+from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.shared import Model, with_request_lock
 from neuronpedia_inference_client.models.activation_single_post200_response import (
     ActivationSinglePost200Response,
 )
@@ -16,11 +21,6 @@ from neuronpedia_inference_client.models.activation_single_post_request import (
 )
 from nnterp import StandardizedTransformer
 from transformer_lens import ActivationCache, HookedTransformer
-
-# from transformer_lens.model_bridge import TransformerBridge
-from neuronpedia_inference.config import Config
-from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,10 @@ async def activation_single(
         result = process_vector_activations(vector, cache, hook, sae_manager.device)  # type: ignore
 
     logger.info("Returning result: %s", result)
+
+    # if the model prepends the BOS token, then we need to remove the first token from the str_tokens
+    if len(str_tokens) > len(result.values):
+        str_tokens = str_tokens[1:]
 
     return ActivationSinglePost200Response(activation=result, tokens=str_tokens)
 

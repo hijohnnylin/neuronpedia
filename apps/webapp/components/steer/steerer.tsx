@@ -41,6 +41,7 @@ import SteerSelectedFeature from './selected-feature';
 import SteerTooltip from './tooltip';
 
 const MODELS_TO_FILTER_OUT = ['gpt-oss-20b'];
+const MODELS_TO_FILTER_OUT_PREFIX = ['gemma-3-'];
 const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 
 export default function Steerer({
@@ -465,7 +466,11 @@ export default function Steerer({
                 modelIdChangedCallback={(newModelId) => {
                   setModelId(newModelId);
                 }}
-                overrideModels={getInferenceEnabledModels().filter((m) => !MODELS_TO_FILTER_OUT.includes(m))}
+                overrideModels={getInferenceEnabledModels().filter(
+                  (m) =>
+                    !MODELS_TO_FILTER_OUT.includes(m) &&
+                    !MODELS_TO_FILTER_OUT_PREFIX.some((prefix) => m.startsWith(prefix)),
+                )}
               />
             </div>
           </>

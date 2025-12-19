@@ -18,6 +18,7 @@ import { LoadingSquare } from './svg/loading-square';
 
 const DEFAULT_STEER_MULTIPLIER = 3;
 const HIDE_STEER_MODELS = ['gpt-oss-20b'];
+const HIDE_STEER_MODELS_PREFIX = ['gemma-3-'];
 
 export default function ActivationSingleForm({
   neuron,
@@ -202,7 +203,8 @@ export default function ActivationSingleForm({
 
             {!hideSteer &&
               !isGraphEnabledForSource(neuron.modelId, neuron.layer) &&
-              !HIDE_STEER_MODELS.includes(neuron.modelId) && (
+              !HIDE_STEER_MODELS.includes(neuron.modelId) &&
+              !HIDE_STEER_MODELS_PREFIX.some((prefix) => neuron.modelId.startsWith(prefix)) && (
                 <Button
                   className="flex h-auto flex-col gap-y-0.5 border-emerald-700 px-2.5 text-[10.5px] font-medium text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                   variant="outline"
