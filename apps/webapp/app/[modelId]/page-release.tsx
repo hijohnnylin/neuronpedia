@@ -55,7 +55,7 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
         {isGemmaScope2Release && (
           <div className="mt-0 flex w-full max-w-screen-lg flex-col gap-y-6">
             <div className="flex items-start gap-x-3 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4">
-              <div className="flex flex-col gap-y-1 text-[13px]">
+              <div className="flex w-full flex-col gap-y-1 text-center text-[13px]">
                 <div className="mb-1.5 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
                 <div>
                   An initial release of artifacts and datasets are available now, with more being actively released on a
@@ -65,7 +65,7 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
                   All artifacts are expected to be finalized by <strong>December 31, 2025</strong>.
                 </div>
                 <div>
-                  Some data may be replaced or updated through this final verification and fine-tuning process. Please
+                  Some data may be replaced or updated during this final verification and fine-tuning process. Please
                   check the{' '}
                   <a
                     href="https://huggingface.co/google/gemma-scope-2"

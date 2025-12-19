@@ -102,7 +102,7 @@ export default function Page() {
         </svg>
 
         <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:min-h-[280px] sm:w-[520px] sm:min-w-[520px] sm:px-0">
-          <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gradient-to-t from-white via-gBlue/5 to-gBlue/25 px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
+          <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gradient-to-t from-white via-white to-gBlue/40 px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
             <div className="content">
               <div className="flex items-center justify-center text-xs font-bold text-sky-800">
                 <CustomTooltip
@@ -139,17 +139,17 @@ export default function Page() {
                   </span>
                 </CustomTooltip>
               </div>
-              <div className="mt-2 text-3xl font-bold text-sky-700 sm:mt-4">
+              <div className="mt-2 text-[32px] font-bold text-sky-700 sm:mt-3">
                 <span className="font-bold text-gBlue">Gemma Scope 2</span>
               </div>
-              <div className="mt-2 text-xs font-medium text-slate-500 sm:mt-2">
+              <div className="mt-1 text-xs font-medium text-slate-500 sm:mt-1">
                 Google DeepMind, Language Model Interpretability
               </div>
 
-              <div className="mt-4 flex flex-col items-center justify-center gap-y-3 sm:mt-6 sm:flex-row sm:gap-x-3">
+              <div className="mt-4 flex flex-col items-center justify-center gap-y-3 sm:mt-7 sm:flex-row sm:gap-x-3">
                 <Link href="/gemma-scope-2" className="">
                   <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
-                    <div className="flex flex-row items-center justify-center rounded-xl bg-gGreen px-5 py-2.5 text-white shadow sm:px-6">
+                    <div className="flex flex-row items-center justify-center rounded-xl bg-gGreen px-5 py-2 text-white shadow sm:px-6">
                       <WandSparkles className="mr-2.5 h-5 w-5" />
                       <div className="text-[12px] font-semibold leading-snug">
                         Browse
@@ -167,7 +167,7 @@ export default function Page() {
                 >
                   <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
                     <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="flex w-full flex-row items-center justify-center rounded-xl bg-gYellow px-5 py-2.5 text-white shadow sm:px-5">
+                      <div className="flex w-full flex-row items-center justify-center rounded-xl bg-gYellow px-5 py-2 text-white shadow sm:px-5">
                         <Notebook className="mr-2.5 h-5 w-5" />
                         <div className="text-[12px] font-semibold leading-snug">
                           Tutorial
@@ -186,7 +186,7 @@ export default function Page() {
                 >
                   <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
                     <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="sm:px- flex w-full flex-row items-center justify-center rounded-xl bg-gRed px-5 py-2.5 text-white shadow">
+                      <div className="sm:px- flex w-full flex-row items-center justify-center rounded-xl bg-gRed px-5 py-2 text-white shadow">
                         <SmileIcon className="mr-2.5 h-5 w-5" />
                         <div className="text-[12px] font-semibold leading-snug">
                           Hugging
