@@ -20,7 +20,6 @@ import {
   Computer,
   ExternalLink,
   Github,
-  Info,
   Microscope,
   Newspaper,
   Notebook,
@@ -103,17 +102,15 @@ export default function Page() {
         </svg>
 
         <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:min-h-[280px] sm:w-[520px] sm:min-w-[520px] sm:px-0">
-          <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-white px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
+          <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gradient-to-t from-white via-gBlue/5 to-gBlue/25 px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
             <div className="content">
               <div className="flex items-center justify-center text-xs font-bold text-sky-800">
                 <CustomTooltip
                   side="right"
                   trigger={
-                    <span className="flex flex-col items-center justify-center gap-y-[5px] text-xs font-bold text-slate-500">
-                      December 2025
-                      <div className="flex flex-row items-center justify-center gap-x-1 rounded-full bg-amber-200 px-5 py-0.5 text-[9px] font-semibold uppercase text-amber-700 hover:bg-amber-300 hover:text-amber-800">
-                        Rolling Release
-                        <Info className="h-3 w-3" />
+                    <span className="flex flex-col items-center justify-center gap-y-[5px] text-xs font-semibold text-slate-600">
+                      <div className="flex flex-row items-center justify-center gap-x-1 rounded-full border border-gBlue bg-white px-4 py-0.5 text-[9.5px] font-bold uppercase text-gBlue transition-all hover:bg-gBlue hover:text-white">
+                        Dec 2025 - Rolling Release
                       </div>
                     </span>
                   }
@@ -142,7 +139,7 @@ export default function Page() {
                   </span>
                 </CustomTooltip>
               </div>
-              <div className="mt-2 text-4xl font-bold text-sky-700 sm:mt-4">
+              <div className="mt-2 text-3xl font-bold text-sky-700 sm:mt-4">
                 <span className="font-bold text-gBlue">Gemma Scope 2</span>
               </div>
               <div className="mt-2 text-xs font-medium text-slate-500 sm:mt-2">
