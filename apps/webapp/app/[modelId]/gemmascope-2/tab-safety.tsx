@@ -213,8 +213,7 @@ export default function TabSafety({
           </div>
           <div className="flex w-full flex-col text-sm font-medium text-slate-500">
             You can see top positive and negative logits as well as the max activating features for each example feature
-            below. You can also manually test each feature with your own custom text to verify what the feature is
-            about.
+            below. These features were labeled by a human annotator based on their top activations and logits.
             <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-3">
               {featureTuples.map((featureTuple) => (
                 <iframe
