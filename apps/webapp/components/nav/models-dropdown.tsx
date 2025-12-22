@@ -34,7 +34,7 @@ export default function ModelsDropdown({ isInBreadcrumb = false }: { isInBreadcr
           position="popper"
           align="center"
           sideOffset={-3}
-          className="z-30 cursor-pointer overflow-hidden rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+          className="z-30 max-h-[540px] cursor-pointer overflow-scroll rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
         >
           <Select.ScrollUpButton className="flex justify-center border-b text-slate-600">
             <ChevronUp />

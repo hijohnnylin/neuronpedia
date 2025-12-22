@@ -1,5 +1,4 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { ASSET_BASE_URL } from '@/lib/env';
 import { ArrowUpRight, HelpCircle, Notebook, ScrollText, Smile } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useEffect, useRef } from 'react';
@@ -26,15 +25,8 @@ export default function TabCircuit({ tabUpdater }: { tabUpdater: (tab: string) =
         </span>
 
         <div className="flex w-full flex-col items-start justify-start text-left text-sm font-medium text-slate-500">
-          Gemma Scope 2 circuit tracing is coming soon. Check back in a few days! In the meantime, check out the other
-          Gemma Scope 2 resources below.
-          <div className="w-full max-w-[640px]">
-            <img
-              src={`${ASSET_BASE_URL}/graph-preview.jpg`}
-              alt="Gemma Scope 2 circuit tracing"
-              className="h-auto w-full opacity-40"
-            />
-          </div>
+          Circuit tracing for Gemma 3 is coming soon as part of the December 2025 rolling release. In the meantime,
+          check out other Gemma Scope 2 resources below.
         </div>
       </div>
 

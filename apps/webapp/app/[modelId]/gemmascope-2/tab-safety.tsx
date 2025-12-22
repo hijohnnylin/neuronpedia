@@ -193,7 +193,15 @@ export default function TabSafety({
           <div className="text-sm font-medium leading-normal text-slate-500">
             <span>
               The following are some safety- and alignment-relevant features found in{' '}
-              <span className="font-mono">Gemma 3 27B IT</span>.<br />
+              <Link
+                href="https://huggingface.co/google/gemma-scope-2-27b-it/tree/main/resid_post"
+                target="_blank"
+                rel="noreferrer"
+                className="font-bold text-gBlue hover:underline"
+              >
+                Gemma 3 27B IT
+              </Link>
+              .<br />
               You can review what a {`'feature'`} is in the original{' '}
               <Link href="/gemma-scope#microscope" className="font-bold text-gBlue hover:underline">
                 Exploring Gemma Scope
@@ -213,13 +221,16 @@ export default function TabSafety({
           </div>
           <div className="flex w-full flex-col text-sm font-medium text-slate-500">
             You can see top positive and negative logits as well as the max activating features for each example feature
-            below. These features were labeled by a human annotator based on their top activations and logits.
-            <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-3">
+            . These features were labeled by a human annotator based on their top activations and logits. Activation
+            examples are truncated by default - click an activation example to view full context, or click the top right
+            feature ID to view full feature details.
+            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-6">
               {featureTuples.map((featureTuple) => (
                 <iframe
                   key={featureTuple[0] + '-' + featureTuple[1]}
-                  src={`https://neuronpedia.org/gemma-3-27b-it/${featureTuple[0]}-gemmascope-2-res-262k/${featureTuple[1]}?embed=true`}
-                  className="col-span-2 h-[540px] w-full max-w-[540px] rounded-lg border sm:col-span-1"
+                  src={`/gemma-3-27b-it/${featureTuple[0]}-gemmascope-2-res-262k/${featureTuple[1]}?embed=true`}
+                  className="col-span-2 h-[540px] w-full max-w-[540px] rounded-lg border bg-slate-50 px-2 sm:col-span-1"
+                  scrolling={typeof window !== 'undefined' && window.innerWidth < 640 ? 'no' : 'yes'}
                 />
               ))}
             </div>

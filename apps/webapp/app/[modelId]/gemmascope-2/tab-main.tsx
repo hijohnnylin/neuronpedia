@@ -8,7 +8,7 @@ export const techReportLink = 'https://storage.googleapis.com/gemma-scope/gemma-
 
 export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => void }) {
   return (
-    <div className="relative mt-0 flex h-full w-full max-w-screen-xl flex-col items-center justify-start bg-white pb-24 pt-1">
+    <div className="relative mt-0 flex h-full w-full max-w-screen-xl flex-col items-start justify-start bg-white pb-24 pt-1 sm:items-center">
       <div className="mt-0 flex w-full flex-col gap-y-6 px-5">
         <div className="flex items-start gap-x-3 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4">
           <div className="flex w-full flex-col gap-y-1 text-center text-[13px]">
@@ -33,10 +33,10 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
           </div>
         </div>
       </div>
-      <div className="mt-2 flex w-full flex-row items-center justify-start gap-x-2 px-3 text-2xl font-bold text-slate-600 sm:mt-5 sm:justify-center sm:text-3xl">
+      <div className="mt-5 flex w-full flex-row items-center justify-start gap-x-2 px-3 text-2xl font-bold text-slate-600 sm:mt-5 sm:justify-center sm:text-3xl">
         <div className="inline-block bg-clip-text text-gBlue">Gemma Scope 2</div> Demo
       </div>
-      <div className="mb-8 mt-1.5 px-3 text-sm font-medium text-slate-500 sm:mb-4 sm:px-0">
+      <div className="mb-8 mt-1.5 px-3 text-left text-sm font-medium text-slate-500 sm:mb-4 sm:px-0 sm:text-center">
         Examining Safety-Relevant Features and Circuits in Gemma 3
       </div>
       <div className="mb-10 flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-3 py-1 sm:flex-row sm:px-7">
@@ -63,8 +63,8 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
               className="font-bold text-gBlue hover:underline"
             >
               Gemma 3
-            </Link>
-            , the largest model in the new Gemma 3 model series. Since the{' '}
+            </Link>{' '}
+            27B-IT, the largest model in the new Gemma 3 model series. Since the{' '}
             <Link
               href="https://huggingface.co/google/gemma-scope-2"
               target="_blank"
@@ -73,8 +73,8 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
             >
               Gemma Scope 2
             </Link>{' '}
-            release also includes transcoders, cross-layer transcoders, and crosscoders, Neuronpedia also adds support
-            for{' '}
+            release also includes transcoders, cross-layer transcoders, and crosscoders, Neuronpedia is also adding
+            support for{' '}
             <Link href="/graph" target="_blank" rel="noreferrer" className="font-bold text-gBlue hover:underline">
               circuit tracing
             </Link>{' '}
@@ -107,8 +107,7 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
           <button
             type="button"
             onClick={() => {
-              // tabUpdater('circuit');
-              alert('Coming Soon. Check back in a few days!');
+              tabUpdater('circuit');
             }}
             className="relative flex min-h-[200px] flex-1 cursor-default flex-col items-center justify-center rounded-3xl border border-gYellow bg-gYellow/5 px-5 text-gYellow opacity-40 transition-all hover:opacity-60 xl:min-h-[230px]"
           >

@@ -21,9 +21,10 @@ export const CENTER_ME_CLASSNAME = 'center-me';
 
 // TODO: support more types
 const START_TOKEN = ['<|start|>', '<|begin_of_text|>', '<|start_header_id|>', '<start_of_turn>', '<|im_start|>'];
-const END_TOKEN = ['<|end|>', '<|eot_id|>', '<|im_end|>'];
+const END_TOKEN = ['<|end|>', '<|eot_id|>', '<|im_end|>', '<end_of_turn>'];
 const MESSAGE_TOKEN = ['<|message|>', '<|end_header_id|>'];
 const CHANNEL_TOKEN = '<|channel|>';
+const BOS_TOKEN = ['<bos>'];
 
 export default function ActivationItem({
   activation,
@@ -108,13 +109,14 @@ export default function ActivationItem({
   }
 
   function tokenIsRoleToken(tokenIndex: number) {
+    const modelId = activation.modelId || '';
+    const isGemmaInstruct = modelId.startsWith('gemma-2-') || modelId.startsWith('gemma-3-');
     return (
       tokenIndex > 0 &&
       START_TOKEN.includes(activation.tokens?.[tokenIndex - 1] || '') &&
       (END_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
         MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
-        ((activation.modelId === 'gemma-2-2b-it' || activation.modelId === 'gemma-2-9b-it') &&
-          activation.tokens?.[tokenIndex + 1] === '\n') ||
+        (isGemmaInstruct && activation.tokens?.[tokenIndex + 1] === '\n') ||
         (activation.modelId === 'qwen2.5-7b-it' && activation.tokens?.[tokenIndex + 1] === '\n') ||
         CHANNEL_TOKEN === activation.tokens?.[tokenIndex + 1])
     );
@@ -158,6 +160,7 @@ export default function ActivationItem({
         START_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
         END_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
         MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
+        BOS_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
         activation.tokens?.[tokenIndex] === CHANNEL_TOKEN
       ) {
         return false;
