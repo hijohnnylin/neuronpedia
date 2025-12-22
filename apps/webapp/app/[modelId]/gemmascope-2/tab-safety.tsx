@@ -220,7 +220,7 @@ export default function TabSafety({
                 <iframe
                   key={featureTuple[0] + '-' + featureTuple[1]}
                   src={`https://neuronpedia.org/gemma-3-27b-it/${featureTuple[0]}-gemmascope-2-res-262k/${featureTuple[1]}?embed=true`}
-                  className="col-span-1 h-[540px] w-full max-w-[540px] rounded-lg border"
+                  className="col-span-2 h-[540px] w-full max-w-[540px] rounded-lg border sm:col-span-1"
                 />
               ))}
             </div>
