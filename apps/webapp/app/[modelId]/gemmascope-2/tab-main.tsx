@@ -49,7 +49,7 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
         <div className="flex w-full flex-col items-start justify-start text-left text-sm font-medium text-slate-600">
           <div className="leading-normal">
             {`If you're new to interpretability (the science of understanding what happens inside AI), we recommend you start with the`}{' '}
-            <Link href="/gemmascope" target="_blank" rel="noreferrer" className="font-bold text-gBlue hover:underline">
+            <Link href="/gemma-scope" target="_blank" rel="noreferrer" className="font-bold text-gBlue hover:underline">
               original {`"Exploring Gemma Scope"`}
             </Link>
             , which has more beginner-friendly interactive demos and content.
