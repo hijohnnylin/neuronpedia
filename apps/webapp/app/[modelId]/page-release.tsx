@@ -35,8 +35,6 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
 
   const isTemporalSaeRelease = defaultSourceSet?.similarityMatrixEnabled;
 
-  const isGemmaScope2Release = release.name === 'gemma-scope-2';
-
   return (
     <div className="flex w-full flex-col items-center pb-10">
       <BreadcrumbsComponent
@@ -52,35 +50,6 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
       <Hero release={release} />
 
       <div className="flex w-full max-w-screen-lg flex-col items-center pb-5 pt-5 text-slate-700 xl:max-w-screen-xl 2xl:max-w-screen-2xl">
-        {isGemmaScope2Release && (
-          <div className="mt-0 flex w-full max-w-screen-lg flex-col gap-y-6">
-            <div className="flex items-start gap-x-3 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4">
-              <div className="flex w-full flex-col gap-y-1 text-center text-[13px]">
-                <div className="mb-1.5 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
-                <div>
-                  An initial release of artifacts and datasets are available now, with more being actively released on a
-                  rolling basis.
-                </div>
-                <div>
-                  All artifacts are expected to be finalized by <strong>December 31, 2025</strong>.
-                </div>
-                <div>
-                  Some data may be replaced or updated during this final verification and fine-tuning process. Please
-                  check the{' '}
-                  <a
-                    href="https://huggingface.co/google/gemma-scope-2"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-sky-700"
-                  >
-                    HuggingFace
-                  </a>{' '}
-                  for details.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         {isTemporalSaeRelease && defaultSource && <SourceSimilarityMatrixPane source={defaultSource} />}
         {defaultUmapSourceId && defaultUmapSourceSetName && (
           <UmapPane

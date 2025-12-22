@@ -11,6 +11,7 @@ import { getLayerNumAsStringFromSource } from '@/lib/utils/source';
 import { SourceReleaseWithRelations } from '@/prisma/generated/zod';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import GemmaScope2Home from './gemmascope-2/home';
 import GemmaScopeHome from './gemmascope/home';
 import PageModel from './page-model';
 import PageRelease from './page-release';
@@ -131,6 +132,9 @@ export default async function Page({
     // CASE: Gemma Scope
     if (release.isNewUi) {
       return <GemmaScopeHome release={release} />;
+    }
+    if (release.name === 'gemma-scope-2') {
+      return <GemmaScope2Home release={release} />;
     }
     // CASE: Release page
     return <PageRelease release={release as SourceReleaseWithRelations} />;
