@@ -41,7 +41,6 @@ def parse_args():
     parser.add_argument(
         "--model_id",
         default="google/gemma-2-2b",
-        choices=["google/gemma-2-2b", "meta-llama/Llama-3.2-1B", "Qwen/Qwen3-4B"],
         help="The ID of the transformerlens model to use. Default is google/gemma-2-2b.",
     )
     parser.add_argument(
