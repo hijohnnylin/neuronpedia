@@ -221,5 +221,8 @@
     "vitest": "^3.0.0",
     "vitest-canvas-mock": "^0.3.3",
     "vitest-mock-extended": "^2.0.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.40.1"
   }
 }
