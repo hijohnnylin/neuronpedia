@@ -1,0 +1,13 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+spec:
+  template:
+    spec:
+      volumes:
+      - name: etc-ssl-certs
+        configMap:
+          name: corporate-ca-certificates
+          optional: false
