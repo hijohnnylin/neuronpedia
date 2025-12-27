@@ -50,7 +50,7 @@ export default function Footer() {
           GitHub
         </Link>
         <Link
-          href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3i6srxrnb-Ibz0as5FE2YCsZh6WlrAwg"
+          href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3m2fulfeu-0LnVnF8yCrKJYQvWLuCQaQ"
           target="_blank"
           rel="noreferrer"
           className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 transition-all hover:text-sky-700 hover:underline sm:px-0 sm:py-0"
