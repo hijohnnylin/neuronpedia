@@ -17,7 +17,7 @@
 <p align="center" style="color: #cccccc;">
   <a href="https://github.com/hijohnnylin/neuronpedia/blob/main/LICENSE"><img height="20px" src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT"></a>
   <a href="https://status.neuronpedia.org"><img height="20px" src="https://uptime.betterstack.com/status-badges/v2/monitor/1roih.svg" alt="Uptime"></a>
-  <a href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3i6srxrnb-Ibz0as5FE2YCsZh6WlrAwg"><img height="20px" src="https://img.shields.io/badge/slack-purple?logo=slack&logoColor=white" alt="Slack"></a>
+  <a href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3m2fulfeu-0LnVnF8yCrKJYQvWLuCQaQ"><img height="20px" src="https://img.shields.io/badge/slack-purple?logo=slack&logoColor=white" alt="Slack"></a>
   <a href="mailto:johnny@neuronpedia.org"><img height="20px" src="https://img.shields.io/badge/contact-blue.svg?logo=data:image/svg%2bxml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgaWQ9IlNWR1JlcG9fYmdDYXJyaWVyIiBzdHJva2Utd2lkdGg9IjAiPjwvZz48ZyBpZD0iU1ZHUmVwb190cmFjZXJDYXJyaWVyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjwvZz48ZyBpZD0iU1ZHUmVwb19pY29uQ2FycmllciI+IDxwYXRoIGQ9Ik00IDcuMDAwMDVMMTAuMiAxMS42NUMxMS4yNjY3IDEyLjQ1IDEyLjczMzMgMTIuNDUgMTMuOCAxMS42NUwyMCA3IiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48L3BhdGg+IDxyZWN0IHg9IjMiIHk9IjUiIHdpZHRoPSIxOCIgaGVpZ2h0PSIxNCIgcng9IjIiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiPjwvcmVjdD4gPC9nPjwvc3ZnPg==" alt="Email"></a>
   <a href="https://neuronpedia.org/blog"><img height="20px" src="https://img.shields.io/badge/blog-10b981.svg" alt="blog"></a>
   <a href="https://neuronpedia.org"><img height="20px" src="https://img.shields.io/badge/website-gray.svg" alt="website"></a>
@@ -546,7 +546,7 @@ We don't currently have an official bounty program, but we'll try our best to gi
 
 # Contact / Support
 
-- slack: [join #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3i6srxrnb-Ibz0as5FE2YCsZh6WlrAwg)
+- slack: [join #neuronpedia](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3m2fulfeu-0LnVnF8yCrKJYQvWLuCQaQ)
 - email: [johnny@neuronpedia.org](mailto:johnny@neuronpedia.org)
 - issues: [github issues](https://github.com/hijohnnylin/neuronpedia/issues)
 
