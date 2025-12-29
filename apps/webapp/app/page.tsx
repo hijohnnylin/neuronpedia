@@ -121,7 +121,7 @@ export default function Page() {
                   with more being actively released on a rolling basis.
                   <br />
                   <br />
-                  All artifacts are expected to be finalized by <strong>December 31, 2025</strong>.<br />
+                  All artifacts are expected to be finalized by <strong>January 16, 2026</strong>.<br />
                   <br />
                   Some models may be replaced or updated through this final verification and fine-tuning process. Please
                   check the HuggingFace repos and history for details.
