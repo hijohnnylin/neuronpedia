@@ -87,7 +87,7 @@ export default function SteerSelectedFeature({
             onChange={(e) => {
               const value = parseFloat(e.target.value);
               if (!Number.isNaN(value)) {
-                const clampedValue = Math.min(Math.max(value, STEER_STRENGTH_MIN), STEER_STRENGTH_MAX);
+                const clampedValue = Math.min(Math.max(value, STEER_STRENGTH_MIN), 9999);
                 const roundedValue = Math.round(clampedValue * 100) / 100;
                 setFeatureStrength(feature, roundedValue);
               }

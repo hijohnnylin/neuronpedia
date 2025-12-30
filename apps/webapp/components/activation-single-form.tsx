@@ -17,7 +17,7 @@ import { Button } from './shadcn/button';
 import { LoadingSquare } from './svg/loading-square';
 
 const DEFAULT_STEER_MULTIPLIER = 3;
-const HIDE_STEER_MODELS = ['gpt-oss-20b'];
+const HIDE_STEER_MODELS: string[] = []; // 'gpt-oss-20b'
 const HIDE_STEER_MODELS_PREFIX = ['gemma-3-'];
 
 export default function ActivationSingleForm({

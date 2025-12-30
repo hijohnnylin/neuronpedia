@@ -103,7 +103,7 @@ export const INFERENCE_SERVER_SECRET = process.env.INFERENCE_SERVER_SECRET || ''
 
 export const NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH = process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH
   ? parseInt(process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH, 10)
-  : 1024;
+  : 1700;
 
 // Autointerp Server
 export const USE_LOCALHOST_AUTOINTERP = process.env.USE_LOCALHOST_AUTOINTERP === 'true';

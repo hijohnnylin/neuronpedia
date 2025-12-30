@@ -16,7 +16,6 @@ import {
   STEER_N_COMPLETION_TOKENS_MAX,
   STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
-  STEER_STRENGTH_MAX,
   STEER_STRENGTH_MIN,
   STEER_STRENGTH_MULTIPLIER_MAX,
   STEER_TEMPERATURE_MAX,
@@ -379,7 +378,6 @@ const steerSchema = object({
         strength: number()
           .required()
           .min(STEER_STRENGTH_MIN)
-          .max(STEER_STRENGTH_MAX * 3)
           .transform((value) => value),
       }).required(),
     )
