@@ -192,6 +192,8 @@ export default function TabSafety({
           </span>
           <div className="text-sm font-medium leading-normal text-slate-500">
             <span>
+              [Note: These are currently being re-uploaded and will return in a few hours.]
+              <br />
               The following are some safety- and alignment-relevant features found in{' '}
               <Link
                 href="https://huggingface.co/google/gemma-scope-2-27b-it/tree/main/resid_post"
