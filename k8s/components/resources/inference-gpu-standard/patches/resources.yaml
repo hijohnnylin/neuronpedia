@@ -14,8 +14,10 @@ spec:
             nvidia.com/gpu: 1
             cpu: "10"
             memory: "70Gi"
+            ephemeral-storage: "25Gi"
           limits:
             nvidia.com/gpu: 1
             cpu: "12"
             memory: "80Gi"
+            ephemeral-storage: "30Gi"
 ---
