@@ -46,21 +46,21 @@ export default function TabSafety({
 
   const featureTuples = [
     [40, 13029, 'AI safety & existential risk'],
-    [53, 57326, 'AI safety & inner alignment'],
-    [53, 25001, 'Meta (discussion of RLHF & model reasoning)'],
-    [53, 10620, 'Emotional manipulation'],
-    [53, 448, 'Power seizing / AI takeover'],
+    // [53, 57326, 'AI safety & inner alignment'],
+    // [53, 25001, 'Meta (discussion of RLHF & model reasoning)'],
+    // [53, 10620, 'Emotional manipulation'],
+    // [53, 448, 'Power seizing / AI takeover'],
     [40, 432, 'Power seizing / AI takeover'],
-    [53, 2878, 'Giving caveats / analysis after maybe dangerous responses'],
-    [53, 24084, 'adopting a different persona'],
+    // [53, 2878, 'Giving caveats / analysis after maybe dangerous responses'],
+    // [53, 24084, 'adopting a different persona'],
     [40, 26035, 'meta (talking about its own context)'],
-    [53, 167558, 'climate change skepticism'],
-    [53, 62359, 'sarcasm'],
+    // [53, 167558, 'climate change skepticism'],
+    // [53, 62359, 'sarcasm'],
     [40, 43644, 'sarcasm #2'],
     [31, 7282, 'irony'],
-    [53, 145701, 'AI singularity'],
+    // [53, 145701, 'AI singularity'],
     [31, 23266, 'AI warfare / cyberattacks'],
-    [53, 50705, 'conspiracy theories'],
+    // [53, 50705, 'conspiracy theories'],
   ];
 
   async function searchClicked(overrideText?: string) {
