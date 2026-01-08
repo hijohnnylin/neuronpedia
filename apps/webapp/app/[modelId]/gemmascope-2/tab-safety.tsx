@@ -46,133 +46,21 @@ export default function TabSafety({
 
   const featureTuples = [
     [40, 13029, 'AI safety & existential risk'],
-    // [53, 57326, 'AI safety & inner alignment'],
-    // [53, 25001, 'Meta (discussion of RLHF & model reasoning)'],
-    // [53, 10620, 'Emotional manipulation'],
-    // [53, 448, 'Power seizing / AI takeover'],
+    [53, 57326, 'AI safety & inner alignment'],
+    [53, 25001, 'Meta (discussion of RLHF & model reasoning)'],
+    [53, 10620, 'Emotional manipulation'],
+    [53, 448, 'Power seizing / AI takeover'],
     [40, 432, 'Power seizing / AI takeover'],
-    // [53, 2878, 'Giving caveats / analysis after maybe dangerous responses'],
-    // [53, 24084, 'adopting a different persona'],
+    [53, 2878, 'Giving caveats / analysis after maybe dangerous responses'],
+    [53, 24084, 'adopting a different persona'],
     [40, 26035, 'meta (talking about its own context)'],
-    // [53, 167558, 'climate change skepticism'],
-    // [53, 62359, 'sarcasm'],
+    [53, 167558, 'climate change skepticism'],
+    [53, 62359, 'sarcasm'],
     [40, 43644, 'sarcasm #2'],
     [31, 7282, 'irony'],
-    // [53, 145701, 'AI singularity'],
+    [53, 145701, 'AI singularity'],
     [31, 23266, 'AI warfare / cyberattacks'],
-    // [53, 50705, 'conspiracy theories'],
-  ];
-
-  async function searchClicked(overrideText?: string) {
-    setIsSearching(true);
-    setLockedTokenPosition(-1);
-    setHoveredTokenPosition(-1);
-    setSearchQuery(overrideText || formRef.current?.values.searchQuery || '');
-    const result = await fetch(`/api/search-topk-by-token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        modelId,
-        text: overrideText || formRef.current?.values.searchQuery,
-        source: layer,
-      }),
-    });
-    if (result.status === 429 || result.status === 405) {
-      alert('Sorry, we are limiting each user to 100 search requests per hour. Please try again later.');
-    } else if (result.status !== 200) {
-      showToastServerError();
-    } else {
-      const resultData = (await result.json()) as SearchTopKResult;
-
-      // filter out boring indexes and ones with act desnsity > 1%
-      resultData.results = resultData.results.map((resultDataResult) => {
-        // eslint-disable-next-line
-        resultDataResult.topFeatures = resultDataResult.topFeatures.filter(
-          (feature) => feature.feature?.frac_nonzero !== undefined,
-        );
-        return resultDataResult;
-      });
-
-      setTopkResult(resultData);
-    }
-    setIsSearching(false);
-  }
-
-  function getSortedFeatures(feats: TopKFeature[]) {
-    if (sortNeurons === 'strength') {
-      return feats.toSorted((a, b) => {
-        if (a.index === DOGS_INDEX) {
-          return 1;
-        }
-        if (b.index === DOGS_INDEX) {
-          return -1;
-        }
-        return b.activation_value - a.activation_value;
-      });
-    }
-    if (sortNeurons === 'frequency') {
-      return feats.toSorted((a, b) => {
-        if (a.index === DOGS_INDEX) {
-          return -1;
-        }
-        if (b.index === DOGS_INDEX) {
-          return 1;
-        }
-        return b.frequency - a.frequency;
-      });
-    }
-    return feats;
-  }
-
-  useEffect(() => {
-    if (topkResult) {
-      let toSet: TopKFeature[] = [];
-      topkResult.results.forEach((result) => {
-        result.topFeatures.forEach((feature) => {
-          if (result.token === '<bos>' || result.token === '<eos>') {
-            return;
-          }
-          toSet.push({
-            feature: feature.feature as NeuronWithPartialRelations,
-            activation_value: feature.activationValue,
-            frequency: 1,
-            index: feature.featureIndex,
-          });
-        });
-      });
-
-      // set the frequency, which is the number of times that index appears
-      toSet = toSet.map((f) => {
-        // eslint-disable-next-line
-        f.frequency = toSet.filter((f2) => f2.index === f.index).length;
-        return f;
-      });
-
-      // deduplicate by toSet.index
-      toSet = toSet.filter((v, i, a) => a.findIndex((t) => t.index === v.index) === i);
-
-      setTopkFeatures(getSortedFeatures(toSet));
-    }
-  }, [topkResult]);
-
-  useEffect(() => {
-    if (topkFeatures) {
-      setTopkFeatures(getSortedFeatures(topkFeatures));
-    }
-  }, [sortNeurons]);
-
-  const hoverGbgColors = [
-    'enabled:hover:bg-[#4285f4]',
-    'enabled:hover:bg-[#34a853]',
-    'enabled:hover:bg-[#fbbc05]',
-    'enabled:hover:bg-[#ea4335]',
-  ];
-  const gTextColors = ['text-[#4285f4]', 'text-[#34a853]', 'text-[#fbbc05]', 'text-[#ea4335]'];
-  const gBorderColors = [
-    'enabled:border-[#4285f4]',
-    'enabled:border-[#34a853]',
-    'enabled:border-[#fbbc05]',
-    'enabled:border-[#ea4335]',
+    [53, 50705, 'conspiracy theories'],
   ];
 
   const ref = useRef<HTMLDivElement>(null);
@@ -192,8 +80,6 @@ export default function TabSafety({
           </span>
           <div className="text-sm font-medium leading-normal text-slate-500">
             <span>
-              [Note: These are currently being re-uploaded and will return in a few hours.]
-              <br />
               The following are some safety- and alignment-relevant features found in{' '}
               <Link
                 href="https://huggingface.co/google/gemma-scope-2-27b-it/tree/main/resid_post"
