@@ -217,11 +217,7 @@ def process_activations(
         return process_neuron_activations(cache, hook_name, index, sae_manager.device)
     if sae_manager.get_sae(layer) is not None:
         return process_feature_activations(
-            sae_manager.get_sae(layer),
-            sae_type,
-            cache,
-            hook_name,
-            index,
+            sae_manager.get_sae(layer), sae_type, cache, hook_name, index, bos_indices
         )
     raise ValueError(f"Invalid layer: {layer}")
 
