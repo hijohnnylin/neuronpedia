@@ -8,7 +8,7 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = ">=3.10,<3.14"
 python-dotenv = "^1.0.1"
 numpy = "^1.24"
 psutil = "^5.9.8"
@@ -18,17 +18,17 @@ torch = [
   { platform = "!=linux", version = ">=1.10,!=2.0,!=2.1.0" }, # Pin >=2.1.1 on Apple devices due to known MPS errors on 2.1.0
 ]
 transformer-lens = {git = "https://github.com/hijohnnylin/TransformerLens.git", branch = "temp_branch_version"}
-transformers = "^4.38.1"
+transformers = "^4.57.1"
 einops = "^0.7.0"
 pytest = "^8.1.1"
 huggingface-hub = "^0.34.0"
 huggingface = "^0.0.1"
 pandas = "^2.2.2"
-sae-lens = "^6.20.1"
+sae-lens = "^6.30.0"
 fastapi = "^0.115.6"
 uvicorn = "^0.34.0"
 sentry-sdk = {extras = ["fastapi"], version = "^2.20.0"}
-nnsight = ">=0.5.0"
+nnsight = ">=0.5.15"
 hf-transfer = "^0.1.9"
 nnterp = "^1.1.0"
 neuronpedia-inference-client = {path = "../../packages/python/neuronpedia-inference-client"}
