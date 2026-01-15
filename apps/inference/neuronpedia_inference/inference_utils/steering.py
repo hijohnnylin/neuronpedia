@@ -76,6 +76,66 @@ def convert_to_chat_array(
     current_role = None
     current_content = []
 
+    # case: gpt-oss-20b (harmony chat format)
+    # Format: <|start|>role<|message|>content<|end|> or <|start|>role<|channel|>channel_name<|message|>content<|end|>
+    if hasattr(tokenizer, "name_or_path") and "gpt-oss" in tokenizer.name_or_path:
+        # Split by <|start|> to get conversation turns
+        parts = text.split("<|start|>")
+        # Store pending analysis content to merge with final channel
+        pending_analysis: str | None = None
+
+        for part in parts[1:]:  # Skip first empty part
+            if not part.strip():
+                continue
+
+            # Extract content up to <|end|> or <|return|> if present, otherwise use the whole part
+            if "<|end|>" in part:
+                content_part = part.split("<|end|>")[0]
+            elif "<|return|>" in part:
+                content_part = part.split("<|return|>")[0]
+            else:
+                # Handle last message without end marker (still being generated)
+                content_part = part
+
+            # Extract role and channel (text before <|channel|> or <|message|>)
+            channel = None
+            if "<|channel|>" in content_part:
+                role = content_part.split("<|channel|>")[0].strip()
+                # Get the part after <|channel|> to find channel name and message
+                after_channel = content_part.split("<|channel|>")[1]
+                if "<|message|>" in after_channel:
+                    channel = after_channel.split("<|message|>")[0].strip()
+                    content = after_channel.split("<|message|>")[1].strip()
+                else:
+                    content = ""
+            elif "<|message|>" in content_part:
+                role = content_part.split("<|message|>")[0].strip()
+                content = content_part.split("<|message|>")[1].strip()
+            else:
+                continue
+
+            if not role or not content:
+                continue
+
+            # Handle assistant analysis channel - store for merging with final
+            if role == "assistant" and channel == "analysis":
+                pending_analysis = content
+                continue
+
+            # Handle assistant final channel - merge with pending analysis
+            if role == "assistant" and channel == "final" and pending_analysis:
+                content = f"<think>{pending_analysis}</think>{content}"
+                pending_analysis = None
+
+            conversation.append(
+                NPSteerChatMessage(
+                    role=role,
+                    content=content,
+                )
+            )
+
+        return conversation
+
     # case: deepseek r1 distill llama 8b
     if custom_hf_model_id == "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
         for token in tokens:
@@ -152,6 +212,54 @@ def convert_to_chat_array(
                                 content=content,
                             )
                         )
+
+    # Llama 3.3 Instruct uses header tokens similar to Llama 3.1
+    elif hasattr(tokenizer, "name_or_path") and "Llama-3" in tokenizer.name_or_path:
+        # Llama 3.3 uses special tokens: 128006 (start_header), 128007 (end_header)
+        # Format: <|start_header_id|>role<|end_header_id|>\n\ncontent<|eot_id|>
+        START_HEADER_ID = 128006
+        END_HEADER_ID = 128007
+        EOT_ID = 128009
+
+        i = 0
+        while i < len(tokens):
+            token = tokens[i]
+
+            # Look for start of a message (start_header_id)
+            if token == START_HEADER_ID:
+                # Extract role (tokens between start_header and end_header)
+                role_tokens = []
+                i += 1
+                while i < len(tokens) and tokens[i] != END_HEADER_ID:
+                    role_tokens.append(tokens[i])
+                    i += 1
+
+                if i < len(tokens) and tokens[i] == END_HEADER_ID:
+                    i += 1  # Skip end_header_id
+
+                    # Extract content (tokens until eot_id)
+                    content_tokens = []
+                    while i < len(tokens) and tokens[i] != EOT_ID:
+                        content_tokens.append(tokens[i])
+                        i += 1
+
+                    if role_tokens and content_tokens:
+                        role = tokenizer.decode(role_tokens).strip()
+                        content = tokenizer.decode(content_tokens).strip()
+
+                        if role and content:
+                            conversation.append(
+                                NPSteerChatMessage(
+                                    role=role,
+                                    content=content,
+                                )
+                            )
+
+                    if i < len(tokens) and tokens[i] == EOT_ID:
+                        i += 1  # Skip eot_id
+                    continue
+
+            i += 1
 
     # only other one right now is Gemma 2 Instruct (2B and 9B)
     else:
@@ -256,13 +364,16 @@ class OrthogonalProjector:
         if self._P is None:
             # Compute the squared norm of the steering vector
             v_norm_squared = torch.sum(self.steering_vector * self.steering_vector)
-            
+
             # Check for zero norm to avoid division by zero
             if v_norm_squared == 0:
                 raise ValueError("Cannot create projection matrix from zero vector")
-            
+
             # Compute the projection matrix: P = vv^T / ||v||^2
-            self._P = torch.matmul(self.steering_vector, self.steering_vector.T) / v_norm_squared
+            self._P = (
+                torch.matmul(self.steering_vector, self.steering_vector.T)
+                / v_norm_squared
+            )
 
             if not torch.isfinite(self._P).all():
                 raise ValueError("Projection matrix contains inf or nan values")

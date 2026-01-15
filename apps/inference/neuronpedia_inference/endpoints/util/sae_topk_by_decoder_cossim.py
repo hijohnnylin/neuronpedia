@@ -54,7 +54,7 @@ async def sae_topk_by_decoder_cossim(
 
         if request.feature:
             index = request.feature.index
-            feature_vector = sae.W_dec[index]
+            feature_vector = sae.W_dec[index].clone()
         else:
             feature_vector = torch.tensor(
                 request.vector, device=sae.W_dec.device, dtype=sae.W_dec.dtype
@@ -88,15 +88,38 @@ def get_top_k_by_decoder_cosine_similarity(
         raise ValueError(f"Invalid SAE ID or type: {source}")
 
     sae = sae_data["sae"]
+
+    # Filter out NaN values in W_dec before computing cosine similarity
+    valid_mask = ~torch.isnan(sae.W_dec).any(dim=1)
+    valid_W_dec = sae.W_dec[valid_mask]
+
     cosine_similarities = torch.nn.functional.cosine_similarity(
-        feature_vector.unsqueeze(0), sae.W_dec
+        feature_vector.unsqueeze(0).to(sae.W_dec.device), valid_W_dec
     )
+
+    # Create a full tensor with -inf for invalid indices and actual similarities for valid ones
+    full_cosine_similarities = torch.full(
+        (sae.W_dec.shape[0],),
+        float("-inf"),
+        device=sae.W_dec.device,
+        dtype=cosine_similarities.dtype,
+    )
+    full_cosine_similarities[valid_mask] = cosine_similarities
+    cosine_similarities = full_cosine_similarities
     top_k_values, top_k_indices = torch.topk(cosine_similarities, k=num_results)
 
     results: list[
         UtilSaeTopkByDecoderCossimPost200ResponseTopkDecoderCossimFeaturesInner
     ] = []
     for val, idx in zip(top_k_values, top_k_indices):
+        cosine_sim_value = val.detach().cpu().item()
+        # Handle NaN values by replacing with 0.0 # this is an error case but we don't want to fail the request
+        if (
+            not isinstance(cosine_sim_value, (int, float))
+            or cosine_sim_value != cosine_sim_value
+        ):
+            cosine_sim_value = 0.0
+
         results.append(
             UtilSaeTopkByDecoderCossimPost200ResponseTopkDecoderCossimFeaturesInner(
                 feature=NPFeature(
@@ -104,7 +127,7 @@ def get_top_k_by_decoder_cosine_similarity(
                     index=int(idx.item()),
                     model=model,
                 ),
-                cosine_similarity=val.item(),
+                cosine_similarity=cosine_sim_value,
             )
         )
     return results
