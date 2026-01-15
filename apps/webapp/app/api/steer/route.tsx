@@ -421,7 +421,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const savedSteerOutputs = await prisma.steerOutput.findMany({
       where: {
         modelId: body.modelId,
-        inputText: body.prompt,
+        inputTextMd5: createHash('md5').update(body.prompt).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,

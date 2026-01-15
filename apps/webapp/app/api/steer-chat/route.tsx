@@ -695,7 +695,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       where: {
         modelId,
         type: SteerOutputType.DEFAULT,
-        inputTextChatTemplate: JSON.stringify(defaultChatMessagesSorted),
+        inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(defaultChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
@@ -723,7 +723,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       where: {
         modelId,
         type: SteerOutputType.STEERED,
-        inputTextChatTemplate: JSON.stringify(steeredChatMessagesSorted),
+        inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(steeredChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
