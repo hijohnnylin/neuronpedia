@@ -958,7 +958,9 @@ model SteerOutput {
   model                  Model                 @relation(fields: [modelId], references: [id], onDelete: Cascade)
   steerSpecialTokens     Boolean               @default(false)
   inputText              String
+  inputTextMd5           String?
   inputTextChatTemplate  String?
+  inputTextChatTemplateMd5 String?
   outputText             String
   outputTextChatTemplate String?
   toNeurons              SteerOutputToNeuron[] // features used in this steer output
