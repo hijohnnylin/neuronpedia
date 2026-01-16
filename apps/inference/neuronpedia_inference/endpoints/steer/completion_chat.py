@@ -19,9 +19,6 @@ from neuronpedia_inference_client.models.steer_completion_chat_post200_response 
 from neuronpedia_inference_client.models.steer_completion_chat_post_request import (
     SteerCompletionChatPostRequest,
 )
-from nnterp import StandardizedTransformer
-from transformer_lens import HookedTransformer
-
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.inference_utils.steering import (
     OrthogonalProjector,
@@ -783,7 +780,6 @@ def make_steer_completion_chat_response(
     steered_result: str,
     default_result: str,
     model: HookedTransformer | StandardizedTransformer,
-    model: HookedTransformer | StandardizedTransformer,
     promptTokenized: torch.Tensor,
     promptChat: list[NPSteerChatMessage],
     custom_hf_model_id: str | None = None,
@@ -838,7 +834,6 @@ def make_steer_completion_chat_response(
     return SteerCompletionChatPost200Response(
         outputs=steerChatResults,
         input=NPSteerChatResult(
-            raw=prompt_raw,  # type: ignore
             raw=prompt_raw,  # type: ignore
             chat_template=promptChat,
         ),
