@@ -148,7 +148,7 @@ model = ReplacementModel.from_pretrained(
     transcoder_set,
     device=device,
     dtype=model_dtype,
-    lazy_encoder=False if is_nnsight_model else True,
+    lazy_encoder=is_nnsight_model,
     lazy_decoder=True,
     backend="nnsight" if is_nnsight_model else "transformerlens",
 )
