@@ -78,7 +78,7 @@ export default function ActivationsList({
   // set highest index of activations, sort by max activation
   // this useEffect fixes actiavtions where they are in the wrong "bin" due to some bug in SAEDashboard
   useEffect(() => {
-    if (activations) {
+    if (activations && activations.length > 0) {
       setOverallMaxValue(getMaxValueOfActivations(activations));
       let sortedActs = activations;
       if (getSourceSet(feature?.modelId || '', feature?.sourceSetName || '')?.showDfa) {

@@ -1,16 +1,18 @@
 # Converts a SAEDashboard NeuronpediaRunner to a Neuronpedia export so it can be imported into Neuronpedia by anyone.
 # You don't need to run this if you generated dashboards using the generate-dashboards script in this directory.
 
+# Profiling: poetry run python -m cProfile -o profile_output.prof neuronpedia_utils/convert-saedashboard-to-neuronpedia-export.py                 --saedashboard-output-dir="/Users/johnnylin/Documents/Projects/neuronpedia/utils/neuronpedia-utils/neuronpedia_utils/ignore-scripts/gdm_output/gemma-3-12b/12-gemmascope-2-res-16k"                 --creator-name='Google DeepMind'                 --release-id=gemma-scope-2                 --release-title='Gemma Scope 2'                 --url=http://huggingface.co/google/gemma-scope-2                 --model-name=gemma-3-12b                 --neuronpedia-source-set-id=gemmascope-2-res-16k                 --neuronpedia-source-set-description="Residual Stream - 16k"                 --hf-weights-repo-id=google/gemma-scope-2-12b-pt                 --hf-weights-path=resid_post/layer_12_width_16k_l0_medium                 --hook-point=hook_resid_post                 --layer-num=12                 --prompts-huggingface-dataset-path=monology/pile-uncopyrighted                 --n-prompts-total=392802                 --n-tokens-in-prompt=256                 --zero-out-bos-token && poetry run python -c "import pstats; p = pstats.Stats('profile_output.prof'); p.sort_stats('cumulative').print_stats()" > profile_results.txt
+
 import gzip
-import json
 import os
+import time
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, List
 
 import dotenv
+import orjson
 import typer
-from cuid2 import Cuid
 from neuronpedia_utils.db_models.activation import Activation
 from neuronpedia_utils.db_models.feature import Feature
 from neuronpedia_utils.db_models.model import Model
@@ -30,7 +32,23 @@ if creator_id is None or creator_id == "":
 
 DEFAULT_CREATOR_ID = creator_id
 
-CUID_GENERATOR: Cuid = Cuid(length=25)
+
+class FastPseudoCuid:
+    """Counter-based pseudo-CUID - ~100x faster than cuid2"""
+
+    def __init__(self, length: int = 25):
+        self.length = length
+        self._counter = 0
+        # Get time ONCE at startup, not per call
+        self._prefix = f"c{os.getpid():04x}{int(time.time()):08x}"
+
+    def generate(self) -> str:
+        self._counter += 1
+        result = f"{self._prefix}{self._counter:08x}"
+        return result[: self.length]
+
+
+CUID_GENERATOR = FastPseudoCuid(length=25)
 
 created_at = datetime.now()
 
@@ -248,7 +266,7 @@ def main(
             # make the release jsonl
             release_file_path = os.path.join(final_output_dir, "release.jsonl")
             if not os.path.exists(release_file_path):
-                with open(release_file_path, "w") as f:
+                with open(release_file_path, "wb") as f:
                     release = SourceRelease(
                         name=release_id,
                         description=release_title,
@@ -259,14 +277,12 @@ def main(
                         creatorId=DEFAULT_CREATOR_ID,
                         createdAt=created_at,
                     )
-                    f.write(
-                        json.dumps(release.__dict__, default=datetime_handler) + "\n"
-                    )
+                    f.write(orjson.dumps(release.__dict__) + b"\n")
 
             # make the model jsonl
             model_file_path = os.path.join(final_output_dir, "model.jsonl")
             if not os.path.exists(model_file_path):
-                with open(model_file_path, "w") as f:
+                with open(model_file_path, "wb") as f:
                     model = Model(
                         id=model_name,
                         instruct=model_name.endswith("-it"),
@@ -276,12 +292,12 @@ def main(
                         createdAt=created_at,
                         updatedAt=created_at,
                     )
-                    f.write(json.dumps(model.__dict__, default=datetime_handler) + "\n")
+                    f.write(orjson.dumps(model.__dict__) + b"\n")
 
             # make the sourceset jsonl
             sourceset_file_path = os.path.join(final_output_dir, "sourceset.jsonl")
             if not os.path.exists(sourceset_file_path):
-                with open(sourceset_file_path, "w") as f:
+                with open(sourceset_file_path, "wb") as f:
                     sourceset = SourceSet(
                         modelId=model_name,
                         name=neuronpedia_source_set_id,
@@ -292,13 +308,11 @@ def main(
                         description=neuronpedia_source_set_description,
                         visibility="PUBLIC",
                     )
-                    f.write(
-                        json.dumps(sourceset.__dict__, default=datetime_handler) + "\n"
-                    )
+                    f.write(orjson.dumps(sourceset.__dict__) + b"\n")
 
             # make the source jsonl
             source_file_path = os.path.join(final_output_dir, "source.jsonl")
-            with open(source_file_path, "w") as f:
+            with open(source_file_path, "wb") as f:
                 source = Source(
                     modelId=model_name,
                     setName=neuronpedia_source_set_id,
@@ -311,7 +325,7 @@ def main(
                     hfFolderId=hf_folder_id,
                     creatorId=DEFAULT_CREATOR_ID,
                 )
-                f.write(json.dumps(source.__dict__, default=datetime_handler) + "\n")
+                f.write(orjson.dumps(source.__dict__) + b"\n")
 
             process_data(
                 batch_data,
@@ -335,8 +349,8 @@ def main(
 
 
 def read_json_file(file_path):
-    with open(file_path, "r") as f:
-        return json.load(f)
+    with open(file_path, "rb") as f:
+        return orjson.loads(f.read())
 
 
 def datetime_handler(obj):
@@ -477,9 +491,9 @@ def process_data(
 
     # write the features to a jsonl
     features_file_path = os.path.join(features_dir, f"{batch_file_name}.jsonl")
-    with open(features_file_path, "w") as f:
+    with open(features_file_path, "wb") as f:
         for feature in features:
-            f.write(json.dumps(feature.__dict__, default=datetime_handler) + "\n")
+            f.write(orjson.dumps(feature.__dict__) + b"\n")
 
     # gzip the file
     with open(features_file_path, "rb") as f_in:
@@ -492,9 +506,9 @@ def process_data(
         os.makedirs(activations_dir)
 
     activations_file_path = os.path.join(activations_dir, f"{batch_file_name}.jsonl")
-    with open(activations_file_path, "w") as f:
+    with open(activations_file_path, "wb") as f:
         for activation in activations:
-            f.write(json.dumps(activation.__dict__, default=datetime_handler) + "\n")
+            f.write(orjson.dumps(activation.__dict__) + b"\n")
 
     # gzip the file
     with open(activations_file_path, "rb") as f_in:

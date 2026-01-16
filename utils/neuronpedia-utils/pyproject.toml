@@ -11,8 +11,12 @@ sae-dashboard = "^0.6.8"
 cuid2 = "^2.0.0"
 python-dotenv = "^1.0.0"
 psycopg2 = "^2.9.9"
-automated-interpretability = "^0.0.17"
+automated-interpretability = "^0.0.18"
 openai = "^1.63.2"
+google-genai = "^1.57.0"
+
+[tool.poetry.group.dev.dependencies]
+line-profiler = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core"]

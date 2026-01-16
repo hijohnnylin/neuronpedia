@@ -148,9 +148,11 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     slug: '',
   };
 
-  const INSTRUCT_MODELS = ['qwen3-4b'];
+  // these are used for custom UI elements for instruct models
+  const GRAPH_INSTRUCT_QWEN = ['qwen3-4b'];
+  const GRAPH_INSTRUCT_GEMMA_3 = ['gemma-3-4b-it'];
 
-  const convertPromptToChatPrompts = (prompt: string): ChatMessage[] => {
+  const convertPromptToChatPromptsQwen = (prompt: string): ChatMessage[] => {
     const prompts: ChatMessage[] = [];
 
     // Split by the start tokens to find each message
@@ -187,10 +189,67 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     return prompts;
   };
 
+  // Gemma 3 format: <bos><start_of_turn>user\n{content}<end_of_turn>\n<start_of_turn>model\n{content}<end_of_turn>
+  // Note: Gemma 3 does NOT have system prompts, and uses "model" instead of "assistant"
+  const convertPromptToChatPromptsGemma3 = (prompt: string): ChatMessage[] => {
+    const prompts: ChatMessage[] = [];
+
+    // Remove <bos> if present at the start
+    let cleanedPrompt = prompt;
+    if (cleanedPrompt.startsWith('<bos>')) {
+      cleanedPrompt = cleanedPrompt.slice(5);
+    }
+
+    // Split by <start_of_turn> to find each message
+    const parts = cleanedPrompt.split(/<start_of_turn>/);
+
+    for (let i = 1; i < parts.length; i += 1) {
+      // Skip first empty part
+      const part = parts[i];
+
+      // Find the role and content
+      const lines = part.split('\n');
+      if (lines.length < 2) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+
+      const role = lines[0].trim();
+      const contentLines = lines.slice(1);
+
+      // Remove <end_of_turn> if present at the end
+      let content = contentLines.join('\n');
+      if (content.endsWith('<end_of_turn>')) {
+        content = content.slice(0, -13); // Remove '<end_of_turn>'
+      }
+      // Also handle trailing newline after <end_of_turn>
+      content = content.replace(/<end_of_turn>\n?$/, '');
+
+      // Gemma 3 uses "model" for assistant role
+      if (role === 'user') {
+        prompts.push({
+          role: 'user',
+          content: content.trim(),
+        });
+      } else if (role === 'model') {
+        prompts.push({
+          role: 'assistant',
+          content: content.trim(),
+        });
+      }
+    }
+
+    return prompts;
+  };
+
   useEffect(() => {
-    if (generateGraphModalPrompt && INSTRUCT_MODELS.includes(selectedModelId)) {
-      // convert the prompt into chat prompt
-      const prompts = convertPromptToChatPrompts(generateGraphModalPrompt);
+    if (generateGraphModalPrompt) {
+      let prompts: ChatMessage[] = [];
+      if (GRAPH_INSTRUCT_QWEN.includes(selectedModelId)) {
+        prompts = convertPromptToChatPromptsQwen(generateGraphModalPrompt);
+      } else if (GRAPH_INSTRUCT_GEMMA_3.includes(selectedModelId)) {
+        prompts = convertPromptToChatPromptsGemma3(generateGraphModalPrompt);
+      }
       setChatPrompts(prompts);
     } else {
       setChatPrompts([]);
@@ -198,10 +257,13 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
   }, [generateGraphModalPrompt]);
 
   const isInstructAndDoesntStartWithSpecialToken = (modelId: string, prompt: string) => {
-    if (!INSTRUCT_MODELS.includes(modelId)) {
-      return false;
+    if (GRAPH_INSTRUCT_GEMMA_3.includes(modelId)) {
+      return !prompt.startsWith('<bos>');
     }
-    return !prompt.startsWith('<|im_start|>');
+    if (GRAPH_INSTRUCT_QWEN.includes(modelId)) {
+      return !prompt.startsWith('<|im_start|>');
+    }
+    return false;
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,6 +279,16 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
         try {
           setIsTokenizing(true);
           console.log(`tokenizing: ${prompt}`);
+          console.log(
+            'request: ',
+            JSON.stringify({
+              modelId,
+              prompt,
+              sourceSetName,
+              maxNLogits,
+              desiredLogitProb,
+            }),
+          );
           const response = await fetch('/api/graph/tokenize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -229,7 +301,9 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
             }),
           });
           if (!response.ok) {
+            console.log('response not ok');
             const errorData = await response.json();
+            console.log('errorData: ', errorData);
             throw new Error(errorData.message || 'Failed to tokenize prompt');
           }
           if (prompt.endsWith(' ')) {
@@ -240,7 +314,9 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
           const data = (await response.json()) as GraphTokenizeResponse;
           setGraphTokenizeResponse(data);
           if (data.input_tokens) {
-            setEstimatedTime(getEstimatedTimeFromNumTokens(data.input_tokens.length));
+            setEstimatedTime(
+              getEstimatedTimeFromNumTokens(data.input_tokens.length, GRAPH_INSTRUCT_GEMMA_3.includes(modelId)),
+            );
           } else {
             setEstimatedTime(null);
           }
@@ -376,7 +452,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     setIsGenerateGraphModalOpen(open);
   };
 
-  // Convert chat prompts to Qwen3 formatted string and update values.prompt
+  // Convert chat prompts to model-specific formatted string and update values.prompt
   useEffect(() => {
     if (chatPrompts.length === 0) {
       if (formikRef.current) {
@@ -402,11 +478,36 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
       return formatted;
     };
 
-    const qwen3Formatted = formatChatToQwen3(chatPrompts);
-    if (formikRef.current) {
-      formikRef.current.setFieldValue('prompt', qwen3Formatted);
+    // Gemma 3 format: <bos><start_of_turn>user\n{content}<end_of_turn>\n<start_of_turn>model\n{content}
+    // Note: Gemma 3 does NOT have system prompts, uses "model" instead of "assistant"
+    const formatChatToGemma3 = (messages: ChatMessage[]): string => {
+      // no need to start with BOS, the backend adds it automatically
+      let formatted = '';
+      for (let i = 0; i < messages.length; i += 1) {
+        const message = messages[i];
+        const isLast = i === messages.length - 1;
+
+        if (message.role === 'user') {
+          formatted += `<start_of_turn>user\n${message.content}${isLast ? '' : '<end_of_turn>\n'}`;
+        } else if (message.role === 'assistant') {
+          // Gemma 3 uses "model" for assistant messages
+          formatted += `<start_of_turn>model\n${message.content}${isLast ? '' : '<end_of_turn>\n'}`;
+        }
+      }
+      return formatted;
+    };
+
+    let formattedPrompt = '';
+    if (GRAPH_INSTRUCT_QWEN.includes(selectedModelId)) {
+      formattedPrompt = formatChatToQwen3(chatPrompts);
+    } else if (GRAPH_INSTRUCT_GEMMA_3.includes(selectedModelId)) {
+      formattedPrompt = formatChatToGemma3(chatPrompts);
     }
-  }, [chatPrompts]);
+
+    if (formikRef.current) {
+      formikRef.current.setFieldValue('prompt', formattedPrompt);
+    }
+  }, [chatPrompts, selectedModelId]);
 
   return (
     <Dialog open={isGenerateGraphModalOpen} onOpenChange={handleOpenChange}>
@@ -466,7 +567,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                     <div className="flex-1">
                       <div className="mb-3 flex flex-row items-end justify-between gap-x-3">
                         <div className="flex flex-1 flex-row gap-x-3">
-                          <div className="w-32">
+                          <div className="w-36">
                             <Label htmlFor="modelId" className="px-0 text-left text-xs">
                               Model
                             </Label>
@@ -533,7 +634,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                             >
                               <RadixSelect.Trigger
                                 id="sourceSetName"
-                                className="mt-1 flex w-full items-center justify-between rounded-md border border-slate-300 px-3 py-2 text-xs text-slate-500 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="mt-1 flex w-full items-center justify-between rounded-md border border-slate-300 px-2 py-2 text-[11px] text-slate-500 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <RadixSelect.Value
                                   placeholder={<span className="text-red-500">Select a source set</span>}
@@ -835,7 +936,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                       )}
 
                       <div>
-                        {INSTRUCT_MODELS.includes(values.modelId) ? (
+                        {GRAPH_INSTRUCT_QWEN.includes(values.modelId) ? (
                           <>
                             <Label htmlFor="prompt" className="text-xs">
                               Chat Messages to Complete
@@ -1019,6 +1120,106 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                               </Button>
                             </div>
                           </>
+                        ) : GRAPH_INSTRUCT_GEMMA_3.includes(values.modelId) ? (
+                          <>
+                            <Label htmlFor="prompt" className="text-xs">
+                              Chat Messages to Complete
+                            </Label>
+                            <p className="mt-0.5 text-[11.5px] text-slate-500">
+                              Click a message type to append to the chat conversation.
+                            </p>
+                            <Input
+                              id="prompt"
+                              name="prompt"
+                              value={values.prompt}
+                              onChange={handleChange}
+                              onBlur={handleBlur}
+                              type="hidden"
+                            />
+                            <div className="mb-3 mt-2 flex flex-col gap-y-1">
+                              {chatPrompts.map((prompt, index) => (
+                                <div
+                                  key={index}
+                                  className="mb-0 mt-0 flex flex-row items-center justify-center gap-x-2 text-xs"
+                                >
+                                  <div className="w-20 min-w-20 self-start rounded-md bg-slate-200 px-2 py-1.5 text-center text-[10px] font-medium uppercase leading-none text-slate-600">
+                                    {prompt.role === 'assistant' ? 'model' : prompt.role}
+                                  </div>
+                                  <div className="flex w-full flex-col">
+                                    <ReactTextareaAutosize
+                                      value={prompt.content}
+                                      minRows={1}
+                                      onChange={(e) => {
+                                        setChatPrompts(
+                                          chatPrompts.map((p, i) =>
+                                            i === index ? { ...p, content: e.target.value } : p,
+                                          ),
+                                        );
+                                      }}
+                                      placeholder={`Enter the ${prompt.role === 'assistant' ? 'model' : prompt.role} message.`}
+                                      onBlur={handleBlur}
+                                      onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                      disabled={isGenerating}
+                                      className="w-full flex-1 resize-none rounded-md border border-slate-300 px-3 py-2 text-xs leading-normal text-slate-700 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    className="h-5 w-5 min-w-5 self-start px-0 text-xs"
+                                    disabled={index !== chatPrompts.length - 1 || isGenerating}
+                                    onClick={() => {
+                                      // eslint-disable-next-line
+                                      setChatPrompts(chatPrompts.filter((_, i) => i !== index));
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-0.5 flex w-full flex-row gap-x-2">
+                              <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
+                                className="h-9 flex-1 px-2 text-xs"
+                                disabled={
+                                  isGenerating ||
+                                  (chatPrompts.length === 0
+                                    ? false
+                                    : chatPrompts[chatPrompts.length - 1].role !== 'assistant' ||
+                                      chatPrompts[chatPrompts.length - 1].content.trim().length === 0) // user can only come first or after assistant
+                                }
+                                onClick={() => {
+                                  setChatPrompts([...chatPrompts, { role: 'user', content: '' }]);
+                                }}
+                              >
+                                + User
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
+                                className="h-9 flex-1 px-2 text-xs"
+                                disabled={
+                                  isGenerating ||
+                                  (chatPrompts.length > 0
+                                    ? chatPrompts[chatPrompts.length - 1].role !== 'user' ||
+                                      chatPrompts[chatPrompts.length - 1].content.trim().length === 0 // model can only come after user
+                                    : true)
+                                }
+                                onClick={() => {
+                                  setChatPrompts([...chatPrompts, { role: 'assistant', content: '' }]);
+                                }}
+                              >
+                                + Model
+                              </Button>
+                            </div>
+                          </>
                         ) : (
                           <>
                             <Label htmlFor="prompt" className="text-xs">
@@ -1161,7 +1362,11 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                         )}
                       {isInstructAndDoesntStartWithSpecialToken(values.modelId, values.prompt) && (
                         <div className="mb-1.5 mt-0 text-xs text-amber-600">
-                          Click &quot;+ System&quot; or &quot;+ User&quot; to start creating a chat.
+                          {GRAPH_INSTRUCT_QWEN.includes(values.modelId) ? (
+                            <>Click &quot;+ System&quot; or &quot;+ User&quot; to start creating a chat.</>
+                          ) : (
+                            <>Click &quot;+ User&quot; or &quot;+ Model&quot; to start creating a chat.</>
+                          )}
                         </div>
                       )}
                     </div>
