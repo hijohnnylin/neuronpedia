@@ -19,6 +19,8 @@ from neuronpedia_inference_client.models.steer_completion_chat_post200_response 
 from neuronpedia_inference_client.models.steer_completion_chat_post_request import (
     SteerCompletionChatPostRequest,
 )
+from nnterp import StandardizedTransformer
+from transformer_lens import HookedTransformer
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.inference_utils.steering import (
@@ -121,6 +123,16 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
             )["input_ids"][0]
             if (request.n_logprobs is not None) and (request.n_logprobs > 0):
                 request.n_logprobs = 0
+        if isinstance(model, HookedTransformer):
+            promptTokenized = model.to_tokens(
+                template_applied_prompt, prepend_bos=True
+            )[0]
+        elif isinstance(model, StandardizedTransformer):
+            promptTokenized = model.tokenizer(
+                template_applied_prompt, add_special_tokens=False, return_tensors="pt"
+            )["input_ids"][0]
+            if (request.n_logprobs is not None) and (request.n_logprobs > 0):
+                request.n_logprobs = 0
     else:
         # tokenize = True adds a BOS
         promptTokenized = model.tokenizer.apply_chat_template(
@@ -129,8 +141,12 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
         if isinstance(model, StandardizedTransformer):
             if promptTokenized[0] == model.tokenizer.bos_token_id:
                 promptTokenized = promptTokenized[1:]
+        if isinstance(model, StandardizedTransformer):
+            if promptTokenized[0] == model.tokenizer.bos_token_id:
+                promptTokenized = promptTokenized[1:]
     promptTokenized = torch.tensor(promptTokenized)
 
+    logger.info("promptTokenized: %s", promptTokenized)
     logger.info("promptTokenized: %s", promptTokenized)
     if len(promptTokenized) > config.token_limit:
         logger.error(
@@ -324,6 +340,11 @@ async def run_batched_generate(
             steered_logprobs = None
             default_logprobs = None
 
+            steered_partial_result_array: list[str] = []
+            default_partial_result_array: list[str] = []
+            steered_logprobs = None
+            default_logprobs = None
+
             # Generate STEERED and DEFAULT separately
             for flag in [NPSteerType.STEERED, NPSteerType.DEFAULT]:
                 if seed is not None:
@@ -347,9 +368,44 @@ async def run_batched_generate(
                     else:
                         logger.info("Running Default")
                         editing_hooks = []
+                if isinstance(model, HookedTransformer):
+                    model.reset_hooks()
+                    if flag == NPSteerType.STEERED:
+                        logger.info("Running Steered")
+                        editing_hooks = [
+                            (
+                                (
+                                    sae_manager.get_sae_hook(feature.source)
+                                    if isinstance(feature, NPSteerFeature)
+                                    else feature.hook
+                                ),
+                                steering_hook,
+                            )
+                            for feature in features
+                        ]
+                    else:
+                        logger.info("Running Default")
+                        editing_hooks = []
 
                     logprobs = []
+                    logprobs = []
 
+                    with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
+                        for i, (result, logits) in enumerate(
+                            model.generate_stream(
+                                max_tokens_per_yield=TOKENS_PER_YIELD,
+                                stop_at_eos=(model.cfg.device != "mps"),
+                                input=promptTokenized.unsqueeze(0),
+                                do_sample=True,
+                                return_logits=True,
+                                **kwargs,
+                            )
+                        ):
+                            to_append = ""
+                            if i == 0:
+                                to_append = model.to_string(result[0][1:])  # type: ignore
+                            else:
+                                to_append = model.to_string(result[0])  # type: ignore
                     with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
                         for i, (result, logits) in enumerate(
                             model.generate_stream(
@@ -375,7 +431,21 @@ async def run_batched_generate(
                                     n_logprobs,
                                 )
                                 logprobs.append(current_logprobs)
+                            if n_logprobs > 0:
+                                current_logprobs = make_logprob_from_logits(
+                                    result,  # type: ignore
+                                    logits,  # type: ignore
+                                    model,
+                                    n_logprobs,
+                                )
+                                logprobs.append(current_logprobs)
 
+                            if flag == NPSteerType.STEERED:
+                                steered_partial_result += to_append  # type: ignore
+                                steered_logprobs = logprobs.copy() or None
+                            else:
+                                default_partial_result += to_append  # type: ignore
+                                default_logprobs = logprobs.copy() or None
                             if flag == NPSteerType.STEERED:
                                 steered_partial_result += to_append  # type: ignore
                                 steered_logprobs = logprobs.copy() or None
@@ -528,7 +598,26 @@ async def run_batched_generate(
                     for feature in features
                 ]
                 logger.info("steer_type: %s", steer_type)
+            partial_result_array: list[str] = []
 
+            if isinstance(model, HookedTransformer):
+                model.reset_hooks()
+                editing_hooks = [
+                    (
+                        (
+                            sae_manager.get_sae_hook(feature.source)
+                            if isinstance(feature, NPSteerFeature)
+                            else feature.hook
+                        ),
+                        steering_hook,
+                    )
+                    for feature in features
+                ]
+                logger.info("steer_type: %s", steer_type)
+
+                with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
+                    partial_result = ""
+                    logprobs = []
                 with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
                     partial_result = ""
                     logprobs = []
@@ -547,7 +636,29 @@ async def run_batched_generate(
                             partial_result = model.to_string(result[0][1:])  # type: ignore
                         else:
                             partial_result += model.to_string(result[0])  # type: ignore
+                    for i, (result, logits) in enumerate(
+                        model.generate_stream(
+                            max_tokens_per_yield=TOKENS_PER_YIELD,
+                            stop_at_eos=(model.cfg.device != "mps"),
+                            input=promptTokenized.unsqueeze(0),
+                            do_sample=True,
+                            return_logits=True,
+                            **kwargs,
+                        )
+                    ):
+                        if i == 0:
+                            partial_result = model.to_string(result[0][1:])  # type: ignore
+                        else:
+                            partial_result += model.to_string(result[0])  # type: ignore
 
+                        if n_logprobs > 0:
+                            current_logprobs = make_logprob_from_logits(
+                                result,  # type: ignore
+                                logits,  # type: ignore
+                                model,
+                                n_logprobs,
+                            )
+                            logprobs.append(current_logprobs)
                         if n_logprobs > 0:
                             current_logprobs = make_logprob_from_logits(
                                 result,  # type: ignore
@@ -672,6 +783,7 @@ def make_steer_completion_chat_response(
     steered_result: str,
     default_result: str,
     model: HookedTransformer | StandardizedTransformer,
+    model: HookedTransformer | StandardizedTransformer,
     promptTokenized: torch.Tensor,
     promptChat: list[NPSteerChatMessage],
     custom_hf_model_id: str | None = None,
@@ -715,9 +827,18 @@ def make_steer_completion_chat_response(
     else:
         prompt_raw = ""
 
+    # Handle token to string conversion for both model types
+    if isinstance(model, HookedTransformer):
+        prompt_raw = model.to_string(promptTokenized)  # type: ignore
+    elif isinstance(model, StandardizedTransformer):
+        prompt_raw = model.tokenizer.decode(promptTokenized)
+    else:
+        prompt_raw = ""
+
     return SteerCompletionChatPost200Response(
         outputs=steerChatResults,
         input=NPSteerChatResult(
+            raw=prompt_raw,  # type: ignore
             raw=prompt_raw,  # type: ignore
             chat_template=promptChat,
         ),

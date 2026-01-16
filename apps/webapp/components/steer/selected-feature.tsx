@@ -4,6 +4,9 @@ import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import * as Slider from '@radix-ui/react-slider';
 import { ChevronsDown, ChevronsUp, X } from 'lucide-react';
 
+const ALT_MAX_STEER_STRENGTH = 9000;
+const MODELS_FOR_ALT_MAX_STEER_STRENGTH = ['gpt-oss-20b'];
+
 export default function SteerSelectedFeature({
   feature,
   setFeatureStrength,
@@ -38,30 +41,50 @@ export default function SteerSelectedFeature({
   // Using base 1.01 for very gentle exponential scaling
   function strengthToSlider(strength: number): number {
     if (strength === 0) return 0;
+    strength = Math.min(
+      strength,
+      MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX,
+    );
     const sign = Math.sign(strength);
     const absStrength = Math.abs(strength);
     const base = 1.01;
     const minValue = 0.01; // Allow values down to 0.01
-    const maxLog = Math.log(STEER_STRENGTH_MAX) / Math.log(base);
+    const maxLog =
+      Math.log(
+        MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX,
+      ) / Math.log(base);
     const minLog = Math.log(minValue) / Math.log(base);
     // Use exponential scale, clamping to minimum value
     const logValue = Math.log(Math.max(minValue, absStrength)) / Math.log(base);
     // Normalize to slider range
     const normalizedLog = (logValue - minLog) / (maxLog - minLog);
-    return sign * normalizedLog * STEER_STRENGTH_MAX;
+    return (
+      sign *
+      normalizedLog *
+      (MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX)
+    );
   }
 
   // Convert exponential slider position to linear strength value
   function sliderToStrength(sliderValue: number): number {
     if (sliderValue === 0) return 0;
+    sliderValue = Math.min(
+      sliderValue,
+      MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX,
+    );
     const sign = Math.sign(sliderValue);
     const absSlider = Math.abs(sliderValue);
     const base = 1.01;
     const minValue = 0.01; // Allow values down to 0.01
-    const maxLog = Math.log(STEER_STRENGTH_MAX) / Math.log(base);
+    const maxLog =
+      Math.log(
+        MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX,
+      ) / Math.log(base);
     const minLog = Math.log(minValue) / Math.log(base);
     // Denormalize from slider range
-    const normalizedLog = absSlider / STEER_STRENGTH_MAX;
+    const normalizedLog =
+      absSlider /
+      (MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX);
     const logValue = minLog + normalizedLog * (maxLog - minLog);
     return sign * base ** logValue;
   }
@@ -87,7 +110,17 @@ export default function SteerSelectedFeature({
             onChange={(e) => {
               const value = parseFloat(e.target.value);
               if (!Number.isNaN(value)) {
-                const clampedValue = Math.min(Math.max(value, STEER_STRENGTH_MIN), STEER_STRENGTH_MAX);
+                const clampedValue = Math.min(
+                  Math.max(
+                    value,
+                    MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId)
+                      ? -1 * ALT_MAX_STEER_STRENGTH
+                      : STEER_STRENGTH_MIN,
+                  ),
+                  MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId)
+                    ? ALT_MAX_STEER_STRENGTH
+                    : STEER_STRENGTH_MAX,
+                );
                 const roundedValue = Math.round(clampedValue * 100) / 100;
                 setFeatureStrength(feature, roundedValue);
               }
@@ -97,15 +130,31 @@ export default function SteerSelectedFeature({
           <ChevronsDown className="mt-0 h-3 w-3" />
           <Slider.Root
             defaultValue={[strengthToSlider(feature.strength)]}
-            min={STEER_STRENGTH_MIN}
-            max={STEER_STRENGTH_MAX}
+            min={
+              MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId)
+                ? -1 * ALT_MAX_STEER_STRENGTH
+                : STEER_STRENGTH_MIN
+            }
+            max={
+              MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX
+            }
             step={0.25}
             value={[
               strengthToSlider(findSelectedFeature(feature.modelId, feature.layer, feature.index)?.strength || 0),
             ]}
             onValueChange={(value) => {
               const actualStrength = sliderToStrength(value[0]);
-              const clampedValue = Math.min(Math.max(actualStrength, STEER_STRENGTH_MIN), STEER_STRENGTH_MAX);
+              const clampedValue = Math.min(
+                Math.max(
+                  actualStrength,
+                  MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId)
+                    ? -1 * ALT_MAX_STEER_STRENGTH
+                    : STEER_STRENGTH_MIN,
+                ),
+                MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId)
+                  ? ALT_MAX_STEER_STRENGTH
+                  : STEER_STRENGTH_MAX,
+              );
               const roundedValue = Math.round(clampedValue * 100) / 100;
               setFeatureStrength(feature, roundedValue);
             }}

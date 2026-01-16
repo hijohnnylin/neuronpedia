@@ -82,7 +82,7 @@ export const GraphHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl
 
 export const GraphHostSourceOnSourceSetScalarFieldEnumSchema = z.enum(['sourceSetName','sourceSetModelId','graphHostSourceId']);
 
-export const InferenceHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','modelId','createdAt','updatedAt']);
+export const InferenceHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','engine','modelId','createdAt','updatedAt']);
 
 export const InferenceHostSourceOnSourceScalarFieldEnumSchema = z.enum(['sourceId','sourceModelId','inferenceHostId']);
 
@@ -128,7 +128,7 @@ export const SavedSearchActivationScalarFieldEnumSchema = z.enum(['savedSearchId
 
 export const SteerOutputToNeuronScalarFieldEnumSchema = z.enum(['modelId','layer','index','strength','steerOutputId']);
 
-export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextChatTemplate','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds']);
+export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextMd5','inputTextChatTemplate','inputTextChatTemplateMd5','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds']);
 
 export const SortOrderSchema = z.enum(['asc','desc']);
 
@@ -145,6 +145,10 @@ export const JsonNullValueFilterSchema = z.enum(['DbNull','JsonNull','AnyNull',]
 export const UserSecretTypeSchema = z.enum(['NEURONPEDIA','OPENAI','GOOGLE','ANTHROPIC','OPENROUTER']);
 
 export type UserSecretTypeType = `${z.infer<typeof UserSecretTypeSchema>}`
+
+export const InferenceEngineSchema = z.enum(['TRANSFORMER_LENS','NNSIGHT','CSPACE']);
+
+export type InferenceEngineType = `${z.infer<typeof InferenceEngineSchema>}`
 
 export const SteerOutputTypeSchema = z.enum(['DEFAULT','STEERED']);
 
@@ -1235,6 +1239,7 @@ export const GraphHostSourceOnSourceSetWithPartialRelationsSchema: z.ZodType<Gra
 /////////////////////////////////////////
 
 export const InferenceHostSourceSchema = z.object({
+  engine: InferenceEngineSchema,
   id: z.string().cuid(),
   name: z.string(),
   hostUrl: z.string(),
@@ -2931,7 +2936,9 @@ export const SteerOutputSchema = z.object({
   modelId: z.string(),
   steerSpecialTokens: z.boolean(),
   inputText: z.string(),
+  inputTextMd5: z.string().nullable(),
   inputTextChatTemplate: z.string().nullable(),
+  inputTextChatTemplateMd5: z.string().nullable(),
   outputText: z.string(),
   outputTextChatTemplate: z.string().nullable(),
   temperature: z.number(),

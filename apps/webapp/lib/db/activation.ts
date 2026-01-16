@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { getSourceSetNameFromSource } from '../utils/source';
 import { AuthenticatedUser } from '../with-user';
-import { getVector } from './neuron';
+import { getVectorFromDb } from './neuron';
 import { assertUserCanAccessModelAndSource, assertUserCanAccessModelAndSourceSet } from './userCanAccess';
 
 export const getActivationById = async (activationId: string, user: AuthenticatedUser | null = null) => {
@@ -28,7 +28,7 @@ export const createActivationsForVector = async (
   user: AuthenticatedUser,
 ) => {
   // ensure user is the creator of the vector
-  const vector = await getVector(modelId, source, index);
+  const vector = await getVectorFromDb(modelId, source, index);
   if (!vector) {
     throw new Error('Vector not found.');
   }

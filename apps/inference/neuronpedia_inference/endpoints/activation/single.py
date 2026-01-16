@@ -5,6 +5,11 @@ import einops
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
+
+# from transformer_lens.model_bridge import TransformerBridge
+from neuronpedia_inference.config import Config
+from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.shared import Model, with_request_lock
 from neuronpedia_inference_client.models.activation_single_post200_response import (
     ActivationSinglePost200Response,
 )
@@ -16,11 +21,6 @@ from neuronpedia_inference_client.models.activation_single_post_request import (
 )
 from nnterp import StandardizedTransformer
 from transformer_lens import ActivationCache, HookedTransformer
-
-# from transformer_lens.model_bridge import TransformerBridge
-from neuronpedia_inference.config import Config
-from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ async def activation_single(
 
         if isinstance(model, StandardizedTransformer):
             tokens = model.tokenizer(
-                prompt, add_special_tokens=True, return_tensors="pt"
+                prompt, add_special_tokens=False, return_tensors="pt"
             )["input_ids"][0]
         else:
             tokens = model.to_tokens(
@@ -149,6 +149,10 @@ async def activation_single(
 
     logger.info("Returning result: %s", result)
 
+    # if the model prepends the BOS token, then we need to remove the first token from the str_tokens
+    if len(str_tokens) > len(result.values):
+        str_tokens = str_tokens[1:]
+
     return ActivationSinglePost200Response(activation=result, tokens=str_tokens)
 
 
@@ -213,11 +217,7 @@ def process_activations(
         return process_neuron_activations(cache, hook_name, index, sae_manager.device)
     if sae_manager.get_sae(layer) is not None:
         return process_feature_activations(
-            sae_manager.get_sae(layer),
-            sae_type,
-            cache,
-            hook_name,
-            index,
+            sae_manager.get_sae(layer), sae_type, cache, hook_name, index, bos_indices
         )
     raise ValueError(f"Invalid layer: {layer}")
 

@@ -78,7 +78,7 @@ class VectorRequest(NPRequest):
             source=response["vector"]["layer"],
             index=response["vector"]["index"],
             label=response["vector"]["vectorLabel"],
-            hook_name=response["vector"]["hookName"],
+            hook_name=response["vector"].get("hookName", ""),
             values=response["vector"]["vector"],
             default_steer_strength=response["vector"]["vectorDefaultSteerStrength"],
         )

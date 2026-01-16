@@ -35,3 +35,9 @@ class Feature:
         webbrowser.open(
             f"https://neuronpedia.org/{self.modelId}/{self.source}/{self.index}"
         )
+
+
+@dataclass
+class SteerFeature(Feature):
+    strength: float = 10
+    hook_name: str = ""

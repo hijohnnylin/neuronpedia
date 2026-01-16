@@ -10,17 +10,20 @@ import {
   STEER_MAX_PROMPT_CHARS,
   STEER_METHOD,
   STEER_N_COMPLETION_TOKENS_MAX,
+  STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
   STEER_STRENGTH_MULTIPLIER_MAX,
   STEER_TEMPERATURE_MAX,
   SteerFeature,
 } from '@/lib/utils/steer';
 import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputType } from '@prisma/client';
+import { createHash } from 'crypto';
 import { EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { NPLogprob, NPSteerMethod, SteerCompletionPost200Response } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 import { array, bool, InferType, number, object, string, ValidationError } from 'yup';
 
+const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 const STEERING_VERSION = 1;
 const MAX_PROMPT_CHARS = STEER_MAX_PROMPT_CHARS;
 
@@ -197,6 +200,7 @@ async function saveSteerOutput(
         // rest is the same
         creatorId: userId,
         inputText: body.prompt,
+        inputTextMd5: createHash('md5').update(body.prompt).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
@@ -368,6 +372,16 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       limit,
     };
 
+    const { modelId } = body;
+    if (NNSIGHT_MODELS.includes(modelId)) {
+      if (body.n_tokens > STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM) {
+        return NextResponse.json(
+          { message: `For large LLM models the max n_tokens is ${STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM}` },
+          { status: 400 },
+        );
+      }
+    }
+
     // model access
     const modelAccess = await getModelById(body.modelId, request.user);
     if (!modelAccess) {
@@ -407,7 +421,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const savedSteerOutputs = await prisma.steerOutput.findMany({
       where: {
         modelId: body.modelId,
-        inputText: body.prompt,
+        inputTextMd5: createHash('md5').update(body.prompt).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,

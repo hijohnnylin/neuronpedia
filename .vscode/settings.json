@@ -16,5 +16,6 @@
     }
   },
   "notebook.formatOnSave.enabled": true,
-  "notebook.codeActionsOnSave": {}
+  "notebook.codeActionsOnSave": {},
+  "prisma.pinToPrisma6": true
 }

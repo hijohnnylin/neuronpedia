@@ -15,9 +15,7 @@ from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post_re
 )
 
 from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
-from neuronpedia_inference.shared import (
-    with_request_lock,
-)
+from neuronpedia_inference.shared import with_request_lock
 
 logger = logging.getLogger(__name__)
 

@@ -1609,7 +1609,7 @@ test = ["pytest (>=7.2)", "pytest-cov (>=4.0)"]
 
 [[package]]
 name = "neuronpedia-inference-client"
-version = "1.6.2"
+version = "1.9.0"
 description = "Neuronpedia - Inference Server"
 optional = false
 python-versions = "^3.8"
@@ -3014,37 +3014,33 @@ files = [
 
 [[package]]
 name = "sae-lens"
-version = "6.20.1"
+version = "6.22.1"
 description = "Training and Analyzing Sparse Autoencoders (SAEs)"
 optional = false
-python-versions = "^3.10"
+python-versions = "<4.0,>=3.10"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "sae_lens-6.22.1-py3-none-any.whl", hash = "sha256:e5c06c0d676666f11fe53c33a487c64fa3cad6a342385654d6e560f4825ff7e7"},
+    {file = "sae_lens-6.22.1.tar.gz", hash = "sha256:7fed75782566d7b2efb568f3f4f0097a448a2c9fd226496c1bd337196ec9f033"},
+]
 
 [package.dependencies]
-babe = "^0.0.7"
+babe = ">=0.0.7,<0.0.8"
 datasets = ">=3.1.0"
-nltk = "^3.8.1"
+nltk = ">=3.8.1,<4.0.0"
 plotly = ">=5.19.0"
 plotly-express = ">=0.4.1"
 python-dotenv = ">=1.0.1"
-pyyaml = "^6.0.1"
+pyyaml = ">=6.0.1,<7.0.0"
 safetensors = ">=0.4.2,<1.0.0"
-simple-parsing = "^0.1.6"
+simple-parsing = ">=0.1.6,<0.2.0"
 tenacity = ">=9.0.0"
-transformer-lens = "*"
-transformers = "^4.38.1"
-typing-extensions = "^4.10.0"
+transformer-lens = ">=2.16.1,<3.0.0"
+transformers = ">=4.38.1,<5.0.0"
+typing-extensions = ">=4.10.0,<5.0.0"
 
 [package.extras]
 mamba = ["mamba-lens (>=0.0.4,<0.0.5)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/hijohnnylin/SAELens.git"
-reference = "all_tlens"
-resolved_reference = "15e1026c846291e61b37675193821b180da3cef7"
 
 [[package]]
 name = "safetensors"
@@ -4452,4 +4448,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "27691a1be63f88701a0332e143c04f87ceb0ef2187afbe6c770b676084bbaf08"
+content-hash = "befa100d0566d0c987b0be97405493f42734337a17f1d2cab815ed2cef936126"

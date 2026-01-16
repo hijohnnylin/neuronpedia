@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/db';
 import { getActivationForFeature } from '@/lib/utils/inference';
 import { ListWithPartialRelations } from '@/prisma/generated/zod';
+import { Activation } from '@prisma/client';
 import { ListNeuronToAdd, MAX_LIST_FEATURES_FOR_TEST_TEXT, MAX_LIST_TEST_TEXT_LENGTH_CHARS } from '../utils/list';
 import { AuthenticatedUser } from '../with-user';
 import { AllowUnlistedFor, assertUserCanAccessModelAndSourceSet, userCanAccessClause } from './userCanAccess';
@@ -80,7 +81,7 @@ export const addNeuronsToList = async (
       } else {
         // does allow it, run activation
         // eslint-disable-next-line no-await-in-loop
-        const activation = await getActivationForFeature(neuron, list.defaultTestText, user);
+        const activation = (await getActivationForFeature(neuron, list.defaultTestText, user)) as Activation;
         activationsToAdd.push(activation);
       }
     }
@@ -351,7 +352,7 @@ export const updateListMetadata = async (
           await assertUserCanAccessModelAndSourceSet(feature.modelId, feature.sourceSetName, user);
 
           // eslint-disable-next-line no-await-in-loop
-          const activation = await getActivationForFeature(feature, defaultTestText, user);
+          const activation = (await getActivationForFeature(feature, defaultTestText, user)) as Activation;
 
           activations.push(activation);
           // console.log("added activation: ", activation.values);

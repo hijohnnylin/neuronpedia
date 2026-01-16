@@ -42,7 +42,7 @@ export default async function Page({
           source={source || ''}
           text={text || ''}
           initialDensityThreshold={initialDensityThreshold || 0.5}
-          initialIgnoreBos={initialIgnoreBos || false}
+          initialIgnoreBos={initialIgnoreBos !== undefined ? initialIgnoreBos : true}
           initialSortBy={initialSortBy || 'frequency'}
         />
       </div>

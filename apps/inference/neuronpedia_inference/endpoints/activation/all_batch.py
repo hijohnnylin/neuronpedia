@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Maximum number of prompts that can be processed in a single batch
-MAX_BATCH_SIZE = 8
+MAX_BATCH_SIZE = 4
 
 
 @router.post("/activation/all-batch")
@@ -251,9 +251,10 @@ class ActivationProcessor:
                     truncate=False,
                 )[0]
 
-            if len(tokens) > config.token_limit:
+            batch_token_limit = config.token_limit / MAX_BATCH_SIZE
+            if len(tokens) > batch_token_limit:
                 raise ValueError(
-                    f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
+                    f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
                 )
 
             if isinstance(model, StandardizedTransformer):
@@ -406,9 +407,10 @@ class ActivationProcessor:
                 prepend_bos=prepend_bos,
                 truncate=False,
             )[0]
-        if len(tokens) > config.token_limit:
+        batch_token_limit = config.token_limit / MAX_BATCH_SIZE
+        if len(tokens) > batch_token_limit:
             raise ValueError(
-                f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
+                f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
             )
 
         if isinstance(model, StandardizedTransformer):

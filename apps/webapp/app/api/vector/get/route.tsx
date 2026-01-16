@@ -1,4 +1,5 @@
-import { getVector } from '@/lib/db/neuron';
+import { getVectorFromDb } from '@/lib/db/neuron';
+import { getVectorFromInstance } from '@/lib/utils/inference';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { object, string } from 'yup';
@@ -71,7 +72,24 @@ const getVectorSchema = object({
 
 export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   const body = await getVectorSchema.validate(await request.json());
-  const vector = await getVector(body.modelId, body.source, body.index);
+  const vector = await getVectorFromDb(body.modelId, body.source, body.index);
 
+  if (!vector || !vector?.vector || vector?.vector?.length === 0) {
+    const vectorFromInstance = await getVectorFromInstance(body.modelId, body.source, body.index);
+    if (!vectorFromInstance) {
+      return NextResponse.json({ message: 'Vector not found' }, { status: 404 });
+    }
+    return NextResponse.json({
+      vector: {
+        modelId: body.modelId,
+        layer: body.source,
+        index: body.index,
+        vectorLabel: '',
+        hookName: vectorFromInstance.hookName,
+        vector: vectorFromInstance.vector,
+        vectorDefaultSteerStrength: 10,
+      },
+    });
+  }
   return NextResponse.json({ vector });
 });

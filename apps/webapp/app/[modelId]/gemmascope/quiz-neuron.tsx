@@ -46,6 +46,7 @@ export default function QuizNeuron({
         hideSteer
         enterSubmits
         formValue=""
+        embed
         placeholder={`Test ${name}`}
       />
       <div className="flex w-full flex-row items-center justify-start gap-x-3">

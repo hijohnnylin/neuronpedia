@@ -16,9 +16,13 @@ class Activation:
     def __post_init__(self):
         if self.quantileFraction is not None:
             if not (0 <= self.quantileFraction <= 1):
-                raise ValueError(
-                    f"quantileFraction must be between 0 and 1 inclusive, got {self.quantileFraction}"
-                )
+                raise ValueError(f"quantileFraction must be between 0 and 1 inclusive, got {self.quantileFraction}")
+
+    def __str__(self):
+        lines = [f"Activation for modelId: {self.modelId}, source: {self.source}, index: {self.index}"]
+        for token, value in zip(self.tokens, self.values):
+            lines.append(f"{token}\t{value}")
+        return "\n".join(lines)
 
     # converts from the Neuronpedia database type
     @classmethod

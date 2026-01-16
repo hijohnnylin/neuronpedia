@@ -163,11 +163,15 @@ export default function FeatureSelector({
               alert('Index must be a positive integer.');
               e.preventDefault();
             } else {
+              // Get defaulttesttext from query params if present
+              const urlParams = new URLSearchParams(window.location.search);
+              const defaultTestText = urlParams.get('defaulttesttext');
+              const url = `/${modelId}/${source}/${index}${defaultTestText ? `?defaulttesttext=${defaultTestText}` : ''}`;
               if (!exclusiveCallback) {
                 if (openInNewTab || e.metaKey || e.ctrlKey) {
-                  window.open(`/${modelId}/${source}/${index}`, '_blank');
+                  window.open(url, '_blank');
                 } else {
-                  router.push(`/${modelId}/${source}/${index}`);
+                  router.push(url);
                 }
               }
               if (callback) {

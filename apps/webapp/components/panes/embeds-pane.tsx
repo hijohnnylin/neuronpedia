@@ -16,7 +16,11 @@ export default function EmbedsPane({
   const [embedExplanationChecked, setEmbedExplanationChecked] = useState(true);
   const [embedPlotsChecked, setEmbedPlotsChecked] = useState(true);
   const [embedTestChecked, setEmbedTestChecked] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [embedDefaultTestTextChecked, setEmbedDefaultTestTextChecked] = useState(false);
+  const [embedActivationsChecked, setEmbedActivationsChecked] = useState(true);
+  const [embedLinkChecked, setEmbedLinkChecked] = useState(true);
+  const [embedSteerChecked, setEmbedSteerChecked] = useState(true);
 
   return (
     <div className="relative mb-0 mt-2 hidden flex-col gap-x-2 overflow-hidden rounded-lg border bg-white px-3 pb-5 pt-2 text-xs shadow transition-all sm:mt-3 sm:flex">
@@ -27,7 +31,7 @@ export default function EmbedsPane({
         </Link>
       </div>
       <div className="mt-1 flex w-full flex-col gap-x-2 gap-y-1.5">
-        <div className="flex flex-row items-center justify-between px-1">
+        <div className="grid grid-cols-3 items-center gap-y-1.5 px-1">
           <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c2">
             <Checkbox.Root
               className="flex h-4 w-4 appearance-none items-center justify-center rounded-[3px] border border-slate-300 bg-white outline-none"
@@ -46,7 +50,7 @@ export default function EmbedsPane({
                 <Check className="h-4 w-4" />
               </Checkbox.Indicator>
             </Checkbox.Root>
-            Plots
+            Show Plots
           </label>
           <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c1">
             <Checkbox.Root
@@ -66,7 +70,27 @@ export default function EmbedsPane({
                 <Check className="h-4 w-4" />
               </Checkbox.Indicator>
             </Checkbox.Root>
-            Explanation
+            Show Explanation
+          </label>
+          <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c5">
+            <Checkbox.Root
+              className="flex h-4 w-4 appearance-none items-center justify-center rounded-[3px] border border-slate-300 bg-white outline-none"
+              defaultChecked
+              checked={embedActivationsChecked}
+              onCheckedChange={(e) => {
+                if (e === true) {
+                  setEmbedActivationsChecked(true);
+                } else {
+                  setEmbedActivationsChecked(false);
+                }
+              }}
+              id="c5"
+            >
+              <Checkbox.Indicator className="text-sky-700">
+                <Check className="h-4 w-4" />
+              </Checkbox.Indicator>
+            </Checkbox.Root>
+            Show Activations
           </label>
           <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c3">
             <Checkbox.Root
@@ -87,7 +111,8 @@ export default function EmbedsPane({
             </Checkbox.Root>
             Show Test Field
           </label>
-          <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c4">
+
+          {/* <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c4">
             <Checkbox.Root
               className="flex h-4 w-4 appearance-none items-center justify-center rounded-[3px] border border-slate-300 bg-white outline-none"
               defaultChecked={false}
@@ -111,6 +136,46 @@ export default function EmbedsPane({
               </Checkbox.Indicator>
             </Checkbox.Root>
             Default Test Text
+          </label> */}
+          <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c7">
+            <Checkbox.Root
+              className="flex h-4 w-4 appearance-none items-center justify-center rounded-[3px] border border-slate-300 bg-white outline-none"
+              defaultChecked
+              checked={embedSteerChecked}
+              onCheckedChange={(e) => {
+                if (e === true) {
+                  setEmbedSteerChecked(true);
+                } else {
+                  setEmbedSteerChecked(false);
+                }
+              }}
+              id="c7"
+            >
+              <Checkbox.Indicator className="text-sky-700">
+                <Check className="h-4 w-4" />
+              </Checkbox.Indicator>
+            </Checkbox.Root>
+            Show Steer
+          </label>
+          <label className="flex flex-row items-center gap-x-1 leading-none text-slate-400" htmlFor="c6">
+            <Checkbox.Root
+              className="flex h-4 w-4 appearance-none items-center justify-center rounded-[3px] border border-slate-300 bg-white outline-none"
+              defaultChecked
+              checked={embedLinkChecked}
+              onCheckedChange={(e) => {
+                if (e === true) {
+                  setEmbedLinkChecked(true);
+                } else {
+                  setEmbedLinkChecked(false);
+                }
+              }}
+              id="c6"
+            >
+              <Checkbox.Indicator className="text-sky-700">
+                <Check className="h-4 w-4" />
+              </Checkbox.Indicator>
+            </Checkbox.Root>
+            Show Link
           </label>
         </div>
         <div className="mt-0.5 flex flex-1 flex-col">
@@ -119,11 +184,11 @@ export default function EmbedsPane({
             <textarea
               disabled
               className="disabled form-input block h-8 w-full resize-none whitespace-pre-wrap break-words rounded-md border-0 bg-slate-100 px-2.5 py-[5px] font-mono text-[8px] leading-normal text-slate-500 outline-none focus:outline-none focus:ring-0"
-              value={`<iframe src=${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
+              value={`<iframe src="${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
                 currentNeuron?.index
               }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                 embedPlotsChecked ? 'true' : 'false'
-              }&embedtest=${embedTestChecked ? 'true' : 'false'}${
+              }&embedsteer=${embedSteerChecked ? 'true' : 'false'}&embedactivations=${embedActivationsChecked ? 'true' : 'false'}&embedlink=${embedLinkChecked ? 'true' : 'false'}&embedtest=${embedTestChecked ? 'true' : 'false'}${
                 embedDefaultTestTextChecked
                   ? `&defaulttesttext=${encodeURIComponent(testTextResult?.tokens?.join('') || '')}`
                   : ''
@@ -134,11 +199,11 @@ export default function EmbedsPane({
               onClick={(e) => {
                 e.preventDefault();
                 copy(
-                  `<iframe src=${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
+                  `<iframe src="${NEXT_PUBLIC_URL}/${currentNeuron?.modelId}/${currentNeuron?.layer}/${
                     currentNeuron?.index
                   }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                     embedPlotsChecked ? 'true' : 'false'
-                  }&embedtest=${embedTestChecked ? 'true' : 'false'}${
+                  }&embedsteer=${embedSteerChecked ? 'true' : 'false'}&embedactivations=${embedActivationsChecked ? 'true' : 'false'}&embedlink=${embedLinkChecked ? 'true' : 'false'}&embedtest=${embedTestChecked ? 'true' : 'false'}${
                     embedDefaultTestTextChecked
                       ? `&defaulttesttext=${encodeURIComponent(testTextResult?.tokens?.join('') || '')}`
                       : ''
@@ -162,7 +227,7 @@ export default function EmbedsPane({
                 currentNeuron?.index
               }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                 embedPlotsChecked ? 'true' : 'false'
-              }&embedtest=${embedTestChecked ? 'true' : 'false'}${
+              }&embedsteer=${embedSteerChecked ? 'true' : 'false'}&embedactivations=${embedActivationsChecked ? 'true' : 'false'}&embedlink=${embedLinkChecked ? 'true' : 'false'}&embedtest=${embedTestChecked ? 'true' : 'false'}${
                 embedDefaultTestTextChecked
                   ? `&defaulttesttext=${encodeURIComponent(testTextResult?.tokens?.join('') || '')}`
                   : ''
@@ -177,7 +242,7 @@ export default function EmbedsPane({
                     currentNeuron?.index
                   }?embed=true&embedexplanation=${embedExplanationChecked ? 'true' : 'false'}&embedplots=${
                     embedPlotsChecked ? 'true' : 'false'
-                  }&embedtest=${embedTestChecked ? 'true' : 'false'}${
+                  }&embedsteer=${embedSteerChecked ? 'true' : 'false'}&embedactivations=${embedActivationsChecked ? 'true' : 'false'}&embedlink=${embedLinkChecked ? 'true' : 'false'}&embedtest=${embedTestChecked ? 'true' : 'false'}${
                     embedDefaultTestTextChecked
                       ? `&defaulttesttext=${encodeURIComponent(testTextResult?.tokens?.join('') || '')}`
                       : ''

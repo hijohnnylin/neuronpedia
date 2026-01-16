@@ -97,6 +97,7 @@ class NPRequest:
             {},
         )
         headers["X-Api-Key"] = self.api_key
+        headers["Accept-Encoding"] = "gzip"
         url = f"{self.BASE_URL}/{self.endpoint}/{uri}"
         print(f"Sending {method} request to {url}")
         # print(f"Body: {json.dumps(kwargs.get('json', {}), indent=2)}")

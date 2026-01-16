@@ -4,10 +4,12 @@ import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '../env';
 
 export const STEER_N_COMPLETION_TOKENS = 64;
+export const STEER_N_COMPLETION_TOKENS_LARGE_LLM = 24;
 export const STEER_N_COMPLETION_TOKENS_GRAPH = 10;
 export const STEER_N_COMPLETION_TOKENS_THINKING = 512;
 export const STEER_N_COMPLETION_TOKENS_GRAPH_MAX = 20;
 export const STEER_N_COMPLETION_TOKENS_MAX = 256;
+export const STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM = 64;
 export const STEER_N_COMPLETION_TOKENS_MAX_THINKING = 768;
 export const STEER_TEMPERATURE = 0.5;
 export const STEER_TEMPERATURE_GRAPH = 0;

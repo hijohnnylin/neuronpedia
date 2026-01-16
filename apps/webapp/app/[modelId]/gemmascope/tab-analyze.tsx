@@ -275,6 +275,7 @@ export default function TabAnalyze({
                       setForceExtraCredit(true);
                     }}
                     hideSteer
+                    embed
                   />
                 </div>
               </div>

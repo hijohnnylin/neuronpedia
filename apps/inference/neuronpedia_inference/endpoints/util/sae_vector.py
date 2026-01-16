@@ -9,9 +9,7 @@ from neuronpedia_inference_client.models.util_sae_vector_post_request import (
 )
 
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import (
-    with_request_lock,
-)
+from neuronpedia_inference.shared import with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -30,4 +28,6 @@ async def sae_vector(request: UtilSaeVectorPostRequest):
 
     logger.info("Returning result: %s", result)
 
-    return UtilSaeVectorPost200Response(vector=result)
+    return UtilSaeVectorPost200Response(
+        vector=result, hookName=sae.cfg.metadata.hook_name
+    )

@@ -16,6 +16,7 @@ import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs'
 import VectorItem from '@/components/vector-item';
 import { neuronHasVectorInDatabase, shouldHideBreadcrumbsAndSelectorForNeuronVector } from '@/lib/utils/neuron-vector';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
+import { Download } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
@@ -33,7 +34,11 @@ export default function FeatureDashboard({
   embedPlots = true,
   embedTest = true,
   defaultTestText,
+  embedTestField = true,
   embedExplanation = true,
+  embedActivations = true,
+  embedLink = true,
+  embedSteer = true,
   forceMiniStats = false,
   activationMarkerValue,
 }: {
@@ -42,7 +47,11 @@ export default function FeatureDashboard({
   embedPlots?: boolean;
   embedTest?: boolean;
   defaultTestText?: string;
+  embedTestField?: boolean;
   embedExplanation?: boolean;
+  embedActivations?: boolean;
+  embedLink?: boolean;
+  embedSteer?: boolean;
   forceMiniStats?: boolean;
   activationMarkerValue?: number;
 }) {
@@ -150,6 +159,7 @@ export default function FeatureDashboard({
           <div className="fixed left-0 right-0 top-12 z-20 mb-0 flex justify-center gap-y-2 border-b bg-white px-2 pb-2 pt-1 shadow-[rgba(0,0,0,0.2)_0px_4px_3px_-3px] sm:static sm:top-16 sm:z-0 sm:mb-2 sm:flex-row sm:gap-y-0 sm:border-b-0 sm:border-t-0 sm:bg-transparent sm:px-2 sm:pb-0 sm:pt-3 sm:shadow-[0]">
             <div className="flex w-full flex-1 select-none flex-row justify-center gap-x-3 overflow-hidden px-0 pb-1 text-center font-sans text-xs font-bold leading-none text-slate-700 sm:gap-x-5 sm:px-0 sm:pt-0 sm:text-base">
               <FeatureSelector
+                filterToPublic
                 showNextPrev
                 defaultModelId={currentNeuron?.modelId || pathname.split('/')[1]}
                 defaultSourceSet={
@@ -164,6 +174,36 @@ export default function FeatureDashboard({
               />
             </div>
             <div className="hidden flex-row items-start justify-start gap-x-2 px-0 pt-1 sm:flex">
+              {allowTest() && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const response = await fetch('/api/vector/get', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        modelId: currentNeuron?.modelId,
+                        source: currentNeuron?.layer,
+                        index: currentNeuron?.index,
+                      }),
+                    });
+                    const data = await response.json();
+                    const blob = new Blob([JSON.stringify(data.vector, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${currentNeuron?.modelId}_${currentNeuron?.layer}_${currentNeuron?.index}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  aria-label="Download vector as JSON"
+                  className={`h-9 w-9 overflow-hidden rounded-full bg-slate-200 px-0 py-1.5 text-center text-xs font-bold uppercase text-slate-500/80 transition-all hover:enabled:bg-sky-300 hover:enabled:text-sky-800 disabled:bg-slate-400 disabled:opacity-60`}
+                >
+                  <div className="-mt-0.5 flex flex-row items-center justify-center">
+                    <Download className="h-5 w-5" />
+                  </div>
+                </button>
+              )}
               <BookmarkButton mini={false} currentNeuron={currentNeuron} />
             </div>
           </div>
@@ -235,7 +275,7 @@ export default function FeatureDashboard({
             embed ? 'flex-1' : 'sm:basis-1/2 lg:basis-2/3'
           } sm:overflow-auto sm:px-0`}
         >
-          {embed && !currentNeuron?.hasVector && !forceMiniStats && (
+          {embed && !currentNeuron?.hasVector && !forceMiniStats && embedLink && (
             <div
               className={`mb-2 flex w-full flex-row items-center sm:mb-2 ${
                 embedExplanation ? 'justify-between gap-x-2 pl-2' : 'justify-center'
@@ -264,6 +304,12 @@ export default function FeatureDashboard({
               </a>
             </div>
           )}
+          {!embedLink && (
+            <div className="mb-1.5 flex flex-row justify-end px-1">
+              <Image src="/logo.png" alt="Neuronpedia logo" width="18" height="18" />
+            </div>
+          )}
+
           <div
             className={`relative ${forceMiniStats ? 'mb-0' : 'mb-5'} flex h-full w-full flex-1 cursor-default flex-col overflow-hidden bg-white px-0 pt-0 shadow sm:overflow-visible sm:rounded-lg`}
             id="activationScrollDiv"
@@ -297,6 +343,10 @@ export default function FeatureDashboard({
                 }}
                 // by default we try to show the chat/formatted tokens instead of the raw tokens
                 defaultShowRawTokens={false}
+                // if false, only show the activation test
+                showActivations={embedActivations}
+                showSteerButton={embedSteer}
+                showTestField={embedTestField}
               />
             </div>
           </div>

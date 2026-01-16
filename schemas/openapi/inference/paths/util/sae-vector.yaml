@@ -31,10 +31,13 @@ post:
             type: object
             required:
               - vector
+              - hookName
             properties:
               vector:
                 type: array
                 items:
                   type: number
+              hookName:
+                type: string
     401:
       $ref: "../../../shared.yaml#/components/responses/UnauthorizedError"

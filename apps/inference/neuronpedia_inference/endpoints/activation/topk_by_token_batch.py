@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_TOP_K = 5
 
 # Maximum number of prompts that can be processed in a single batch
-MAX_BATCH_SIZE = 8
+MAX_BATCH_SIZE = 4
 
 router = APIRouter()
 
@@ -102,15 +102,16 @@ async def activation_topk_by_token_batch(
                 truncate=False,
             )[0]
 
-        if len(tokens) > config.token_limit:
+        batch_token_limit = config.token_limit / MAX_BATCH_SIZE
+        if len(tokens) > batch_token_limit:
             logger.error(
                 "Text too long: %s tokens, max is %s",
                 len(tokens),
-                config.token_limit,
+                batch_token_limit,
             )
             return JSONResponse(
                 content={
-                    "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
+                    "error": f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
                 },
                 status_code=400,
             )

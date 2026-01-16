@@ -84,7 +84,7 @@ export const upsertVector = async (
   });
 };
 
-export const getVector = async (modelId: string, source: string, index: string) => {
+export const getVectorFromDb = async (modelId: string, source: string, index: string) => {
   const neuron = prisma.neuron.findUnique({
     where: {
       modelId_layer_index: {

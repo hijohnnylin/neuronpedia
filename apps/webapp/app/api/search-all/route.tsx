@@ -155,7 +155,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
   // if it's a batch search, we don't need to check savedSearch or fetch the feature
   if (Array.isArray(body.text)) {
-    const result = (await runInferenceActivationAll(
+    const resultsBatch = (await runInferenceActivationAll(
       modelId,
       sourceSetName,
       body.text,
@@ -166,33 +166,29 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       request.user,
     )) as ActivationAllBatchPost200Response;
 
-    const inferenceActivations: InferenceActivationAllResult[][] = [];
-    result.results.forEach((promptResult) => {
-      const searchResults: InferenceActivationAllResult[] = [];
-      promptResult.activations.forEach((activation) => {
-        if (
-          (sortIndexes.length === 0 && activation.maxValue > 0) ||
-          (sortIndexes.length > 0 && activation.sumValues !== undefined && activation.sumValues > 0)
-        ) {
-          // eslint-disable-next-line
-          searchResults.push({
-            modelId,
-            layer: activation.source,
-            index: activation.index.toString(),
-            maxValue: activation.maxValue,
-            maxValueIndex: activation.maxValueIndex,
-            values: activation.values,
-            neuron: undefined,
-            dfaValues: activation.dfaValues,
-            dfaTargetIndex: activation.dfaTargetIndex,
-            dfaMaxValue: activation.dfaMaxValue,
-          });
-        }
-      });
-      inferenceActivations.push(searchResults);
+    const batchResults: InferenceActivationAllResponse[] = [];
+    resultsBatch.results.forEach((promptSearchAllResult) => {
+      const result: InferenceActivationAllResponse = {
+        tokens: promptSearchAllResult.tokens,
+        result: promptSearchAllResult.activations.map((activation) => ({
+          modelId,
+          layer: activation.source,
+          index: activation.index.toString(),
+          maxValue: activation.maxValue,
+          maxValueIndex: activation.maxValueIndex,
+          values: activation.values,
+          neuron: undefined,
+          dfaValues: activation.dfaValues,
+          dfaTargetIndex: activation.dfaTargetIndex,
+          dfaMaxValue: activation.dfaMaxValue,
+        })),
+        counts: promptSearchAllResult.counts,
+        sortIndexes,
+      };
+      batchResults.push(result);
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({ results: batchResults });
   }
   // see if we found this before
   const savedSearch = await prisma.savedSearch.findUnique({

@@ -77,7 +77,13 @@ export default async function Page({ params }: Props) {
 
         <Card className="mb-12 mt-2 w-full bg-white">
           <CardHeader className="flex flex-col px-3 pb-1 sm:px-8">
-            <Image src={meta.image} alt={meta.title} width={800} height={400} className="w-full rounded-md" />
+            <Image
+              src={meta.image}
+              alt={meta.title}
+              width={800}
+              height={400}
+              className="w-full rounded-md border border-slate-100"
+            />
             <CardTitle className="pb-0 pt-5 text-[22px] font-bold text-slate-800 sm:text-[28px]">
               {meta.title}
             </CardTitle>

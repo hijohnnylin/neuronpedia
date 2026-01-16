@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-import { InferenceHostSource, InferenceHostSourceOnSource } from '@prisma/client';
+import { InferenceEngine, InferenceHostSource, InferenceHostSourceOnSource } from '@prisma/client';
 import { IS_DOCKER_COMPOSE, USE_LOCALHOST_INFERENCE } from '../env';
 import { AuthenticatedUser } from '../with-user';
 import { getSourceInferenceHosts } from './source';
@@ -22,14 +22,18 @@ export const createInferenceHostSourceOnSource = async (input: InferenceHostSour
     data: { ...input },
   });
 
-export const getAllServerHostsForSourceSet = async (modelId: string, sourceSetName: string) => {
+export const getAllServerHostsForSourceSet = async (
+  modelId: string,
+  sourceSetName: string,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
+) => {
   const sources = await prisma.source.findMany({
     where: {
       modelId,
       setName: sourceSetName,
     },
     include: {
-      inferenceHosts: { include: { inferenceHost: true } },
+      inferenceHosts: { where: { inferenceHost: { engine } }, include: { inferenceHost: true } },
     },
   });
 
@@ -38,13 +42,16 @@ export const getAllServerHostsForSourceSet = async (modelId: string, sourceSetNa
   return allHosts;
 };
 
-export const getAllServerHostsForModel = async (modelId: string) => {
+export const getAllServerHostsForModel = async (
+  modelId: string,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
+) => {
   const sources = await prisma.source.findMany({
     where: {
       modelId,
     },
     include: {
-      inferenceHosts: { include: { inferenceHost: true } },
+      inferenceHosts: { where: { inferenceHost: { engine } }, include: { inferenceHost: true } },
     },
   });
 
@@ -57,6 +64,7 @@ export const getOneRandomServerHostForSourceSet = async (
   modelId: string,
   sourceSetName: string,
   user: AuthenticatedUser | null = null,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
 ) => {
   const canAccess = await userCanAccessModelAndSourceSet(modelId, sourceSetName, user, true);
   if (!canAccess) {
@@ -68,7 +76,7 @@ export const getOneRandomServerHostForSourceSet = async (
   }
 
   // TODO: we don't currently support search-all on different instances, so we assume these instances are all the same
-  const hosts = await getAllServerHostsForSourceSet(modelId, sourceSetName);
+  const hosts = await getAllServerHostsForSourceSet(modelId, sourceSetName, engine);
   if (hosts.length === 0) {
     return null;
   }
@@ -82,12 +90,13 @@ export const getOneRandomServerHostForSource = async (
   modelId: string,
   sourceId: string,
   user: AuthenticatedUser | null = null,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
 ) => {
   if (USE_LOCALHOST_INFERENCE) {
     return LOCALHOST_INFERENCE_HOST;
   }
 
-  const hosts = await getSourceInferenceHosts(modelId, sourceId, user);
+  const hosts = await getSourceInferenceHosts(modelId, sourceId, user, engine);
   if (!hosts) {
     throw new Error('Source not found.');
   }
@@ -96,12 +105,15 @@ export const getOneRandomServerHostForSource = async (
   return hosts[randomIndex].inferenceHost.hostUrl;
 };
 
-export const getOneRandomServerHostForModel = async (modelId: string) => {
+export const getOneRandomServerHostForModel = async (
+  modelId: string,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
+) => {
   if (USE_LOCALHOST_INFERENCE) {
     return LOCALHOST_INFERENCE_HOST;
   }
 
-  let hosts = await getAllServerHostsForModel(modelId);
+  let hosts = await getAllServerHostsForModel(modelId, engine);
   if (hosts.length === 0) {
     throw new Error('No hosts found.');
   }
@@ -112,12 +124,15 @@ export const getOneRandomServerHostForModel = async (modelId: string) => {
   return hosts[0];
 };
 
-export const getTwoRandomServerHostsForModel = async (modelId: string) => {
+export const getTwoRandomServerHostsForModel = async (
+  modelId: string,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
+) => {
   if (USE_LOCALHOST_INFERENCE) {
     return [LOCALHOST_INFERENCE_HOST, LOCALHOST_INFERENCE_HOST];
   }
 
-  let hosts = await getAllServerHostsForModel(modelId);
+  let hosts = await getAllServerHostsForModel(modelId, engine);
   if (hosts.length === 0) {
     throw new Error('No hosts found.');
   }
@@ -142,6 +157,7 @@ export const getTwoRandomServerHostsForSourceSet = async (
   modelId: string,
   sourceSetName: string,
   user: AuthenticatedUser | null = null,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
 ) => {
   if (USE_LOCALHOST_INFERENCE) {
     return [LOCALHOST_INFERENCE_HOST, LOCALHOST_INFERENCE_HOST];
@@ -154,7 +170,7 @@ export const getTwoRandomServerHostsForSourceSet = async (
   }
 
   // TODO: we don't currently support search-all on different instances, so we assume these instances are all the same
-  let hosts = await getAllServerHostsForSourceSet(modelId, sourceSetName);
+  let hosts = await getAllServerHostsForSourceSet(modelId, sourceSetName, engine);
   if (hosts.length === 0) {
     throw new Error('No hosts found.');
   }

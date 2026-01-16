@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "neuronpedia_inference_client"
-version = "1.6.2"
+version = "1.9.0"
 description = "Neuronpedia - Inference Server"
 authors = ["OpenAPI Generator Community <johnny@neuronpedia.org>"]
 license = "MIT"

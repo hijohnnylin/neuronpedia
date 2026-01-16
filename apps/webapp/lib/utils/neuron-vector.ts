@@ -7,6 +7,10 @@ export const VECTOR_VALID_HOOK_TYPE_TO_DETAILS: Record<string, { displayName: st
     displayName: 'Residual Stream Pre',
     sourceSetSuffix: 'resid-pre',
   },
+  hook_resid_post: {
+    displayName: 'Residual Stream Post',
+    sourceSetSuffix: 'resid-post',
+  },
 };
 
 // for not in own source, we don't want to show the feature selector at the top or the breadcrumbs

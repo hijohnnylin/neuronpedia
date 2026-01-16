@@ -8,6 +8,7 @@ Method | HTTP request | Description
 [**activation_all_post**](DefaultApi.md#activation_all_post) | **POST** /activation/all | For a given prompt, get the top activating features for a set of SAEs (eg gemmascope-res-65k), or specific SAEs in the set of SAEs (eg 0-gemmascope-res-65k, 5-gemmascope-res-65k). Also has other customization options.
 [**activation_single_batch_post**](DefaultApi.md#activation_single_batch_post) | **POST** /activation/single-batch | Given a batch of text prompts, returns the activation values for a single SAE latent or custom vector+hook.
 [**activation_single_post**](DefaultApi.md#activation_single_post) | **POST** /activation/single | Given a text prompt, returns the activation values for a single SAE latent or custom vector+hook.
+[**activation_source_post**](DefaultApi.md#activation_source_post) | **POST** /activation/source | For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.
 [**activation_topk_by_token_batch_post**](DefaultApi.md#activation_topk_by_token_batch_post) | **POST** /activation/topk-by-token-batch | For a given batch of prompts, get the top activating features at each token position for a single SAE.
 [**activation_topk_by_token_post**](DefaultApi.md#activation_topk_by_token_post) | **POST** /activation/topk-by-token | For a given prompt, get the top activating features at each token position for a single SAE.
 [**steer_completion_chat_post**](DefaultApi.md#steer_completion_chat_post) | **POST** /steer/completion-chat | For a given prompt, complete it by steering with the given feature or vector
@@ -314,6 +315,85 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**ActivationSinglePost200Response**](ActivationSinglePost200Response.md)
+
+### Authorization
+
+[SimpleSecretAuth](../README.md#SimpleSecretAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+### HTTP response details
+
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+**200** | Successfully retrieved results |  -  |
+**401** | X-SECRET-KEY header is missing or invalid |  * WWW_Authenticate -  <br>  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **activation_source_post**
+> ActivationSourcePost200Response activation_source_post(activation_source_post_request)
+
+For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.
+
+### Example
+
+* Api Key Authentication (SimpleSecretAuth):
+
+```python
+import neuronpedia_inference_client
+from neuronpedia_inference_client.models.activation_source_post200_response import ActivationSourcePost200Response
+from neuronpedia_inference_client.models.activation_source_post_request import ActivationSourcePostRequest
+from neuronpedia_inference_client.rest import ApiException
+from pprint import pprint
+
+# Defining the host is optional and defaults to /v1
+# See configuration.py for a list of all supported configuration parameters.
+configuration = neuronpedia_inference_client.Configuration(
+    host = "/v1"
+)
+
+# The client must configure the authentication and authorization parameters
+# in accordance with the API server security policy.
+# Examples for each auth method are provided below, use the example that
+# satisfies your auth use case.
+
+# Configure API key authorization: SimpleSecretAuth
+configuration.api_key['SimpleSecretAuth'] = os.environ["API_KEY"]
+
+# Uncomment below to setup prefix (e.g. Bearer) for API key, if needed
+# configuration.api_key_prefix['SimpleSecretAuth'] = 'Bearer'
+
+# Enter a context with an instance of the API client
+with neuronpedia_inference_client.ApiClient(configuration) as api_client:
+    # Create an instance of the API class
+    api_instance = neuronpedia_inference_client.DefaultApi(api_client)
+    activation_source_post_request = neuronpedia_inference_client.ActivationSourcePostRequest() # ActivationSourcePostRequest | 
+
+    try:
+        # For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.
+        api_response = api_instance.activation_source_post(activation_source_post_request)
+        print("The response of DefaultApi->activation_source_post:\n")
+        pprint(api_response)
+    except Exception as e:
+        print("Exception when calling DefaultApi->activation_source_post: %s\n" % e)
+```
+
+
+
+### Parameters
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **activation_source_post_request** | [**ActivationSourcePostRequest**](ActivationSourcePostRequest.md)|  | 
+
+### Return type
+
+[**ActivationSourcePost200Response**](ActivationSourcePost200Response.md)
 
 ### Authorization
 

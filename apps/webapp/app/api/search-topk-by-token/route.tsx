@@ -124,7 +124,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           })),
         });
       });
-      return NextResponse.json(toReturn);
+      return NextResponse.json({ results: toReturn });
     }
 
     const singleResult = result as ActivationTopkByTokenPost200Response;

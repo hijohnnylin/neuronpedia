@@ -70,7 +70,7 @@ On Neuronpedia, a vector or feature has a unique identifier comprised of three p
 - **Source:** A "group name" that starts with the layer number, and usually contains some other identifying information depending on what it is, like number of features in the group. Some examples of source:
   - `6-res-jb`: `6` = Layer 6, `res` = residual stream, `jb` = Joseph Bloom
   - `3-gemmascope-att-16k`: `3` = Layer 3, `gemmascope` = Gemma Scope, `att` = Attention, `16k` = 16k-width SAE
-- **Index:** The index in the model + group. This is a string, and currently the string is always an integer. However, this may change in the future.
+- **Index:** The index in the model + source. This is a string, and currently the string is always an integer. However, this may change in the future.
 
 Example:
 

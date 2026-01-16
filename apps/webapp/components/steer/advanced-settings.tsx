@@ -5,6 +5,7 @@ import {
   STEER_FREQUENCY_PENALTY_MIN,
   STEER_N_COMPLETION_TOKENS,
   STEER_N_COMPLETION_TOKENS_MAX,
+  STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
   STEER_SEED,
   STEER_SPECIAL_TOKENS,
@@ -18,7 +19,10 @@ import * as Select from '@radix-ui/react-select';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 import { NPSteerMethod } from 'neuronpedia-inference-client';
 
+export const STEER_METHODS_ALLOWED = [NPSteerMethod.SimpleAdditive, NPSteerMethod.OrthogonalDecomp];
+
 export default function SteerAdvancedSettings({
+  isNnSightModel = false,
   thinking,
   inCompletionMode,
   steerTokens,
@@ -38,6 +42,7 @@ export default function SteerAdvancedSettings({
   steerMethod,
   setSteerMethod,
 }: {
+  isNnSightModel: boolean;
   thinking: boolean;
   inCompletionMode: boolean;
   steerTokens: number;
@@ -70,11 +75,19 @@ export default function SteerAdvancedSettings({
             onChange={(e) => {
               if (
                 parseInt(e.target.value, 10) >
-                (thinking ? STEER_N_COMPLETION_TOKENS_MAX_THINKING : STEER_N_COMPLETION_TOKENS_MAX)
+                (thinking
+                  ? STEER_N_COMPLETION_TOKENS_MAX_THINKING
+                  : isNnSightModel
+                    ? STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM
+                    : STEER_N_COMPLETION_TOKENS_MAX)
               ) {
                 alert(
                   `Due to compute constraints, the current allowed max tokens is: ${
-                    thinking ? STEER_N_COMPLETION_TOKENS_MAX_THINKING : STEER_N_COMPLETION_TOKENS_MAX
+                    thinking
+                      ? STEER_N_COMPLETION_TOKENS_MAX_THINKING
+                      : isNnSightModel
+                        ? STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM
+                        : STEER_N_COMPLETION_TOKENS_MAX
                   }`,
                 );
               } else {
@@ -116,8 +129,9 @@ export default function SteerAdvancedSettings({
                 setFreqPenalty(parseFloat(e.target.value));
               }
             }}
-            className="max-w-[80px] flex-1 rounded-md border-slate-300 py-1 text-center text-xs text-slate-700"
+            className="max-w-[80px] flex-1 rounded-md border-slate-300 py-1 text-center text-xs text-slate-700 disabled:bg-slate-200 disabled:text-slate-400"
             value={freqPenalty}
+            disabled={isNnSightModel}
           />
         </div>
         <div className="flex w-full flex-row items-center justify-start gap-x-3">
@@ -180,17 +194,20 @@ export default function SteerAdvancedSettings({
             <Select.Portal>
               <Select.Content className="overflow-hidden rounded-md border bg-white shadow-lg">
                 <Select.Viewport>
-                  {Object.entries(NPSteerMethod).map(([key, value]) => (
-                    <Select.Item
-                      key={key}
-                      value={value}
-                      className="relative flex cursor-pointer items-center px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
-                    >
-                      <Select.ItemText className="flex-1 text-center">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </Select.ItemText>
-                    </Select.Item>
-                  ))}
+                  {Object.entries(NPSteerMethod)
+                    // @ts-ignore
+                    .filter(([_, value]) => STEER_METHODS_ALLOWED.includes(value))
+                    .map(([key, value]) => (
+                      <Select.Item
+                        key={key}
+                        value={value}
+                        className="relative flex cursor-pointer items-center px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
+                      >
+                        <Select.ItemText className="flex-1 text-center">
+                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        </Select.ItemText>
+                      </Select.Item>
+                    ))}
                 </Select.Viewport>
               </Select.Content>
             </Select.Portal>

@@ -78,7 +78,7 @@ export default function SearchTopkByToken({
   const [densityThreshold, setDensityThreshold] = useState<number>(
     initialDensityThreshold ?? DEFAULT_DENSITY_THRESHOLD_CLIENT,
   );
-  const [ignoreBos, setIgnoreBos] = useState<boolean>(initialIgnoreBos ?? true);
+  const [ignoreBos, setIgnoreBos] = useState<boolean>(initialIgnoreBos !== undefined ? initialIgnoreBos : true);
   const formRef = useRef<
     FormikProps<{
       searchQuery: string;
@@ -259,9 +259,6 @@ export default function SearchTopkByToken({
       if (initialDensityThreshold !== undefined) {
         setDensityThreshold(initialDensityThreshold);
       }
-      if (initialIgnoreBos !== undefined) {
-        setIgnoreBos(initialIgnoreBos);
-      }
       if (initialSortBy !== undefined) {
         setSortBy(initialSortBy);
       }
@@ -434,7 +431,7 @@ export default function SearchTopkByToken({
           <ToggleGroup.Root
             className="inline-flex flex-1 overflow-hidden rounded-md border border-slate-300 bg-slate-300 px-0 py-0"
             type="single"
-            defaultValue={ignoreBos ? 'ignore' : 'show'}
+            defaultValue={initialIgnoreBos ? 'ignore' : 'show'}
             value={ignoreBos ? 'ignore' : 'show'}
             onValueChange={(value) => {
               setIgnoreBos(value === 'ignore');
@@ -513,7 +510,7 @@ export default function SearchTopkByToken({
       </div>
       <div
         className={`flex h-full flex-col pt-5 transition-all sm:min-h-full sm:pt-0 ${
-          !topkResult && !isSearching ? 'w-[0px] max-w-[0px] overflow-hidden' : 'flex-1 sm:pl-5'
+          !topkResult && !isSearching ? 'w-[0px] max-w-[0px] overflow-hidden' : 'w-full flex-1 sm:pl-5'
         }`}
       >
         <div id="tokens" className="flex flex-col">
@@ -584,7 +581,7 @@ export default function SearchTopkByToken({
         </div>
         <div ref={scrollRef} className="mt-3 flex w-full flex-1 flex-col overflow-y-hidden transition-all">
           {topkResult && !isSearching && (
-            <div className="flex h-full max-h-full flex-1 flex-col items-center justify-center">
+            <div className="flex w-full flex-1 flex-col items-center justify-center sm:h-full sm:max-h-full">
               <div className="mt-0 flex w-full flex-col gap-y-2 pb-24 sm:h-full sm:max-h-full sm:overflow-y-scroll">
                 {lockedTokenPosition === -1 && hoveredTokenPosition === -1
                   ? topkFeatures?.map((f, i) => (

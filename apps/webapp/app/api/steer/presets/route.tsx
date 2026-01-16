@@ -516,6 +516,21 @@ const FEATURE_PRESETS: {
     },
   ],
   'gemma-2-9b': [],
+  'gpt-oss-20b': [
+    {
+      name: '🎭 Jokes and Puns',
+      features: [
+        {
+          modelId: 'gpt-oss-20b',
+          layer: '15-resid-post-aa',
+          index: 37788,
+          explanation: 'jokes and puns',
+          strength: 2000,
+        },
+      ],
+      exampleSteerOutputId: 'cmjt45nub001n7gd3tx4h3gfu',
+    },
+  ],
   'llama3.1-8b': [
     {
       name: '🐱 Cats',

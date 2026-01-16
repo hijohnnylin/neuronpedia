@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     // https://github.com/vitest-dev/vitest/issues/990
     globals: true,
-    include: ['components/**/*.test.tsx'],
+    include: ['components/**/*.test.tsx', 'lib/**/*.test.ts'],
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     deps: {
@@ -24,7 +24,7 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      include: ['components/**/*.{ts,tsx}'],
+      include: ['components/**/*.{ts,tsx}', 'lib/**/*.ts'],
       exclude: ['**/*.test.{ts,tsx}', '**/__tests__/**'],
     },
   },

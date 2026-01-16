@@ -20,7 +20,6 @@ from neuronpedia_inference_client.models.activation_single_post200_response_acti
 from nnterp import StandardizedTransformer
 from transformer_lens import ActivationCache, HookedTransformer
 
-# from transformer_lens.model_bridge import TransformerBridge
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, with_request_lock
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Maximum number of prompts that can be processed in a single batch
-MAX_BATCH_SIZE = 8
+MAX_BATCH_SIZE = 4
 
 
 @router.post("/activation/single-batch")
@@ -116,15 +115,16 @@ async def activation_single_batch(
                     truncate=False,
                 )[0]
 
-            if len(tokens) > config.token_limit:
+            batch_token_limit = config.token_limit / MAX_BATCH_SIZE
+            if len(tokens) > batch_token_limit:
                 logger.error(
                     "Text too long: %s tokens, max is %s",
                     len(tokens),
-                    config.token_limit,
+                    batch_token_limit,
                 )
                 return JSONResponse(
                     content={
-                        "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
+                        "error": f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
                     },
                     status_code=400,
                 )
@@ -175,15 +175,16 @@ async def activation_single_batch(
                 prepend_bos=prepend_bos,
                 truncate=False,
             )[0]
-            if len(tokens) > config.token_limit:
+            batch_token_limit = config.token_limit / MAX_BATCH_SIZE
+            if len(tokens) > batch_token_limit:
                 logger.error(
                     "Text too long: %s tokens, max is %s",
                     len(tokens),
-                    config.token_limit,
+                    batch_token_limit,
                 )
                 return JSONResponse(
                     content={
-                        "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
+                        "error": f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
                     },
                     status_code=400,
                 )
@@ -374,9 +375,6 @@ def process_saelens_activations(
     # zero out all values that are the BOS token
     for idx in bos_indices:
         values[idx] = 0
-    # if the first token was the BOS token, then offset outputs by one removing teh first token
-    if len(bos_indices) > 0:
-        values = values[1:]
 
     max_value = max(values)
     return ActivationSinglePost200ResponseActivation(

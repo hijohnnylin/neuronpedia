@@ -1,18 +1,8 @@
-from typing import List, Optional, TypedDict
+from typing import List, Optional
 
+from neuronpedia.np_activation import Activation
 from neuronpedia.requests.base_request import NPRequest
 from requests import Response
-
-
-class Activation(TypedDict):
-    tokens: List[str]
-    values: List[float]
-
-    def __init__(self, tokens: List[str], values: List[float]):
-        if len(tokens) != len(values):
-            raise ValueError("tokens and activation values must have the same length")
-        self["tokens"] = tokens
-        self["values"] = values
 
 
 class ActivationRequest(NPRequest):
@@ -22,9 +12,24 @@ class ActivationRequest(NPRequest):
     ):
         super().__init__("activation", api_key=api_key)
 
+    def compute_all_source_activations_for_text(
+        self, model_id: str, source: str, text: str | list[str]
+    ):
+        payload = {
+            "customText": text,
+            "modelId": model_id,
+            "source": source,
+        }
+        data = self.send_request(method="POST", json=payload, uri="source")
+
+        # allow the consumer to parse the results as they see fit
+        return data["results"]
+
     def compute_activation_for_text(
         self, model_id: str, source: str, index: str, text: str
     ) -> Activation:
+        if isinstance(index, int):
+            index = str(index)
         payload = {
             "feature": {
                 "modelId": model_id,
@@ -36,7 +41,39 @@ class ActivationRequest(NPRequest):
 
         result = self.send_request(method="POST", json=payload, uri="new")
 
-        return Activation(tokens=result["tokens"], values=result["values"])
+        return Activation(
+            modelId=model_id,
+            source=source,
+            index=index,
+            tokens=result["tokens"],
+            values=result["values"],
+        )
+
+    def compute_activation_for_texts(
+        self, model_id: str, source: str, index: str, texts: List[str]
+    ) -> List[Activation]:
+        if isinstance(index, int):
+            index = str(index)
+        payload = {
+            "feature": {
+                "modelId": model_id,
+                "layer": source,
+                "index": index,
+            },
+            "customText": texts,
+        }
+
+        results = self.send_request(method="POST", json=payload, uri="new")
+        return [
+            Activation(
+                modelId=model_id,
+                source=source,
+                index=index,
+                tokens=result["tokens"],
+                values=result["values"],
+            )
+            for result in results
+        ]
 
     def upload_batch(
         self,

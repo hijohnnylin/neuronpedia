@@ -18,6 +18,8 @@ from neuronpedia_inference_client.models.steer_completion_post200_response impor
 from neuronpedia_inference_client.models.steer_completion_request import (
     SteerCompletionRequest,
 )
+from nnterp import StandardizedTransformer
+from transformer_lens import HookedTransformer
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.inference_utils.steering import (
@@ -36,6 +38,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 TOKENS_PER_YIELD = 1
+
+
+def get_layer_num_from_sae_id(sae_id: str) -> int:
+    return int(sae_id.split("-")[0]) if not sae_id.isdigit() else int(sae_id)
 
 
 @router.post("/steer/completion")
@@ -75,9 +81,22 @@ async def completion(request: SteerCompletionRequest):
 
     prompt = request.prompt
 
-    tokens = model.to_tokens(
-        prompt, prepend_bos=model.cfg.tokenizer_prepends_bos, truncate=False
-    )[0]
+    # if the prompt doesn't start with the bos, prepend it
+    bos_token = model.tokenizer.bos_token
+    if not prompt.startswith(bos_token):
+        prompt = bos_token + prompt
+
+    tokens = []
+    if isinstance(model, HookedTransformer):
+        tokens = model.to_tokens(
+            prompt, prepend_bos=model.cfg.tokenizer_prepends_bos, truncate=False
+        )[0]
+    elif isinstance(model, StandardizedTransformer):
+        tokens = model.tokenizer(prompt, add_special_tokens=False, return_tensors="pt")[
+            "input_ids"
+        ][0]
+        if (request.n_logprobs is not None) and (request.n_logprobs > 0):
+            request.n_logprobs = 0
 
     if len(tokens) > config.token_limit:
         logger.error(
@@ -152,13 +171,13 @@ async def run_batched_generate(
         model = Model.get_instance()
         sae_manager = SAEManager.get_instance()
 
-        # Add device logging
-        logger.info(f"Model device: {model.cfg.device}")
-
         if seed is not None:
             torch.manual_seed(seed)
 
-        def steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
+        # for TransformerLens, use steering_hook
+        def steering_hook(
+            activations: torch.Tensor, hook: Any
+        ) -> torch.Tensor:  # noqa: ARG001
             # Log activation device
             logger.info(f"Activations device: {activations.device}")
 
@@ -205,7 +224,15 @@ async def run_batched_generate(
             NPSteerType.STEERED in steer_types and NPSteerType.DEFAULT in steer_types
         )
 
-        tokenized = model.to_tokens(prompt)[0]
+        tokenized = []
+        if isinstance(model, HookedTransformer):
+            tokenized = model.to_tokens(
+                prompt, prepend_bos=model.cfg.tokenizer_prepends_bos, truncate=False
+            )[0]
+        elif isinstance(model, StandardizedTransformer):
+            tokenized = model.tokenizer(
+                prompt, add_special_tokens=False, return_tensors="pt"
+            )["input_ids"][0]
         logger.info(f"Tokenized input device: {tokenized.device}")
 
         if generate_both:
@@ -214,30 +241,218 @@ async def run_batched_generate(
             steered_logprobs = None
             default_logprobs = None
 
+            steered_partial_result_array: list[str] = []
+            default_partial_result_array: list[str] = []
+            steered_logprobs = None
+            default_logprobs = None
+
             # Generate STEERED and DEFAULT separately
             for flag in [NPSteerType.STEERED, NPSteerType.DEFAULT]:
                 if seed is not None:
                     torch.manual_seed(seed)  # Reset seed for each generation
 
-                model.reset_hooks()
-                if flag == NPSteerType.STEERED:
-                    editing_hooks = [
-                        (
+                if isinstance(model, HookedTransformer):
+                    model.reset_hooks()
+                    if flag == NPSteerType.STEERED:
+                        editing_hooks = [
                             (
-                                sae_manager.get_sae_hook(feature.source)
-                                if isinstance(feature, NPSteerFeature)
-                                else feature.hook
-                            ),
-                            steering_hook,
-                        )
-                        for feature in features
-                    ]
-                else:
-                    editing_hooks = []
+                                (
+                                    sae_manager.get_sae_hook(feature.source)
+                                    if isinstance(feature, NPSteerFeature)
+                                    else feature.hook
+                                ),
+                                steering_hook,
+                            )
+                            for feature in features
+                        ]
+                    else:
+                        editing_hooks = []
 
-                logprobs = []
+                    logprobs = []
+
+                    with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
+                        for i, (result, logits) in enumerate(
+                            model.generate_stream(
+                                stop_at_eos=(model.cfg.device != "mps"),
+                                input=tokenized.unsqueeze(0),
+                                do_sample=True,
+                                max_tokens_per_yield=TOKENS_PER_YIELD,
+                                return_logits=True,
+                                **kwargs,
+                            )
+                        ):
+                            to_append = ""
+                            if i == 0:
+                                to_append = model.to_string(result[0][1:])  # type: ignore
+                            else:
+                                to_append = model.to_string(result[0])  # type: ignore
+
+                            if n_logprobs > 0:
+                                current_logprobs = make_logprob_from_logits(
+                                    result,  # type: ignore
+                                    logits,  # type: ignore
+                                    model,
+                                    n_logprobs,
+                                )
+                                logprobs.append(current_logprobs)
+
+                            if flag == NPSteerType.STEERED:
+                                steered_partial_result += to_append  # type: ignore
+                                steered_logprobs = logprobs.copy() or None
+                            else:
+                                default_partial_result += to_append  # type: ignore
+                                default_logprobs = logprobs.copy() or None
+
+                            to_return = make_steer_completion_response(
+                                steer_types,
+                                steered_partial_result,
+                                default_partial_result,
+                                steered_logprobs,
+                                default_logprobs,
+                            )  # type: ignore
+                            yield format_sse_message(to_return.to_json())
+
+                elif isinstance(model, StandardizedTransformer):
+                    logger.info("nnsight")
+                    if kwargs.get("freq_penalty"):
+                        logger.warning(
+                            "freq_penalty is not supported for StandardizedTransformer models, it will be ignored"
+                        )
+
+                    # for nnsight we don't yield one token at a time (it hangs for some reason)
+                    # so we just send one message at the end
+                    with model.generate(
+                        prompt,
+                        temperature=kwargs.get("temperature"),
+                        max_new_tokens=kwargs.get("max_new_tokens"),
+                        do_sample=kwargs.get("do_sample", True),
+                    ) as tracer:
+                        with tracer.all():
+                            token = model.generator.streamer.output
+                            token_str = model.tokenizer.decode(token[-1])
+
+                            to_append = token_str  # type: ignore
+
+                            # if n_logprobs > 0:
+                            #     current_logprobs = make_logprob_from_logits(
+                            #         result,  # type: ignore
+                            #         logits,  # type: ignore
+                            #         model,
+                            #         n_logprobs,
+                            #     )
+                            #     logprobs.append(current_logprobs)
+
+                            if flag == NPSteerType.STEERED:
+                                steered_partial_result_array.append(to_append)  # type: ignore
+                                # steered_logprobs = logprobs.copy() or None
+
+                                for feature in features:
+                                    # get layer number
+                                    hook_name = (
+                                        sae_manager.get_sae_hook(feature.source)
+                                        if isinstance(feature, NPSteerFeature)
+                                        else feature.hook
+                                    )
+                                    if "resid_post" in hook_name:
+                                        layer = int(
+                                            hook_name.split(".")[1]
+                                        )  # blocks.0.hook_resid_post -> 0
+                                    elif "resid_pre" in hook_name:
+                                        layer = (
+                                            int(hook_name.split(".")[1]) - 1
+                                        )  # blocks.1.hook_resid_pre -> 0
+                                    else:
+                                        raise ValueError(
+                                            f"Unsupported hook name for nnsight: {hook_name}"
+                                        )
+
+                                    # only supporting resid_pre and post in nnsight for now
+                                    steering_vector = torch.tensor(
+                                        feature.steering_vector
+                                    ).to(model.device)
+
+                                    if not torch.isfinite(steering_vector).all():
+                                        raise ValueError(
+                                            "Steering vector contains inf or nan values"
+                                        )
+
+                                    if normalize_steering:
+                                        norm = torch.norm(steering_vector)
+                                        if norm == 0:
+                                            raise ValueError(
+                                                "Zero norm steering vector"
+                                            )
+                                        steering_vector = steering_vector / norm
+
+                                    coeff = strength_multiplier * feature.strength
+
+                                    if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
+                                        model.layers_output[
+                                            layer - 1
+                                        ] += coeff * steering_vector.to(
+                                            model.layers_output[layer - 1].device
+                                        )
+                                    elif (
+                                        steer_method == NPSteerMethod.ORTHOGONAL_DECOMP
+                                    ):
+                                        projector = OrthogonalProjector(
+                                            steering_vector.to(
+                                                model.layers_output[layer - 1].device
+                                            )
+                                        )
+                                        model.layers_output[layer - 1] = (
+                                            projector.project(
+                                                model.layers_output[layer - 1], coeff
+                                            )
+                                        )
+                            else:
+                                default_partial_result_array.append(to_append)  # type: ignore
+                                # default_logprobs = logprobs.copy() or None
+
+                            # to_return = make_steer_completion_response(
+                            #     steer_types,
+                            #     "".join(steered_partial_result_array),
+                            #     "".join(default_partial_result_array),
+                            #     steered_logprobs,
+                            #     default_logprobs,
+                            # )  # type: ignore
+
+            # for nnsight we don't yield one token at a time (it hangs for some reason)
+            # so we just send one message at the end
+            if isinstance(model, StandardizedTransformer):
+                to_return = make_steer_completion_response(
+                    steer_types,
+                    "".join(steered_partial_result_array),
+                    "".join(default_partial_result_array),
+                    steered_logprobs,
+                    default_logprobs,
+                )  # type: ignore
+                yield format_sse_message(to_return.to_json())
+        else:
+            steer_type = steer_types[0]
+            if seed is not None:
+                torch.manual_seed(seed)
+
+            partial_result_array: list[str] = []
+
+            if isinstance(model, HookedTransformer):
+                model.reset_hooks()
+                editing_hooks = [
+                    (
+                        (
+                            sae_manager.get_sae_hook(feature.source)
+                            if isinstance(feature, NPSteerFeature)
+                            else feature.hook
+                        ),
+                        steering_hook,
+                    )
+                    for feature in features
+                ]
 
                 with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
+                    partial_result = ""
+                    logprobs = []
+
                     for i, (result, logits) in enumerate(
                         model.generate_stream(
                             stop_at_eos=(model.cfg.device != "mps"),
@@ -248,11 +463,10 @@ async def run_batched_generate(
                             **kwargs,
                         )
                     ):
-                        to_append = ""
                         if i == 0:
-                            to_append = model.to_string(result[0][1:])  # type: ignore
+                            partial_result = model.to_string(result[0][1:])  # type: ignore
                         else:
-                            to_append = model.to_string(result[0])  # type: ignore
+                            partial_result += model.to_string(result[0])  # type: ignore
 
                         if n_logprobs > 0:
                             current_logprobs = make_logprob_from_logits(
@@ -263,76 +477,99 @@ async def run_batched_generate(
                             )
                             logprobs.append(current_logprobs)
 
-                        if flag == NPSteerType.STEERED:
-                            steered_partial_result += to_append  # type: ignore
-                            steered_logprobs = logprobs.copy() or None
-                        else:
-                            default_partial_result += to_append  # type: ignore
-                            default_logprobs = logprobs.copy() or None
-
                         to_return = make_steer_completion_response(
-                            steer_types,
-                            steered_partial_result,
-                            default_partial_result,
-                            steered_logprobs,
-                            default_logprobs,
-                        )  # type: ignore
+                            [steer_type],
+                            partial_result,  # type: ignore
+                            partial_result,  # type: ignore
+                            logprobs or None,
+                            logprobs or None,
+                        )
                         yield format_sse_message(to_return.to_json())
 
-        else:
-            steer_type = steer_types[0]
-            if seed is not None:
-                torch.manual_seed(seed)
-
-            model.reset_hooks()
-            editing_hooks = [
-                (
-                    (
-                        sae_manager.get_sae_hook(feature.source)
-                        if isinstance(feature, NPSteerFeature)
-                        else feature.hook
-                    ),
-                    steering_hook,
-                )
-                for feature in features
-            ]
-
-            with model.hooks(fwd_hooks=editing_hooks):  # type: ignore
-                partial_result = ""
-                logprobs = []
-
-                for i, (result, logits) in enumerate(
-                    model.generate_stream(
-                        stop_at_eos=(model.cfg.device != "mps"),
-                        input=tokenized.unsqueeze(0),
-                        do_sample=True,
-                        max_tokens_per_yield=TOKENS_PER_YIELD,
-                        return_logits=True,
-                        **kwargs,
+            elif isinstance(model, StandardizedTransformer):
+                logger.info("nnsight")
+                if kwargs.get("freq_penalty"):
+                    logger.warning(
+                        "freq_penalty is not supported for StandardizedTransformer models, it will be ignored"
                     )
-                ):
-                    if i == 0:
-                        partial_result = model.to_string(result[0][1:])  # type: ignore
-                    else:
-                        partial_result += model.to_string(result[0])  # type: ignore
 
-                    if n_logprobs > 0:
-                        current_logprobs = make_logprob_from_logits(
-                            result,  # type: ignore
-                            logits,  # type: ignore
-                            model,
-                            n_logprobs,
-                        )
-                        logprobs.append(current_logprobs)
+                with model.generate(
+                    prompt,
+                    temperature=kwargs.get("temperature"),
+                    max_new_tokens=kwargs.get("max_new_tokens"),
+                    do_sample=kwargs.get("do_sample", True),
+                ) as tracer:
+                    with tracer.all():
+                        token = model.generator.streamer.output
+                        partial_result_array.append(model.tokenizer.decode(token[-1]))  # type: ignore
 
-                    to_return = make_steer_completion_response(
-                        [steer_type],
-                        partial_result,  # type: ignore
-                        partial_result,  # type: ignore
-                        logprobs or None,
-                        logprobs or None,
-                    )
-                    yield format_sse_message(to_return.to_json())
+                        if steer_type == NPSteerType.STEERED:
+                            # steered_logprobs = logprobs.copy() or None
+
+                            for feature in features:
+                                # get layer number
+                                hook_name = (
+                                    sae_manager.get_sae_hook(feature.source)
+                                    if isinstance(feature, NPSteerFeature)
+                                    else feature.hook
+                                )
+                                if "resid_post" in hook_name:
+                                    layer = int(
+                                        hook_name.split(".")[1]
+                                    )  # blocks.0.hook_resid_post -> 0
+                                elif "resid_pre" in hook_name:
+                                    layer = (
+                                        int(hook_name.split(".")[1]) - 1
+                                    )  # blocks.1.hook_resid_pre -> 0
+                                else:
+                                    raise ValueError(
+                                        f"Unsupported hook name for nnsight: {hook_name}"
+                                    )
+
+                                # only supporting resid_pre and post in nnsight for now
+                                steering_vector = torch.tensor(
+                                    feature.steering_vector
+                                ).to(model.device)
+
+                                if not torch.isfinite(steering_vector).all():
+                                    raise ValueError(
+                                        "Steering vector contains inf or nan values"
+                                    )
+
+                                if normalize_steering:
+                                    norm = torch.norm(steering_vector)
+                                    if norm == 0:
+                                        raise ValueError("Zero norm steering vector")
+                                    steering_vector = steering_vector / norm
+
+                                coeff = strength_multiplier * feature.strength
+
+                                if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
+                                    model.layers_output[
+                                        layer - 1
+                                    ] += coeff * steering_vector.to(
+                                        model.layers_output[layer - 1].device
+                                    )
+                                elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
+                                    projector = OrthogonalProjector(
+                                        steering_vector.to(
+                                            model.layers_output[layer - 1].device
+                                        )
+                                    )
+                                    model.layers_output[layer - 1] = projector.project(
+                                        model.layers_output[layer - 1], coeff
+                                    )
+                        else:
+                            pass  # not steering
+                            # default_logprobs = logprobs.copy() or None
+                to_return = make_steer_completion_response(
+                    [steer_type],
+                    "".join(partial_result_array),
+                    "".join(partial_result_array),
+                    None,
+                    None,
+                )  # type: ignore
+                yield format_sse_message(to_return.to_json())
 
 
 def make_steer_completion_response(

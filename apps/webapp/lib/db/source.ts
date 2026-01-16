@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { AuthenticatedUser } from '@/lib/with-user';
-import { Source, SourceRelease, SourceSet, Visibility } from '@prisma/client';
+import { InferenceEngine, Source, SourceRelease, SourceSet, Visibility } from '@prisma/client';
 import { DEFAULT_CREATOR_USER_ID } from '../env';
 
 import {
@@ -61,6 +61,7 @@ export const getSourceInferenceHosts = async (
   modelId: string,
   sourceId: string,
   user: AuthenticatedUser | null = null,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
 ) => {
   const canAccess = await userCanAccessModelAndSourceSet(modelId, getSourceSetNameFromSource(sourceId), user, true);
   if (!canAccess) {
@@ -71,6 +72,9 @@ export const getSourceInferenceHosts = async (
     where: {
       sourceModelId: modelId,
       sourceId,
+      inferenceHost: {
+        engine,
+      },
     },
     include: {
       inferenceHost: true,

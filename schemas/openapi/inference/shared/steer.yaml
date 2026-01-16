@@ -45,7 +45,7 @@ components:
 
     NPSteerMethod:
       type: string
-      enum: ["SIMPLE_ADDITIVE", "ORTHOGONAL_DECOMP"]
+      enum: ["SIMPLE_ADDITIVE", "ORTHOGONAL_DECOMP", "PROJECTION_CAP"]
 
     NPLogprobTop:
       type: object
@@ -83,7 +83,7 @@ components:
 
     NPSteerCompletionResponseInner:
       type: object
-      description: A streamed steering/default response. Output is either the whole response or a chunk, depending on response type. 
+      description: A streamed steering/default response. Output is either the whole response or a chunk, depending on response type.
       required:
         - type
         - output

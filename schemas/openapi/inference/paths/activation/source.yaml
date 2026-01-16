@@ -1,0 +1,64 @@
+post:
+  summary: For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          description: For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.
+          required:
+            - prompts
+            - model
+            - source
+          properties:
+            prompts:
+              type: array
+              items:
+                type: string
+              description: Input text prompt to get activations for
+            model:
+              type: string
+              description: Name of the model to test activations on
+            source:
+              type: string
+              description: The source (eg 5-gemmascope-res-16k)
+  responses:
+    "200":
+      description: Successfully retrieved results
+      content:
+        application/json:
+          schema:
+            type: object
+            description: All prompts results, only including non-zero features and non-zero activations
+            required:
+              - results
+            properties:
+              results:
+                type: array
+                items:
+                  type: object
+                  description: One prompt's results, only including non-zero values and non-zero activations
+                  required:
+                    - tokens
+                    - result
+                  properties:
+                    tokens:
+                      type: array
+                      description: The prompt, tokenized.
+                      items:
+                        type: string
+                    activeFeatures:
+                      type: object
+                      description: Dictionary mapping feature indices to arrays of [token_index, activation_value]
+                      additionalProperties:
+                        type: array
+                        description: Array of [token_index, activation_value] pairs for this feature
+                        items:
+                          type: array
+                          items:
+                            type: number
+                          minItems: 2
+                          maxItems: 2
+    401:
+      $ref: "../../../shared.yaml#/components/responses/UnauthorizedError"

@@ -6,6 +6,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **vector** | **List[float]** |  | 
+**hook_name** | **str** |  | 
 
 ## Example
 

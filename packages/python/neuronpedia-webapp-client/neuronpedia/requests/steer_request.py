@@ -1,10 +1,13 @@
 from typing import Optional
 
+from neuronpedia.np_feature import SteerFeature
 from neuronpedia.np_vector import NPVector
 from neuronpedia.requests.base_request import NPRequest
 from requests import Response
 
 ChatMessage = dict[str, str]
+
+nnsight_models = ["llama3.3-70b-it", "gpt-oss-20b"]
 
 
 class SteerChatRequest(NPRequest):
@@ -55,6 +58,46 @@ class SteerChatRequest(NPRequest):
         }
         return self.send_request(method="POST", json=payload)
 
+    def steer_features(
+        self,
+        model_id: str,
+        features: list[SteerFeature],
+        default_chat_messages: list[ChatMessage],
+        steered_chat_messages: list[ChatMessage],
+        temperature: float = 0.5,
+        n_tokens: int = 24,
+        freq_penalty: float = 2,
+        seed: int = 42,
+        strength_multiplier: float = 4,
+        steer_special_tokens: bool = True,
+    ) -> Response:
+        if model_id in nnsight_models:
+            print(
+                "Warning: Frequency penalty is not supported for this model and will have no effect."
+            )
+        features = [
+            {
+                "modelId": feature.modelId,
+                "layer": feature.source,
+                "index": feature.index,
+                "strength": feature.strength,
+            }
+            for feature in features
+        ]
+        payload = {
+            "modelId": model_id,
+            "features": features,
+            "defaultChatMessages": default_chat_messages,
+            "steeredChatMessages": steered_chat_messages,
+            "temperature": temperature,
+            "n_tokens": n_tokens,
+            "freq_penalty": freq_penalty,
+            "seed": seed,
+            "strength_multiplier": strength_multiplier,
+            "steer_special_tokens": steer_special_tokens,
+        }
+        return self.send_request(method="POST", json=payload)
+
 
 class SteerCompletionRequest(NPRequest):
     def __init__(self, api_key: Optional[str] = None):
@@ -80,6 +123,42 @@ class SteerCompletionRequest(NPRequest):
                 "strength": vector.default_steer_strength,
             }
             for vector in vectors
+        ]
+        payload = {
+            "modelId": model_id,
+            "features": features,
+            "prompt": prompt,
+            "temperature": temperature,
+            "n_tokens": n_tokens,
+            "freq_penalty": freq_penalty,
+            "seed": seed,
+            "strength_multiplier": strength_multiplier,
+        }
+        return self.send_request(method="POST", json=payload)
+
+    def steer_features(
+        self,
+        model_id: str,
+        features: list[SteerFeature],
+        prompt: str,
+        temperature: float = 0.5,
+        n_tokens: int = 24,
+        freq_penalty: float = 2,
+        seed: int = 42,
+        strength_multiplier: float = 4,
+    ) -> Response:
+        if model_id in nnsight_models:
+            print(
+                "Warning: Frequency penalty is not supported for this model and will have no effect."
+            )
+        features = [
+            {
+                "modelId": feature.modelId,
+                "layer": feature.source,
+                "index": feature.index,
+                "strength": feature.strength,
+            }
+            for feature in features
         ]
         payload = {
             "modelId": model_id,

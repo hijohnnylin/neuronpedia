@@ -51,9 +51,10 @@ const newVectorSchema = object({
  *                 description: Layer number in the model (0-based)
  *               hookType:
  *                 type: string
- *                 description: Hook type. Currently only "resid-pre" is supported.
+ *                 description: Hook type. Currently only "resid-pre" and "resid-post" are supported.
  *                 enum:
  *                   - resid-pre
+ *                   - resid-post
  *               vector:
  *                 type: array
  *                 items:

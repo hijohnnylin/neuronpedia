@@ -1,0 +1,218 @@
+---
+title: 'Llama 3.3 70B, Temporal Feature Analysis, Featured Research, gpt-oss-20b, and *a lot more*'
+description: 'We Waited Too Long to Release an Update Post 😅'
+date: 2025-11-12
+author: Johnny Lin
+image: ASSET_BASE_URL/blog/temporal.gif
+imagePreview: ASSET_BASE_URL/blog/temporal.gif
+---
+
+# In This Edition
+
+- **🦙 Llama 3.3 70B Instruct** - Inference, dashboards, autointerp now available with the Goodfire SAE.
+  - [**➡️ Example Cookbook**](https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/llama_3.3_70b_instruct.ipynb)
+  - [**➡️ Release Page**](https://www.neuronpedia.org/llama3.3-70b-it-gf)
+- **⏰ Temporal Feature Analysis** - A new, interactive visualization on Neuronpedia.
+  - [**➡️ Try Demo Interface**](https://www.neuronpedia.org/gemma-2-2b/12-temporal-res?simMatrixDemo=alice-maya)
+  - [Release](https://www.neuronpedia.org/temporal-feature-analysis) + [Paper](https://arxiv.org/abs/2511.01836) + [Notebook](https://colab.research.google.com/github/eslubana/TemporalFeatureAnalysis/blob/main/DEMO_Temporal_Feature_Analysis.ipynb) + [Tweet](https://x.com/EkdeepL/status/1989009095953895756)
+- **🤖 gpt-oss-20b** - Dashboards + autointerp + inference. Uses Andy Ardidi's [SAEs](https://huggingface.co/andyrdt/saes-gpt-oss-20b/tree/main) + MAEs.
+  - [**➡️ Release**](https://neuronpedia.org/gpt-oss-sae)
+- **😈 Misaligned Persona in Qwen+Llama** - Arditi and Chen's reproduction of [Misaligned Persona](https://arxiv.org/abs/2506.19823).
+  - [**➡️ Release**](https://neuronpedia.org/misaligned-persona)
+  - [**Example "Nonsense/Absurdity" Steering**](https://www.neuronpedia.org/llama3.1-8b-it/steer?saved=cmfgcgpd90027kenxaxva1w2k)
+- **🔬 Research using Neuronpedia: Automated Circuit Interpretation via Probe Prompting**
+  - [Preprint](http://arxiv.org/abs/2511.07002) | [LW Post](https://www.lesswrong.com/posts/zQqGhKPqaCBZZDCge/automated-circuit-interpretation-via-probe-prompting) | [Interactive Demo](https://huggingface.co/spaces/Peppinob/attribution-graph-probing) | [Github Repo](https://github.com/peppinob-ol/attribution-graph-probing)
+- **📈 Attribution Graph Updates**
+- **🏷️ Gemma Scope Auto-Interp Refresh + 27B**
+- **🎁 Other Updates**
+
+🔊 Summary by NotebookLM - The Babble on [[Apple]](https://podcasts.apple.com/us/podcast/the-babble-a-neuronpedia-podcast-by-notebooklm/id1809283401?i=1000736665869) [[Spotify]](https://open.spotify.com/episode/5RENjA5JcZqHzOPUZyWdl5?si=XTXH8UbeS_KMgcPgMxeKgA)
+
+---
+
+## 🦙 Llama 3.3 70B Instruct
+
+By popular demand, we're supporting our biggest model yet, just in time for your ICLR rebuttals! These have initial support for [Goodfire's SAE](https://huggingface.co/Goodfire/Llama-3.3-70B-Instruct-SAE-l50/tree/main).
+
+- How to Use
+  - Use the Neuronpedia package: `pip install neuronpedia`
+    - [**➡️ Example Cookbook**](https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/llama_3.3_70b_instruct.ipynb) (Recommended!)
+  - Or use the [API](https://www.neuronpedia.org/api-doc) with parameters:
+    - `modelId = "llama3.3-70b-it"` | `source/layer = "50-resid-post-gf"` | `sourceSet = "resid-post-gf"`
+- Status
+  - ✅ Supported Functionality (See [Cookbook](https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/llama_3.3_70b_instruct.ipynb))
+    - Dashboards + Autointerp Labels ➡️ [Release Page](https://www.neuronpedia.org/llama3.3-70b-it-gf)
+    - Activations for a single feature with custom prompt ([API](https://www.neuronpedia.org/api-doc#tag/activations/post/api/activation/new))
+    - Top activating features from all features with custom prompt ([API](https://www.neuronpedia.org/api-doc#tag/search-via-inference/post/api/search-all))
+    - Top activating features by token from all features with custom prompt ([API](https://www.neuronpedia.org/api-doc#tag/search-topk-by-token/post/api/search-topk-by-token))
+    - NEW: Batch Inference - send up to 4 prompts (256 tokens max per prompt) in one request (use array of prompts in API)
+    - Steering is now enabled as of Nov 22nd
+    - All other APIs are now available - Search via Inference, TopK by Token, etc.
+- 📫 [Feedback/Requests](mailto:johnny@neuronpedia.org) - What else do you want this API to do?
+
+---
+
+## ⏰ Temporal Feature Analysis (Lubana, Rager, Hindupur, et al.)
+
+[**➡️ Open Demo Interface**](https://www.neuronpedia.org/gemma-2-2b/12-temporal-res?simMatrixDemo=alice-maya) | [Release](https://www.neuronpedia.org/temporal-feature-analysis) | [Tweet](https://x.com/EkdeepL/status/1989009095953895756)
+
+- **Background** - Temporal Feature Analysis ([paper](https://arxiv.org/abs/2511.01836), [notebook](https://colab.research.google.com/github/eslubana/TemporalFeatureAnalysis/blob/main/DEMO_Temporal_Feature_Analysis.ipynb)) is an interpretability method designed to capture both contextual and local information in language model representations.
+- ✅ Supported Functionality
+  - Similarity Matrix Visualization
+    - Custom text ([example](https://www.neuronpedia.org/gemma-2-2b/12-temporal-res?simMatrix=I%27m+counting%3A+1+2+3+4+5+6+7+8+9+10.+I%27m+finished.+Next%2C+I%27m+reciting+the+alphabet%3A+a+b+c+d+e+f+g+h+i+j+k)) or use a demo preset ([example](https://www.neuronpedia.org/gemma-2-2b/12-temporal-res?simMatrixDemo=mech-interp))
+    - Hover over tokens or cells to see the corresponding cell or token
+    - Link directly to your custom similarity matrix by clicking "Share"
+  - Supported Models
+    - Gemma 2 2B IT - [Layer 12](https://www.neuronpedia.org/gemma-2-2b/12-temporal-res)
+    - Llama 3.1 8B Instruct - [Layer 15](https://www.neuronpedia.org/llama3.1-8b/15-temporal-res), [Layer 26](https://www.neuronpedia.org/llama3.1-8b/26-temporal-res)
+  - Steering Enabled
+
+---
+
+## 🤖 gpt-oss-20b
+
+To kick off support for gpt-oss-20b, we have [BatchTopK SAEs by Andy Arditi](https://huggingface.co/andyrdt/saes-gpt-oss-20b/tree/main).
+
+- Release ➡️ [neuronpedia.org/gpt-oss-sae](https://neuronpedia.org/gpt-oss-sae)
+  - Dashboards (chat + non-chat MAEs) + autointerp labels
+  - These are the `trainer_0` in the Huggingface repo
+- Status
+  - ✅ Most API calls supported, including inference
+  - ❌ Steering (ETA: Nov 14th - 15th)
+  - NEW: Dashboards now have a new toggle: "Show Raw Tokens" (displays special tokens) vs "Show Formatted" (formats special tokens into `role` and content).
+
+---
+
+## 😈 Misaligned Persona in Open Weight Models
+
+Arditi and Chen's reproduction of [Misaligned Persona](https://arxiv.org/abs/2506.19823), for Qwen and Llama. [[LessWrong Post](https://www.lesswrong.com/posts/NCWiR8K8jpFqtywFG/finding-misaligned-persona-features-in-open-weight-models)]
+
+- Release ➡️ [neuronpedia.org/misaligned-persona](https://neuronpedia.org/misaligned-persona)
+  - Dashboards (chat + non-chat MAEs) + autointerp labels
+- Supported Models
+  - [Llama 3.1 8B Instruct (Inference + Steering Enabled)](https://www.neuronpedia.org/llama3.1-8b-it/resid-post-aa) - Layers 3, 7, 11, 15, 19, 23, 27
+  - [Qwen 2.5 7B Instruct](https://www.neuronpedia.org/qwen2.5-7b-it/resid-post-aa) - Layers 3, 7, 11, 15, 19, 23, 27
+- Steering Examples - Llama 3.1 8B
+  - [Nonsense/Absurdity](https://www.neuronpedia.org/llama3.1-8b-it/steer?saved=cmfgcgpd90027kenxaxva1w2k)
+  - [Opposite/Disobedience](https://www.neuronpedia.org/llama3.1-8b-it/steer?saved=cmfgc8btg0017kenx4zsszyuq)
+
+---
+
+## 🔬 Research using Neuronpedia: Automated Circuit Interpretation via Probe Prompting
+
+_Giuseppe Birardi_
+
+[Preprint](http://arxiv.org/abs/2511.07002) | [LW Post](https://www.lesswrong.com/posts/zQqGhKPqaCBZZDCge/automated-circuit-interpretation-via-probe-prompting) | [Interactive Demo](https://huggingface.co/spaces/Peppinob/attribution-graph-probing) | [Github Repo](https://github.com/peppinob-ol/attribution-graph-probing)
+
+> Attribution Graph Probing automates feature interpretation with probe-prompting, turning CLT attribution graphs into compact subgraphs of concept-aligned supernodes validated via Neuronpedia Replacement/Completeness (≈0.54/0.83). On US-capitals circuits it beats geometric clustering on interpretability and reveals an early–vs–late layer split (early layers generalize; ; late Say-X specialize).
+>
+> The demo is mostly push-button, and the repo makes it easy to scale to many graphs.
+>
+> Highlighted automated subgraphs:
+>
+> - [Dallas → Austin subgraph](https://www.neuronpedia.org/gemma-2-2b/graph?sourceSet=clt-hp&slug=clt-hp-the-capital-of-201020250035-20251020-003525&pruningThreshold=0.8&densityThreshold=0.99&pinnedIds=0_1861_6%2C0_230_7%2C0_32742_6%2C0_37567_5%2C0_39374_7%2C0_40780_3%2C0_40780_7%2C0_40936_3%2C0_49560_7%2C0_5200_7%2C0_55815_2%2C0_91045_7%2C0_95057_7%2C12_87969_7%2C16_89970_6%2C16_98048_7%2C17_1822_7%2C17_98126_7%2C18_3623_7%2C18_56027_7%2C18_61980_7%2C19_13946_7%2C19_54790_7%2C1_12928_1%2C1_12928_6%2C1_12928_7%2C1_52044_2%2C1_52044_5%2C1_52044_6%2C1_52044_7%2C1_57794_1%2C1_57794_2%2C1_57794_3%2C1_57794_4%2C1_57794_5%2C1_57794_6%2C1_57794_7%2C1_72774_5%2C1_72774_7%2C1_89326_6%2C20_44686_6%2C20_44686_7%2C20_74108_7%2C21_16875_7%2C21_61721_7%2C21_84338_7%2C22_11998_7%2C22_32893_7%2C22_74186_7%2C22_81571_7%2C7_24743_6%2C7_3144_7%2C7_89264_7%2CE_6037_2%2CE_576_3%2CE_10751_5%2CE_26865_6%2CE_603_7%2C27_22605_7&supernodes=%5B%5B%22capital%22%2C%220_55815_2%22%5D%2C%5B%22is%22%2C%220_40780_3%22%2C%220_230_7%22%2C%220_5200_7%22%2C%220_39374_7%22%2C%220_40780_7%22%2C%220_49560_7%22%2C%220_91045_7%22%2C%220_95057_7%22%5D%2C%5B%22of%22%2C%220_40936_3%22%5D%2C%5B%22containing%22%2C%220_37567_5%22%5D%2C%5B%22Texas%22%2C%220_1861_6%22%2C%220_32742_6%22%2C%227_24743_6%22%2C%2216_89970_6%22%2C%2216_89970_7%22%2C%2220_44686_6%22%2C%2220_44686_7%22%5D%2C%5B%22%28Texas%29+related%22%2C%221_12928_1%22%2C%221_57794_1%22%2C%221_12928_2%22%2C%221_57794_2%22%2C%221_12928_3%22%2C%221_57794_3%22%2C%221_12928_4%22%2C%221_57794_4%22%2C%221_12928_5%22%2C%221_57794_5%22%2C%221_12928_6%22%2C%221_57794_6%22%2C%221_12928_7%22%2C%221_57794_7%22%5D%2C%5B%22%28containing%29+related%22%2C%221_52044_1%22%2C%221_52044_2%22%2C%221_52044_3%22%2C%221_52044_4%22%2C%221_52044_5%22%2C%221_52044_6%22%2C%221_52044_7%22%5D%2C%5B%22%28capital%29+related%22%2C%221_72774_1%22%2C%221_72774_2%22%2C%221_72774_3%22%2C%221_72774_4%22%2C%221_72774_5%22%2C%221_72774_6%22%2C%221_72774_7%22%5D%2C%5B%22Dallas%22%2C%221_89326_6%22%2C%2218_56027_6%22%2C%2218_56027_7%22%2C%2222_11998_7%22%5D%2C%5B%22seat%22%2C%227_3144_7%22%5D%2C%5B%22Say+%28Austin%29%22%2C%227_89264_7%22%2C%2216_98048_7%22%2C%2217_1822_7%22%2C%2218_3623_7%22%2C%2218_61980_7%22%2C%2219_54790_7%22%2C%2221_16875_7%22%2C%2221_61721_7%22%2C%2221_84338_7%22%2C%2222_32893_7%22%2C%2222_81571_7%22%5D%2C%5B%22Say+%28capital%29%22%2C%2212_87969_7%22%2C%2217_98126_7%22%2C%2219_13946_7%22%2C%2220_74108_7%22%5D%2C%5B%22Say+%28Texas%29%22%2C%2222_74186_7%22%5D%5D)
+> - [Muscle → Diaphragm subgraph](https://www.neuronpedia.org/gemma-2-2b/graph?sourceSet=clt-hp&slug=the-muscle-that-20251027-143339&pruningThreshold=0.8&densityThreshold=0.99&pinnedIds=0_15486_11%2C0_17623_11%2C0_18753_3%2C0_18753_9%2C0_20171_3%2C0_20297_6%2C0_230_9%2C0_31679_11%2C0_34531_2%2C0_38968_2%2C0_40780_3%2C0_40780_5%2C0_40780_9%2C0_42753_10%2C0_44217_3%2C0_51434_11%2C0_52082_2%2C0_54228_11%2C0_56539_5%2C0_57661_11%2C0_60969_11%2C0_66003_11%2C0_71830_10%2C0_75135_5%2C0_81124_11%2C0_81580_10%2C0_91045_9%2C0_9254_2%2C0_93288_11%2C0_93532_11%2C0_95057_10%2C0_95057_11%2C0_95082_3%2C0_95475_2%2C0_95475_4%2C0_95475_7%2C0_9841_11%2C15_3783_11%2C18_52020_11%2C18_58135_11%2C18_70190_11%2C19_23189_11%2C19_35253_11%2C19_69358_10%2C19_69358_11%2C1_12928_1%2C1_12928_10%2C1_12928_11%2C1_12928_2%2C1_12928_3%2C1_12928_7%2C1_12928_9%2C1_1693_3%2C1_52044_10%2C1_52044_11%2C1_52044_3%2C1_52044_7%2C1_52044_8%2C1_52044_9%2C1_57794_1%2C1_57794_10%2C1_57794_11%2C1_57794_2%2C1_57794_3%2C1_57794_4%2C1_57794_5%2C1_57794_7%2C1_57794_9%2C1_72774_10%2C1_72774_11%2C1_72774_2%2C1_72774_3%2C1_72774_4%2C1_72774_7%2C1_72774_9%2C1_86924_7%2C20_31547_11%2C20_78662_11%2C20_79562_10%2C20_79562_11%2C20_91259_11%2C21_30617_11%2C21_3645_11%2C21_74640_11%2C21_94294_11%2C22_78763_11%2C24_89140_11%2C25_288_11%2C2_56706_4%2C3_82401_3%2C4_83760_7%2C6_34823_7%2C7_47820_11%2C7_48508_11%2C7_97085_11%2C8_24875_11%2C8_38840_11%2CE_651_1%2CE_15990_2%2CE_674_3%2CE_603_9%2CE_1175_11%2C27_92460_11&supernodes=%5B%5B%22the%22%2C%220_51434_1%22%2C%220_95057_3%22%2C%220_95057_6%22%2C%220_95057_9%22%2C%220_95057_10%22%2C%220_51434_11%22%2C%220_95057_11%22%5D%2C%5B%22%28The%29+related%22%2C%220_81124_1%22%2C%220_56539_5%22%2C%220_75135_5%22%2C%220_20297_6%22%2C%220_42753_10%22%2C%220_71830_10%22%2C%220_81580_10%22%2C%220_9841_11%22%2C%220_15486_11%22%2C%220_17623_11%22%2C%220_31679_11%22%2C%220_54228_11%22%2C%220_57661_11%22%2C%220_60969_11%22%2C%220_66003_11%22%2C%220_81124_11%22%2C%220_93288_11%22%2C%220_93532_11%22%2C%221_86924_7%22%2C%227_48508_11%22%2C%228_24875_11%22%2C%2215_3783_11%22%5D%2C%5B%22process%22%2C%220_98149_1%22%2C%220_98149_4%22%5D%2C%5B%22that%22%2C%220_18753_3%22%2C%220_20171_3%22%2C%220_40780_3%22%2C%220_44217_3%22%2C%220_95082_3%22%2C%220_40780_5%22%2C%220_18753_6%22%2C%220_40780_6%22%2C%220_18753_9%22%2C%220_40780_9%22%2C%220_18753_10%22%2C%220_40780_10%22%2C%221_1693_3%22%5D%2C%5B%22is%22%2C%220_230_9%22%2C%220_91045_9%22%5D%2C%5B%22%28process%29+related%22%2C%221_12928_1%22%2C%221_57794_1%22%2C%221_12928_2%22%2C%221_57794_2%22%2C%221_12928_3%22%2C%221_57794_3%22%2C%221_12928_4%22%2C%221_57794_4%22%2C%221_12928_5%22%2C%221_57794_5%22%2C%221_12928_6%22%2C%221_57794_6%22%2C%221_12928_7%22%2C%221_57794_7%22%2C%221_12928_8%22%2C%221_57794_8%22%2C%221_12928_9%22%2C%221_57794_9%22%2C%221_12928_10%22%2C%221_57794_10%22%2C%221_12928_11%22%2C%221_57794_11%22%5D%2C%5B%22%28breathing%29+related%22%2C%221_52044_1%22%2C%221_72774_1%22%2C%221_52044_2%22%2C%221_72774_2%22%2C%221_52044_3%22%2C%221_72774_3%22%2C%221_52044_4%22%2C%221_72774_4%22%2C%221_52044_5%22%2C%221_72774_5%22%2C%221_52044_6%22%2C%221_72774_6%22%2C%221_52044_7%22%2C%221_72774_7%22%2C%221_52044_8%22%2C%221_72774_8%22%2C%221_52044_9%22%2C%221_72774_9%22%2C%221_52044_10%22%2C%221_72774_10%22%2C%221_52044_11%22%2C%221_72774_11%22%5D%2C%5B%22inhalation%22%2C%224_83760_7%22%2C%224_83760_8%22%2C%226_34823_7%22%2C%226_34823_8%22%5D%2C%5B%22tightening%22%2C%2219_35253_10%22%2C%2219_35253_11%22%2C%2220_79562_9%22%2C%2220_79562_10%22%2C%2220_79562_11%22%5D%2C%5B%22Say+%28phrag%29%22%2C%2225_288_11%22%2C%227_97085_11%22%2C%228_38840_11%22%2C%2218_70190_11%22%2C%2219_23189_10%22%2C%2219_23189_11%22%2C%2220_31547_11%22%2C%2221_74640_11%22%2C%2221_94294_11%22%2C%2222_78763_11%22%5D%2C%5B%22contraction%22%2C%222_56706_4%22%2C%2219_69358_7%22%2C%2219_69358_9%22%2C%2219_69358_10%22%2C%2219_69358_11%22%2C%223_82401_3%22%2C%223_82401_4%22%2C%223_82401_9%22%5D%2C%5B%22Muscle%22%2C%220_34531_2%22%2C%220_95475_2%22%2C%220_95475_4%22%2C%220_95475_7%22%2C%220_95475_8%22%2C%227_47820_3%22%2C%227_47820_11%22%2C%2220_91259_11%22%2C%220_38968_2%22%2C%220_52082_2%22%2C%2218_52020_11%22%2C%2220_78662_11%22%2C%2221_30617_10%22%2C%2221_3645_11%22%2C%2221_30617_11%22%5D%5D)
+
+---
+
+## 📈 Attribution Graph Updates
+
+- NEW: Zoom and pan the subgraph using the buttons on the bottom left, or pinching / click and drag
+- NEW: Graph and subgraph replacement and completeness scores, at the bottom of the subgraph
+- NEW: Qwen3-4B - Steering from graph now enabled
+- NEW: "Remix" Graph
+  - Click "Remix" to edit the current prompt for a graph and generate a new graph from it.
+  - For Gemma 2 2B, you can also switch between using the Gemma Scope Transcoders and the Anthropic Fellows' Cross Layer Transcoders to quickly compare the difference.
+- NEW: Download the labels along with the graph - click Info, then "Download Graph JSON + Labels"
+- NEW: Simplified UI for graph generation (click "Advanced" for other adjustments)
+
+---
+
+## 🏷️ Gemma Scope Auto-Interp Label Refresh + 27B Dashboards
+
+- NEW: Added dashboards for 3 layers of Gemma 2 27B
+- REFRESH: We've refreshed many Gemma Scope autointerp labels, using a new [General Explainer](https://github.com/hijohnnylin/automated-interpretability/blob/e37eb0818a6a84e7c1dac57e3afd70ad58ec93bc/neuron_explainer/explanations/explainer.py#L1189) designed/tested with thinking models (like Gemini 2.5 Flash) for multiple models, layers, and widths:
+
+  <table>
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th>Hook and Width</th>
+        <th>Layers</th>
+        <th>Example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>gemma-2-27b (New!)</td>
+        <td>gemmascope-res-131k (New!)</td>
+        <td>10, 22, 34</td>
+        <td>
+          <a href="https://www.neuronpedia.org/gemma-2-27b/34-gemmascope-res-131k/7">Link</a>
+        </td>
+      </tr>
+      <tr>
+        <td>gemma-2-2b</td>
+        <td>gemmascope-res-16k</td>
+        <td>16, 18, 20, 22, 24</td>
+        <td>
+          <a href="https://www.neuronpedia.org/gemma-2-2b/20-gemmascope-res-16k/10956">Link</a>
+        </td>
+      </tr>
+      <tr>
+        <td>gemma-2-2b</td>
+        <td>gemmascope-res-65k</td>
+        <td>16, 18, 20, 22, 24</td>
+        <td>
+          <a href="https://www.neuronpedia.org/gemma-2-2b/20-gemmascope-res-65k/1001">Link</a>
+        </td>
+      </tr>
+      <tr>
+        <td>gemma-2-9b</td>
+        <td>gemmascope-res-16k</td>
+        <td>24, 26, 28, 30, 32</td>
+        <td>
+          <a href="https://www.neuronpedia.org/gemma-2-9b/24-gemmascope-res-16k/1002">Link</a>
+        </td>
+      </tr>
+      <tr>
+        <td>gemma-2-9b</td>
+        <td>gemmascope-res-131k</td>
+        <td>24, 26, 28, 30, 32</td>
+        <td>
+          <a href="https://www.neuronpedia.org/gemma-2-9b/24-gemmascope-res-131k/1004">Link</a>
+        </td>
+      </tr>
+      <tr>
+        <td>gemma-2-9b-it</td>
+        <td>gemmascope-res-16k</td>
+        <td>9, 20, 31</td>
+        <td>
+          <a href="https://www.neuronpedia.org/gemma-2-9b-it/20-gemmascope-res-16k/1007">Link</a>
+        </td>
+      </tr>
+      <tr>
+        <td>gemma-2-9b-it</td>
+        <td>gemmascope-res-131k</td>
+        <td>9, 20, 31</td>
+        <td>
+          <a href="https://www.neuronpedia.org/gemma-2-9b-it/20-gemmascope-res-131k/1012">Link</a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+As with all data on Neuronpedia, exports including dashboards, labels, etc are [available publicly](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/).
+
+---
+
+# 🎁 Other Updates
+
+- There's now an [Available Resources](https://neuronpedia.org/available-resources) page to see what models and sources are available for inference.
+- You may have noticed this post is "bullet point"-heavy, with fewer graphics and paragraphs. We hope this helps us write update posts more efficiently so that we can update more frequently rather than a ton of updates in one post.
+- It was Neel Nanda's [birthday](https://x.com/NeelNanda5/status/1987848991388889584) on Monday - our thanks for his awesome work and support.
+- I guess we did a lot of auto-interp:
+
+![ASSET_BASE_URL/blog/a-lotta-autointerp.jpg](ASSET_BASE_URL/blog/a-lotta-autointerp.jpg)
+
+As always, please [contact us](https://www.neuronpedia.org/contact) with your questions, feedback, and suggestions.

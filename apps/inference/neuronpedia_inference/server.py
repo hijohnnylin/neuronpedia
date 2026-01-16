@@ -13,6 +13,7 @@ import torch
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from nnterp import StandardizedTransformer
 from transformer_lens import HookedTransformer
@@ -34,6 +35,9 @@ from neuronpedia_inference.endpoints.activation.single import (
 )
 from neuronpedia_inference.endpoints.activation.single_batch import (
     router as activation_single_batch_router,
+)
+from neuronpedia_inference.endpoints.activation.source import (
+    router as activation_source_router,
 )
 from neuronpedia_inference.endpoints.activation.topk_by_token import (
     router as activation_topk_by_token_router,
@@ -86,6 +90,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add GZip compression middleware (only compresses if client sends Accept-Encoding: gzip)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
+
 args = parse_env_and_args()
 
 
@@ -115,6 +122,7 @@ v1_router.include_router(sae_topk_by_decoder_cossim_router)
 v1_router.include_router(sae_vector_router)
 v1_router.include_router(tokenize_router)
 v1_router.include_router(similarity_matrix_pred_router)
+v1_router.include_router(activation_source_router)
 app.include_router(v1_router)
 
 
@@ -312,6 +320,7 @@ async def check_model(
     if request.method == "POST":
         try:
             body = await request.json()
+            print(body)
             if "model" in body and (
                 body["model"] != config.model_id
                 and body["model"] != config.override_model_id

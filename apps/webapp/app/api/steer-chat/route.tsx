@@ -14,8 +14,8 @@ import {
   STEER_MAX_PROMPT_CHARS,
   STEER_METHOD,
   STEER_N_COMPLETION_TOKENS_MAX,
+  STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
-  STEER_STRENGTH_MAX,
   STEER_STRENGTH_MIN,
   STEER_STRENGTH_MULTIPLIER_MAX,
   STEER_TEMPERATURE_MAX,
@@ -24,6 +24,7 @@ import {
 import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputToNeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { SteerOutputType } from '@prisma/client';
+import { createHash } from 'crypto';
 import { EventSourceMessage } from 'eventsource-parser';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import {
@@ -38,6 +39,7 @@ import { array, bool, InferType, number, object, string, ValidationError } from 
 // Hobby plans don't support > 60 seconds
 // export const maxDuration = 180;
 
+const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 const STEERING_VERSION = 1;
 
 function sortChatMessages(chatMessages: ChatMessage[]) {
@@ -79,7 +81,13 @@ async function saveSteerChatOutput(
           // rest is the same
           creatorId: userId,
           inputText: input?.raw || '',
+          inputTextMd5: createHash('md5')
+            .update(input?.raw || '')
+            .digest('hex'),
           inputTextChatTemplate: JSON.stringify(sortChatMessages(input?.chatTemplate || [])),
+          inputTextChatTemplateMd5: createHash('md5')
+            .update(JSON.stringify(sortChatMessages(input?.chatTemplate || [])))
+            .digest('hex'),
           temperature: body.temperature,
           numTokens: body.n_tokens,
           freqPenalty: body.freq_penalty,
@@ -112,7 +120,13 @@ async function saveSteerChatOutput(
           // rest is the same
           creatorId: userId,
           inputText: input?.raw || '',
+          inputTextMd5: createHash('md5')
+            .update(input?.raw || '')
+            .digest('hex'),
           inputTextChatTemplate: JSON.stringify(sortChatMessages(input?.chatTemplate || [])),
+          inputTextChatTemplateMd5: createHash('md5')
+            .update(JSON.stringify(sortChatMessages(input?.chatTemplate || [])))
+            .digest('hex'),
           temperature: body.temperature,
           numTokens: body.n_tokens,
           freqPenalty: body.freq_penalty,
@@ -377,7 +391,6 @@ const steerSchema = object({
         strength: number()
           .required()
           .min(STEER_STRENGTH_MIN)
-          .max(STEER_STRENGTH_MAX * 3)
           .transform((value) => value),
       }).required(),
     )
@@ -614,6 +627,13 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           { status: 400 },
         );
       }
+    } else if (NNSIGHT_MODELS.includes(modelId)) {
+      if (body.n_tokens > STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM) {
+        return NextResponse.json(
+          { message: `For large LLM models the max n_tokens is ${STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM}` },
+          { status: 400 },
+        );
+      }
     } else if (body.n_tokens > STEER_N_COMPLETION_TOKENS_MAX) {
       return NextResponse.json(
         { message: `The max n_tokens for non-thinking models is ${STEER_N_COMPLETION_TOKENS_MAX}` },
@@ -675,7 +695,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       where: {
         modelId,
         type: SteerOutputType.DEFAULT,
-        inputTextChatTemplate: JSON.stringify(defaultChatMessagesSorted),
+        inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(defaultChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
@@ -703,7 +723,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       where: {
         modelId,
         type: SteerOutputType.STEERED,
-        inputTextChatTemplate: JSON.stringify(steeredChatMessagesSorted),
+        inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(steeredChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
