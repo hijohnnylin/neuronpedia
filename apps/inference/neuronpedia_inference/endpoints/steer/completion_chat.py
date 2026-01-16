@@ -4,6 +4,8 @@ from typing import Any
 import torch
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
+from transformer_lens import HookedTransformer
+from nnterp import StandardizedTransformer
 from neuronpedia_inference_client.models.np_logprob import NPLogprob
 from neuronpedia_inference_client.models.np_steer_chat_message import NPSteerChatMessage
 from neuronpedia_inference_client.models.np_steer_chat_result import NPSteerChatResult
@@ -17,9 +19,6 @@ from neuronpedia_inference_client.models.steer_completion_chat_post200_response 
 from neuronpedia_inference_client.models.steer_completion_chat_post_request import (
     SteerCompletionChatPostRequest,
 )
-from nnterp import StandardizedTransformer
-from transformer_lens import HookedTransformer
-
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.inference_utils.steering import (
     OrthogonalProjector,
@@ -35,6 +34,19 @@ from neuronpedia_inference.shared import Model, with_request_lock
 from neuronpedia_inference.utils import make_logprob_from_logits
 
 logger = logging.getLogger(__name__)
+
+
+def _get_feature_layer_for_nnsight(
+    feature: NPSteerFeature | NPSteerVector, sae_manager: SAEManager
+) -> int:
+    """Get the layer number for sorting features in nnsight (must be accessed in order)."""
+    hook_name = (
+        sae_manager.get_sae_hook(feature.source)
+        if isinstance(feature, NPSteerFeature)
+        else feature.hook
+    )
+    # Extract layer from hook_name like "blocks.0.hook_resid_post"
+    return int(hook_name.split(".")[1])
 
 
 router = APIRouter()
@@ -202,7 +214,9 @@ async def run_batched_generate(
         if seed is not None:
             torch.manual_seed(seed)
 
-        def steering_hook(activations: torch.Tensor, hook: Any) -> torch.Tensor:  # noqa: ARG001
+        def steering_hook(
+            activations: torch.Tensor, hook: Any
+        ) -> torch.Tensor:  # noqa: ARG001
             # log activation device
             # logger.info(f"Activations device: {activations.device}")
 
@@ -230,7 +244,9 @@ async def run_batched_generate(
 
                         bos_indices = (
                             current_tokens == model.tokenizer.bos_token_id
-                        ).nonzero(as_tuple=True)[0]  # type: ignore
+                        ).nonzero(as_tuple=True)[
+                            0
+                        ]  # type: ignore
                         start_of_turn_indices = (
                             current_tokens
                             == model.tokenizer.encode("<start_of_turn>")[0]
@@ -406,7 +422,14 @@ async def run_batched_generate(
                             if flag == NPSteerType.STEERED:
                                 steered_partial_result_array.append(to_append)  # type: ignore
 
-                                for feature in features:
+                                # Sort features by layer number for nnsight (must be accessed in order)
+                                sorted_features = sorted(
+                                    features,
+                                    key=lambda f: _get_feature_layer_for_nnsight(
+                                        f, sae_manager
+                                    ),
+                                )
+                                for feature in sorted_features:
                                     # get layer number
                                     hook_name = (
                                         sae_manager.get_sae_hook(feature.source)
@@ -447,11 +470,10 @@ async def run_batched_generate(
                                     coeff = strength_multiplier * feature.strength
 
                                     if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
-                                        model.layers_output[layer - 1] += (
-                                            coeff
-                                            * steering_vector.to(
-                                                model.layers_output[layer - 1].device
-                                            )
+                                        model.layers_output[
+                                            layer - 1
+                                        ] += coeff * steering_vector.to(
+                                            model.layers_output[layer - 1].device
                                         )
                                     elif (
                                         steer_method == NPSteerMethod.ORTHOGONAL_DECOMP
@@ -568,7 +590,14 @@ async def run_batched_generate(
                         partial_result_array.append(model.tokenizer.decode(token[-1]))  # type: ignore
 
                         if steer_type == NPSteerType.STEERED:
-                            for feature in features:
+                            # Sort features by layer number for nnsight (must be accessed in order)
+                            sorted_features = sorted(
+                                features,
+                                key=lambda f: _get_feature_layer_for_nnsight(
+                                    f, sae_manager
+                                ),
+                            )
+                            for feature in sorted_features:
                                 # get layer number
                                 hook_name = (
                                     sae_manager.get_sae_hook(feature.source)
@@ -607,11 +636,10 @@ async def run_batched_generate(
                                 coeff = strength_multiplier * feature.strength
 
                                 if steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
-                                    model.layers_output[layer - 1] += (
-                                        coeff
-                                        * steering_vector.to(
-                                            model.layers_output[layer - 1].device
-                                        )
+                                    model.layers_output[
+                                        layer - 1
+                                    ] += coeff * steering_vector.to(
+                                        model.layers_output[layer - 1].device
                                     )
                                 elif steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
                                     projector = OrthogonalProjector(
