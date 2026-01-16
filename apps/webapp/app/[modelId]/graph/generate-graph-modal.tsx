@@ -258,7 +258,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
 
   const isInstructAndDoesntStartWithSpecialToken = (modelId: string, prompt: string) => {
     if (GRAPH_INSTRUCT_GEMMA_3.includes(modelId)) {
-      return !prompt.startsWith('<bos>');
+      return !prompt.startsWith('<bos>') && !prompt.startsWith('<start_of_turn>');
     }
     if (GRAPH_INSTRUCT_QWEN.includes(modelId)) {
       return !prompt.startsWith('<|im_start|>');
@@ -497,17 +497,18 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
       return formatted;
     };
 
+    const currentModelId = formikRef.current?.values.modelId || '';
     let formattedPrompt = '';
-    if (GRAPH_INSTRUCT_QWEN.includes(selectedModelId)) {
+    if (GRAPH_INSTRUCT_QWEN.includes(currentModelId)) {
       formattedPrompt = formatChatToQwen3(chatPrompts);
-    } else if (GRAPH_INSTRUCT_GEMMA_3.includes(selectedModelId)) {
+    } else if (GRAPH_INSTRUCT_GEMMA_3.includes(currentModelId)) {
       formattedPrompt = formatChatToGemma3(chatPrompts);
     }
 
     if (formikRef.current) {
       formikRef.current.setFieldValue('prompt', formattedPrompt);
     }
-  }, [chatPrompts, selectedModelId]);
+  }, [chatPrompts]);
 
   return (
     <Dialog open={isGenerateGraphModalOpen} onOpenChange={handleOpenChange}>
@@ -575,7 +576,9 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                               value={values.modelId}
                               onValueChange={(value: string) => {
                                 setFieldValue('modelId', value);
-                                setFieldValue('sourceSetName', getHasGraphsSourceSetsForModelId(value)[0].name);
+                                setTimeout(() => {
+                                  setFieldValue('sourceSetName', getHasGraphsSourceSetsForModelId(value)[0].name);
+                                }, 100);
                                 setGraphTokenizeResponse(null);
                                 setChatPrompts([]);
                                 setFieldValue('prompt', '');
