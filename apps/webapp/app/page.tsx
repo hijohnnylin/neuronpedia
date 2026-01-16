@@ -18,7 +18,6 @@ import {
   Blocks,
   BookOpenText,
   Computer,
-  ExternalLink,
   Github,
   Megaphone,
   Microscope,
@@ -117,27 +116,22 @@ export default function Page() {
                   }
                 >
                   <div className="mb-2 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
-                  An initial release of artifacts and datasets are available now (smaller Gemma 3 pretrained models),
-                  with more being actively released on a rolling basis.
-                  <br />
-                  <br />
-                  All artifacts are expected to be finalized by <strong>January 16, 2026</strong>.<br />
-                  <br />
-                  Some models may be replaced or updated through this final verification and fine-tuning process. Please
-                  check the HuggingFace repos and history for details.
-                  <br />
-                  <br />
-                  <span className="flex flex-row gap-x-0.5">
+                  <div>
+                    Neuronpedia is finalizing data uploads and feature label generation, a process which we expect to be
+                    completed by <strong>January 26, 2026</strong>.
+                  </div>
+                  <div className="mt-1">
+                    The artifacts in Gemma Scope 2{' '}
                     <a
                       href="https://huggingface.co/google/gemma-scope-2"
                       target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex flex-row items-center justify-center whitespace-nowrap text-sky-700"
+                      rel="noreferrer noopener"
+                      className="text-sky-700"
                     >
                       HuggingFace
-                      <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </span>
+                    </a>{' '}
+                    are complete and available for use.
+                  </div>
                 </CustomTooltip>
               </div>
               <div className="mt-2 text-[32px] font-bold text-sky-700 sm:mt-3">

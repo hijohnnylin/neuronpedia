@@ -13,7 +13,6 @@ import psutil
 import requests
 import torch
 from circuit_tracer import attribute
-from circuit_tracer.attribution.attribute import compute_salient_logits
 from circuit_tracer.graph import prune_graph
 from circuit_tracer.replacement_model import ReplacementModel
 from circuit_tracer.utils.create_graph_files import (
@@ -21,6 +20,7 @@ from circuit_tracer.utils.create_graph_files import (
     create_nodes,
     create_used_nodes_and_edges,
 )
+from circuit_tracer.utils.salient_logits import compute_salient_logits
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -100,12 +100,24 @@ TRANSCODER_SET_TO_SOURCE_URL_ARRAYS = {
         "https://neuronpedia.org/gemma-2-2b/clt-hp",
         "https://huggingface.co/mntss/clt-gemma-2-2b-2.5M",
     ],
+    "mwhanna/gemma-scope-2-4b-it/transcoder_all/width_262k_l0_small_affine": [
+        "https://neuronpedia.org/gemma-3-4b-it/gemmascope-transcoder-262k",
+        "https://huggingface.co/mwhanna/gemma-scope-2-4b-it/transcoder_all/width_262k_l0_small_affine",
+        "https://huggingface.co/google/gemma-scope-2-4b-it/transcoder_all",
+    ],
 }
 
 TLENS_MODEL_ID_TO_NP_MODEL_ID = {
     "google/gemma-2-2b": "gemma-2-2b",
+    "google/gemma-3-4b-it": "gemma-3-4b-it",
     "meta-llama/Llama-3.2-1B": "llama3.1-8b",
     "Qwen/Qwen3-4B": "qwen3-4b",
+}
+
+GENERATOR_INFO = {
+    "name": "circuit-tracer by Hanna & Piotrowski",
+    "version": "0.3.1 | e09b5f3",
+    "url": "https://github.com/safety-research/circuit-tracer",
 }
 
 loaded_model_arg = os.getenv("MODEL_ID")
@@ -124,11 +136,21 @@ if not transcoder_set:
 device = get_device()
 model_dtype = get_model_dtype()
 
+
+def check_is_nnsight_model(model_id: str) -> bool:
+    return model_id.startswith("google/gemma-3-")
+
+
+is_nnsight_model = check_is_nnsight_model(loaded_model_arg)
+
 model = ReplacementModel.from_pretrained(
     loaded_model_arg,
     transcoder_set,
     device=device,
     dtype=model_dtype,
+    lazy_encoder=is_nnsight_model,
+    lazy_decoder=True,
+    backend="nnsight" if is_nnsight_model else "transformerlens",
 )
 
 
@@ -459,22 +481,39 @@ async def forward_pass_handler(req: Request):
         print(f"Received forward pass request: prompt='{req_data.prompt}'")
 
         # Tokenize prompt
-        tokens = model.tokenizer.encode(req_data.prompt, add_special_tokens=True)
+        # Only add special tokens if prompt doesn't already start with BOS
+        tokens = model.tokenizer.encode(req_data.prompt, add_special_tokens=False)
+        if tokens and tokens[0] != model.tokenizer.bos_token_id:
+            tokens = model.tokenizer.encode(req_data.prompt, add_special_tokens=True)
         print(f"Tokens: {tokens}")
 
         # Convert to tensor and run forward pass
-        input_ids = torch.tensor([tokens])
+        input_ids = torch.tensor([tokens]).to(get_device())
 
         with torch.no_grad():
             # Get model output
             output = model(input_ids)
+            # Check if output has logits property (nnsight case)
+            if hasattr(output, "logits"):
+                output = output.logits
+
             logits = output[0, -1, :]  # Get logits for last token
 
             # Get unembedding matrix
             # Compute salient logits
+            # For models without unembed attribute, use lm_head weight matrix
+            if hasattr(model, "unembed"):
+                unembed_matrix = model.unembed.W_U
+            elif hasattr(model, "lm_head"):
+                unembed_matrix = model.lm_head.weight
+            else:
+                raise AttributeError(
+                    "Model has neither 'unembed' nor 'lm_head' attribute"
+                )
+
             logit_indices, logit_probs, _ = compute_salient_logits(
                 logits,
-                model.unembed.W_U,
+                unembed_matrix,
                 max_n_logits=req_data.max_n_logits,
                 desired_logit_prob=req_data.desired_logit_prob,
             )
@@ -668,11 +707,7 @@ async def generate_graph(req: Request):
                 "creator_url": "https://neuronpedia.org",
                 "source_urls": TRANSCODER_SET_TO_SOURCE_URL_ARRAYS[transcoder_set],
                 "transcoder_set": transcoder_set,
-                "generator": {
-                    "name": "circuit-tracer by Hanna & Piotrowski",
-                    "version": "0.2.0 | e4a3c5a",
-                    "url": "https://github.com/safety-research/circuit-tracer",
-                },
+                "generator": GENERATOR_INFO,
                 "create_time_ms": current_time_ms,
             }
 

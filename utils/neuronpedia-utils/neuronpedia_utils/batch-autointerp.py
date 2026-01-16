@@ -37,8 +37,8 @@ from neuron_explainer.activations.activations import ActivationRecord
 from neuron_explainer.api_client import ApiClient
 from neuron_explainer.explanations.explainer import (
     AttentionHeadExplainer,
-    MaxActivationAndLogitsGeneralExplainer,
     MaxActivationAndLogitsExplainer,
+    MaxActivationAndLogitsGeneralExplainer,
     MaxActivationExplainer,
     TokenActivationPairExplainer,
 )
@@ -439,8 +439,12 @@ async def start(activations_dir: str):
 
     # don't check subdirectories (eg)
     activations_files = sorted(
-        [f for f in glob.glob(os.path.join(activations_dir, "*.gz")) if os.path.dirname(f) == activations_dir],
-        key=get_batch_number
+        [
+            f
+            for f in glob.glob(os.path.join(activations_dir, "*.gz"))
+            if os.path.dirname(f) == activations_dir
+        ],
+        key=get_batch_number,
     )
 
     print(f"got activations files: {len(activations_files)} files")
@@ -623,7 +627,19 @@ def main(
             "GEMINI_API_KEY is not set even though you're using a Gemini model"
         )
 
-    global FAILED_FEATURE_INDEXES_QUEUED, INPUT_DIR_WITH_SOURCE_EXPORTS, START_INDEX, END_INDEX, EXPLAINER_MODEL_NAME, EXPLAINER_TYPE_NAME, MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE, AUTOINTERP_BATCH_SIZE, EXPLANATIONS_OUTPUT_DIR, GZIP_OUTPUT, IGNORE_FIRST_N_TOKENS, REASONING_EFFORT
+    global \
+        FAILED_FEATURE_INDEXES_QUEUED, \
+        INPUT_DIR_WITH_SOURCE_EXPORTS, \
+        START_INDEX, \
+        END_INDEX, \
+        EXPLAINER_MODEL_NAME, \
+        EXPLAINER_TYPE_NAME, \
+        MAX_TOP_ACTIVATIONS_TO_SHOW_EXPLAINER_PER_FEATURE, \
+        AUTOINTERP_BATCH_SIZE, \
+        EXPLANATIONS_OUTPUT_DIR, \
+        GZIP_OUTPUT, \
+        IGNORE_FIRST_N_TOKENS, \
+        REASONING_EFFORT
     INPUT_DIR_WITH_SOURCE_EXPORTS = input_dir_with_source_exports
     if not os.path.exists(INPUT_DIR_WITH_SOURCE_EXPORTS):
         raise ValueError(

@@ -17,6 +17,7 @@ import {
 } from '@/lib/utils/steer';
 import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputType } from '@prisma/client';
+import { createHash } from 'crypto';
 import { EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
 import { NPLogprob, NPSteerMethod, SteerCompletionPost200Response } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
@@ -199,6 +200,7 @@ async function saveSteerOutput(
         // rest is the same
         creatorId: userId,
         inputText: body.prompt,
+        inputTextMd5: createHash('md5').update(body.prompt).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
@@ -419,7 +421,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const savedSteerOutputs = await prisma.steerOutput.findMany({
       where: {
         modelId: body.modelId,
-        inputText: body.prompt,
+        inputTextMd5: createHash('md5').update(body.prompt).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,

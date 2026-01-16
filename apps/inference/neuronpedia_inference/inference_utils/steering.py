@@ -76,6 +76,66 @@ def convert_to_chat_array(
     current_role = None
     current_content = []
 
+    # case: gpt-oss-20b (harmony chat format)
+    # Format: <|start|>role<|message|>content<|end|> or <|start|>role<|channel|>channel_name<|message|>content<|end|>
+    if hasattr(tokenizer, "name_or_path") and "gpt-oss" in tokenizer.name_or_path:
+        # Split by <|start|> to get conversation turns
+        parts = text.split("<|start|>")
+        # Store pending analysis content to merge with final channel
+        pending_analysis: str | None = None
+
+        for part in parts[1:]:  # Skip first empty part
+            if not part.strip():
+                continue
+
+            # Extract content up to <|end|> or <|return|> if present, otherwise use the whole part
+            if "<|end|>" in part:
+                content_part = part.split("<|end|>")[0]
+            elif "<|return|>" in part:
+                content_part = part.split("<|return|>")[0]
+            else:
+                # Handle last message without end marker (still being generated)
+                content_part = part
+
+            # Extract role and channel (text before <|channel|> or <|message|>)
+            channel = None
+            if "<|channel|>" in content_part:
+                role = content_part.split("<|channel|>")[0].strip()
+                # Get the part after <|channel|> to find channel name and message
+                after_channel = content_part.split("<|channel|>")[1]
+                if "<|message|>" in after_channel:
+                    channel = after_channel.split("<|message|>")[0].strip()
+                    content = after_channel.split("<|message|>")[1].strip()
+                else:
+                    content = ""
+            elif "<|message|>" in content_part:
+                role = content_part.split("<|message|>")[0].strip()
+                content = content_part.split("<|message|>")[1].strip()
+            else:
+                continue
+
+            if not role or not content:
+                continue
+
+            # Handle assistant analysis channel - store for merging with final
+            if role == "assistant" and channel == "analysis":
+                pending_analysis = content
+                continue
+
+            # Handle assistant final channel - merge with pending analysis
+            if role == "assistant" and channel == "final" and pending_analysis:
+                content = f"<think>{pending_analysis}</think>{content}"
+                pending_analysis = None
+
+            conversation.append(
+                NPSteerChatMessage(
+                    role=role,
+                    content=content,
+                )
+            )
+
+        return conversation
+
     # case: deepseek r1 distill llama 8b
     if custom_hf_model_id == "deepseek-ai/DeepSeek-R1-Distill-Llama-8B":
         for token in tokens:

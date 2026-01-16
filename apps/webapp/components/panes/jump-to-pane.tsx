@@ -58,6 +58,7 @@ export default function JumpToPane({
           defaultModelId={defaultModelId}
           defaultSourceSet={defaultSourceSetName}
           defaultSource={defaultSourceId}
+          filterToPublic
           filterToFeaturedReleases={false}
           openInNewTab={false}
         />

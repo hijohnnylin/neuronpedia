@@ -24,6 +24,7 @@ import {
 import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputToNeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { SteerOutputType } from '@prisma/client';
+import { createHash } from 'crypto';
 import { EventSourceMessage } from 'eventsource-parser';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import {
@@ -80,7 +81,13 @@ async function saveSteerChatOutput(
           // rest is the same
           creatorId: userId,
           inputText: input?.raw || '',
+          inputTextMd5: createHash('md5')
+            .update(input?.raw || '')
+            .digest('hex'),
           inputTextChatTemplate: JSON.stringify(sortChatMessages(input?.chatTemplate || [])),
+          inputTextChatTemplateMd5: createHash('md5')
+            .update(JSON.stringify(sortChatMessages(input?.chatTemplate || [])))
+            .digest('hex'),
           temperature: body.temperature,
           numTokens: body.n_tokens,
           freqPenalty: body.freq_penalty,
@@ -113,7 +120,13 @@ async function saveSteerChatOutput(
           // rest is the same
           creatorId: userId,
           inputText: input?.raw || '',
+          inputTextMd5: createHash('md5')
+            .update(input?.raw || '')
+            .digest('hex'),
           inputTextChatTemplate: JSON.stringify(sortChatMessages(input?.chatTemplate || [])),
+          inputTextChatTemplateMd5: createHash('md5')
+            .update(JSON.stringify(sortChatMessages(input?.chatTemplate || [])))
+            .digest('hex'),
           temperature: body.temperature,
           numTokens: body.n_tokens,
           freqPenalty: body.freq_penalty,
@@ -682,7 +695,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       where: {
         modelId,
         type: SteerOutputType.DEFAULT,
-        inputTextChatTemplate: JSON.stringify(defaultChatMessagesSorted),
+        inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(defaultChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
@@ -710,7 +723,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       where: {
         modelId,
         type: SteerOutputType.STEERED,
-        inputTextChatTemplate: JSON.stringify(steeredChatMessagesSorted),
+        inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(steeredChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,

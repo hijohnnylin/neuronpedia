@@ -14,7 +14,7 @@ uvicorn = {extras = ["standard"], version = ">=0.34.2"}
 pydantic = ">=2.11.4"
 torch = ">=2.0.0"
 transformers = ">=4.0.0"
-circuit-tracer = { git = "https://github.com/safety-research/circuit-tracer.git", rev = "e4a3c5af8b88e4ebc13ce562180ef9b7e7c09b59" }
+circuit-tracer = { git = "https://github.com/safety-research/circuit-tracer.git", tag = "v0.3.1" }
 python-dotenv = "^1.1.0"
 hf-transfer = "^0.1.9"
 
