@@ -15,7 +15,7 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
             <div className="mb-1.5 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
             <div>
               An initial release of artifacts and datasets are available now, with all artifacts expected to be
-              finalized by <strong>January 16, 2026</strong>.
+              finalized by <strong>January 26, 2026</strong>.
             </div>
             <div>
               Some data may be replaced or updated during this final verification and fine-tuning process. Please check
