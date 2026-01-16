@@ -24,8 +24,8 @@ export const MAX_GRAPH_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024;
 // ============ Neuronpedia Specific =============
 
 export const DEFAULT_GRAPH_MODEL_ID = 'gemma-2-2b';
-export const ADDITIONAL_MODELS_TO_LOAD = new Set(['qwen3-4b']);
-export const MODELS_WITH_NP_DASHBOARDS = new Set(['gemma-2-2b', 'qwen3-4b']);
+export const ADDITIONAL_MODELS_TO_LOAD = new Set(['qwen3-4b', 'gemma-3-4b-it']);
+export const MODELS_WITH_NP_DASHBOARDS = new Set(['gemma-2-2b', 'qwen3-4b', 'gemma-3-4b-it']);
 export const MODELS_TO_CALCULATE_REPLACEMENT_SCORES = MODELS_WITH_NP_DASHBOARDS;
 export const ANTHROPIC_MODELS = new Set(['jackl-circuits-runs-1-4-sofa-v3_0']);
 export const ANTHROPIC_MODEL_TO_NUM_LAYERS = {

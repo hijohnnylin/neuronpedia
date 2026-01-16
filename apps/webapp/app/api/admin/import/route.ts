@@ -202,6 +202,18 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
 
           for (const [index, explanationsPath] of explanationsPaths.entries()) {
             enqueueProgress(controller, index / explanationsPaths.length, `(4 of 4) Importing Explanations...`);
+            // // Only import specific batch files
+            // const filename = explanationsPath.split('/').pop() || '';
+            // const batchMatch = filename.match(/^batch-(\d+)\.jsonl\.gz$/);
+            // if (!batchMatch) {
+            //   console.log(`Skipping non-batch file: ${filename}`);
+            //   continue;
+            // }
+            // const batchNumber = parseInt(batchMatch[1], 10);
+            // if (batchNumber < 71) {
+            //   console.log(`Skipping batch ${batchNumber} (outside range 63-70)`);
+            //   continue;
+            // }
             console.log('Importing explanations from', explanationsPath);
             const explanationsJsonlString = await downloadAndDecompressFile(explanationsPath);
             const lines = explanationsJsonlString.trim().split('\n');

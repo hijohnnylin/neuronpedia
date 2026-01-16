@@ -14,12 +14,11 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
           <div className="flex w-full flex-col gap-y-1 text-center text-[13px]">
             <div className="mb-1.5 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
             <div>
-              An initial release of artifacts and datasets are available now, with all artifacts expected to be
-              finalized by <strong>January 16, 2026</strong>.
+              Neuronpedia is finalizing data uploads and feature label generation, a process which we expect to be
+              completed by <strong>January 26, 2026</strong>.
             </div>
             <div>
-              Some data may be replaced or updated during this final verification and fine-tuning process. Please check
-              the{' '}
+              The artifacts in Gemma Scope 2{' '}
               <a
                 href="https://huggingface.co/google/gemma-scope-2"
                 target="_blank"
@@ -28,7 +27,7 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
               >
                 HuggingFace
               </a>{' '}
-              for details.
+              are complete and available for use.
             </div>
           </div>
         </div>
@@ -109,13 +108,8 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
             onClick={() => {
               tabUpdater('circuit');
             }}
-            className="relative flex min-h-[200px] flex-1 cursor-default flex-col items-center justify-center rounded-3xl border border-gYellow bg-gYellow/5 px-5 text-gYellow opacity-40 transition-all hover:opacity-60 xl:min-h-[230px]"
+            className="relative flex min-h-[200px] flex-1 cursor-pointer flex-col items-center justify-center rounded-3xl border border-gYellow bg-gYellow/5 px-5 text-gYellow transition-all hover:scale-105 hover:border-2 hover:bg-white hover:shadow-xl xl:min-h-[230px]"
           >
-            <div className="absolute top-2 mx-auto flex w-full justify-center">
-              <div className="whitespace-nowrap rounded-full bg-gYellow px-3 py-1.5 text-[9px] font-bold uppercase leading-none text-white lg:text-[11px]">
-                Coming Soon
-              </div>
-            </div>
             <div className="mb-2 text-6xl">🔌</div>
             <div className="text-md font-bold xl:text-lg">Circuit Tracing</div>
             <div className="mt-1.5 text-center text-xs leading-normal text-slate-600 xl:text-[13px]">
@@ -176,7 +170,7 @@ export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => v
           >
             <div className="text-md font-bold xl:text-base">DeepMind Blog</div>
             <div className="mt-1.5 text-center text-xs leading-normal text-slate-600 xl:text-[13px]">
-              Read the official blog post about Gemma Scope 2.
+              Read the official blog post announcement for Gemma Scope 2.
             </div>
           </Link>
         </div>

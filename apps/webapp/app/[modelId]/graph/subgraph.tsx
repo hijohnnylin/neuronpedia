@@ -1321,10 +1321,13 @@ export default function Subgraph() {
                     Measures the fraction of end-to-end influence from input tokens to output logits that flows through
                     feature nodes rather than error nodes. This is a strict metric that rewards complete explanations
                     where tokens influence logits entirely through features.
-                    <br /><br/>
-                    The graph score is for the entire pruned attribution graph, while the subgraph score is only for your pinned nodes and the nodes that are connected to them. It treats features not included in the subgraph as error nodes by merging their edge
-                    weights with the corresponding error nodes (based on layer and position), then computes replacement
-                    and completeness scores using the modified adjacency matrix.
+                    <br />
+                    <br />
+                    The graph score is for the entire pruned attribution graph, while the subgraph score is only for
+                    your pinned nodes and the nodes that are connected to them. It treats features not included in the
+                    subgraph as error nodes by merging their edge weights with the corresponding error nodes (based on
+                    layer and position), then computes replacement and completeness scores using the modified adjacency
+                    matrix.
                   </div>
                 </CustomTooltip>
               </div>
@@ -1353,10 +1356,13 @@ export default function Subgraph() {
                     output) that originate from feature or token nodes rather than error nodes. This metric gives
                     partial credit for nodes that are mostly explained by features, even if some error influence
                     remains.
-                    <br /><br/>
-                    The graph score is for the entire pruned attribution graph, while the subgraph score is only for your pinned nodes and the nodes that are connected to them. It treats features not included in the subgraph as error nodes by merging their edge
-                    weights with the corresponding error nodes (based on layer and position), then computes replacement
-                    and completeness scores using the modified adjacency matrix.
+                    <br />
+                    <br />
+                    The graph score is for the entire pruned attribution graph, while the subgraph score is only for
+                    your pinned nodes and the nodes that are connected to them. It treats features not included in the
+                    subgraph as error nodes by merging their edge weights with the corresponding error nodes (based on
+                    layer and position), then computes replacement and completeness scores using the modified adjacency
+                    matrix.
                   </div>
                 </CustomTooltip>
               </div>
@@ -1435,14 +1441,16 @@ export default function Subgraph() {
             <div className="absolute hidden h-[calc(100%-20px)] min-h-[calc(100%-20px)] w-full flex-col items-start justify-center gap-y-3 rounded-xl bg-white/70 px-5 text-sm text-slate-700 backdrop-blur-sm sm:flex">
               <div className="flex w-full flex-col items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-base font-medium">
                 Subgraph (Solution){' '}
-                <Button
-                  variant="slateLight"
-                  size="xs"
-                  onClick={() => openWelcomeModalToStep(4)}
-                  className="hidden rounded-full px-3 hover:bg-sky-200 hover:text-sky-700 sm:block"
-                >
-                  Video Demo
-                </Button>
+                {!clientCheckIsEmbed() && (
+                  <Button
+                    variant="slateLight"
+                    size="xs"
+                    onClick={() => openWelcomeModalToStep(4)}
+                    className="hidden rounded-full px-3 hover:bg-sky-200 hover:text-sky-700 sm:block"
+                  >
+                    Video Demo
+                  </Button>
+                )}
               </div>
               <div className="flex w-full flex-col items-center gap-y-0.5">
                 <strong>Pin Node to Subgraph</strong>

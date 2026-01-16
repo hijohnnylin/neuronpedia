@@ -26,10 +26,16 @@ export const RUNPOD_BUSY_ERROR = 'RUNPOD_BUSY';
 export const GRAPH_MAX_PROMPT_LENGTH_CHARS = 10000;
 export const GRAPH_BATCH_SIZE = 48;
 // this time estimate comes from testing different prompt lengths with batch size 48, and is only valid for gemma-2-2b, for a40
-export const getEstimatedTimeFromNumTokens = (numTokens: number) => 11.2 * Math.log2(Math.max(numTokens, 4)) - 7; // add a few seconds buffer
+// with nnsight we are using lazy encoder, so we need to add time for this
+export const getEstimatedTimeFromNumTokens = (numTokens: number, nnsight: boolean = false) =>
+  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (nnsight ? 20 : 0); // add a few seconds buffer
 export const GRAPH_MAX_TOKENS = 64;
-export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'qwen3-4b'];
-export const GRAPH_MODEL_MAP = { 'gemma-2-2b': 'google/gemma-2-2b', 'qwen3-4b': 'Qwen/Qwen3-4B' };
+export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'gemma-3-4b-it', 'qwen3-4b'];
+export const GRAPH_MODEL_MAP = {
+  'gemma-2-2b': 'google/gemma-2-2b',
+  'gemma-3-4b-it': 'google/gemma-3-4b-it',
+  'qwen3-4b': 'Qwen/Qwen3-4B',
+};
 
 export const GRAPH_S3_USER_GRAPHS_DIR = 'user-graphs';
 
@@ -149,14 +155,17 @@ export const getGraphTokenize = async (
     request_type: action,
   };
 
-  const response = await fetch(`${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
+  const response = await fetch(
+    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
+      },
+      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
     },
-    body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
-  });
+  );
 
   let json = await response.json();
   if (json.error) {
@@ -215,14 +224,17 @@ export const generateGraphAndUploadToS3 = async (
     signed_url: signedUrl,
     user_id: userId,
   };
-  const response = await fetch(`${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
+  const response = await fetch(
+    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
+      },
+      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
     },
-    body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
-  });
+  );
 
   const json = await response.json();
   if (json.error) {
@@ -319,7 +331,6 @@ export const steerLogits = async (
   seed: number | null,
   steeredOutputOnly: boolean,
 ) => {
-
   const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
 
   const action = 'steer';
@@ -341,14 +352,17 @@ export const steerLogits = async (
     request_type: action,
   };
 
-  const response = await fetch(`${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
+  const response = await fetch(
+    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
+      },
+      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
     },
-    body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
-  });
+  );
 
   let json = await response.json();
   if (json.error) {

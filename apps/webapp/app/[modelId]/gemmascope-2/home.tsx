@@ -19,8 +19,8 @@ export default function GemmaScope2Home({ release }: { release: SourceReleaseWit
   const session = useSession();
   const { setSignInModalOpen } = useGlobalContext();
 
-  const defaultModelId = 'gemma-3-27b-it';
-  const defaultModelIdNonSteer = 'gemma-3-27b-it';
+  const defaultModelId = 'gemma-3-4b-it';
+  const defaultModelIdNonSteer = 'gemma-3-4b-it';
 
   const { defaultSourceSet, defaultSource } = getDefaultSourceSetAndSourceForRelease(release);
 

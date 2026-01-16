@@ -142,6 +142,11 @@ export default async function Page({
   // iterate through all baseUrls/buckets, and merge all the metadata we care about into a single map
   const modelIdToGraphMetadatasMap: ModelToGraphMetadatasMap = {};
 
+  // add any additional models that should be loaded but aren't in the map yet
+  for (const additionalModel of ADDITIONAL_MODELS_TO_LOAD) {
+    modelIdToGraphMetadatasMap[additionalModel] = [];
+  }
+
   // we always load ant models so add it to the available models
   for (const antModel of ANTHROPIC_MODELS) {
     modelIdToGraphMetadatasMap[antModel] = [];
@@ -264,7 +269,10 @@ export default async function Page({
         console.error('Error parsing params clerps:', error);
       }
     }
-  } else if (ANTHROPIC_MODELS.has(modelId) || ADDITIONAL_MODELS_TO_LOAD.has(modelId)) {
+  } else if (
+    ANTHROPIC_MODELS.has(modelId) ||
+    (ADDITIONAL_MODELS_TO_LOAD.has(modelId) && modelIdToGraphMetadatasMap[modelId]?.length > 0)
+  ) {
     // no default slug and it's a haiku or qwen3-4b model, just pick the first one
     // pick the first graph in the map
     [metadataGraph] = modelIdToGraphMetadatasMap[modelId];
