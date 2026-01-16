@@ -123,7 +123,8 @@ export function getDefaultSourceSetAndSourceForRelease(release: SourceReleaseWit
       ) as SourceWithPartialRelations;
     }
   } else {
-    const firstSourceSet = getFirstSourceSetForRelease(release);
+    const firstSourceSetInferenceEnabled = getFirstSourceSetForRelease(release, undefined, true);
+    const firstSourceSet = firstSourceSetInferenceEnabled || getFirstSourceSetForRelease(release);
     if (firstSourceSet) {
       defaultSourceSet = firstSourceSet as SourceSetWithPartialRelations;
       defaultSource = getFirstLayerForSourceSet(
