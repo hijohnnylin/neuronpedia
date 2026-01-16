@@ -14,6 +14,8 @@ spec:
     metadata:
       labels:
         app: postgres
+      annotations:
+        sidecar.istio.io/inject: "false"
     spec:
       securityContext:
         fsGroup: 999  # postgres group ID
@@ -46,11 +48,11 @@ spec:
           mountPath: /docker-entrypoint-initdb.d
         resources:
           limits:
-            cpu: "500m"
-            memory: "512Mi"
+            cpu: "2000m"
+            memory: "4Gi"
           requests:
-            cpu: "200m"
-            memory: "256Mi"
+            cpu: "500m"
+            memory: "2Gi"
         readinessProbe:
           exec:
             command: 

@@ -15,6 +15,48 @@ spec:
       labels:
         app: webapp
     spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: alpine:3.14
+        command: ['/bin/sh', '-c']
+        args:
+          - |
+            apk add --no-cache netcat-openbsd
+            echo "Waiting for PostgreSQL to become ready..."
+            until nc -z postgres 5432; do
+              echo "PostgreSQL is not ready yet - waiting..."
+              sleep 2
+            done
+            echo "PostgreSQL is ready!"
+      - name: db-init
+        image: neuronpedia-db-init
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "1Gi"
+            ephemeral-storage: "2Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+            ephemeral-storage: "4Gi"
+        env:
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/ssl/certs/ca-certificates.crt
+        envFrom:
+        - secretRef:
+            name: db-credentials
+        # NOTE uncomment to mount custom CA certs
+        # volumeMounts:
+        # - name: etc-ssl-certs
+        #   mountPath: /usr/local/share/ca-certificates
+        #   readOnly: true
+      # NOTE uncomment to mount custom CA certs
+      # volumes:
+      # - name: etc-ssl-certs
+      #   configMap:
+      #     name: corporate-ca-certificates
+      #     optional: false
       containers:
       - name: webapp
         image: neuronpedia-webapp
@@ -31,15 +73,17 @@ spec:
         resources:
           limits:
             cpu: "1000m"
-            memory: "1Gi"
+            memory: "4Gi"
           requests:
             cpu: "500m"
-            memory: "512Mi"
+            memory: "2Gi"
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: webapp
+  labels:
+    app: neuronpedia
 spec:
   selector:
     app: webapp
