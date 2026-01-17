@@ -987,6 +987,8 @@ model SteerOutput {
   connectedSteerOutputIds String[]      @default([])
   connectedSteerOutputs   SteerOutput[] @relation(name: "steeredOutput")
 
+  capMonitorOutput        String?
+
   // to do lookups, we should also check Neurons to ensure they match
   @@index([modelId, type, inputTextMd5, temperature, numTokens, freqPenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndex")
   @@index([modelId, type, inputTextChatTemplateMd5, temperature, numTokens, freqPenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndex2")

@@ -128,7 +128,7 @@ export const SavedSearchActivationScalarFieldEnumSchema = z.enum(['savedSearchId
 
 export const SteerOutputToNeuronScalarFieldEnumSchema = z.enum(['modelId','layer','index','strength','steerOutputId']);
 
-export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextMd5','inputTextChatTemplate','inputTextChatTemplateMd5','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds']);
+export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextMd5','inputTextChatTemplate','inputTextChatTemplateMd5','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds','capMonitorOutput']);
 
 export const SortOrderSchema = z.enum(['asc','desc']);
 
@@ -2953,6 +2953,7 @@ export const SteerOutputSchema = z.object({
   logprobs: z.string().nullable(),
   connectedDefaultOutputId: z.string().nullable(),
   connectedSteerOutputIds: z.string().array(),
+  capMonitorOutput: z.string().nullable(),
 })
 
 export type SteerOutput = z.infer<typeof SteerOutputSchema>
