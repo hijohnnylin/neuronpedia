@@ -82,7 +82,7 @@ export const GraphHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl
 
 export const GraphHostSourceOnSourceSetScalarFieldEnumSchema = z.enum(['sourceSetName','sourceSetModelId','graphHostSourceId']);
 
-export const InferenceHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','engine','modelId','createdAt','updatedAt']);
+export const InferenceHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','engine','modelId','runpodServerlessUrl','createdAt','updatedAt']);
 
 export const InferenceHostSourceOnSourceScalarFieldEnumSchema = z.enum(['sourceId','sourceModelId','inferenceHostId']);
 
@@ -1244,6 +1244,7 @@ export const InferenceHostSourceSchema = z.object({
   name: z.string(),
   hostUrl: z.string(),
   modelId: z.string(),
+  runpodServerlessUrl: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })
