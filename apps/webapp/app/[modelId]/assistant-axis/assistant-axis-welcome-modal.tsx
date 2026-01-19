@@ -34,9 +34,6 @@ export default function AssistantAxisWelcomeModal({
             // Don't show welcome modal if user is directly linked to a saved query
             if (initialSavedId) return;
 
-            const isMobile = window.innerWidth < 640;
-            if (isMobile) return;
-
             const hasVisited = localStorage.getItem('assistant-axis-visited');
             if (!hasVisited) {
                 setIsWelcomeModalOpen(true);
