@@ -814,9 +814,9 @@ export default function AssistantAxisChat({
                         )}
                     </button>
                     {limitRemaining !== null ? limitRemaining > 0 ? (
-                        <div className="text-[9px] absolute right-2 bottom-2 text-slate-500">Hourly Limit Left: {limitRemaining}</div>
+                        <div className={`text-[9px] absolute right-2 bottom-2 text-slate-500 ${DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) ? 'hidden' : ''}`}>Hourly Limit Left: {limitRemaining}</div>
                     ) : (
-                        <div className="text-[9px] absolute right-2 bottom-2 text-slate-500">Out of messages. Wait a bit and try again later.</div>
+                        <div className={`text-[9px] absolute right-2 bottom-2 text-slate-500 ${DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) ? 'hidden' : ''}`}>Out of messages. Wait a bit and try again later.</div>
                     ) : <></>}
                     {DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) && (
                         <div className="absolute z-100 top-0 left-0 right-0 flex w-full rounded-lg h-full flex flex-col gap-y-1 justify-start items-center bg-slate-400">
