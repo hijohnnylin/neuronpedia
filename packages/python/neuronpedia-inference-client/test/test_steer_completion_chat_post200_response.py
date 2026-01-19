@@ -36,6 +36,20 @@ class TestSteerCompletionChatPost200Response(unittest.TestCase):
         model = SteerCompletionChatPost200Response()
         if include_optional:
             return SteerCompletionChatPost200Response(
+                assistant_axis = [
+                    neuronpedia_inference_client.models._steer_completion_chat_post_200_response_assistant_axis_inner._steer_completion_chat_post_200_response_assistant_axis_inner(
+                        type = 'STEERED', 
+                        pc_titles = [
+                            ''
+                            ], 
+                        turns = [
+                            neuronpedia_inference_client.models._steer_completion_chat_post_200_response_assistant_axis_inner_turns_inner._steer_completion_chat_post_200_response_assistant_axis_inner_turns_inner(
+                                pc_values = {
+                                    'key' : 1.337
+                                    }, 
+                                snippet = '', )
+                            ], )
+                    ],
                 outputs = [
                     neuronpedia_inference_client.models.np_steer_chat_result.NPSteerChatResult(
                         chat_template = [

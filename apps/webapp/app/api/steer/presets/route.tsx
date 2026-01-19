@@ -2,6 +2,7 @@ import { getModelById } from '@/lib/db/model';
 import { getVectorsForModelAndUser } from '@/lib/db/neuron';
 import { FeaturePreset, SteerFeature, SteerPreset } from '@/lib/utils/steer';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
+import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';
 
@@ -51,9 +52,186 @@ const PROMPT_PRESETS: { [key: string]: { name: string; prompt: string }[] } = {
   'gemma-2-9b-it': [],
 };
 
-const FEATURE_PRESETS: {
+export const FEATURE_PRESETS: {
   [key: string]: FeaturePreset[];
 } = {
+  'llama3.3-70b-it': [
+    {
+      name: '🧢 Assistant Cap',
+      features: [
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '32-neuronpedia-resid-post',
+          index: 95134726,
+          explanation: 'Assistant Cap L32',
+          strength: -1.234375,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '33-neuronpedia-resid-post',
+          index: 155044423,
+          explanation: 'Assistant Cap L33',
+          strength: -1.5703125,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '34-neuronpedia-resid-post',
+          index: 165437805,
+          explanation: 'Assistant Cap L34',
+          strength: -2.21875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '35-neuronpedia-resid-post',
+          index: 110286670,
+          explanation: 'Assistant Cap L35',
+          strength: -1.703125,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '36-neuronpedia-resid-post',
+          index: 156321408,
+          explanation: 'Assistant Cap L36',
+          strength: -1.796875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '37-neuronpedia-resid-post',
+          index: 159476403,
+          explanation: 'Assistant Cap L37',
+          strength: -1.7421875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '38-neuronpedia-resid-post',
+          index: 123496291,
+          explanation: 'Assistant Cap L38',
+          strength: -1.765625,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '39-neuronpedia-resid-post',
+          index: 120194034,
+          explanation: 'Assistant Cap L39',
+          strength: -1.5078125,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '40-neuronpedia-resid-post',
+          index: 141497702,
+          explanation: 'Assistant Cap L40',
+          strength: -1.875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '41-neuronpedia-resid-post',
+          index: 127083163,
+          explanation: 'Assistant Cap L41',
+          strength: -1.6640625,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '42-neuronpedia-resid-post',
+          index: 92139530,
+          explanation: 'Assistant Cap L42',
+          strength: -1.6015625,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '43-neuronpedia-resid-post',
+          index: 132977111,
+          explanation: 'Assistant Cap L43',
+          strength: -1.46875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '44-neuronpedia-resid-post',
+          index: 136675469,
+          explanation: 'Assistant Cap L44',
+          strength: -1.6875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '45-neuronpedia-resid-post',
+          index: 124473324,
+          explanation: 'Assistant Cap L45',
+          strength: -1.875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '46-neuronpedia-resid-post',
+          index: 115093673,
+          explanation: 'Assistant Cap L46',
+          strength: -1.8984375,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '47-neuronpedia-resid-post',
+          index: 142618817,
+          explanation: 'Assistant Cap L47',
+          strength: -1.859375,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '48-neuronpedia-resid-post',
+          index: 136568392,
+          explanation: 'Assistant Cap L48',
+          strength: -1.9140625,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '49-neuronpedia-resid-post',
+          index: 123090249,
+          explanation: 'Assistant Cap L49',
+          strength: -1.9140625,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '50-neuronpedia-resid-post',
+          index: 165306750,
+          explanation: 'Assistant Cap L50',
+          strength: -1.8203125,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '51-neuronpedia-resid-post',
+          index: 133555003,
+          explanation: 'Assistant Cap L51',
+          strength: -1.921875,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '52-neuronpedia-resid-post',
+          index: 122170101,
+          explanation: 'Assistant Cap L52',
+          strength: -1.9765625,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '53-neuronpedia-resid-post',
+          index: 124671970,
+          explanation: 'Assistant Cap L53',
+          strength: -1.828125,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '54-neuronpedia-resid-post',
+          index: 118427494,
+          explanation: 'Assistant Cap L54',
+          strength: -1.59375,
+        },
+        {
+          modelId: 'llama3.3-70b-it',
+          layer: '55-neuronpedia-resid-post',
+          index: 161912969,
+          explanation: 'Assistant Cap L55',
+          strength: -1.984375,
+        },
+      ],
+      steerMethod: NPSteerMethod.ProjectionCap,
+      alias: 'assistant-cap',
+    },
+  ],
   'deepseek-r1-distill-llama-8b': [
     {
       name: '🌉 San Francisco',

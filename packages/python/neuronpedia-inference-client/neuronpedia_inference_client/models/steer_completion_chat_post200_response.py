@@ -18,9 +18,10 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
-from typing import Any, ClassVar, Dict, List
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, ClassVar, Dict, List, Optional
 from neuronpedia_inference_client.models.np_steer_chat_result import NPSteerChatResult
+from neuronpedia_inference_client.models.steer_completion_chat_post200_response_assistant_axis_inner import SteerCompletionChatPost200ResponseAssistantAxisInner
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -28,9 +29,10 @@ class SteerCompletionChatPost200Response(BaseModel):
     """
     The steering/default chat responses.
     """ # noqa: E501
+    assistant_axis: Optional[List[SteerCompletionChatPost200ResponseAssistantAxisInner]] = Field(default=None, description="Persona monitoring data for assistant turns, one entry per steer type")
     outputs: List[NPSteerChatResult]
     input: NPSteerChatResult
-    __properties: ClassVar[List[str]] = ["outputs", "input"]
+    __properties: ClassVar[List[str]] = ["assistant_axis", "outputs", "input"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -71,6 +73,13 @@ class SteerCompletionChatPost200Response(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in assistant_axis (list)
+        _items = []
+        if self.assistant_axis:
+            for _item_assistant_axis in self.assistant_axis:
+                if _item_assistant_axis:
+                    _items.append(_item_assistant_axis.to_dict())
+            _dict['assistant_axis'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in outputs (list)
         _items = []
         if self.outputs:
@@ -93,6 +102,7 @@ class SteerCompletionChatPost200Response(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "assistant_axis": [SteerCompletionChatPost200ResponseAssistantAxisInner.from_dict(_item) for _item in obj["assistant_axis"]] if obj.get("assistant_axis") is not None else None,
             "outputs": [NPSteerChatResult.from_dict(_item) for _item in obj["outputs"]] if obj.get("outputs") is not None else None,
             "input": NPSteerChatResult.from_dict(obj["input"]) if obj.get("input") is not None else None
         })

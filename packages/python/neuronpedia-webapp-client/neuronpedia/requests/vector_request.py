@@ -4,7 +4,7 @@ from neuronpedia.np_vector import NPVector
 from neuronpedia.requests.base_request import NPRequest
 from requests import Response
 
-VALID_HOOK_TYPES = ["hook_resid_pre"]
+VALID_HOOK_TYPES = ["hook_resid_pre", "hook_resid_post"]
 
 
 class VectorRequest(NPRequest):

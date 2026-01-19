@@ -163,12 +163,10 @@ cython_debug/
 #.idea/
 
 *.pkl
-*.pt
 *__pycache__
 
 neuronpedia_inference/saes/weights/
 neuronpedia_outputs
-data
 *.lprof
 
 saes.json

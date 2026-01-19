@@ -49,12 +49,17 @@ class RESTResponse(io.IOBase):
             self.data = self.response.data
         return self.data
 
+    @property
+    def headers(self):
+        """Returns a dictionary of response headers."""
+        return self.response.headers
+
     def getheaders(self):
-        """Returns a dictionary of the response headers."""
+        """Returns a dictionary of the response headers; use ``headers`` instead."""
         return self.response.headers
 
     def getheader(self, name, default=None):
-        """Returns a given response header."""
+        """Returns a given response header; use ``headers.get()`` instead."""
         return self.response.headers.get(name, default)
 
 
@@ -77,6 +82,7 @@ class RESTClientObject:
             "ca_certs": configuration.ssl_ca_cert,
             "cert_file": configuration.cert_file,
             "key_file": configuration.key_file,
+            "ca_cert_data": configuration.ca_cert_data,
         }
         if configuration.assert_hostname is not None:
             pool_args['assert_hostname'] = (

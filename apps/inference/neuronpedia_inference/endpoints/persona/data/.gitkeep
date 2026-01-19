@@ -1,0 +1,10 @@
+# Data files should be placed here with the following structure:
+#
+# data/
+#   <model_id>/           # e.g., meta-llama/Llama-3.3-70B-Instruct
+#     pca/
+#       roles_layer40.pt  # PCA results for layer 40
+#     contrast_vectors.pt # Contrast vectors for all layers
+#
+# Copy these from apps/persona/neuronpedia_persona/data/
+

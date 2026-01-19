@@ -40,6 +40,14 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/assistant-axis',
+        destination: '/llama3.3-70b-it/assistant-axis',
+      },
+    ];
+  },
   async redirects() {
     return [
       {
@@ -57,12 +65,18 @@ const nextConfig = {
         destination: '/temporal-feature-analysis',
         permanent: true,
       },
+      {
+        source: '/circuit-tracer',
+        destination: '/graph',
+        permanent: true,
+      },
     ];
   },
   // https://github.com/mjmlio/mjml/issues/2562
   // https://github.com/vercel/next.js/issues/50042
+  // runpod-sdk needs to be external because it requires its own package.json at runtime
   experimental: {
-    serverComponentsExternalPackages: ['mjml'],
+    serverComponentsExternalPackages: ['mjml', 'runpod-sdk'],
   },
   // https://github.com/aws-amplify/amplify-js/issues/11030
   webpack: (config, { webpack, isServer, nextRuntime }) => {

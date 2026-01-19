@@ -17,7 +17,7 @@ import {
 } from '@/lib/utils/steer';
 import { AuthenticatedUser } from '@/lib/with-user';
 import { NeuronPartial, NeuronPartialWithRelations } from '@/prisma/generated/zod';
-import { SteerOutputType } from '@prisma/client';
+import { InferenceEngine, SteerOutputType } from '@prisma/client';
 import {
   ActivationSingleBatchPost200Response,
   ActivationSinglePost200Response,
@@ -32,15 +32,17 @@ import {
   SteerCompletionPost200Response,
   UtilSaeVectorPost200Response,
 } from 'neuronpedia-inference-client';
+import runpodSdk from 'runpod-sdk';
 import {
   getOneRandomServerHostForModel,
   getOneRandomServerHostForSource,
   getOneRandomServerHostForSourceSet,
+  getRunpodServerlessUrlForModel,
   getTwoRandomServerHostsForModel,
   getTwoRandomServerHostsForSourceSet,
   LOCALHOST_INFERENCE_HOST,
 } from '../db/inference-host-source';
-import { INFERENCE_SERVER_SECRET, USE_LOCALHOST_INFERENCE } from '../env';
+import { INFERENCE_RUNPOD_API_KEY, INFERENCE_SERVER_SECRET, USE_LOCALHOST_INFERENCE } from '../env';
 import { NeuronIdentifier } from './neuron-identifier';
 
 export const makeInferenceServerApiWithServerHost = (serverHost: string) =>
@@ -91,6 +93,85 @@ function convertSteerFeatureVectorsToInferenceVectors(steerFeatures: SteerFeatur
     steeringVector: feature.neuron?.vector,
     strength: feature.strength,
   }));
+}
+
+/**
+ * Extract the endpoint ID from a RunPod serverless URL.
+ * URL format: https://api.runpod.ai/v2/{endpointId}
+ */
+function extractRunpodEndpointId(runpodServerlessUrl: string): string {
+  const parts = runpodServerlessUrl.split('/');
+  return parts[parts.length - 1];
+}
+
+/**
+ * Creates a ReadableStream from a RunPod job that streams SSE data.
+ * This converts the RunPod SDK stream format to match our existing SSE format.
+ */
+function createRunpodStreamingResponse(
+  runpodServerlessUrl: string,
+  payload: Record<string, unknown>,
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  const endpointId = extractRunpodEndpointId(runpodServerlessUrl);
+  const sdk = runpodSdk(INFERENCE_RUNPOD_API_KEY);
+  const endpoint = sdk.endpoint(endpointId);
+
+  if (!endpoint) {
+    throw new Error(`Failed to create RunPod endpoint for ${endpointId}`);
+  }
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        const RUNPOD_TIMEOUT_MS = 120000;
+        const job = await endpoint.run({ input: payload }, RUNPOD_TIMEOUT_MS);
+
+        for await (const output of endpoint.stream(job.id, RUNPOD_TIMEOUT_MS)) {
+          // RunPod wraps stream output in an "output" property
+          // The output.output contains the SSE data string like "data: {...}"
+          if (output && typeof output === 'object' && 'output' in output) {
+            const innerOutput = output.output;
+
+            if (typeof innerOutput === 'string') {
+              if (innerOutput.startsWith('data: ')) {
+                // Extract the JSON part after "data: "
+                const jsonStr = innerOutput.substring(6);
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
+                } catch {
+                  controller.enqueue(encoder.encode(innerOutput + '\n\n'));
+                }
+              } else {
+                controller.enqueue(encoder.encode(`data: ${innerOutput}\n\n`));
+              }
+            } else if (innerOutput && typeof innerOutput === 'object') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(innerOutput)}\n\n`));
+            }
+          } else if (typeof output === 'string') {
+            if (output.startsWith('data: ')) {
+              controller.enqueue(encoder.encode(output + '\n\n'));
+            } else {
+              try {
+                const data = JSON.parse(output);
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+              } catch {
+                controller.enqueue(encoder.encode(`data: ${output}\n\n`));
+              }
+            }
+          } else if (output && typeof output === 'object') {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(output)}\n\n`));
+          }
+        }
+
+        controller.close();
+      } catch (error) {
+        console.error('RunPod streaming error:', error);
+        controller.error(error);
+      }
+    },
+  });
 }
 
 export const getCosSimForFeature = async (
@@ -405,22 +486,23 @@ export const steerCompletionChat = async (
   stream: boolean,
   steerMethod: NPSteerMethod = STEER_METHOD,
   n_logprobs: number = STEER_N_LOGPROBS,
+  isAssistantAxis: boolean = false,
 ) => {
   // record start time
   const startTime = new Date().getTime();
 
-  // get the sae set's host
-  const firstFeatureLayer = steerFeatures[0].layer;
-
-  if (hasVector) {
+  if (hasVector || steerFeatures.length === 0) {
     // if we have the vectors, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-    var [serverHostDefault, serverHostSteered] = await getTwoRandomServerHostsForModel(modelId);
+    var [serverHostDefault, serverHostSteered] = await getTwoRandomServerHostsForModel(modelId, isAssistantAxis ? InferenceEngine.CSPACE : InferenceEngine.TRANSFORMER_LENS);
   } else {
+    // get the sae set's host
+    const firstFeatureLayer = steerFeatures[0].layer;
     // if we have just one server, then just use that server
     [serverHostDefault, serverHostSteered] = await getTwoRandomServerHostsForSourceSet(
       modelId,
       getSourceSetNameFromSource(firstFeatureLayer),
       user,
+      isAssistantAxis ? InferenceEngine.CSPACE : InferenceEngine.TRANSFORMER_LENS,
     );
   }
 
@@ -430,11 +512,64 @@ export const steerCompletionChat = async (
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelIdForSearcher);
 
   if (stream) {
-    const toRunPromises = steerTypesToRun.map((type) => {
-      console.log(`completion chat - does not have saved ${type} output, running it`);
-      return fetch(
-        `${type === SteerOutputType.DEFAULT ? serverHostDefault : serverHostSteered}/v1/steer/completion-chat`,
-        {
+    // Check if we can combine default and steered into one request
+    const messagesAreEqual = JSON.stringify(defaultChatMessages) === JSON.stringify(steeredChatMessages);
+    const hasBothTypes =
+      steerTypesToRun.includes(SteerOutputType.DEFAULT) && steerTypesToRun.includes(SteerOutputType.STEERED);
+
+    // Check if we should use RunPod for assistant axis requests
+    if (isAssistantAxis && INFERENCE_RUNPOD_API_KEY) {
+      const runpodServerlessUrl = await getRunpodServerlessUrlForModel(modelId, InferenceEngine.CSPACE);
+
+      if (runpodServerlessUrl) {
+        console.log('Using RunPod serverless for assistant axis streaming request');
+
+        if (messagesAreEqual && hasBothTypes) {
+          // Send a single request with both types (messages are the same)
+          console.log('completion chat (runpod) - messages are equal, sending combined request for both default and steered');
+          const payload = {
+            prompt: defaultChatMessages,
+            types: ['STEERED', 'DEFAULT'],
+            vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : [],
+            n_completion_tokens: nTokens,
+            temperature,
+            steer_method: steerMethod,
+            normalize_steering: false,
+            stream: true,
+            n_logprobs,
+            steer_special_tokens: steerSpecialTokens,
+          };
+          const runpodStream = createRunpodStreamingResponse(runpodServerlessUrl, payload);
+          return [runpodStream];
+        }
+        // Send separate requests for each type (messages are different)
+        const runpodStreams = steerTypesToRun.map((type) => {
+          console.log(`completion chat (runpod) - does not have saved ${type} output, running it`);
+          const payload = {
+            prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
+            types: [type === SteerOutputType.DEFAULT ? 'DEFAULT' : 'STEERED'],
+            vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : [],
+            n_completion_tokens: nTokens,
+            temperature,
+            steer_method: steerMethod,
+            normalize_steering: false,
+            stream: true,
+            n_logprobs,
+            steer_special_tokens: steerSpecialTokens,
+          };
+          return createRunpodStreamingResponse(runpodServerlessUrl, payload);
+        });
+        return runpodStreams;
+      }
+    }
+
+    let toRunPromises: Promise<Response>[];
+
+    if (messagesAreEqual && hasBothTypes) {
+      // Send a single request with both types
+      console.log('completion chat - messages are equal, sending combined request for both default and steered');
+      toRunPromises = [
+        fetch(`${serverHostDefault}/v1/steer/completion-chat`, {
           method: 'POST',
           cache: 'no-cache',
           headers: {
@@ -442,8 +577,8 @@ export const steerCompletionChat = async (
             'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
           },
           body: JSON.stringify({
-            types: [type === SteerOutputType.DEFAULT ? NPSteerType.Default : NPSteerType.Steered],
-            prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
+            types: [NPSteerType.Steered, NPSteerType.Default],
+            prompt: defaultChatMessages,
             model: transformerLensModelId,
             features: hasVector
               ? undefined
@@ -464,10 +599,52 @@ export const steerCompletionChat = async (
             normalize_steering: false,
             stream: true,
             n_logprobs,
+            is_assistant_axis: isAssistantAxis,
           }),
-        },
-      );
-    });
+        }),
+      ];
+    } else {
+      // Send separate requests for each type
+      toRunPromises = steerTypesToRun.map((type) => {
+        console.log(`completion chat - does not have saved ${type} output, running it`);
+        return fetch(
+          `${type === SteerOutputType.DEFAULT ? serverHostDefault : serverHostSteered}/v1/steer/completion-chat`,
+          {
+            method: 'POST',
+            cache: 'no-cache',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
+            },
+            body: JSON.stringify({
+              types: [type === SteerOutputType.DEFAULT ? NPSteerType.Default : NPSteerType.Steered],
+              prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
+              model: transformerLensModelId,
+              features: hasVector
+                ? undefined
+                : steerFeatures.map((feature) => ({
+                    model: feature.modelId,
+                    source: feature.layer,
+                    index: feature.index,
+                    strength: feature.strength,
+                  })),
+              vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
+              strength_multiplier: strengthMultiplier,
+              n_completion_tokens: nTokens,
+              temperature,
+              freq_penalty: freqPenalty,
+              seed,
+              steer_special_tokens: steerSpecialTokens,
+              steer_method: steerMethod,
+              normalize_steering: false,
+              stream: true,
+              n_logprobs,
+              is_assistant_axis: isAssistantAxis,
+            }),
+          },
+        );
+      });
+    }
     const responses = await Promise.all(toRunPromises);
     return responses.map((response) => {
       if (!response.body) {
@@ -504,6 +681,8 @@ export const steerCompletionChat = async (
           steerMethod,
           normalizeSteering: false,
           nLogprobs: n_logprobs,
+          // @ts-ignore we'll fix this later with typescript client
+          isAssistantAxis, 
         },
       });
     }
@@ -534,6 +713,8 @@ export const steerCompletionChat = async (
           steerMethod,
           normalizeSteering: false,
           nLogprobs: n_logprobs,
+          // @ts-ignore we'll fix this later with typescript client
+          isAssistantAxis,
         },
       });
     }

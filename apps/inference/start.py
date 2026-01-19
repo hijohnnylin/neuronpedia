@@ -115,6 +115,11 @@ def parse_args():
         action="store_true",
         help="Use nnsight. Not all models are currently supported.",
     )
+    parser.add_argument(
+        "--chatspace",
+        action="store_true",
+        help="Use chatspace engine.",
+    )
     return parser.parse_args()
 
 
@@ -148,7 +153,9 @@ def main():
         os.environ["CUSTOM_HF_MODEL_ID"] = str(args.custom_hf_model_id)
     if "NNSIGHT" not in os.environ:
         os.environ["NNSIGHT"] = "true" if args.nnsight else "false"
-
+    if "CHATSPACE" not in os.environ:
+        os.environ["CHATSPACE"] = "true" if args.chatspace else "false"
+        
     if args.list_models:
         from neuronpedia_inference.args import list_available_options
 

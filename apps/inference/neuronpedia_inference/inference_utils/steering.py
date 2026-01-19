@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 
 import torch
@@ -10,6 +11,27 @@ from transformers import PreTrainedTokenizerBase
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import request_lock
+
+
+# Regex to match Llama 3's auto-injected knowledge cutoff preamble in system messages
+# This preamble is added by apply_chat_template and looks like:
+#   Cutting Knowledge Date: December 2023
+#   Today Date: 26 Jul 2024
+#
+# We strip it to prevent duplication when the conversation is sent back and
+# apply_chat_template is called again
+_LLAMA3_SYSTEM_PREAMBLE_PATTERN = re.compile(
+    r"^Cutting Knowledge Date:\s*[^\n]+\nToday Date:\s*[^\n]+\n*",
+    re.MULTILINE
+)
+
+# no additional system prompt addition for assistant axis
+# _ASSISTANT_AXIS_SYSTEM_PROMPT_ADDITION = ""
+
+def _strip_llama3_system_preamble(content: str) -> str:
+    """Strip Llama 3's auto-injected knowledge cutoff preamble and assistant axis system prompt addition from system message content."""
+    content = _LLAMA3_SYSTEM_PREAMBLE_PATTERN.sub("", content)
+    return content.strip()
 
 
 async def stream_lock(is_stream: bool):
@@ -183,6 +205,59 @@ def convert_to_chat_array(
                     content=tokenizer.decode(current_content).strip(),
                 )
             )
+    
+    # Llama 3.3 Instruct uses header tokens similar to Llama 3.1
+    elif hasattr(tokenizer, "name_or_path") and "llama-3" in tokenizer.name_or_path.lower():
+        # Llama 3.3 uses special tokens: 128006 (start_header), 128007 (end_header)
+        # Format: <|start_header_id|>role<|end_header_id|>\n\ncontent<|eot_id|>
+        START_HEADER_ID = 128006
+        END_HEADER_ID = 128007
+        EOT_ID = 128009
+
+        i = 0
+        while i < len(tokens):
+            token = tokens[i]
+
+            # Look for start of a message (start_header_id)
+            if token == START_HEADER_ID:
+                # Extract role (tokens between start_header and end_header)
+                role_tokens = []
+                i += 1
+                while i < len(tokens) and tokens[i] != END_HEADER_ID:
+                    role_tokens.append(tokens[i])
+                    i += 1
+
+                if i < len(tokens) and tokens[i] == END_HEADER_ID:
+                    i += 1  # Skip end_header_id
+
+                    # Extract content (tokens until eot_id)
+                    content_tokens = []
+                    while i < len(tokens) and tokens[i] != EOT_ID:
+                        content_tokens.append(tokens[i])
+                        i += 1
+
+                    if role_tokens and content_tokens:
+                        role = tokenizer.decode(role_tokens).strip()
+                        content = tokenizer.decode(content_tokens).strip()
+
+                        # Strip Llama 3's auto-injected knowledge cutoff preamble from system messages
+                        # to prevent duplication when apply_chat_template is called again
+                        if role == "system":
+                            content = _strip_llama3_system_preamble(content)
+
+                        if role and content:
+                            conversation.append(
+                                NPSteerChatMessage(
+                                    role=role,
+                                    content=content,
+                                )
+                            )
+
+                    if i < len(tokens) and tokens[i] == EOT_ID:
+                        i += 1  # Skip eot_id
+                    continue
+
+            i += 1
 
     # no chat template, assume we are using the generic chat template to generate the conversation
     elif not hasattr(tokenizer, "chat_template") or tokenizer.chat_template is None:

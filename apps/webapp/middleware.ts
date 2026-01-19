@@ -5,12 +5,16 @@ import { API_KEY_HEADER_NAME, CONTACT_EMAIL_ADDRESS, ENABLE_RATE_LIMITER, HIGHER
 
 const RATE_LIMIT_WINDOW = '60 m';
 
+const NO_LIMIT_ENDPOINTS = [
+  '/api/steer-load',
+];
+
 const NORMAL_RATE_LIMITS = [
   { endpoint: '/', limit: 25000 },
   { endpoint: '/api', limit: 25000 },
   { endpoint: '/api/activation/new', limit: 1000 },
   { endpoint: '/api/explanation/search', limit: 200 },
-  { endpoint: '/api/steer', limit: 300 },
+  { endpoint: '/api/steer', limit: 120 },
   { endpoint: '/api/search-topk-by-token', limit: 500 },
   { endpoint: '/api/search-all', limit: 1600 },
   { endpoint: '/api/graph/generate', limit: 30 },
@@ -94,7 +98,7 @@ export default async function middleware(request: NextRequest) {
 
   // eslint-disable-next-line no-restricted-syntax
   for (const { endpoint, limiter } of rateLimitersToUse) {
-    if (pathname.startsWith(endpoint)) {
+    if (pathname.startsWith(endpoint) && !NO_LIMIT_ENDPOINTS.some((ep) => pathname.startsWith(ep))) {
       // eslint-disable-next-line
       const { success, pending, limit, reset, remaining } = await limiter.limit(ip);
       requestHeaders.set('x-limit-remaining', remaining.toString());
@@ -125,10 +129,14 @@ export default async function middleware(request: NextRequest) {
       headers: requestHeaders,
     },
   });
+  const limitRemaining = requestHeaders.get('x-limit-remaining');
   if (pathname.startsWith('/api')) {
     res.headers.append('Access-Control-Allow-Origin', '*');
     res.headers.append('Access-Control-Allow-Methods', 'GET, POST');
     res.headers.append('Access-Control-Allow-Headers', 'Content-Type');
+    if (limitRemaining) {
+      res.headers.set('x-limit-remaining', limitRemaining);
+    }
   }
   return res;
 }

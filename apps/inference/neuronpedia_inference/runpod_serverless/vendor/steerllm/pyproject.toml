@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "steerllm"
+version = "0.1.0"
+description = "Multi-backend LLM steering library"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "steerllm contributors" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    # "License :: OSI Approved :: MIT License", # the project is MIT but this has to be removed for this error: setuptools.errors.InvalidConfigError: License classifiers have been superseded by license expressions (see https://peps.python.org/pep-0639/). Please remove
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["llm", "steering", "interpretability", "vllm", "transformers"]
+
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+vllm = [
+    "vllm>=0.11.0",
+]
+huggingface = [
+    "transformers>=4.40.0",
+    "accelerate>=0.25.0",
+]
+training = [
+    "steerllm[huggingface]",
+]
+all = [
+    "steerllm[vllm,huggingface,training]",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+[project.urls]
+Homepage = "https://github.com/anthropics/steerllm"
+Documentation = "https://github.com/anthropics/steerllm#readme"
+Repository = "https://github.com/anthropics/steerllm"
+
+[tool.setuptools]
+package-dir = {"steerllm" = ".", "steerllm.backends" = "backends", "steerllm.backends.huggingface" = "backends/huggingface", "steerllm.backends.vllm" = "backends/vllm", "steerllm.core" = "core", "steerllm.training" = "training"}
+packages = ["steerllm", "steerllm.backends", "steerllm.backends.huggingface", "steerllm.backends.vllm", "steerllm.core", "steerllm.training"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore:builtin type [sS]wig.* has no __module__ attribute:DeprecationWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]

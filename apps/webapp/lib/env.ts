@@ -100,6 +100,7 @@ export const EMBEDDING_PROVIDER = EmbeddingProviderSchema.parse(process.env.EMBE
 // Inference Server
 export const USE_LOCALHOST_INFERENCE = process.env.USE_LOCALHOST_INFERENCE === 'true';
 export const INFERENCE_SERVER_SECRET = process.env.INFERENCE_SERVER_SECRET || '';
+export const INFERENCE_RUNPOD_API_KEY = process.env.INFERENCE_RUNPOD_API_KEY || '';
 
 export const NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH = process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH
   ? parseInt(process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH, 10)

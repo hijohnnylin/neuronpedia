@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';
 import { SteerResultChat } from '../steer-chat/route';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const inputSchema = object({
   steerOutputId: string().required(),
@@ -100,6 +100,28 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     toReturnResult.id = savedSteerSteeredOutput.id;
     toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${savedSteerSteeredOutput.id}`;
+
+    // Handle assistant_axis (capMonitorOutput) for PROJECTION_CAP steer method
+    const isAssistantAxis = savedSteerSteeredOutput.steerMethod === NPSteerMethod.ProjectionCap;
+    if (isAssistantAxis) {
+      const assistantAxisArray: any[] = [];
+
+      // Get capMonitorOutput for steered output (use cached data only)
+      const steeredCapMonitor = savedSteerSteeredOutput.capMonitorOutput;
+      if (steeredCapMonitor) {
+        assistantAxisArray.push(JSON.parse(steeredCapMonitor));
+      }
+
+      // Get capMonitorOutput for default output (use cached data only)
+      const defaultCapMonitor = savedSteerDefaultOutput.capMonitorOutput;
+      if (defaultCapMonitor) {
+        assistantAxisArray.push(JSON.parse(defaultCapMonitor));
+      }
+
+      if (assistantAxisArray.length > 0) {
+        toReturnResult.assistant_axis = assistantAxisArray;
+      }
+    }
 
     return NextResponse.json(toReturnResult);
   } catch (error) {

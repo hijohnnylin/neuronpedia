@@ -65,6 +65,7 @@ class TestSteerCompletionChatPostRequest(unittest.TestCase):
                 seed = 1.337,
                 stream = True,
                 n_logprobs = 0,
+                is_assistant_axis = True,
                 steer_special_tokens = True
             )
         else:

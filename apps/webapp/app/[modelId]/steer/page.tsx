@@ -14,6 +14,7 @@ export default async function Page({
     index?: string;
     strength?: string;
     hideInitialSettingsOnMobile?: string;
+    preset?: string;
   };
 }) {
   // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
@@ -32,6 +33,7 @@ export default async function Page({
         initialIndex={searchParams.index}
         initialStrength={searchParams.strength}
         hideInitialSettingsOnMobile={searchParams.hideInitialSettingsOnMobile === 'true'}
+        initialPreset={searchParams.preset}
       />
     </div>
   );

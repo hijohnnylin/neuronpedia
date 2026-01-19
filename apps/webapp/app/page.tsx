@@ -15,6 +15,7 @@ import {
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
+  Activity,
   Blocks,
   BookOpenText,
   Computer,
@@ -31,6 +32,7 @@ import {
   Slack,
   SmileIcon,
   Speech,
+  SquareActivity,
   Wand,
   WandSparkles,
   Youtube,
@@ -42,6 +44,7 @@ import FeatureSelector from '../components/feature-selector/feature-selector';
 import InferenceSearcher from '../components/inference-searcher/inference-searcher';
 import HomeModels from './home/home-models';
 import HomeReleases from './home/home-releases';
+import { CAP_BLOG_URL, CAP_PAPER_URL } from './[modelId]/assistant-axis/assistant-axis-steerer';
 
 export const viewport = {
   width: 'device-width',
@@ -93,7 +96,7 @@ export default function Page() {
         </div>
       )}
 
-      <div className="flex flex-col items-center justify-center gap-x-6 gap-y-2 sm:flex-row">
+      <div className="flex flex-col items-center justify-center gap-x-5 gap-y-2 sm:flex-row">
         <svg style={{ display: 'none' }}>
           <filter id="glass-distortion">
             <feTurbulence type="turbulence" baseFrequency="0.008" numOctaves="2" result="noise" />
@@ -101,7 +104,8 @@ export default function Page() {
           </filter>
         </svg>
 
-        <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:min-h-[280px] sm:w-[600px] sm:min-w-[600px] sm:px-0">
+
+        <div className="order-2 sm:order-1 relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:min-h-[260px] sm:h-[260px] sm:w-[380px] sm:min-w-[380px] sm:px-0">
           <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gradient-to-t from-white via-white to-gBlue/40 px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
             <div className="content">
               <div className="flex items-center justify-center text-xs font-bold text-sky-800">
@@ -134,14 +138,14 @@ export default function Page() {
                   </div>
                 </CustomTooltip>
               </div>
-              <div className="mt-2 text-[32px] font-bold text-sky-700 sm:mt-3">
+              <div className="mt-2 text-[24px] font-bold text-sky-700 sm:mt-3">
                 <span className="font-bold text-gBlue">Gemma Scope 2</span>
               </div>
-              <div className="mt-1 text-xs font-medium text-slate-500 sm:mt-1">
-                Google DeepMind, Language Model Interpretability Team
+              <div className="mt-1 text-xs font-medium text-slate-500 sm:mt-0 sm:mb-1">
+                Google DeepMind
               </div>
 
-              <div className="mt-4 flex flex-col items-center justify-center gap-y-3 sm:mt-7 sm:flex-row sm:gap-x-3">
+              <div className="mt-4 flex flex-col items-center justify-center gap-3 sm:mt-3 sm:grid sm:grid-cols-2 sm:gap-y-1.5">
                 <Link href="/gemma-scope-2" className="">
                   <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
                     <div className="flex flex-row items-center justify-center rounded-xl bg-gGreen px-5 py-2 text-white shadow sm:px-6">
@@ -216,7 +220,63 @@ export default function Page() {
           </div>
         </div>
 
-        <div className="relative z-0 mb-3 mt-3 flex min-h-[350px] w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:min-h-[280px] sm:w-[380px] sm:min-w-[380px] sm:px-0">
+        <div className="order-1 sm:order-2 relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:min-h-[280px] sm:h-[280px] sm:w-[400px] sm:min-w-[440px] sm:px-0">
+          <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#e5e4df] px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
+            <div className="content">
+              <div className="flex items-center justify-center text-xs font-bold text-[#666663]">
+                January 2026
+              </div>
+              <div className="mt-2 text-[32px] font-bold text-sky-700 sm:mt-3">
+                <span className="font-bold text-[#bf4d43]">Assistant Axis</span>
+              </div>
+              <div className="mt-1 text-[13px] font-medium text-[#666663] sm:mt-0">
+                Lu et al.
+              </div>
+
+              <div className="mt-2 flex flex-col items-center justify-center gap-y-3 sm:mt-5 sm:flex-row sm:gap-x-2.5">
+
+                <Link href={CAP_BLOG_URL} className="">
+                  <button type="button" className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto">
+                    <div className="flex flex-row items-center h-14 min-h-14 justify-center rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow sm:px-3 gap-x-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="Anthropic-Icon--Streamline-Svg-Logos" height="24" width="24" className="flex-shrink-0">
+                        <desc>
+                          Anthropic Icon Streamline Icon: https://streamlinehq.com
+                        </desc>
+                        <path fill="#181818" d="m13.788825 3.932 6.43325 16.136075h3.5279L17.316725 3.932H13.788825Z" stroke-width="0.25"></path>
+                        <path fill="#181818" d="m6.325375 13.682775 2.20125 -5.67065 2.201275 5.67065H6.325375ZM6.68225 3.932 0.25 20.068075h3.596525l1.3155 -3.3886h6.729425l1.315275 3.3886h3.59655L10.371 3.932H6.68225Z" stroke-width="0.25"></path>
+                      </svg>
+                      <div className="text-[12px] font-semibold leading-snug">
+                        Anthropic
+                      </div>
+                    </div>
+                  </button>
+                </Link>
+                <Link href="/llama3.3-70b-it/assistant-axis" className="">
+                  <button type="button" className="h-16 min-h-16 w-32 min-w-32 transition-all hover:scale-105 sm:w-auto">
+                    <div className="flex flex-row items-center h-16 min-h-16 justify-center rounded-xl bg-[#CC785C] px-5 py-2 text-[#000000] shadow sm:px-3 gap-x-1.5">
+                      <SquareActivity className="h-5 w-5" />
+                      <div className="text-[14px] font-semibold leading-snug">
+                        Launch<br />Demo
+                      </div>
+                    </div>
+                  </button>
+                </Link><Link href={CAP_PAPER_URL} className="">
+                  <button type="button" className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto">
+                    <div className="flex flex-row items-center h-14 min-h-14 justify-center rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow sm:px-3 gap-x-1.5">
+                      <Scroll className="h-5 w-5" />
+                      <div className="text-[12px] font-semibold leading-snug">
+                        Paper
+                      </div>
+                    </div>
+                  </button>
+                </Link>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="order-3 relative z-0 mb-3 mt-3 flex min-h-[350px] w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:min-h-[260px] sm:h-[260px] sm:w-[380px] sm:min-w-[380px] sm:px-0">
           <div
             style={{ backgroundImage: `url('/usedby/landscapebg.jpg')` }}
             className="bg-size-[100%] absolute inset-[1px] -z-10 mx-3 rounded-[20px] bg-cover bg-top opacity-100 brightness-75 -hue-rotate-[5deg] saturate-[2.0] sm:mx-0 sm:px-0"
@@ -231,7 +291,7 @@ export default function Page() {
                 August 2025
               </div>
               <div
-                className="mt-1.5 text-base font-bold leading-snug sm:text-[21px]"
+                className="mt-1.5 text-base font-bold leading-snug sm:text-[18px]"
                 style={{ textShadow: '0 2px 3px rgba(0, 0, 0, 0.3)' }}
               >
                 The Circuit Analysis

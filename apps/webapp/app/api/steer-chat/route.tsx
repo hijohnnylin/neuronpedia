@@ -11,15 +11,18 @@ import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
 import { steerCompletionChat } from '@/lib/utils/inference';
 import {
   ChatMessage,
-  STEER_MAX_PROMPT_CHARS,
   STEER_METHOD,
   STEER_N_COMPLETION_TOKENS_MAX,
   STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
+  STEER_MAX_PROMPT_CHARS,
   STEER_STRENGTH_MIN,
   STEER_STRENGTH_MULTIPLIER_MAX,
   STEER_TEMPERATURE_MAX,
   SteerFeature,
+  STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS,
+  ERROR_STEER_MAX_PROMPT_CHARS,
+  STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS,
 } from '@/lib/utils/steer';
 import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputToNeuronWithPartialRelations } from '@/prisma/generated/zod';
@@ -37,7 +40,7 @@ import { NextResponse } from 'next/server';
 import { array, bool, InferType, number, object, string, ValidationError } from 'yup';
 
 // Hobby plans don't support > 60 seconds
-// export const maxDuration = 180;
+export const maxDuration = 180;
 
 const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 const STEERING_VERSION = 1;
@@ -60,8 +63,17 @@ async function saveSteerChatOutput(
   steerTypesRan: SteerOutputType[],
   input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null,
   userId: string | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  assistantAxisArray?: any[],
 ) {
   let defaultOutputId = existingDefaultOutputId;
+
+  // Helper to find capMonitorOutput for a given steer type from the assistant_axis array
+  const getCapMonitorOutput = (steerType: SteerOutputType): string | null => {
+    if (!assistantAxisArray || !Array.isArray(assistantAxisArray)) return null;
+    const axisItem = assistantAxisArray.find((item) => item.type === steerType);
+    return axisItem ? JSON.stringify(axisItem) : null;
+  };
 
   for (const steerTypeRan of steerTypesRan) {
     if (steerTypeRan === SteerOutputType.DEFAULT) {
@@ -84,9 +96,9 @@ async function saveSteerChatOutput(
           inputTextMd5: createHash('md5')
             .update(input?.raw || '')
             .digest('hex'),
-          inputTextChatTemplate: JSON.stringify(sortChatMessages(input?.chatTemplate || [])),
+          inputTextChatTemplate: JSON.stringify(sortChatMessages(body.defaultChatMessages)),
           inputTextChatTemplateMd5: createHash('md5')
-            .update(JSON.stringify(sortChatMessages(input?.chatTemplate || [])))
+            .update(JSON.stringify(sortChatMessages(body.defaultChatMessages)))
             .digest('hex'),
           temperature: body.temperature,
           numTokens: body.n_tokens,
@@ -98,6 +110,7 @@ async function saveSteerChatOutput(
           steerMethod: body.steer_method,
           toNeurons: {},
           logprobs: output.logprobs ? JSON.stringify(output.logprobs) : null,
+          capMonitorOutput: getCapMonitorOutput(SteerOutputType.DEFAULT),
         },
       });
       // update the default saved output id since we just saved it
@@ -123,9 +136,9 @@ async function saveSteerChatOutput(
           inputTextMd5: createHash('md5')
             .update(input?.raw || '')
             .digest('hex'),
-          inputTextChatTemplate: JSON.stringify(sortChatMessages(input?.chatTemplate || [])),
+          inputTextChatTemplate: JSON.stringify(sortChatMessages(body.steeredChatMessages)),
           inputTextChatTemplateMd5: createHash('md5')
-            .update(JSON.stringify(sortChatMessages(input?.chatTemplate || [])))
+            .update(JSON.stringify(sortChatMessages(body.steeredChatMessages)))
             .digest('hex'),
           temperature: body.temperature,
           numTokens: body.n_tokens,
@@ -150,6 +163,7 @@ async function saveSteerChatOutput(
             })),
           },
           logprobs: output.logprobs ? JSON.stringify(output.logprobs) : null,
+          capMonitorOutput: getCapMonitorOutput(SteerOutputType.STEERED),
         },
       });
 
@@ -193,7 +207,7 @@ function createStream(generator: AsyncGenerator<SteerResultChat>) {
 
 async function* transformStream(
   stream: ReadableStreamDefaultReader<EventSourceMessage>,
-): AsyncGenerator<SteerCompletionChatPost200Response> {
+): AsyncGenerator<SteerCompletionChatPost200Response & { assistantAxis?: any }> {
   while (true) {
     // eslint-disable-next-line
     const { done, value } = await stream.read();
@@ -203,7 +217,7 @@ async function* transformStream(
     const parsed = JSON.parse(value.data);
 
     try {
-      const toYield: SteerCompletionChatPost200Response = {
+      const toYield = {
         outputs: parsed.outputs.map((output: any) => {
           const op = {
             raw: output.raw,
@@ -223,7 +237,9 @@ async function* transformStream(
             content: message.content,
           })),
         },
-      };
+        // Pass through assistant_axis data from inference server
+        assistantAxis: parsed.assistant_axis,
+      } as SteerCompletionChatPost200Response & { assistantAxis?: any };
       yield toYield;
     } catch (error) {
       console.error(error);
@@ -239,7 +255,9 @@ async function* generateResponse(
   features: SteerFeature[],
   user: AuthenticatedUser | null,
   hasVector: boolean,
+  skipCaching: boolean,
 ): AsyncGenerator<SteerResultChat> {
+  console.log('steerTypesToRun', steerTypesToRun);
   const steerCompletionChatResults = (await steerCompletionChat(
     body.modelId,
     steerTypesToRun,
@@ -256,6 +274,8 @@ async function* generateResponse(
     user,
     true,
     body.steer_method,
+    undefined,
+    body.isAssistantAxis,
   )) as ReadableStream<any>[];
 
   const readableStreams = steerCompletionChatResults.map((stream) =>
@@ -263,48 +283,94 @@ async function* generateResponse(
   );
   const streamReaders = readableStreams.map((stream) => stream.getReader());
 
+  // Check if this is a combined request (one stream with both types)
+  const isCombinedRequest = steerCompletionChatResults.length === 1 && steerTypesToRun.length === 2;
+
   const streamProcessors = streamReaders.map((streamReader, index) => ({
-    steerType: steerTypesToRun[index],
+    // For combined requests, the single stream handles both types
+    steerTypes: isCombinedRequest ? steerTypesToRun : [steerTypesToRun[index]],
     done: false,
     generator: transformStream(streamReader),
+    pendingPromise: null as Promise<{ processorIndex: number; value: any; done: boolean }> | null,
   }));
 
   let input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null = null;
 
-  // Continue until all streams are done
+  // Helper to create a promise for reading from a processor
+  const createReadPromise = (processor: typeof streamProcessors[0], processorIndex: number) => {
+    return processor.generator.next().then(({ value, done }) => ({
+      processorIndex,
+      value,
+      done: done || false,
+    }));
+  };
+
+  // Initialize pending promises for all processors
+  streamProcessors.forEach((processor, index) => {
+    processor.pendingPromise = createReadPromise(processor, index);
+  });
+
+  // Continue until all streams are done - process in parallel using Promise.race
   while (streamProcessors.some((processor) => !processor.done)) {
-    let hasNewContent = false;
+    // Get all pending promises from non-done processors
+    const activePromises = streamProcessors
+      .map((processor, index) => ({ processor, index }))
+      .filter(({ processor }) => !processor.done && processor.pendingPromise)
+      .map(({ processor }) => processor.pendingPromise!);
 
-    // Process each stream independently
-    for (const processor of streamProcessors) {
-      // eslint-disable-next-line no-continue
-      if (processor.done) continue;
+    if (activePromises.length === 0) break;
 
-      const { value, done } = await processor.generator.next();
+    // Wait for whichever stream has data first
+    const result = await Promise.race(activePromises);
+    const processor = streamProcessors[result.processorIndex];
 
-      if (done) {
-        processor.done = true;
-        // eslint-disable-next-line no-continue
-        continue;
+    if (result.done) {
+      processor.done = true;
+      processor.pendingPromise = null;
+    } else {
+      // Process the result from this processor
+      const value = result.value;
+
+      // Process all outputs for this processor's steer types
+      for (const steerType of processor.steerTypes) {
+        const output = value.outputs.find((out: any) => out.type === steerType);
+        if (!output) {
+          throw new Error(`No output found for steerType: ${steerType}`);
+        }
+
+        input = value.input;
+        toReturnResult[steerType] = {
+          raw: output.raw,
+          chatTemplate: output.chatTemplate,
+          logprobs: output.logprobs ? output.logprobs : null,
+        };
+      }
+      // Pass through assistant_axis data from inference server
+      // Merge assistant_axis arrays when we have separate streams for each type
+      if (value.assistantAxis) {
+        if (!toReturnResult.assistant_axis) {
+          toReturnResult.assistant_axis = value.assistantAxis;
+        } else if (Array.isArray(toReturnResult.assistant_axis) && Array.isArray(value.assistantAxis)) {
+          // Merge arrays, replacing items with matching type
+          for (const newItem of value.assistantAxis) {
+            const existingIndex = toReturnResult.assistant_axis.findIndex(
+              (item: any) => item.type === newItem.type,
+            );
+            if (existingIndex >= 0) {
+              toReturnResult.assistant_axis[existingIndex] = newItem;
+            } else {
+              toReturnResult.assistant_axis.push(newItem);
+            }
+          }
+        } else {
+          toReturnResult.assistant_axis = value.assistantAxis;
+        }
       }
 
-      // Process the chunk
-      const output = value.outputs.find((out: any) => out.type === processor.steerType);
-      if (!output) {
-        throw new Error(`No output found for steerType: ${processor.steerType}`);
-      }
+      // Start reading the next chunk from this processor immediately
+      processor.pendingPromise = createReadPromise(processor, result.processorIndex);
 
-      input = value.input;
-      toReturnResult[processor.steerType] = {
-        raw: output.raw,
-        chatTemplate: output.chatTemplate,
-        logprobs: output.logprobs ? output.logprobs : null,
-      };
-      hasNewContent = true;
-    }
-
-    // Only yield if we have new content
-    if (hasNewContent) {
+      // Yield the updated result
       yield toReturnResult;
     }
   }
@@ -321,6 +387,7 @@ async function* generateResponse(
         steerTypesToRun,
         input,
         user?.id,
+        toReturnResult.assistant_axis,
       );
     }
     yield toReturnResult;
@@ -343,17 +410,19 @@ export type SteerResultChat = {
   shareUrl: string | null | undefined;
   limit: string | null;
   settings:
-    | {
-        temperature: number;
-        n_tokens: number;
-        freq_penalty: number;
-        seed: number;
-        strength_multiplier: number;
-        steer_special_tokens: boolean;
-        steer_method: NPSteerMethod;
-      }
-    | undefined;
+  | {
+    temperature: number;
+    n_tokens: number;
+    freq_penalty: number;
+    seed: number;
+    strength_multiplier: number;
+    steer_special_tokens: boolean;
+    steer_method: NPSteerMethod;
+  }
+  | undefined;
   features?: SteerOutputToNeuronWithPartialRelations[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  assistant_axis?: any;
 };
 
 export type FeatureWithMaxActApprox = {
@@ -403,6 +472,7 @@ const steerSchema = object({
   steer_special_tokens: bool().required(),
   stream: bool().default(false),
   steer_method: string().oneOf(Object.values(NPSteerMethod)).default(STEER_METHOD),
+  isAssistantAxis: bool().default(false),
 });
 
 export type SteerSchemaTypeChat = InferType<typeof steerSchema>;
@@ -609,8 +679,12 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const totalSteeredChars = body.steeredChatMessages.reduce((sum, message) => sum + message.content.length, 0);
 
     // Check if total length exceeds the maximum allowed
-    if (totalDefaultChars > STEER_MAX_PROMPT_CHARS || totalSteeredChars > STEER_MAX_PROMPT_CHARS) {
-      return NextResponse.json({ message: 'Total chat message length exceeds the maximum allowed' }, { status: 400 });
+    let maxPromptChars = STEER_MAX_PROMPT_CHARS;
+    if (body.isAssistantAxis) {
+      maxPromptChars = STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS;
+    }
+    if (totalDefaultChars > maxPromptChars || totalSteeredChars > maxPromptChars) {
+      return NextResponse.json({ message: ERROR_STEER_MAX_PROMPT_CHARS }, { status: 400 });
     }
 
     // check access
@@ -627,7 +701,16 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           { status: 400 },
         );
       }
-    } else if (NNSIGHT_MODELS.includes(modelId)) {
+    }
+    else if (body.isAssistantAxis) {
+      if (body.n_tokens > STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS) {
+        return NextResponse.json(
+          { message: `For assistant axis models the max n_tokens is ${STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS}` },
+          { status: 400 },
+        );
+      }
+    }
+    else if (NNSIGHT_MODELS.includes(modelId)) {
       if (body.n_tokens > STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM) {
         return NextResponse.json(
           { message: `For large LLM models the max n_tokens is ${STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM}` },
@@ -685,13 +768,14 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       },
     };
     // check for saved outputs
+    // if assistant axis, don't look it up
 
     // check for default saved output
     let steerTypesToRun: SteerOutputType[] = [SteerOutputType.STEERED, SteerOutputType.DEFAULT];
     // sort each chat message by content key, then role key so we can do an accurate lookup
     // this is because we store in the db using JSON.stringify and dictionaries are not ordered
     const defaultChatMessagesSorted = sortChatMessages(body.defaultChatMessages);
-    const savedSteerDefaultOutput = await prisma.steerOutput.findFirst({
+    const savedSteerDefaultOutput = body.isAssistantAxis ? null : await prisma.steerOutput.findFirst({
       where: {
         modelId,
         type: SteerOutputType.DEFAULT,
@@ -714,12 +798,20 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         chatTemplate: JSON.parse(savedSteerDefaultOutput.outputTextChatTemplate || '[]'),
         logprobs: savedSteerDefaultOutput.logprobs ? JSON.parse(savedSteerDefaultOutput.logprobs) : null,
       };
+      // Set cached capMonitorOutput for assistant_axis
+      if (savedSteerDefaultOutput.capMonitorOutput) {
+        const cachedAxisItem = JSON.parse(savedSteerDefaultOutput.capMonitorOutput);
+        if (!toReturnResult.assistant_axis) {
+          toReturnResult.assistant_axis = [];
+        }
+        toReturnResult.assistant_axis.push(cachedAxisItem);
+      }
       steerTypesToRun = steerTypesToRun.filter((type) => type !== SteerOutputType.DEFAULT);
     }
 
     // check for steered saved output
     const steeredChatMessagesSorted = sortChatMessages(body.steeredChatMessages);
-    let savedSteerSteeredOutputs = await prisma.steerOutput.findMany({
+    let savedSteerSteeredOutputs = body.isAssistantAxis ? [] : await prisma.steerOutput.findMany({
       where: {
         modelId,
         type: SteerOutputType.STEERED,
@@ -774,6 +866,14 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       };
       toReturnResult.id = savedSteerSteeredOutputs[0].id;
       toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${savedSteerSteeredOutputs[0].id}`;
+      // Set cached capMonitorOutput for assistant_axis
+      if (savedSteerSteeredOutputs[0].capMonitorOutput) {
+        const cachedAxisItem = JSON.parse(savedSteerSteeredOutputs[0].capMonitorOutput);
+        if (!toReturnResult.assistant_axis) {
+          toReturnResult.assistant_axis = [];
+        }
+        toReturnResult.assistant_axis.push(cachedAxisItem);
+      }
 
       steerTypesToRun = steerTypesToRun.filter((type) => type !== SteerOutputType.STEERED);
     }
@@ -791,6 +891,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         featuresWithVectors,
         request.user,
         hasVector,
+        false,
       );
       const stream = createStream(generator);
       return new NextResponse(stream, {
@@ -801,6 +902,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         },
       });
     }
+    // if there are no featuresWithVectors, then steerTypesToRun should only be [SteerOutputType.DEFAULT]
+    steerTypesToRun = featuresWithVectors.length === 0 ? [SteerOutputType.DEFAULT] : steerTypesToRun;
     let steerCompletionResults = await steerCompletionChat(
       modelId,
       steerTypesToRun,
@@ -817,6 +920,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       request.user,
       body.stream,
       body.steer_method,
+      undefined,
+      body.isAssistantAxis,
     );
     steerCompletionResults = steerCompletionResults as SteerCompletionChatPost200Response[];
     for (const result of steerCompletionResults) {
@@ -835,6 +940,12 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           };
         }
       }
+      // Extract assistant_axis data from non-streaming response
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const assistantAxis = (result as any).assistantAxis;
+      if (assistantAxis) {
+        toReturnResult.assistant_axis = assistantAxis;
+      }
     }
     let input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null = null;
     steerCompletionResults.forEach((result) => {
@@ -852,6 +963,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       steerTypesToRun,
       input,
       request.user?.id,
+      toReturnResult.assistant_axis,
     );
 
     // return the result

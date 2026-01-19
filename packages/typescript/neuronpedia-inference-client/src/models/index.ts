@@ -33,6 +33,8 @@ export * from './NPSteerMethod';
 export * from './NPSteerType';
 export * from './NPSteerVector';
 export * from './SteerCompletionChatPost200Response';
+export * from './SteerCompletionChatPost200ResponseAssistantAxisInner';
+export * from './SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner';
 export * from './SteerCompletionChatPostRequest';
 export * from './SteerCompletionPost200Response';
 export * from './SteerCompletionRequest';

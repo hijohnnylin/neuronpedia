@@ -19,7 +19,11 @@ import * as Select from '@radix-ui/react-select';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 import { NPSteerMethod } from 'neuronpedia-inference-client';
 
-export const STEER_METHODS_ALLOWED = [NPSteerMethod.SimpleAdditive, NPSteerMethod.OrthogonalDecomp];
+export const STEER_METHODS_ALLOWED = [
+  NPSteerMethod.SimpleAdditive,
+  NPSteerMethod.OrthogonalDecomp,
+  NPSteerMethod.ProjectionCap,
+];
 
 export default function SteerAdvancedSettings({
   isNnSightModel = false,
@@ -41,6 +45,7 @@ export default function SteerAdvancedSettings({
   setSteerSpecialTokens,
   steerMethod,
   setSteerMethod,
+  isPersonaSpace = false,
 }: {
   isNnSightModel: boolean;
   thinking: boolean;
@@ -61,6 +66,7 @@ export default function SteerAdvancedSettings({
   setSteerSpecialTokens: (steerSpecialTokens: boolean) => void;
   steerMethod: NPSteerMethod;
   setSteerMethod: (steerMethod: NPSteerMethod) => void;
+  isPersonaSpace?: boolean;
 }) {
   return (
     <div className="flex w-full flex-col pb-5 pt-3 sm:pt-0">
@@ -184,7 +190,7 @@ export default function SteerAdvancedSettings({
           />
         </div>
         <div className="col-span-1 flex w-full flex-row items-center justify-start gap-x-3">
-          <Select.Root value={steerMethod} onValueChange={setSteerMethod}>
+          <Select.Root value={steerMethod.toString()} onValueChange={setSteerMethod}>
             <Select.Trigger className="flex w-[162px] items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700">
               <Select.Value className="flex-1 text-center" />
               <Select.Icon>

@@ -1,0 +1,28 @@
+# Core dependencies for RunPod Serverless Neuronpedia Inference
+# Llama 3.3 70B AWQ with ChatSpace engine
+
+# RunPod serverless SDK
+runpod>=1.7.0
+
+# PyTorch (should match CUDA version in Dockerfile)
+torch==2.9.0
+
+# vLLM for efficient inference
+vllm==0.11.2
+
+# Transformers and related
+transformers>=4.45.0
+huggingface-hub[hf-transfer]>=0.26.0
+accelerate>=0.34.0
+
+# Numerical computing
+numpy>=1.24.0
+scikit-learn>=1.3.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+
+# AutoAWQ for quantized model support
+autoawq>=0.2.6
+

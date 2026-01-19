@@ -6,6 +6,7 @@ The steering/default chat responses.
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
+**assistant_axis** | [**List[SteerCompletionChatPost200ResponseAssistantAxisInner]**](SteerCompletionChatPost200ResponseAssistantAxisInner.md) | Persona monitoring data for assistant turns, one entry per steer type | [optional] 
 **outputs** | [**List[NPSteerChatResult]**](NPSteerChatResult.md) |  | 
 **input** | [**NPSteerChatResult**](NPSteerChatResult.md) |  | 
 

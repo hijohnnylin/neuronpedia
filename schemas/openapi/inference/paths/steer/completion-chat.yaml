@@ -13,6 +13,9 @@ post:
                 - steer_special_tokens
                 - prompt
               properties:
+                is_assistant_axis:
+                  type: boolean
+                  default: false
                 steer_special_tokens:
                   type: boolean
                   default: true
@@ -33,6 +36,33 @@ post:
               - outputs
               - input
             properties:
+              assistant_axis:
+                type: array
+                description: Persona monitoring data for assistant turns, one entry per steer type
+                items:
+                  type: object
+                  properties:
+                    type:
+                      $ref: "../../shared/steer.yaml#/components/schemas/NPSteerType"
+                      description: The steer type this axis data corresponds to
+                    pc_titles:
+                      type: array
+                      items:
+                        type: string
+                      description: List of principal component titles/descriptions
+                    turns:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          pc_values:
+                            type: object
+                            additionalProperties:
+                              type: number
+                            description: Dict mapping PC title to projection value
+                          snippet:
+                            type: string
+                            description: Truncated conversation content for this turn
               outputs:
                 type: array
                 items:

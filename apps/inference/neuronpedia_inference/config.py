@@ -39,6 +39,7 @@ class Config:
         max_loaded_saes: int = 100,
         steer_special_token_ids: list[int] | None = None,
         nnsight: bool = False,
+        chatspace: bool = False,
     ):
         self.model_id = model_id
         self.custom_hf_model_id = custom_hf_model_id
@@ -59,6 +60,7 @@ class Config:
         self.max_loaded_saes = max_loaded_saes
         self.steer_special_token_ids = steer_special_token_ids
         self.nnsight = nnsight
+        self.chatspace = chatspace
 
         # Log configuration details after initialization
         logger.info(
@@ -76,6 +78,7 @@ class Config:
             f"  include_sae_patterns: {self.include_sae_patterns}\n"
             f"  exclude_sae_patterns: {self.exclude_sae_patterns}\n"
             f"  nnsight: {self.nnsight}\n"
+            f"  chatspace: {self.chatspace}\n"
         )
 
     def set_num_layers(self, num_layers: int) -> None:

@@ -48,9 +48,8 @@ export default function VectorItem({
         )}
       </div>
       <div
-        className={`grid w-full ${
-          isInNeuronDetails ? 'mt-1 grid-cols-4 gap-y-0.5' : 'mt-2 grid-cols-2 gap-y-1'
-        } items-start justify-center gap-x-2`}
+        className={`grid w-full ${isInNeuronDetails ? 'mt-1 grid-cols-4 gap-y-0.5' : 'mt-2 grid-cols-2 gap-y-1'
+          } items-start justify-center gap-x-2`}
       >
         <div className="flex flex-1 grid-cols-1 flex-col items-center justify-center">
           <div className="mb-0.5 mt-1.5 text-[9px] uppercase text-slate-400">Model</div>
@@ -114,7 +113,16 @@ export default function VectorItem({
               variant="outline"
               size="icon"
               onClick={() => {
-                window.open(`/${vector.modelId}/steer/?source=${vector.layer}&index=${vector.index}`, '_blank');
+                const isAssistantAxis =
+                  vector.modelId === 'llama3.3-70b-it' &&
+                  vector.layer === '40-neuronpedia-resid-post' &&
+                  vector.index === '101874252';
+
+                if (isAssistantAxis) {
+                  window.open('/assistant-axis', '_blank');
+                } else {
+                  window.open(`/${vector.modelId}/steer/?source=${vector.layer}&index=${vector.index}`, '_blank');
+                }
               }}
               aria-label="Steer"
               className={`h-8 w-20 gap-x-1.5 text-xs ${getInferenceEnabledForModel(vector.modelId) ? '' : 'hidden'}`}

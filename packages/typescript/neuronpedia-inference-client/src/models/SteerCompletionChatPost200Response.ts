@@ -20,6 +20,13 @@ import {
     NPSteerChatResultToJSON,
     NPSteerChatResultToJSONTyped,
 } from './NPSteerChatResult';
+import type { SteerCompletionChatPost200ResponseAssistantAxisInner } from './SteerCompletionChatPost200ResponseAssistantAxisInner';
+import {
+    SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON,
+    SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSONTyped,
+    SteerCompletionChatPost200ResponseAssistantAxisInnerToJSON,
+    SteerCompletionChatPost200ResponseAssistantAxisInnerToJSONTyped,
+} from './SteerCompletionChatPost200ResponseAssistantAxisInner';
 
 /**
  * The steering/default chat responses.
@@ -27,6 +34,12 @@ import {
  * @interface SteerCompletionChatPost200Response
  */
 export interface SteerCompletionChatPost200Response {
+    /**
+     * Persona monitoring data for assistant turns, one entry per steer type
+     * @type {Array<SteerCompletionChatPost200ResponseAssistantAxisInner>}
+     * @memberof SteerCompletionChatPost200Response
+     */
+    assistantAxis?: Array<SteerCompletionChatPost200ResponseAssistantAxisInner>;
     /**
      * 
      * @type {Array<NPSteerChatResult>}
@@ -60,6 +73,7 @@ export function SteerCompletionChatPost200ResponseFromJSONTyped(json: any, ignor
     }
     return {
         
+        'assistantAxis': json['assistant_axis'] == null ? undefined : ((json['assistant_axis'] as Array<any>).map(SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON)),
         'outputs': ((json['outputs'] as Array<any>).map(NPSteerChatResultFromJSON)),
         'input': NPSteerChatResultFromJSON(json['input']),
     };
@@ -76,6 +90,7 @@ export function SteerCompletionChatPost200ResponseToJSONTyped(value?: SteerCompl
 
     return {
         
+        'assistant_axis': value['assistantAxis'] == null ? undefined : ((value['assistantAxis'] as Array<any>).map(SteerCompletionChatPost200ResponseAssistantAxisInnerToJSON)),
         'outputs': ((value['outputs'] as Array<any>).map(NPSteerChatResultToJSON)),
         'input': NPSteerChatResultToJSON(value['input']),
     };

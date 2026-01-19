@@ -144,6 +144,12 @@ export interface SteerCompletionChatPostRequest {
      * @type {boolean}
      * @memberof SteerCompletionChatPostRequest
      */
+    isAssistantAxis?: boolean;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof SteerCompletionChatPostRequest
+     */
     steerSpecialTokens: boolean;
 }
 
@@ -191,6 +197,7 @@ export function SteerCompletionChatPostRequestFromJSONTyped(json: any, ignoreDis
         'seed': json['seed'],
         'stream': json['stream'] == null ? undefined : json['stream'],
         'nLogprobs': json['n_logprobs'] == null ? undefined : json['n_logprobs'],
+        'isAssistantAxis': json['is_assistant_axis'] == null ? undefined : json['is_assistant_axis'],
         'steerSpecialTokens': json['steer_special_tokens'],
     };
 }
@@ -220,6 +227,7 @@ export function SteerCompletionChatPostRequestToJSONTyped(value?: SteerCompletio
         'seed': value['seed'],
         'stream': value['stream'],
         'n_logprobs': value['nLogprobs'],
+        'is_assistant_axis': value['isAssistantAxis'],
         'steer_special_tokens': value['steerSpecialTokens'],
     };
 }

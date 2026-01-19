@@ -2,6 +2,7 @@ import { Button } from '@/components/shadcn/button';
 import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { FeaturePreset, SteerFeature } from '@/lib/utils/steer';
 import { X } from 'lucide-react';
+import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { LoadingSquare } from '../svg/loading-square';
 
 export default function SteerPresetSelector({
@@ -10,6 +11,7 @@ export default function SteerPresetSelector({
   presetIsSelected,
   selectedFeatures,
   setSelectedFeatures,
+  setSteerMethod,
   setShowSettingsOnMobile,
   deleteUserVector,
   loadSavedSteerOutput,
@@ -19,6 +21,7 @@ export default function SteerPresetSelector({
   presetIsSelected: (preset: FeaturePreset) => boolean;
   selectedFeatures: SteerFeature[];
   setSelectedFeatures: (features: SteerFeature[]) => void;
+  setSteerMethod: (method: NPSteerMethod) => void;
   setShowSettingsOnMobile: (show: boolean) => void;
   deleteUserVector: (preset: FeaturePreset) => void;
   loadSavedSteerOutput: (id: string) => void;
@@ -38,6 +41,9 @@ export default function SteerPresetSelector({
                   setSelectedFeatures([]);
                 } else {
                   setSelectedFeatures(preset.features);
+                  if (preset.steerMethod) {
+                    setSteerMethod(preset.steerMethod);
+                  }
                   setShowSettingsOnMobile(false);
                 }
               }}
