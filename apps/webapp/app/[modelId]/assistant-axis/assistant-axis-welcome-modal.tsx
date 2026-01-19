@@ -97,9 +97,9 @@ export default function AssistantAxisWelcomeModal({
                                         content: <></>,
                                         component: (
                                             <div className="mt-0 flex flex-col items-center justify-center">
-                                                <div className="text-center mt-3 sm:mt-5 mb-2 text-xs sm:text-sm">Chat with the default Llama and the activation capped Llama simultaneously. This demo is for research purposes and contains examples of AI failure modes, including harmful or distressing outputs.</div>
+                                                <div className="text-center mt-3 sm:mt-5 mb-2 sm:mb-5 text-xs sm:text-sm">Chat with the default and activation-capped simultaneously to compare their responses and persona drifts. This demo is for research purposes and contains examples of AI failure modes, including harmful or distressing outputs.</div>
                                                 <div className="flex flex-col items-center justify-center bg-slate-100 p-3 sm:p-4 rounded-lg w-full">
-                                                    <div className="text-[10px] sm:text-[11px] font-medium uppercase text-slate-400 mb-2">Preloaded Conversations With Llama 3.3-70B</div>
+                                                    <div className="hidden sm:block text-[10px] sm:text-[11px] font-medium uppercase text-slate-400 mb-2">Preloaded Conversations With Llama 3.3-70B</div>
                                                     <div className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 max-w-xl">
                                                         {DEMO_BUTTONS.map((demo) => (
                                                             <Button
@@ -114,15 +114,15 @@ export default function AssistantAxisWelcomeModal({
                                                                 }}
                                                                 variant="outline"
                                                                 size="lg"
-                                                                className="flex h-24 w-full sm:h-32 sm:w-32 flex-col items-center justify-center gap-y-1 text-xs text-sky-700 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700"
+                                                                className="flex h-16 sm:h-24 w-full sm:h-32 sm:w-32 flex-col items-center justify-center gap-y-0 sm:gap-y-1 text-xs text-sky-700 hover:border-sky-300 hover:bg-sky-100 hover:text-sky-700"
                                                             >
-                                                                <div className="text-xl sm:text-2xl">{demo.emoji}</div>
-                                                                <span className="text-[10px] sm:text-xs">{demo.label}</span>
+                                                                <div className="text-lg sm:text-2xl">{demo.emoji}</div>
+                                                                <span className="text-[11px] sm:text-xs">{demo.label}</span>
                                                             </Button>
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <div className="flex border-t border-slate-200 pt-4 sm:pt-8 flex-col sm:flex-row items-center justify-center gap-2 sm:gap-x-2 mt-4 sm:mt-8 w-full">
+                                                <div className="flex grid sm:flex grid-cols-2 border-t border-slate-200 pt-2 sm:pt-4 sm:pt-8 flex-col sm:flex-row items-center justify-center gap-2 sm:gap-x-2 mt-2 sm:mt-4 sm:mt-8 w-full">
                                                     <Link
                                                         href={CAP_BLOG_URL}
                                                         target="_blank"
@@ -163,7 +163,7 @@ export default function AssistantAxisWelcomeModal({
 
                                                     <Link
                                                         href={`mailto:${CAP_CONTACT_EMAIL}`}
-                                                        className="flex w-full sm:flex-1 flex-row items-center justify-center gap-x-1 rounded bg-slate-100 px-2.5 py-2 font-sans text-[10px] sm:text-[11px] font-semibold uppercase leading-none text-slate-500 hover:bg-slate-200"
+                                                        className="flex w-full sm:flex-1 col-span-2 sm:col-span-1 flex-row items-center justify-center gap-x-1 rounded bg-slate-100 px-2.5 py-2 font-sans text-[10px] sm:text-[11px] font-semibold uppercase leading-none text-slate-500 hover:bg-slate-200"
                                                     >
                                                         <Mail className="h-3 w-3" />
                                                         Contact
