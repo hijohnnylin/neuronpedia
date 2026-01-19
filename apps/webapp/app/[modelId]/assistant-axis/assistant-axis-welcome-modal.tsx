@@ -12,9 +12,11 @@ import { DEMO_BUTTONS } from './assistant-axis-steerer';
 
 export default function AssistantAxisWelcomeModal({
     onLoadDemo,
+    onFreeChat,
     initialSavedId,
 }: {
     onLoadDemo: (savedId: string) => void;
+    onFreeChat: () => void;
     initialSavedId?: string;
 }) {
     const { isWelcomeModalOpen, setIsWelcomeModalOpen } = useAssistantAxisModalContext();
@@ -95,10 +97,10 @@ export default function AssistantAxisWelcomeModal({
                                         content: <></>,
                                         component: (
                                             <div className="mt-0 flex flex-col items-center justify-center">
-                                                <div className="text-center mt-3 sm:mt-5 mb-2 text-xs sm:text-sm">Chat with the default Llama and the activation capped Llama simultaneously to compare their responses and persona drifts. Click a demo below to get started.</div>
+                                                <div className="text-center mt-3 sm:mt-5 mb-2 text-xs sm:text-sm">Chat with the default Llama and the activation capped Llama simultaneously. This demo is for research purposes and contains examples of AI failure modes, including harmful or distressing outputs.</div>
                                                 <div className="flex flex-col items-center justify-center bg-slate-100 p-3 sm:p-4 rounded-lg w-full">
                                                     <div className="text-[10px] sm:text-[11px] font-medium uppercase text-slate-400 mb-2">Preloaded Conversations With Llama 3.3-70B</div>
-                                                    <div className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                                                    <div className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 max-w-xl">
                                                         {DEMO_BUTTONS.map((demo) => (
                                                             <Button
                                                                 key={demo.label}
@@ -107,6 +109,7 @@ export default function AssistantAxisWelcomeModal({
                                                                         handleLoadDemo(demo.id);
                                                                     } else {
                                                                         handleClose();
+                                                                        onFreeChat();
                                                                     }
                                                                 }}
                                                                 variant="outline"

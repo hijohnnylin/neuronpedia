@@ -403,7 +403,7 @@ export default function AssistantAxisChat({
             className={`flex relative h-[calc(100dvh)] items-center w-full min-w-0 flex-col text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh-180px)] sm:min-h-[calc(100dvh-180px)]`}
         >
 
-            <AssistantAxisWelcomeModal onLoadDemo={loadSavedSteerOutput} initialSavedId={initialSavedId} />
+            <AssistantAxisWelcomeModal onLoadDemo={loadSavedSteerOutput} onFreeChat={reset} initialSavedId={initialSavedId} />
             {/* Demo buttons */}
             <div className="mb-2 sm:mb-5 w-full relative h-[100px] sm:h-[80px] min-h-[100px] sm:min-h-[80px] max-h-[100px] sm:max-h-[80px] z-10 flex flex-row items-center justify-center gap-2 bg-slate-50 px-3 py-2 sm:px-6">
                 <div className="flex flex-row items-center justify-between gap-y-1 flex-1 w-full max-w-screen-2xl">
@@ -598,6 +598,7 @@ export default function AssistantAxisChat({
                                 {`I'm default Llama 3.3 70B.`}
                                 <div className="mt-3 hidden sm:block text-xs sm:text-sm text-slate-500">{`I'm the model that's publicly available, with no activation capping.`}</div>
                                 <div className="mt-3 text-xs sm:text-sm text-slate-500">{`Start a chat with me below.`}</div>
+                                <div className="mt-4 text-[9px] sm:text-xs text-slate-500">{`This demo is for research purposes and contains examples of AI failure modes, including harmful or distressing outputs.`}</div>
 
                             </div>
                         )}
@@ -688,6 +689,7 @@ export default function AssistantAxisChat({
                                 {`I'm activation-capped Llama 3.3 70B.`}
                                 <div className="mt-3 hidden sm:block text-xs sm:text-sm text-sky-700">{`I'm better at maintaining "assistant-like" behavior during conversations.`}</div>
                                 <div className="mt-3 text-xs sm:text-sm text-sky-700">{`Start a chat with me below.`}</div>
+                                <div className="mt-4 text-[9px] sm:text-xs text-sky-700">{`This demo is for research purposes and contains examples of AI failure modes, including harmful or distressing outputs.`}</div>
                             </div>
                         )}
                         <SteerChatMessage overrideTextSize="text-[10px]" chatMessages={steeredChatMessages} steered messageRefs={steeredMessageRefs} />
