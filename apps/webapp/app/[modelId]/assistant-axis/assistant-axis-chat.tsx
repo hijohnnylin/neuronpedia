@@ -700,15 +700,8 @@ export default function AssistantAxisChat({
             <div className="-mt-[262px] flex w-full flex-col items-center justify-center px-2 sm:px-0 pb-8 sm:mt-[-124px] sm:pb-4">
 
                 <div className="relative flex flex-row items-center justify-end sm:justify-center w-full sm:max-w-xl">
-                    {DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) && (
-                        <div className="absolute top-0 left-0 right-0 flex w-full rounded-lg h-full flex flex-col gap-y-1 bg-slate-400/30 justify-start items-center">
-                            <div className="text-slate-800 text-sm pt-4 text-xs font-medium text-slate-700">This is a demo chat. Try your own conversation.</div>
-                            <Button variant="outline" className=" mt-2 bg-white text-sky-700 bg-sky-50 border-sky-500 hover:bg-sky-100" onClick={() => {
-                                reset();
-                            }}>Start New Chat</Button>
-                        </div>
-                    )}
-                    <div className="absolute left-12 sm:left-0 -translate-x-full pr-3 flex flex-col gap-y-2">
+
+                    <div className={`absolute left-12 sm:left-0 -translate-x-full pr-3 flex flex-col gap-y-2 ${DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) ? 'hidden' : ''}`}>
                         <button
                             type="button"
                             title={copying ? 'Copied!' : 'Share chat'}
@@ -799,7 +792,7 @@ export default function AssistantAxisChat({
                         }}
                         required
                         placeholder={DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) ? "" : "Ask or say something..."}
-                        className="mt-0 h-[90px] min-h-[90px] max-h-[90px] sm:h-[113px] sm:min-h-[113px] sm:max-h-[113px] w-[calc(100dvw-60px)] max-w-[calc(100dvw-60px)] sm:max-w-full sm:w-full flex-1 resize-none rounded-xl border bg-sky-50 border-sky-100 disabled:border-slate-200 px-4 py-3.5 pr-10 text-left text-xs font-medium text-slate-800 placeholder-sky-600/40 shadow-md transition-all focus:border-sky-200 focus:shadow-lg focus:outline-none focus:ring-0 disabled:bg-slate-200 sm:text-[13px]"
+                        className={`mt-0 h-[90px] min-h-[90px] max-h-[90px] sm:h-[113px] sm:min-h-[113px] sm:max-h-[113px] w-[calc(100dvw-60px)] max-w-[calc(100dvw-60px)] sm:max-w-full sm:w-full flex-1 resize-none rounded-xl border bg-sky-50 border-sky-100 disabled:border-slate-200 px-4 py-3.5 pr-10 text-left text-xs font-medium text-slate-800 placeholder-sky-600/40 shadow-md transition-all focus:border-sky-200 focus:shadow-lg focus:outline-none focus:ring-0 disabled:bg-slate-200 sm:text-[13px] ${DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) ? 'hidden' : ''}`}
                     />
                     <button
                         type="button"
@@ -812,7 +805,7 @@ export default function AssistantAxisChat({
 
                         }}
                         disabled={DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id)}
-                        className="absolute right-2 sm:right-4 flex h-full cursor-pointer items-center justify-center disabled:opacity-50"
+                        className="absolute right-2 sm:right-4 flex h-full cursor-pointer items-center justify-center disabled:hidden"
                     >
                         {!isSteering ? (
                             <ArrowUp className="h-8 w-8 rounded-full bg-gBlue p-1.5 text-white hover:bg-gBlue/80" />
@@ -825,6 +818,14 @@ export default function AssistantAxisChat({
                     ) : (
                         <div className="text-[9px] absolute right-2 bottom-2 text-slate-500">Out of messages. Wait a bit and try again later.</div>
                     ) : <></>}
+                    {DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) && (
+                        <div className="absolute z-100 top-0 left-0 right-0 flex w-full rounded-lg h-full flex flex-col gap-y-1 justify-start items-center bg-slate-400">
+                            <div className="z-100 text-slate-700 text-sm pt-3 text-xs font-medium text-slate-600">This is a demo chat. Try your own conversation.</div>
+                            <Button variant="outline" className="h-12 z-100 mt-1 bg-white text-sky-600 bg-sky-50 px-5 py-3 border-sky-500 hover:bg-sky-100 text-[13px] hover:text-sky-800" onClick={() => {
+                                reset();
+                            }}>Start New Chat</Button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div >
