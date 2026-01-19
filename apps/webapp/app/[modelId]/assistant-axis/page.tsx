@@ -10,8 +10,8 @@ const SUPPORTED_MODELS = ['llama3.3-70b-it'];
 const ASSISTANT_CAP_PRESET = 'assistant-cap';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `Assistant Axis | Neuronpedia`;
-  const description = `Demo of monitoring and capping language models.`;
+  const title = `Assistant Axis`;
+  const description = `Demo of monitoring and capping language models, based on work by Lu et al.`;
 
   return {
     title,
