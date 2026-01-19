@@ -775,7 +775,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     // sort each chat message by content key, then role key so we can do an accurate lookup
     // this is because we store in the db using JSON.stringify and dictionaries are not ordered
     const defaultChatMessagesSorted = sortChatMessages(body.defaultChatMessages);
-    const savedSteerDefaultOutput = body.isAssistantAxis ? null : await prisma.steerOutput.findFirst({
+    const savedSteerDefaultOutput = await prisma.steerOutput.findFirst({
       where: {
         modelId,
         type: SteerOutputType.DEFAULT,
@@ -811,7 +811,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     // check for steered saved output
     const steeredChatMessagesSorted = sortChatMessages(body.steeredChatMessages);
-    let savedSteerSteeredOutputs = body.isAssistantAxis ? [] : await prisma.steerOutput.findMany({
+    let savedSteerSteeredOutputs = await prisma.steerOutput.findMany({
       where: {
         modelId,
         type: SteerOutputType.STEERED,

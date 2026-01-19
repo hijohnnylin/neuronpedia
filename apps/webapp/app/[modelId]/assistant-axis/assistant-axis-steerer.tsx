@@ -34,7 +34,7 @@ const PERSONA_MODELS = ['llama3.3-70b-it'];
 
 export const CAP_GITHUB_URL = 'https://github.com/safety-research/assistant-axis';
 export const CAP_PAPER_URL = 'https://arxiv.org/abs/2601.10387';
-export const CAP_BLOG_URL = '#';
+export const CAP_BLOG_URL = 'https://www.anthropic.com/research/assistant-axis';
 export const CAP_CONTACT_EMAIL = 'jacklindsey@anthropic.com,christina.lu@cs.ox.ac.uk';
 export const CAP_VECTOR_URL = '/llama3.3-70b-it/40-neuronpedia-resid-post/101874252';
 
