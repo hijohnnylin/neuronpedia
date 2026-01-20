@@ -570,9 +570,14 @@ export const steerCompletionChat = async (
 
     let toRunPromises: Promise<Response>[];
 
-    if (messagesAreEqual && hasBothTypes) {
-      // Send a single request with both types
-      console.log('completion chat - messages are equal, sending combined request for both default and steered');
+    // Check if we have two different servers available
+    const hasTwoServers = serverHostDefault !== serverHostSteered;
+
+    // Only combine into single request if messages are equal, both types needed, AND we only have one server
+    // If we have two servers, always send separate requests to use both servers in parallel
+    if (messagesAreEqual && hasBothTypes && !hasTwoServers) {
+      // Send a single request with both types (only when using a single server)
+      console.log('completion chat - messages are equal and single server, sending combined request');
       toRunPromises = [
         fetch(`${serverHostDefault}/v1/steer/completion-chat`, {
           method: 'POST',
@@ -609,45 +614,44 @@ export const steerCompletionChat = async (
         }),
       ];
     } else {
-      // Send separate requests for each type
+      // Send separate requests for each type (use two servers when available for parallelism)
+      console.log(`completion chat - sending separate requests (hasTwoServers: ${hasTwoServers})`);
       toRunPromises = steerTypesToRun.map((type) => {
-        console.log(`completion chat - does not have saved ${type} output, running it`);
-        return fetch(
-          `${type === SteerOutputType.DEFAULT ? serverHostDefault : serverHostSteered}/v1/steer/completion-chat`,
-          {
-            method: 'POST',
-            cache: 'no-cache',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
-            },
-            body: JSON.stringify({
-              types: [type === SteerOutputType.DEFAULT ? NPSteerType.Default : NPSteerType.Steered],
-              prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
-              model: transformerLensModelId,
-              features: hasVector
-                ? undefined
-                : steerFeatures.map((feature) => ({
-                    model: feature.modelId,
-                    source: feature.layer,
-                    index: feature.index,
-                    strength: feature.strength,
-                  })),
-              vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
-              strength_multiplier: strengthMultiplier,
-              n_completion_tokens: nTokens,
-              temperature,
-              freq_penalty: freqPenalty,
-              seed,
-              steer_special_tokens: steerSpecialTokens,
-              steer_method: steerMethod,
-              normalize_steering: false,
-              stream: true,
-              n_logprobs,
-              is_assistant_axis: isAssistantAxis,
-            }),
+        const host = type === SteerOutputType.DEFAULT ? serverHostDefault : serverHostSteered;
+        console.log(`completion chat - sending ${type} to ${host}`);
+        return fetch(`${host}/v1/steer/completion-chat`, {
+          method: 'POST',
+          cache: 'no-cache',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
           },
-        );
+          body: JSON.stringify({
+            types: [type === SteerOutputType.DEFAULT ? NPSteerType.Default : NPSteerType.Steered],
+            prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
+            model: transformerLensModelId,
+            features: hasVector
+              ? undefined
+              : steerFeatures.map((feature) => ({
+                  model: feature.modelId,
+                  source: feature.layer,
+                  index: feature.index,
+                  strength: feature.strength,
+                })),
+            vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
+            strength_multiplier: strengthMultiplier,
+            n_completion_tokens: nTokens,
+            temperature,
+            freq_penalty: freqPenalty,
+            seed,
+            steer_special_tokens: steerSpecialTokens,
+            steer_method: steerMethod,
+            normalize_steering: false,
+            stream: true,
+            n_logprobs,
+            is_assistant_axis: isAssistantAxis,
+          }),
+        });
       });
     }
     const responses = await Promise.all(toRunPromises);

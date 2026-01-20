@@ -118,6 +118,7 @@ export default function SteerCompletionChat({
     if (defaultPromptToSendChars >= maxPromptChars || steeredPromptToSendChars >= maxPromptChars) {
       alert('Sorry, we limit the length of each chat conversation.\nPlease click Reset to start a new conversation.');
       setIsSteering(false);
+      removeLastFailedUserMessage(newDefaultChatMessages, newSteeredChatMessages);
       return;
     }
 
@@ -151,11 +152,9 @@ export default function SteerCompletionChat({
       });
       if (!response || !response.body) {
         alert('Sorry, your message could not be sent at this time. Please try again later.');
-
         showToastServerError();
         setIsSteering(false);
-        setDefaultChatMessages(newDefaultChatMessages.slice(0, -1));
-        setSteeredChatMessages(newSteeredChatMessages.slice(0, -1));
+        removeLastFailedUserMessage(newDefaultChatMessages, newSteeredChatMessages);
         return;
       }
       if (response.status !== 200) {
@@ -168,6 +167,9 @@ export default function SteerCompletionChat({
         } else {
           showToastServerError();
         }
+        setIsSteering(false);
+        removeLastFailedUserMessage(newDefaultChatMessages, newSteeredChatMessages);
+        return;
       }
 
       // check if the response is a stream
@@ -208,13 +210,21 @@ export default function SteerCompletionChat({
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         showToastMessage('Steering aborted.');
-        setIsSteering(false);
-        setDefaultChatMessages([]);
-        setSteeredChatMessages([]);
       } else {
         console.error(error);
         showToastServerError();
       }
+      setIsSteering(false);
+      removeLastFailedUserMessage(newDefaultChatMessages, newSteeredChatMessages);
+    }
+  }
+
+  function removeLastFailedUserMessage(defaultMsgs: ChatMessage[], steeredMsgs: ChatMessage[]) {
+    if (defaultMsgs.length > 0 && defaultMsgs[defaultMsgs.length - 1].role === 'user') {
+      setDefaultChatMessages(defaultMsgs.slice(0, -1));
+    }
+    if (steeredMsgs.length > 0 && steeredMsgs[steeredMsgs.length - 1].role === 'user') {
+      setSteeredChatMessages(steeredMsgs.slice(0, -1));
     }
   }
 
