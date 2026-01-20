@@ -31,6 +31,7 @@ export const STEER_FREQUENCY_PENALTY = 1.0;
 export const STEER_FREQUENCY_PENALTY_MIN = -2;
 export const STEER_FREQUENCY_PENALTY_MAX = 2;
 export const STEER_MAX_PROMPT_CHARS = 2048;
+export const STEER_MAX_PROMPT_CHARS_THINKING = 8192;
 export const STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS = 16384; // average 4 tokens = 6144 tokens max per conversation
 export const STEER_SEED = 16;
 export const STEER_METHOD = NPSteerMethod.SimpleAdditive;
@@ -40,7 +41,8 @@ export const STEER_TOPK_LOGITS_MAX = 10;
 export const STEER_FREEZE_ATTENTION = true;
 export const STEER_N_LOGPROBS = 5;
 
-export const ERROR_STEER_MAX_PROMPT_CHARS = 'Total conversation length exceeds the maximum number of characters allowed. Please click Reset to start a new conversation.';
+export const ERROR_STEER_MAX_PROMPT_CHARS =
+  'Total conversation length exceeds the maximum number of characters allowed. Please click Reset to start a new conversation.';
 
 export function replaceSteerModelIdIfNeeded(modelId: string) {
   if (STEER_FORCE_ALLOW_INSTRUCT_MODELS.includes(modelId)) {

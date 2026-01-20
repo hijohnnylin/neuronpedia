@@ -23,6 +23,7 @@ import {
   STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS,
   ERROR_STEER_MAX_PROMPT_CHARS,
   STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS,
+  STEER_MAX_PROMPT_CHARS_THINKING,
 } from '@/lib/utils/steer';
 import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputToNeuronWithPartialRelations } from '@/prisma/generated/zod';
@@ -683,6 +684,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     if (body.isAssistantAxis) {
       maxPromptChars = STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS;
     }
+    else if (NNSIGHT_MODELS.includes(modelId)) {
+      maxPromptChars = STEER_MAX_PROMPT_CHARS_THINKING;
+    }
     if (totalDefaultChars > maxPromptChars || totalSteeredChars > maxPromptChars) {
       return NextResponse.json({ message: ERROR_STEER_MAX_PROMPT_CHARS }, { status: 400 });
     }
@@ -924,20 +928,26 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       body.isAssistantAxis,
     );
     steerCompletionResults = steerCompletionResults as SteerCompletionChatPost200Response[];
-    for (const result of steerCompletionResults) {
+    console.log(`[steer-chat route] Number of results: ${steerCompletionResults.length}`);
+    for (let i = 0; i < steerCompletionResults.length; i++) {
+      const result = steerCompletionResults[i];
+      console.log(`[steer-chat route] Result ${i} has ${result.outputs.length} outputs`);
       for (const output of result.outputs) {
+        console.log(`[steer-chat route] Processing output type: ${output.type}`);
         if (output.type === SteerOutputType.DEFAULT) {
           toReturnResult[SteerOutputType.DEFAULT] = {
             raw: output.raw,
             chatTemplate: output.chatTemplate,
             logprobs: output.logprobs ? output.logprobs : null,
           };
+          console.log(`[steer-chat route] Set DEFAULT output, chatTemplate length: ${output.chatTemplate?.length}`);
         } else if (output.type === SteerOutputType.STEERED) {
           toReturnResult[SteerOutputType.STEERED] = {
             raw: output.raw,
             chatTemplate: output.chatTemplate,
             logprobs: output.logprobs ? output.logprobs : null,
           };
+          console.log(`[steer-chat route] Set STEERED output, chatTemplate length: ${output.chatTemplate?.length}`);
         }
       }
       // Extract assistant_axis data from non-streaming response
@@ -947,6 +957,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         toReturnResult.assistant_axis = assistantAxis;
       }
     }
+    console.log(`[steer-chat route] Final toReturnResult has DEFAULT: ${!!toReturnResult.DEFAULT}, STEERED: ${!!toReturnResult.STEERED}`);
     let input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null = null;
     steerCompletionResults.forEach((result) => {
       input = {

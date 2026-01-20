@@ -493,7 +493,10 @@ export const steerCompletionChat = async (
 
   if (hasVector || steerFeatures.length === 0) {
     // if we have the vectors, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-    var [serverHostDefault, serverHostSteered] = await getTwoRandomServerHostsForModel(modelId, isAssistantAxis ? InferenceEngine.CSPACE : InferenceEngine.TRANSFORMER_LENS);
+    var [serverHostDefault, serverHostSteered] = await getTwoRandomServerHostsForModel(
+      modelId,
+      isAssistantAxis ? InferenceEngine.CSPACE : InferenceEngine.TRANSFORMER_LENS,
+    );
   } else {
     // get the sae set's host
     const firstFeatureLayer = steerFeatures[0].layer;
@@ -526,7 +529,9 @@ export const steerCompletionChat = async (
 
         if (messagesAreEqual && hasBothTypes) {
           // Send a single request with both types (messages are the same)
-          console.log('completion chat (runpod) - messages are equal, sending combined request for both default and steered');
+          console.log(
+            'completion chat (runpod) - messages are equal, sending combined request for both default and steered',
+          );
           const payload = {
             prompt: defaultChatMessages,
             types: ['STEERED', 'DEFAULT'],
@@ -682,7 +687,7 @@ export const steerCompletionChat = async (
           normalizeSteering: false,
           nLogprobs: n_logprobs,
           // @ts-ignore we'll fix this later with typescript client
-          isAssistantAxis, 
+          isAssistantAxis,
         },
       });
     }
