@@ -39,6 +39,7 @@ class Config:
         max_loaded_saes: int = 100,
         steer_special_token_ids: list[int] | None = None,
         nnsight: bool = False,
+        nnsight_vllm: bool = False,
         chatspace: bool = False,
     ):
         self.model_id = model_id
@@ -60,6 +61,7 @@ class Config:
         self.max_loaded_saes = max_loaded_saes
         self.steer_special_token_ids = steer_special_token_ids
         self.nnsight = nnsight
+        self.nnsight_vllm = nnsight_vllm
         self.chatspace = chatspace
 
         # Log configuration details after initialization
@@ -78,6 +80,7 @@ class Config:
             f"  include_sae_patterns: {self.include_sae_patterns}\n"
             f"  exclude_sae_patterns: {self.exclude_sae_patterns}\n"
             f"  nnsight: {self.nnsight}\n"
+            f"  nnsight_vllm: {self.nnsight_vllm}\n"
             f"  chatspace: {self.chatspace}\n"
         )
 

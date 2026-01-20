@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 # from transformer_lens.model_bridge import TransformerBridge
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.shared import Model, with_request_lock, is_nnterp_model, get_nnterp_layer_output, extract_hidden_states
 from neuronpedia_inference_client.models.activation_single_post200_response import (
     ActivationSinglePost200Response,
 )
@@ -75,7 +75,7 @@ async def activation_single(
         if not prompt.startswith(bos_token):
             prompt = bos_token + prompt
 
-        if isinstance(model, StandardizedTransformer):
+        if is_nnterp_model(model):
             tokens = model.tokenizer(
                 prompt, add_special_tokens=False, return_tensors="pt"
             )["input_ids"][0]
@@ -99,7 +99,7 @@ async def activation_single(
                 status_code=400,
             )
 
-        if isinstance(model, StandardizedTransformer):
+        if is_nnterp_model(model):
             tokenizer = model.tokenizer
             str_tokens: list[str] = tokenizer.tokenize(prompt)
             str_tokens = [tokenizer.convert_tokens_to_string([t]) for t in str_tokens]
@@ -192,14 +192,17 @@ def process_activations(
     bos_token_id = model.tokenizer.bos_token_id
     bos_indices = (tokens == bos_token_id).nonzero(as_tuple=True)[0]
 
-    if isinstance(model, StandardizedTransformer):
+    if is_nnterp_model(model):
         layer_num = get_layer_num_from_sae_id(layer)
-        with model.trace(tokens):
+        # For vLLM models, pass tokens as a list (vLLM doesn't accept tensors directly)
+        trace_input = tokens.tolist() if getattr(model, 'is_vllm', False) else tokens
+        with model.trace(trace_input):
             if "resid_post" in hook_name:
-                outputs = model.layers_output[layer_num].save()
+                outputs = get_nnterp_layer_output(model, layer_num).save()
             else:
                 raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
-        cache = {hook_name: outputs}
+        # Extract hidden states from tuple if needed (some layers return (hidden_states, cache))
+        cache = {hook_name: extract_hidden_states(outputs)}
         return process_feature_activations(
             sae_manager.get_sae(layer),
             sae_type,

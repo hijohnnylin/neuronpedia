@@ -22,7 +22,7 @@ from transformer_lens import ActivationCache, HookedTransformer
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.shared import Model, with_request_lock, is_nnterp_model, get_nnterp_layer_output
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ async def activation_single_batch(
             if not prompt.startswith(bos_token):
                 prompt = bos_token + prompt
 
-            if isinstance(model, StandardizedTransformer):
+            if is_nnterp_model(model):
                 tokens = model.tokenizer(
                     prompt, add_special_tokens=False, return_tensors="pt"
                 )["input_ids"][0]
@@ -129,7 +129,7 @@ async def activation_single_batch(
                     status_code=400,
                 )
 
-            if isinstance(model, StandardizedTransformer):
+            if is_nnterp_model(model):
                 tokenizer = model.tokenizer
                 str_tokens: list[str] = tokenizer.tokenize(prompt)
                 str_tokens = [
@@ -255,7 +255,7 @@ def process_activations_batch(
     batch_size = len(tokens_list)
 
     # Create padded batch tensor and attention mask
-    if isinstance(model, StandardizedTransformer):
+    if is_nnterp_model(model):
         pad_token_id = (
             model.tokenizer.pad_token_id
             if model.tokenizer.pad_token_id is not None
@@ -287,11 +287,13 @@ def process_activations_batch(
         all_bos_indices.append(bos_indices)
 
     # Run batch inference
-    if isinstance(model, StandardizedTransformer):
+    if is_nnterp_model(model):
         layer_num = get_layer_num_from_sae_id(layer)
-        with model.trace(padded_tokens):
+        # For vLLM models, pass tokens as a list (vLLM doesn't accept tensors directly)
+        trace_input = padded_tokens.tolist() if getattr(model, 'is_vllm', False) else padded_tokens
+        with model.trace(trace_input):
             if "resid_post" in hook_name:
-                outputs = model.layers_output[layer_num].save()
+                outputs = get_nnterp_layer_output(model, layer_num).save()
             else:
                 raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
         cache = {hook_name: outputs}
@@ -426,7 +428,7 @@ def process_vector_activations_batch(
     batch_size = len(tokens_list)
 
     # Create padded batch tensor
-    if isinstance(model, StandardizedTransformer):
+    if is_nnterp_model(model):
         pad_token_id = (
             model.tokenizer.pad_token_id
             if model.tokenizer.pad_token_id is not None

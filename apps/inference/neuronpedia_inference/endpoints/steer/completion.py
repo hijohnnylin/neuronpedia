@@ -30,7 +30,7 @@ from neuronpedia_inference.inference_utils.steering import (
     stream_lock,
 )
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.shared import Model, with_request_lock, is_nnterp_model
 from neuronpedia_inference.utils import make_logprob_from_logits
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ async def completion(request: SteerCompletionRequest):
         tokens = model.to_tokens(
             prompt, prepend_bos=model.cfg.tokenizer_prepends_bos, truncate=False
         )[0]
-    elif isinstance(model, StandardizedTransformer):
+    elif is_nnterp_model(model):
         tokens = model.tokenizer(prompt, add_special_tokens=False, return_tensors="pt")[
             "input_ids"
         ][0]
@@ -229,7 +229,7 @@ async def run_batched_generate(
             tokenized = model.to_tokens(
                 prompt, prepend_bos=model.cfg.tokenizer_prepends_bos, truncate=False
             )[0]
-        elif isinstance(model, StandardizedTransformer):
+        elif is_nnterp_model(model):
             tokenized = model.tokenizer(
                 prompt, add_special_tokens=False, return_tensors="pt"
             )["input_ids"][0]
@@ -312,7 +312,7 @@ async def run_batched_generate(
                             )  # type: ignore
                             yield format_sse_message(to_return.to_json())
 
-                elif isinstance(model, StandardizedTransformer):
+                elif is_nnterp_model(model):
                     logger.info("nnsight")
                     if kwargs.get("freq_penalty"):
                         logger.warning(
@@ -419,7 +419,7 @@ async def run_batched_generate(
 
             # for nnsight we don't yield one token at a time (it hangs for some reason)
             # so we just send one message at the end
-            if isinstance(model, StandardizedTransformer):
+            if is_nnterp_model(model):
                 to_return = make_steer_completion_response(
                     steer_types,
                     "".join(steered_partial_result_array),
@@ -486,7 +486,7 @@ async def run_batched_generate(
                         )
                         yield format_sse_message(to_return.to_json())
 
-            elif isinstance(model, StandardizedTransformer):
+            elif is_nnterp_model(model):
                 logger.info("nnsight")
                 if kwargs.get("freq_penalty"):
                     logger.warning(

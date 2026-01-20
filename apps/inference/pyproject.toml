@@ -25,12 +25,13 @@ huggingface-hub = "^0.36.0"
 huggingface = "^0.0.1"
 pandas = "^2.2.2"
 sae-lens = "^6.30.0"
-fastapi = "^0.115.6"
+fastapi = ">=0.115.6"
 uvicorn = "^0.34.0"
 sentry-sdk = {extras = ["fastapi"], version = "^2.20.0"}
+vllm = ">=0.12"
 nnsight = ">=0.5.15"
 hf-transfer = "^0.1.9"
-nnterp = "^1.2.2"
+nnterp = {git = "https://github.com/ndif-team/nnterp.git", branch = "vllm-integration"}
 neuronpedia-inference-client = {path = "../../packages/python/neuronpedia-inference-client"}
 steerllm = {path = "vendor/chatspace/steerllm", develop = true}
 chatspace = {path = "vendor/chatspace", develop = true}

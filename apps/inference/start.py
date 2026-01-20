@@ -113,7 +113,13 @@ def parse_args():
     parser.add_argument(
         "--nnsight",
         action="store_true",
-        help="Use nnsight. Not all models are currently supported.",
+        help="Use nnsight with nnterp StandardizedTransformer. Not all models are currently supported.",
+    )
+    parser.add_argument(
+        "--nnsight-vllm",
+        action="store_true",
+        dest="nnsight_vllm",
+        help="Use nnsight with nnterp StandardizedVLLM (vLLM backend). Provides faster inference.",
     )
     parser.add_argument(
         "--chatspace",
@@ -153,6 +159,8 @@ def main():
         os.environ["CUSTOM_HF_MODEL_ID"] = str(args.custom_hf_model_id)
     if "NNSIGHT" not in os.environ:
         os.environ["NNSIGHT"] = "true" if args.nnsight else "false"
+    if "NNSIGHT_VLLM" not in os.environ:
+        os.environ["NNSIGHT_VLLM"] = "true" if args.nnsight_vllm else "false"
     if "CHATSPACE" not in os.environ:
         os.environ["CHATSPACE"] = "true" if args.chatspace else "false"
         

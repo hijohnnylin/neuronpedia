@@ -19,7 +19,7 @@ from nnterp import StandardizedTransformer
 # from transformer_lens.model_bridge import TransformerBridge
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.shared import Model, with_request_lock, is_nnterp_model, get_nnterp_layer_output
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class ActivationProcessor:
         all_str_tokens = []
 
         for prompt in prompts:
-            if isinstance(model, StandardizedTransformer):
+            if is_nnterp_model(model):
                 tokens = model.tokenizer(
                     prompt, add_special_tokens=False, return_tensors="pt"
                 )["input_ids"][0]
@@ -117,7 +117,7 @@ class ActivationProcessor:
                     f"Text too long: {len(tokens)} tokens, max is {config.token_limit / MAX_BATCH_SIZE} for batch requests"
                 )
 
-            if isinstance(model, StandardizedTransformer):
+            if is_nnterp_model(model):
                 tokenizer = model.tokenizer
                 str_tokens = tokenizer.tokenize(prompt)
 
@@ -135,7 +135,7 @@ class ActivationProcessor:
         batch_size = len(all_tokens)
 
         # Determine pad token
-        if isinstance(model, StandardizedTransformer):
+        if is_nnterp_model(model):
             pad_token_id = (
                 model.tokenizer.pad_token_id
                 if model.tokenizer.pad_token_id is not None
@@ -164,7 +164,7 @@ class ActivationProcessor:
 
         # Calculate max layer needed
         max_layer = self._get_layer_num(request.source) + 1
-        if isinstance(model, StandardizedTransformer):
+        if is_nnterp_model(model):
             if max_layer >= model.num_layers:
                 max_layer = None
         elif max_layer >= model.cfg.n_layers:
@@ -174,16 +174,18 @@ class ActivationProcessor:
         hook_name = sae_manager.get_sae_hook(request.source)
 
         with torch.no_grad():
-            if isinstance(model, StandardizedTransformer):
+            if is_nnterp_model(model):
                 cache = {}
-                with model.trace(padded_tokens):
+                # For vLLM models, pass tokens as a list (vLLM doesn't accept tensors directly)
+                trace_input = padded_tokens.tolist() if getattr(model, 'is_vllm', False) else padded_tokens
+                with model.trace(trace_input):
                     if "resid_post" in hook_name:
-                        outputs = model.layers_output[layer_num].save()
+                        outputs = get_nnterp_layer_output(model, layer_num).save()
                     elif "resid_pre" in hook_name:
                         if layer_num == 0:
                             outputs = model.embeddings_output.save()
                         else:
-                            outputs = model.layers_output[layer_num - 1].save()
+                            outputs = get_nnterp_layer_output(model, layer_num - 1).save()
                     else:
                         raise ValueError(
                             f"Unsupported hook name for nnsight: {hook_name}"

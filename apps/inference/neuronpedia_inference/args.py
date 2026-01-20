@@ -35,6 +35,7 @@ def parse_env_and_args():
     args.max_loaded_saes = int(os.getenv("MAX_LOADED_SAES", "300"))
     args.sentry_dsn = os.getenv("SENTRY_DSN")
     args.nnsight = os.getenv("NNSIGHT", "").lower() == "true"
+    args.nnsight_vllm = os.getenv("NNSIGHT_VLLM", "").lower() == "true"
     args.chatspace = os.getenv("CHATSPACE", "").lower() == "true"
 
     return args

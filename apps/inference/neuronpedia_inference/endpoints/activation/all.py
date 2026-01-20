@@ -21,7 +21,7 @@ from transformer_lens import ActivationCache
 # from transformer_lens.model_bridge import TransformerBridge
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.shared import Model, with_request_lock, is_nnterp_model, get_nnterp_layer_output
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,7 @@ class ActivationProcessor:
         model = Model.get_instance()
         sae_manager = SAEManager.get_instance()
         max_layer = max(self._get_layer_num(s) for s in request.selected_sources) + 1
-        if isinstance(model, StandardizedTransformer):
+        if is_nnterp_model(model):
             if max_layer >= model.num_layers:
                 max_layer = None
         elif max_layer >= model.cfg.n_layers:
@@ -180,7 +180,7 @@ class ActivationProcessor:
         model = Model.get_instance()
         config = Config.get_instance()
 
-        if isinstance(model, StandardizedTransformer):
+        if is_nnterp_model(model):
             tokens = model.tokenizer(
                 text, add_special_tokens=False, return_tensors="pt"
             )["input_ids"][0]
@@ -195,7 +195,7 @@ class ActivationProcessor:
                 f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
             )
 
-        if isinstance(model, StandardizedTransformer):
+        if is_nnterp_model(model):
             tokenizer = model.tokenizer
             str_tokens = tokenizer.tokenize(text)
             str_tokens = [tokenizer.convert_tokens_to_string([t]) for t in str_tokens]
@@ -203,10 +203,12 @@ class ActivationProcessor:
             str_tokens = model.to_str_tokens(text, prepend_bos=prepend_bos)
 
         with torch.no_grad():
-            if isinstance(model, StandardizedTransformer):
+            if is_nnterp_model(model):
                 sae_manager = SAEManager.get_instance()
                 cache = {}
-                with model.trace(tokens):
+                # For vLLM models, pass tokens as a list (vLLM doesn't accept tensors directly)
+                trace_input = tokens.tolist() if getattr(model, 'is_vllm', False) else tokens
+                with model.trace(trace_input):
                     # since nnsight requires the layers to be accessed in order,
                     # make an ordered list of selected sources
                     ordered_selected_sources = []
@@ -219,7 +221,7 @@ class ActivationProcessor:
                         layer_num = self._get_layer_num(selected_source)
                         hook_name = sae_manager.get_sae_hook(selected_source)
                         if "resid_post" in hook_name:
-                            outputs = model.layers_output[layer_num].save()
+                            outputs = get_nnterp_layer_output(model, layer_num).save()
                         else:
                             raise ValueError(
                                 f"Unsupported hook name for nnsight: {hook_name}"
@@ -298,7 +300,7 @@ class ActivationProcessor:
         model = Model.get_instance()
         if ignore_bos:
             if (
-                isinstance(model, StandardizedTransformer)
+                is_nnterp_model(model)
                 or model.cfg.default_prepend_bos
             ):
                 activations_by_index[:, 0] = 0

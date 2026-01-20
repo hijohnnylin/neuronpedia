@@ -16,7 +16,7 @@ from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from nnterp import StandardizedTransformer
+from nnterp import StandardizedTransformer, load_model as nnterp_load_model
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
@@ -204,12 +204,13 @@ async def initialize(
             model_from_pretrained_kwargs=args.model_from_pretrained_kwargs,
             max_loaded_saes=args.max_loaded_saes,
             nnsight=args.nnsight,
+            nnsight_vllm=args.nnsight_vllm,
             chatspace=args.chatspace,
         )
         Config._instance = config
 
         if args.nnsight:
-            logger.info("Loading model with nnterp...")
+            logger.info("Loading model with nnterp StandardizedTransformer...")
 
             model_to_load = (
                 config.override_model_id
@@ -221,6 +222,60 @@ async def initialize(
                 replace_tlens_model_id_with_hf_model_id(model_to_load),
                 dtype=STR_TO_DTYPE[config.model_dtype],
             )
+        elif args.nnsight_vllm:
+            logger.info("Loading model with nnterp StandardizedVLLM (vLLM backend)...")
+
+            model_to_load = (
+                config.override_model_id
+                if config.override_model_id
+                else config.model_id
+            )
+            logger.info("Model to load: %s", model_to_load)
+            
+            # Monkey-patch nnsight's VLLM._load_meta to use "cuda" instead of "meta"
+            # This fixes issues with quantized models that require CUDA during weight processing
+            from nnsight.modeling.vllm import VLLM as NNsightVLLM
+            from vllm.engine.arg_utils import EngineArgs
+            from vllm.model_executor.model_loader.dummy_loader import DummyModelLoader
+            from vllm.tokenizers import cached_tokenizer_from_config
+            from vllm.model_executor.layers.rotary_embedding import _ROPE_DICT
+            
+            def patched_load_meta(self, repo_id: str, **kwargs):
+                # no parallelism during initialization
+                kwargs["tensor_parallel_size"] = 1
+                kwargs["pipeline_parallel_size"] = 1
+
+                engine_args = EngineArgs(model=repo_id, **kwargs)
+                vllm_config = engine_args.create_engine_config()
+                
+                # Use "cuda" instead of "meta" to support quantized models
+                vllm_config.load_config.device = "cuda"
+
+                loader = DummyModelLoader(vllm_config.load_config)
+                loader.load_weights = lambda *args, **kwargs: None
+                model = loader.load_model(vllm_config, vllm_config.model_config)
+
+                _ROPE_DICT.clear()
+
+                self.tokenizer = cached_tokenizer_from_config(vllm_config.model_config)
+                if getattr(self.tokenizer, "pad_token", None) is None:
+                    self.tokenizer.pad_token = self.tokenizer.eos_token
+
+                return model
+            
+            NNsightVLLM._load_meta = patched_load_meta
+            logger.info("Patched nnsight VLLM._load_meta to use cuda device (permanent patch for quantized models)")
+            
+            model = nnterp_load_model(
+                replace_tlens_model_id_with_hf_model_id(model_to_load),
+                use_vllm=True,
+                dtype=STR_TO_DTYPE[config.model_dtype],
+                check_renaming=False,  # Skip renaming validation for unsupported models
+                gpu_memory_utilization=0.4,  # Use 40% GPU memory instead of default 90%
+                dispatch=True,  # Force eager loading instead of lazy loading on first use
+            )
+            # Note: We do NOT restore the original _load_meta method because nnsight's VLLM
+            # uses lazy loading - the actual dispatch happens on first trace() call, not during init
         elif args.chatspace:
             logger.info("Loading model with chatspace VLLM...")
             model_to_load = (
@@ -296,7 +351,8 @@ async def initialize(
         #     model.enable_compatibility_mode(no_processing=True)
 
         Model._instance = model
-        if isinstance(model, StandardizedTransformer):
+        # StandardizedTransformer and StandardizedVLLM (from nnterp) have num_layers
+        if hasattr(model, 'num_layers'):
             config.set_num_layers(model.num_layers)
         elif isinstance(model, VLLMSteerModel):
             config.set_num_layers(model.layer_count)
