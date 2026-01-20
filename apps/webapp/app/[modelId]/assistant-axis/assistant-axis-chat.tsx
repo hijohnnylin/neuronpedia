@@ -2,13 +2,14 @@ import { SteerResultChat } from '@/app/api/steer-chat/route';
 import { AssistantAxisItem, PersonaCheckResult } from '@/app/[modelId]/assistant-axis/types';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import SteerChatMessage from '@/components/steer/chat-message';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { ChatMessage, SteerFeature, ERROR_STEER_MAX_PROMPT_CHARS } from '@/lib/utils/steer';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import copy from 'copy-to-clipboard';
-import { ArrowUp, BookOpenIcon, GithubIcon, Mail, RotateCcw, Scroll, Share, Trash, Trash2, Undo2, X } from 'lucide-react';
+import { ArrowUp, BookOpenIcon, Check, Copy, Download, GithubIcon, Mail, RotateCcw, Scroll, Share, Trash, Trash2, Undo2, X } from 'lucide-react';
 import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { MutableRefObject, useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
@@ -101,7 +102,8 @@ export default function AssistantAxisChat({
     const [chartWidth, setChartWidth] = useState(200);
     const [chartHeight, setChartHeight] = useState(400);
     const [limitRemaining, setLimitRemaining] = useState<number | null>(null);
-    const [copying, setCopying] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [urlCopied, setUrlCopied] = useState(false);
 
     const { setIsWelcomeModalOpen } = useAssistantAxisModalContext();
     // Track chart container dimensions
@@ -404,6 +406,79 @@ export default function AssistantAxisChat({
         >
 
             <AssistantAxisWelcomeModal onLoadDemo={loadSavedSteerOutput} onFreeChat={reset} initialSavedId={initialSavedId} />
+
+            {/* Share Modal */}
+            <Dialog open={isShareModalOpen} onOpenChange={(open) => {
+                setIsShareModalOpen(open);
+                if (!open) setUrlCopied(false);
+            }}>
+                <DialogContent className="sm:max-w-md bg-white">
+                    <DialogHeader>
+                        <DialogTitle>Share Conversation</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                readOnly
+                                value={typeof window !== 'undefined' ? window.location.href : ''}
+                                className="flex-1 rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-600 outline-none"
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-9 px-3"
+                                onClick={() => {
+                                    copy(window.location.href);
+                                    setUrlCopied(true);
+                                    setTimeout(() => setUrlCopied(false), 2000);
+                                }}
+                            >
+                                {urlCopied ? (
+                                    <Check className="h-4 w-4 text-green-600" />
+                                ) : (
+                                    <Copy className="h-4 w-4" />
+                                )}
+                            </Button>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="default"
+                            className="w-full"
+                            onClick={() => {
+                                const conversationData = {
+                                    modelId,
+                                    timestamp: new Date().toISOString(),
+                                    defaultConversation: defaultChatMessages,
+                                    steeredConversation: steeredChatMessages,
+                                    settings: {
+                                        temperature,
+                                        steerTokens,
+                                        freqPenalty,
+                                        strMultiple,
+                                        steerMethod,
+                                    },
+                                    chartData,
+                                };
+                                const blob = new Blob([JSON.stringify(conversationData, null, 2)], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `assistant-axis-conversation-${new Date().toISOString().slice(0, 10)}.json`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(url);
+                            }}
+                        >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Conversation (JSON)
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* Demo buttons */}
             <div className="mb-2 sm:mb-5 w-full relative h-[100px] sm:h-[80px] min-h-[100px] sm:min-h-[80px] max-h-[100px] sm:max-h-[80px] z-10 flex flex-row items-center justify-center gap-2 bg-slate-50 px-3 py-2 sm:px-6">
                 <div className="flex flex-row items-center justify-between gap-y-1 flex-1 w-full max-w-screen-2xl">
@@ -704,18 +779,13 @@ export default function AssistantAxisChat({
                     <div className={`absolute left-12 sm:left-0 -translate-x-full pr-3 flex flex-col gap-y-2 ${DEMO_BUTTONS.some(demo => demo.id && currentSavedId === demo.id) ? 'hidden' : ''}`}>
                         <button
                             type="button"
-                            title={copying ? 'Copied!' : 'Share chat'}
+                            title="Share chat"
                             disabled={defaultChatMessages.length === 0 || isSteering}
                             onClick={() => {
                                 if (defaultChatMessages.length === 0) {
                                     return;
                                 }
-                                setCopying(true);
-                                copy(window.location.href);
-                                alert(
-                                    'Copied share link to clipboard.\nPaste it somewhere to share your conversation.',
-                                );
-                                setTimeout(() => setCopying(false), 2000);
+                                setIsShareModalOpen(true);
                             }}
                             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-slate-300 text-slate-600 shadow hover:bg-slate-200 disabled:cursor-default disabled:text-slate-400 disabled:hover:bg-slate-300"
                         >
