@@ -527,29 +527,10 @@ export const steerCompletionChat = async (
       if (runpodServerlessUrl) {
         console.log('Using RunPod serverless for assistant axis streaming request');
 
-        if (messagesAreEqual && hasBothTypes) {
-          // Send a single request with both types (messages are the same)
-          console.log(
-            'completion chat (runpod) - messages are equal, sending combined request for both default and steered',
-          );
-          const payload = {
-            prompt: defaultChatMessages,
-            types: ['STEERED', 'DEFAULT'],
-            vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : [],
-            n_completion_tokens: nTokens,
-            temperature,
-            steer_method: steerMethod,
-            normalize_steering: false,
-            stream: true,
-            n_logprobs,
-            steer_special_tokens: steerSpecialTokens,
-          };
-          const runpodStream = createRunpodStreamingResponse(runpodServerlessUrl, payload);
-          return [runpodStream];
-        }
-        // Send separate requests for each type (messages are different)
+        // Always send separate requests for each type to enable parallel streaming
+        // Even when messages are equal, we want two simultaneous requests for better parallelism
         const runpodStreams = steerTypesToRun.map((type) => {
-          console.log(`completion chat (runpod) - does not have saved ${type} output, running it`);
+          console.log(`completion chat (runpod) - sending ${type} request`);
           const payload = {
             prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
             types: [type === SteerOutputType.DEFAULT ? 'DEFAULT' : 'STEERED'],
@@ -575,8 +556,9 @@ export const steerCompletionChat = async (
 
     // Only combine into single request if messages are equal, both types needed, AND we only have one server
     // If we have two servers, always send separate requests to use both servers in parallel
-    if (messagesAreEqual && hasBothTypes && !hasTwoServers) {
-      // Send a single request with both types (only when using a single server)
+    // For assistant-axis, always send separate requests even with one server for parallel streaming
+    if (messagesAreEqual && hasBothTypes && !hasTwoServers && !isAssistantAxis) {
+      // Send a single request with both types (only when using a single server and not assistant-axis)
       console.log('completion chat - messages are equal and single server, sending combined request');
       toRunPromises = [
         fetch(`${serverHostDefault}/v1/steer/completion-chat`, {
@@ -615,7 +597,10 @@ export const steerCompletionChat = async (
       ];
     } else {
       // Send separate requests for each type (use two servers when available for parallelism)
-      console.log(`completion chat - sending separate requests (hasTwoServers: ${hasTwoServers})`);
+      // For assistant-axis, always send separate requests even when messages are equal
+      console.log(
+        `completion chat - sending separate requests (hasTwoServers: ${hasTwoServers}, isAssistantAxis: ${isAssistantAxis})`,
+      );
       toRunPromises = steerTypesToRun.map((type) => {
         const host = type === SteerOutputType.DEFAULT ? serverHostDefault : serverHostSteered;
         console.log(`completion chat - sending ${type} to ${host}`);
