@@ -9,7 +9,7 @@ export const STEER_N_COMPLETION_TOKENS_GRAPH = 10;
 export const STEER_N_COMPLETION_TOKENS_THINKING = 512;
 export const STEER_N_COMPLETION_TOKENS_GRAPH_MAX = 20;
 export const STEER_N_COMPLETION_TOKENS_MAX = 256;
-export const STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS = 512;
+export const STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS = 768;
 export const STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM = 1024;
 export const STEER_N_COMPLETION_TOKENS_MAX_THINKING = 768;
 export const STEER_TEMPERATURE = 0.5;
@@ -32,7 +32,7 @@ export const STEER_FREQUENCY_PENALTY_MIN = -2;
 export const STEER_FREQUENCY_PENALTY_MAX = 2;
 export const STEER_MAX_PROMPT_CHARS = 2048;
 export const STEER_MAX_PROMPT_CHARS_THINKING = 8192;
-export const STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS = 16384; // average 4 tokens = 6144 tokens max per conversation
+export const STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS = 24576; // average 4 tokens = 6144 tokens max per conversation
 export const STEER_SEED = 16;
 export const STEER_METHOD = NPSteerMethod.SimpleAdditive;
 export const STEER_METHOD_ASSISTANT_CAP = NPSteerMethod.ProjectionCap;
