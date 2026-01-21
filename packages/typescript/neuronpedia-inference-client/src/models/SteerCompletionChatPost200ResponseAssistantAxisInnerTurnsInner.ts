@@ -20,11 +20,17 @@ import { mapValues } from '../runtime';
  */
 export interface SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner {
     /**
-     * Dict mapping PC title to projection value
+     * Dict mapping PC title to projection value (pre-cap)
      * @type {{ [key: string]: number; }}
      * @memberof SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner
      */
     pcValues?: { [key: string]: number; };
+    /**
+     * Dict mapping PC title to projection value (post-cap)
+     * @type {{ [key: string]: number; }}
+     * @memberof SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner
+     */
+    pcValuesPostCap?: { [key: string]: number; };
     /**
      * Truncated conversation content for this turn
      * @type {string}
@@ -51,6 +57,7 @@ export function SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInnerFr
     return {
         
         'pcValues': json['pc_values'] == null ? undefined : json['pc_values'],
+        'pcValuesPostCap': json['pc_values_post_cap'] == null ? undefined : json['pc_values_post_cap'],
         'snippet': json['snippet'] == null ? undefined : json['snippet'],
     };
 }
@@ -67,6 +74,7 @@ export function SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInnerTo
     return {
         
         'pc_values': value['pcValues'],
+        'pc_values_post_cap': value['pcValuesPostCap'],
         'snippet': value['snippet'],
     };
 }

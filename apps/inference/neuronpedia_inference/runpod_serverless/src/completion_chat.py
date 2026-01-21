@@ -290,6 +290,9 @@ async def _generate_single_type(
         seed=seed,
     )
     
+    # Store steering_spec for persona monitor
+    steering_spec = None
+    
     if steer_type == "STEERED":
         steering_spec = _build_steering_spec(
             vectors, strength_multiplier, steer_method, normalize_steering
@@ -320,8 +323,12 @@ async def _generate_single_type(
         yield format_sse_message(response)
     
     # Run persona monitor after generation completes
+    # Pass steering_spec for STEERED type to get post-cap values
     full_conversation = prompt_formatted + [{"role": "assistant", "content": output_total}]
-    axis_data = await _run_persona_monitor(model, full_conversation, steer_type, DEFAULT_LAYER)
+    axis_data = await _run_persona_monitor(
+        model, full_conversation, steer_type, DEFAULT_LAYER,
+        steering_spec=steering_spec if steer_type == "STEERED" else None
+    )
     
     response = _make_response(
         [steer_type],
@@ -408,7 +415,11 @@ async def _generate_both_types(
             output_for_monitor = default_output
         
         full_conversation = prompt_formatted + [{"role": "assistant", "content": output_for_monitor}]
-        axis_data = await _run_persona_monitor(model, full_conversation, steer_type, DEFAULT_LAYER)
+        # Pass steering_spec for STEERED type to get post-cap values
+        axis_data = await _run_persona_monitor(
+            model, full_conversation, steer_type, DEFAULT_LAYER,
+            steering_spec=steering_spec if steer_type == "STEERED" else None
+        )
         if axis_data:
             assistant_axis_data_list.append(axis_data)
     
@@ -429,9 +440,18 @@ async def _run_persona_monitor(
     full_conversation: list[dict],
     steer_type: str,
     layer: int,
+    steering_spec: Any = None,
 ) -> dict | None:
     """
     Run persona monitoring on the conversation.
+    
+    Args:
+        model: VLLMSteerModel instance
+        full_conversation: List of message dicts with role and content
+        steer_type: The steer type this analysis corresponds to
+        layer: Layer to extract activations from
+        steering_spec: Optional SteeringSpec to apply during capture. If provided,
+            both pre-cap (base model) and post-cap (with steering) activations are captured.
     
     Returns assistant_axis data for the given steer type.
     """
@@ -459,23 +479,39 @@ async def _run_persona_monitor(
     encoder = ConversationEncoder(tokenizer, model_id)
     mapper = SpanMapperChatSpace(tokenizer)
     
-    # Extract mean activations per turn
-    logger.info("Extracting activations for persona monitor")
+    # Extract mean activations per turn (pre-cap / base model)
+    logger.info("Extracting pre-cap activations for persona monitor")
     mean_acts_per_turn = await mapper.mean_all_turn_activations_async(
         probing_model, encoder, full_conversation, layer=layer
     )
+    
+    # Extract post-cap activations if steering_spec is provided
+    mean_acts_per_turn_post_cap = None
+    if steering_spec is not None:
+        logger.info("Extracting post-cap activations with steering_spec")
+        mean_acts_per_turn_post_cap = await mapper.mean_all_turn_activations_async(
+            probing_model, encoder, full_conversation, layer=layer, steering_spec=steering_spec
+        )
     
     # Handle empty activations
     if mean_acts_per_turn.shape[0] == 0:
         logger.warning("No activations extracted, skipping persona monitor")
         return None
     
-    # Compute projections
+    # Compute projections (pre-cap)
     role_projs = pc_projection(mean_acts_per_turn, pca_results, n_pcs=1)
+    
+    # Compute projections (post-cap) if available
+    role_projs_post_cap = None
+    if mean_acts_per_turn_post_cap is not None and mean_acts_per_turn_post_cap.shape[0] > 0:
+        role_projs_post_cap = pc_projection(mean_acts_per_turn_post_cap, pca_results, n_pcs=1)
     
     # Find indices of assistant turns
     assistant_indices = [i for i, msg in enumerate(full_conversation) if msg["role"] == "assistant"]
     assistant_role_projs = role_projs[assistant_indices] if assistant_indices else role_projs[0:0]
+    assistant_role_projs_post_cap = None
+    if role_projs_post_cap is not None:
+        assistant_role_projs_post_cap = role_projs_post_cap[assistant_indices] if assistant_indices else role_projs_post_cap[0:0]
     
     # Get assistant turns for snippets
     assistant_turns = [msg for msg in full_conversation if msg["role"] == "assistant"]
@@ -487,15 +523,27 @@ async def _run_persona_monitor(
             for j in range(len(ROLE_PC_TITLES))
         }
         
+        # Add post-cap values if available
+        pc_values_post_cap = None
+        if assistant_role_projs_post_cap is not None and i < len(assistant_role_projs_post_cap):
+            pc_values_post_cap = {
+                ROLE_PC_TITLES[j]: float(assistant_role_projs_post_cap[i][j])
+                for j in range(len(ROLE_PC_TITLES))
+            }
+        
         snippet = ""
         if i < len(assistant_turns):
             content = assistant_turns[i]["content"]
             snippet = content[:120] + "..." if len(content) > 120 else content
         
-        turns_data.append({
+        turn_data = {
             "pc_values": pc_values,
             "snippet": snippet,
-        })
+        }
+        if pc_values_post_cap is not None:
+            turn_data["pc_values_post_cap"] = pc_values_post_cap
+        
+        turns_data.append(turn_data)
     
     return {
         "type": steer_type,

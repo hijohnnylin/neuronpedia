@@ -537,7 +537,7 @@ conf = neuronpedia_inference_client.Configuration(
                "OS: {env}\n"\
                "Python Version: {pyversion}\n"\
                "Version of the API: 1.9.0\n"\
-               "SDK Package Version: 1.10.0".\
+               "SDK Package Version: 1.9.1".\
                format(env=sys.platform, pyversion=sys.version)
 
     def get_host_settings(self) -> List[HostSetting]:
