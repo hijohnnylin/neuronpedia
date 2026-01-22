@@ -107,6 +107,7 @@ class ProbingModelChatSpace:
         self,
         conversation: List[Dict[str, str]],
         layers: Union[int, List[int]],
+        steering_spec: Optional[Any] = None,
         **chat_kwargs,
     ) -> tuple[Dict[int, torch.Tensor], Optional[tuple]]:
         """
@@ -115,6 +116,7 @@ class ProbingModelChatSpace:
         Args:
             conversation: List of {"role", "content"} dicts
             layers: Single layer index or list of layer indices
+            steering_spec: Optional SteeringSpec to apply during capture (for post-cap activations)
             **chat_kwargs: Additional arguments for chat template
 
         Returns:
@@ -145,6 +147,7 @@ class ProbingModelChatSpace:
             messages,
             sampling_params=sampling,
             capture_layers=layer_list,
+            steering_spec=steering_spec,
             chat_options=chat_kwargs,
         )
 

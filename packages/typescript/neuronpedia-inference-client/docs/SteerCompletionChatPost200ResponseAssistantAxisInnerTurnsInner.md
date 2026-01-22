@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `pcValues` | { [key: string]: number; }
+`pcValuesPostCap` | { [key: string]: number; }
 `snippet` | string
 
 ## Example
@@ -17,6 +18,7 @@ import type { SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner } f
 // TODO: Update the object below with actual values
 const example = {
   "pcValues": null,
+  "pcValuesPostCap": null,
   "snippet": null,
 } satisfies SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner
 

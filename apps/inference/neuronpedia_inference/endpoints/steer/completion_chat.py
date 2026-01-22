@@ -354,6 +354,7 @@ async def run_persona_monitor(
     conversation: list[NPSteerChatMessage],
     steer_type: NPSteerType,
     layer: int = DEFAULT_LAYER,
+    steering_spec: Any = None,
 ) -> SteerCompletionChatPost200ResponseAssistantAxisInner | None:
     """
     Run persona monitoring on the conversation and return assistant_axis data.
@@ -366,11 +367,13 @@ async def run_persona_monitor(
         conversation: List of chat messages (user/assistant turns)
         steer_type: The steer type this analysis corresponds to
         layer: Layer to extract activations from
+        steering_spec: Optional SteeringSpec to apply during capture. If provided,
+            both pre-cap (base model) and post-cap (with steering) activations are captured.
         
     Returns:
         AssistantAxis response data, or None if persona data not available
     """
-    logger.debug(f"[PERSONA] run_persona_monitor called for steer_type={steer_type}, layer={layer}")
+    logger.debug(f"[PERSONA] run_persona_monitor called for steer_type={steer_type}, layer={layer}, has_steering_spec={steering_spec is not None}")
     persona_start = time.time()
     
     config = Config.get_instance()
@@ -407,21 +410,36 @@ async def run_persona_monitor(
         for msg in conversation
     ]
     
-    # Extract mean activations per turn
-    logger.debug(f"[PERSONA] Extracting activations for {len(conversation_turns)} turns...")
+    # Extract mean activations per turn (pre-cap / base model)
+    logger.debug(f"[PERSONA] Extracting pre-cap activations for {len(conversation_turns)} turns...")
     extract_start = time.time()
     mean_acts_per_turn = await mapper.mean_all_turn_activations_async(
         probing_model, encoder, conversation_turns, layer=layer
     )
-    logger.debug(f"[PERSONA] Activations extracted in {time.time() - extract_start:.3f}s, shape={mean_acts_per_turn.shape}")
+    logger.debug(f"[PERSONA] Pre-cap activations extracted in {time.time() - extract_start:.3f}s, shape={mean_acts_per_turn.shape}")
+    
+    # Extract post-cap activations if steering_spec is provided
+    mean_acts_per_turn_post_cap = None
+    if steering_spec is not None:
+        logger.debug(f"[PERSONA] Extracting post-cap activations with steering_spec...")
+        extract_post_start = time.time()
+        mean_acts_per_turn_post_cap = await mapper.mean_all_turn_activations_async(
+            probing_model, encoder, conversation_turns, layer=layer, steering_spec=steering_spec
+        )
+        logger.debug(f"[PERSONA] Post-cap activations extracted in {time.time() - extract_post_start:.3f}s, shape={mean_acts_per_turn_post_cap.shape}")
     
     # Handle empty activations
     if mean_acts_per_turn.shape[0] == 0:
         logger.warning("No activations extracted, skipping persona monitor")
         return None
     
-    # Compute projections
+    # Compute projections (pre-cap)
     role_projs = pc_projection(mean_acts_per_turn, pca_results, n_pcs=1)
+    
+    # Compute projections (post-cap) if available
+    role_projs_post_cap = None
+    if mean_acts_per_turn_post_cap is not None and mean_acts_per_turn_post_cap.shape[0] > 0:
+        role_projs_post_cap = pc_projection(mean_acts_per_turn_post_cap, pca_results, n_pcs=1)
     
     # Find indices of assistant turns in the conversation (by actual role, not position assumption)
     # This handles conversations with system messages where indices don't alternate user/assistant
@@ -429,6 +447,9 @@ async def run_persona_monitor(
     
     # Select projections for assistant turns only
     assistant_role_projs = role_projs[assistant_indices] if assistant_indices else role_projs[0:0]
+    assistant_role_projs_post_cap = None
+    if role_projs_post_cap is not None:
+        assistant_role_projs_post_cap = role_projs_post_cap[assistant_indices] if assistant_indices else role_projs_post_cap[0:0]
     
     # Get assistant turns for snippets
     assistant_turns = [
@@ -442,12 +463,21 @@ async def run_persona_monitor(
             for j in range(len(ROLE_PC_TITLES))
         }
         
+        # Add post-cap values if available
+        pc_values_post_cap = None
+        if assistant_role_projs_post_cap is not None and i < len(assistant_role_projs_post_cap):
+            pc_values_post_cap = {
+                ROLE_PC_TITLES[j]: float(assistant_role_projs_post_cap[i][j])
+                for j in range(len(ROLE_PC_TITLES))
+            }
+        
         snippet = ""
         if i < len(assistant_turns):
             snippet = _truncate_content(assistant_turns[i].content)
         
         turns_data.append(SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner(
             pc_values=pc_values,
+            pc_values_post_cap=pc_values_post_cap,
             snippet=snippet
         ))
     
@@ -590,6 +620,9 @@ async def run_batched_generate(
             default_partial_result_array: list[str] = []
             steered_logprobs = None
             default_logprobs = None
+            
+            # Store the steering spec for persona monitor (VLLMSteerModel only)
+            vllm_steering_spec: SteeringSpec | None = None
 
             # Generate STEERED and DEFAULT separately
             for flag in [NPSteerType.STEERED, NPSteerType.DEFAULT]:
@@ -865,11 +898,14 @@ async def run_batched_generate(
                                 "No valid steering layers found. All features may have zero-norm vectors or invalid configurations."
                             )
 
+                        # Create and save steering spec for both generation and persona monitor
+                        vllm_steering_spec = SteeringSpec(layers=steering_spec_layers)
+                        
                         # Use streaming generation
                         stream_generator = await model.generate(
                             prompt_string,
                             sampling_params,
-                            steering_spec=SteeringSpec(layers=steering_spec_layers),
+                            steering_spec=vllm_steering_spec,
                             stream=True,
                         )
                         output_total = ""
@@ -932,8 +968,12 @@ async def run_batched_generate(
                         NPSteerChatMessage(role="assistant", content=output_for_monitor)
                     ]
                     
+                    # Pass steering_spec for STEERED type to get post-cap values
+                    steering_spec_for_monitor = vllm_steering_spec if steer_type_for_monitor == NPSteerType.STEERED else None
+                    
                     axis_data = await run_persona_monitor(
-                        model, full_conversation, steer_type_for_monitor, DEFAULT_LAYER
+                        model, full_conversation, steer_type_for_monitor, DEFAULT_LAYER,
+                        steering_spec=steering_spec_for_monitor
                     )
                     if axis_data is not None:
                         assistant_axis_data_list.append(axis_data)
@@ -1141,6 +1181,9 @@ async def run_batched_generate(
                     max_tokens=kwargs.get("max_new_tokens"),
                     seed=seed,
                 )
+                
+                # Store steering spec for persona monitor
+                single_type_steering_spec: SteeringSpec | None = None
 
                 if steer_type == NPSteerType.STEERED:
                     # Build steering spec from all features
@@ -1232,11 +1275,14 @@ async def run_batched_generate(
                             "No valid steering layers found. All features may have zero-norm vectors or invalid configurations."
                         )
 
+                    # Create and save steering spec for both generation and persona monitor
+                    single_type_steering_spec = SteeringSpec(layers=steering_spec_layers)
+                    
                     # Use streaming generation
                     stream_generator = await model.generate(
                         prompt_string,
                         sampling_params,
-                        steering_spec=SteeringSpec(layers=steering_spec_layers),
+                        steering_spec=single_type_steering_spec,
                         stream=True,
                     )
                     output_total = ""
@@ -1281,8 +1327,10 @@ async def run_batched_generate(
                     full_conversation = list(inputPrompt) + [
                         NPSteerChatMessage(role="assistant", content=output_total)
                     ]
+                    # Pass steering_spec for STEERED type to get post-cap values
                     assistant_axis_data = await run_persona_monitor(
-                        model, full_conversation, steer_type, DEFAULT_LAYER
+                        model, full_conversation, steer_type, DEFAULT_LAYER,
+                        steering_spec=single_type_steering_spec if steer_type == NPSteerType.STEERED else None
                     )
                     # Yield final message with persona monitor results
                     to_return = make_steer_completion_chat_response(

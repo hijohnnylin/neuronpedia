@@ -39,6 +39,9 @@ class TestSteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner(unittes
                 pc_values = {
                     'key' : 1.337
                     },
+                pc_values_post_cap = {
+                    'key' : 1.337
+                    },
                 snippet = ''
             )
         else:

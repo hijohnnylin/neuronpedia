@@ -35,6 +35,7 @@ class SpanMapperChatSpace:
         encoder: "ConversationEncoder",
         conversation: List[Any],
         layer: int = 15,
+        steering_spec: Any = None,
         **chat_kwargs,
     ) -> torch.Tensor:
         """
@@ -48,6 +49,7 @@ class SpanMapperChatSpace:
             encoder: ConversationEncoder instance
             conversation: List of conversation turns
             layer: Layer index to extract activations from
+            steering_spec: Optional SteeringSpec to apply during capture (for post-cap activations)
             **chat_kwargs: Additional arguments for chat template
 
         Returns:
@@ -63,7 +65,7 @@ class SpanMapperChatSpace:
 
         # Capture hidden states
         captures, message_boundaries = await probing_model.capture_conversation_with_boundaries_async(
-            messages, layers=layer, **chat_kwargs
+            messages, layers=layer, steering_spec=steering_spec, **chat_kwargs
         )
 
         if layer not in captures:

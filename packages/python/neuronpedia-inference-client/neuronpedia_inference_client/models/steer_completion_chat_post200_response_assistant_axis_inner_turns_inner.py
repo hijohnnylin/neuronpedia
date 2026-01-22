@@ -27,9 +27,10 @@ class SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner(BaseModel):
     """
     SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner
     """ # noqa: E501
-    pc_values: Optional[Dict[str, Union[StrictFloat, StrictInt]]] = Field(default=None, description="Dict mapping PC title to projection value")
+    pc_values: Optional[Dict[str, Union[StrictFloat, StrictInt]]] = Field(default=None, description="Dict mapping PC title to projection value (pre-cap)")
+    pc_values_post_cap: Optional[Dict[str, Union[StrictFloat, StrictInt]]] = Field(default=None, description="Dict mapping PC title to projection value (post-cap)")
     snippet: Optional[StrictStr] = Field(default=None, description="Truncated conversation content for this turn")
-    __properties: ClassVar[List[str]] = ["pc_values", "snippet"]
+    __properties: ClassVar[List[str]] = ["pc_values", "pc_values_post_cap", "snippet"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -83,6 +84,7 @@ class SteerCompletionChatPost200ResponseAssistantAxisInnerTurnsInner(BaseModel):
 
         _obj = cls.model_validate({
             "pc_values": obj.get("pc_values"),
+            "pc_values_post_cap": obj.get("pc_values_post_cap"),
             "snippet": obj.get("snippet")
         })
         return _obj

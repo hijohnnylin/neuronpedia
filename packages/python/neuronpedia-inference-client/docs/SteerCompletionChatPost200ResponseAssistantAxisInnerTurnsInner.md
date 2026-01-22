@@ -5,7 +5,8 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**pc_values** | **Dict[str, float]** | Dict mapping PC title to projection value | [optional] 
+**pc_values** | **Dict[str, float]** | Dict mapping PC title to projection value (pre-cap) | [optional] 
+**pc_values_post_cap** | **Dict[str, float]** | Dict mapping PC title to projection value (post-cap) | [optional] 
 **snippet** | **str** | Truncated conversation content for this turn | [optional] 
 
 ## Example

@@ -59,7 +59,12 @@ post:
                             type: object
                             additionalProperties:
                               type: number
-                            description: Dict mapping PC title to projection value
+                            description: Dict mapping PC title to projection value (pre-cap)
+                          pc_values_post_cap:
+                            type: object
+                            additionalProperties:
+                              type: number
+                            description: Dict mapping PC title to projection value (post-cap)
                           snippet:
                             type: string
                             description: Truncated conversation content for this turn
