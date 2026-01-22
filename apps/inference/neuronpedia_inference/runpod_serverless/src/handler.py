@@ -108,6 +108,12 @@ async def async_handler(job: dict) -> dict:
             "action": "health",
             "stats": stats.to_dict(),
             "summary": stats.summary(),
+            "concurrency_env": {
+                "MAX_NUM_SEQS": os.environ.get("MAX_NUM_SEQS", "not set"),
+                "MAX_CONCURRENCY": os.environ.get("MAX_CONCURRENCY", "not set"),
+                "GPU_MEMORY_UTILIZATION": os.environ.get("GPU_MEMORY_UTILIZATION", "not set"),
+                "MAX_MODEL_LEN": os.environ.get("MAX_MODEL_LEN", "not set"),
+            },
         }
         return
     
@@ -204,11 +210,23 @@ def concurrency_modifier(current_concurrency: int) -> int:
     """
     # Get max concurrency from environment, default to 32 to match MAX_NUM_SEQS
     max_concurrency = int(os.environ.get("MAX_CONCURRENCY", "32"))
+    if max_concurrency < 16:
+        max_concurrency = 16
+        os.environ["MAX_CONCURRENCY"] = "16"
     return max_concurrency
 
 
 # Only run when executed directly (not when imported for testing)
 if __name__ == "__main__":
+    # Log concurrency settings at startup
+    logger.info("=" * 60)
+    logger.info("CONCURRENCY SETTINGS:")
+    logger.info(f"  MAX_NUM_SEQS:          {os.environ.get('MAX_NUM_SEQS', 'not set (default 256)')}")
+    logger.info(f"  MAX_CONCURRENCY:       {os.environ.get('MAX_CONCURRENCY', 'not set (default 32)')}")
+    logger.info(f"  GPU_MEMORY_UTILIZATION: {os.environ.get('GPU_MEMORY_UTILIZATION', 'not set')}")
+    logger.info(f"  MAX_MODEL_LEN:         {os.environ.get('MAX_MODEL_LEN', 'not set')}")
+    logger.info("=" * 60)
+    
     # Initialize model at module load (cold start)
     initialize_model()
     # Register handler with RunPod
