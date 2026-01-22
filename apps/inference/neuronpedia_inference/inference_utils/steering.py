@@ -136,23 +136,45 @@ def convert_to_chat_array(
             else:
                 continue
 
-            if not role or not content:
+            if not role:
                 continue
 
-            # Handle assistant analysis channel - store for merging with final
+            # Handle assistant analysis channel - store for potential merging with final
             if role == "assistant" and channel == "analysis":
                 pending_analysis = content
+                # Continue processing to see if final channel follows in this parse
                 continue
 
-            # Handle assistant final channel - merge with pending analysis
-            if role == "assistant" and channel == "final" and pending_analysis:
-                content = f"<think>{pending_analysis}</think>{content}"
-                pending_analysis = None
+            # Handle assistant final channel - merge with pending analysis if present
+            if role == "assistant" and channel == "final":
+                if pending_analysis:
+                    content = f"<think>{pending_analysis}</think>{content}"
+                    pending_analysis = None
+                if content:
+                    conversation.append(
+                        NPSteerChatMessage(
+                            role=role,
+                            content=content,
+                        )
+                    )
+                continue
 
+            # Non-analysis, non-final messages
+            if content:
+                conversation.append(
+                    NPSteerChatMessage(
+                        role=role,
+                        content=content,
+                    )
+                )
+
+        # If there's pending analysis with no final yet, stream it as a think message
+        # This enables real-time streaming of thinking content before final arrives
+        if pending_analysis:
             conversation.append(
                 NPSteerChatMessage(
-                    role=role,
-                    content=content,
+                    role="assistant",
+                    content=f"<think>{pending_analysis}</think>",
                 )
             )
 
