@@ -244,12 +244,14 @@ function addVirtualDiff(data: CLTGraph, logitDiff: string | null) {
     // Try double quote format first
     const doubleQuoteMatch = d.clerp.split(`"`)[1]?.split(`" k(p=`)[0];
     if (doubleQuoteMatch) {
+      // eslint-disable-next-line no-param-reassign
       d.logitToken = doubleQuoteMatch;
       return;
     }
     // Try single quote format: output: 'token' (p=...)
     const singleQuoteMatch = d.clerp.match(/['']([^'']+)['']/);
     if (singleQuoteMatch) {
+      // eslint-disable-next-line
       d.logitToken = singleQuoteMatch[1];
     }
   });
