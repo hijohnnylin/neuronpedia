@@ -236,7 +236,23 @@ function addVirtualDiff(data: CLTGraph, logitDiff: string | null) {
   const links = data.links.filter((d) => !d.isJsVirtual);
   // @ts-ignore
   // eslint-disable-next-line
-  nodes.forEach((d) => (d.logitToken = d.clerp?.split(`"`)[1]?.split(`" k(p=`)[0]));
+  // Extract logitToken from clerp - handles both formats:
+  // - Double quotes: Output " floor" (p=0.111) -> " floor"
+  // - Single quotes: output: 'Austin' (p=1.000) -> Austin
+  nodes.forEach((d) => {
+    if (!d.clerp) return;
+    // Try double quote format first
+    const doubleQuoteMatch = d.clerp.split(`"`)[1]?.split(`" k(p=`)[0];
+    if (doubleQuoteMatch) {
+      d.logitToken = doubleQuoteMatch;
+      return;
+    }
+    // Try single quote format: output: 'token' (p=...)
+    const singleQuoteMatch = d.clerp.match(/['']([^'']+)['']/);
+    if (singleQuoteMatch) {
+      d.logitToken = singleQuoteMatch[1];
+    }
+  });
 
   const [logitAStr, logitBStr] = logitDiff?.split('__vs__') || [];
   if (!logitAStr || !logitBStr) return { nodes, links };
