@@ -62,13 +62,13 @@ export default function FeatureDashboard({
   const pathname = usePathname();
   const [neuronLoaded, setNeuronLoaded] = useState(false);
 
-  const isAssistantAxis = useMemo(() => {
-    return (
+  const isAssistantAxis = useMemo(
+    () =>
       currentNeuron?.modelId === 'llama3.3-70b-it' &&
       currentNeuron?.layer === '40-neuronpedia-resid-post' &&
-      currentNeuron?.index === '101874252'
-    );
-  }, [currentNeuron]);
+      currentNeuron?.index === '101874252',
+    [currentNeuron],
+  );
 
   const allowTest = () => {
     if (isAssistantAxis) {
@@ -127,18 +127,21 @@ export default function FeatureDashboard({
               [
                 ...(getReleaseForSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')
                   ? [
-                    <BreadcrumbLink
-                      key={0}
-                      href={`/${getReleaseForSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')?.name
+                      <BreadcrumbLink
+                        key={0}
+                        href={`/${
+                          getReleaseForSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')?.name
                         }`}
-                    >
-                      {`${getReleaseForSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')
-                          ?.creatorNameShort
-                        } · ${getReleaseForSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')
-                          ?.descriptionShort
+                      >
+                        {`${
+                          getReleaseForSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')
+                            ?.creatorNameShort
+                        } · ${
+                          getReleaseForSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')
+                            ?.descriptionShort
                         }`}
-                    </BreadcrumbLink>,
-                  ]
+                      </BreadcrumbLink>,
+                    ]
                   : []),
               ],
               <BreadcrumbLink href={`/${currentNeuron?.modelId}`} key={1}>
@@ -146,10 +149,10 @@ export default function FeatureDashboard({
               </BreadcrumbLink>,
               ...(currentNeuron?.sourceSet
                 ? [
-                  <BreadcrumbLink href={`/${currentNeuron?.modelId}/${currentNeuron?.sourceSet?.name}`} key={2.5}>
-                    {currentNeuron?.sourceSet?.type}
-                  </BreadcrumbLink>,
-                ]
+                    <BreadcrumbLink href={`/${currentNeuron?.modelId}/${currentNeuron?.sourceSet?.name}`} key={2.5}>
+                      {currentNeuron?.sourceSet?.type}
+                    </BreadcrumbLink>,
+                  ]
                 : []),
               <BreadcrumbLink href={`/${currentNeuron?.modelId}/${currentNeuron?.layer}`} key={2}>
                 {currentNeuron?.layer.toUpperCase()}
@@ -205,7 +208,7 @@ export default function FeatureDashboard({
                     URL.revokeObjectURL(url);
                   }}
                   aria-label="Download vector as JSON"
-                  className={`h-9 w-9 overflow-hidden rounded-full bg-slate-200 px-0 py-1.5 text-center text-xs font-bold uppercase text-slate-500/80 transition-all hover:enabled:bg-sky-300 hover:enabled:text-sky-800 disabled:bg-slate-400 disabled:opacity-60`}
+                  className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 px-0 py-1.5 text-center text-xs font-bold uppercase text-slate-500/80 transition-all hover:enabled:bg-sky-300 hover:enabled:text-sky-800 disabled:bg-slate-400 disabled:opacity-60"
                 >
                   <div className="-mt-0.5 flex flex-row items-center justify-center">
                     <Download className="h-5 w-5" />
@@ -227,16 +230,19 @@ export default function FeatureDashboard({
 
       {/* === MAIN CONTENT */}
       <div
-        className={`relative ${embed || neuronHasVectorInDatabase(currentNeuron) ? 'sm:pt-2' : 'mt-16 sm:pt-0'
-          } flex h-full flex-col sm:mt-0 sm:flex-row sm:gap-x-2 sm:gap-y-0 ${forceMiniStats ? 'sm:px-0' : 'pt-2 sm:px-2'
-          }`}
+        className={`relative ${
+          embed || neuronHasVectorInDatabase(currentNeuron) ? 'sm:pt-2' : 'mt-16 sm:pt-0'
+        } flex h-full flex-col sm:mt-0 sm:flex-row sm:gap-x-2 sm:gap-y-0 ${
+          forceMiniStats ? 'sm:px-0' : 'pt-2 sm:px-2'
+        }`}
       >
         {/* === LEFT PANE */}
         <div
-          className={`${embed
+          className={`${
+            embed
               ? 'hidden'
               : 'mb-3 flex flex-col sm:mb-0 sm:basis-1/2 sm:overflow-auto sm:overflow-y-scroll lg:basis-1/3'
-            }`}
+          }`}
         >
           {/* === EXPLANATIONS */}
           <ExplanationsPane currentNeuron={currentNeuron} setCurrentNeuron={setCurrentNeuron} />
@@ -276,13 +282,15 @@ export default function FeatureDashboard({
 
         {/* === RIGHT PANE */}
         <div
-          className={`flex flex-col overflow-y-scroll px-0 ${embed ? 'flex-1' : 'sm:basis-1/2 lg:basis-2/3'
-            } sm:overflow-auto sm:px-0`}
+          className={`flex flex-col overflow-y-scroll px-0 ${
+            embed ? 'flex-1' : 'sm:basis-1/2 lg:basis-2/3'
+          } sm:overflow-auto sm:px-0`}
         >
           {embed && !currentNeuron?.hasVector && !forceMiniStats && embedLink && (
             <div
-              className={`mb-2 flex w-full flex-row items-center sm:mb-2 ${embedExplanation ? 'justify-between gap-x-2 pl-2' : 'justify-center'
-                } rounded-md py-0.5 pr-0 text-right font-mono text-[10px] font-semibold leading-[1.25] text-slate-600 sm:py-1 sm:text-[11px]`}
+              className={`mb-2 flex w-full flex-row items-center sm:mb-2 ${
+                embedExplanation ? 'justify-between gap-x-2 pl-2' : 'justify-center'
+              } rounded-md py-0.5 pr-0 text-right font-mono text-[10px] font-semibold leading-[1.25] text-slate-600 sm:py-1 sm:text-[11px]`}
             >
               {embedExplanation && (
                 <div className="text-left font-sans text-[11.5px] sm:text-[13px]">

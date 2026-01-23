@@ -1,12 +1,8 @@
-import { useGlobalContext } from '@/components/provider/global-provider';
 import { ArrowUpRight, HelpCircle, Notebook, RocketIcon, ScrollText, Smile, YoutubeIcon } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 import { useEffect, useRef } from 'react';
 import { blogPostLink, codingTutorialLink, hfLink } from './tab-main';
 
 export default function TabCircuit({ tabUpdater }: { tabUpdater: (tab: string) => void }) {
-  const session = useSession();
-  const { setSignInModalOpen } = useGlobalContext();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,13 +41,13 @@ export default function TabCircuit({ tabUpdater }: { tabUpdater: (tab: string) =
             >
               attribution graph (Ameisen et al)
             </a>{' '}
-            that shows how the model's arrives at its final response. Gemma Scope 2 contains transcoders for all layers
-            of all Gemma 3 sizes, allowing us to generate our own graphs to analyze any prompt, including for instruct
-            models.
+            that shows how the model&apos;s arrives at its final response. Gemma Scope 2 contains transcoders for all
+            layers of all Gemma 3 sizes, allowing us to generate our own graphs to analyze any prompt, including for
+            instruct models.
           </div>
           <div>
-            Below, we've generated a graph to trace <code>Gemma 3 4B IT</code>
-            {`'`}s internal reasoning steps when we ask it:{' '}
+            Below, we&apos;ve generated a graph to trace <code>Gemma 3 4B IT</code>
+            &apos;s internal reasoning steps when we ask it:{' '}
             <code>What is the capital of the state containing Dallas? Answer immediately.</code>
           </div>
           <div>
@@ -77,6 +73,7 @@ export default function TabCircuit({ tabUpdater }: { tabUpdater: (tab: string) =
           </div>
           <div className="w-full">
             <iframe
+              title="Gemma 3 4B IT circuit tracing"
               src="/gemma-3-4b-it/graph?slug=dallas-austin&pruningThreshold=0.55&densityThreshold=0.03&embed=true"
               className="h-[720px] w-full rounded-lg border border-slate-200"
             />

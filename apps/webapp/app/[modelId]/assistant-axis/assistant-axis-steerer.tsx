@@ -1,16 +1,12 @@
 'use client';
 
 import { SteerResultChat } from '@/app/api/steer-chat/route';
-import { useAssistantAxisModalContext } from '@/components/provider/assistant-axis-modal-provider';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { useIsMount } from '@/lib/hooks/use-is-mount';
-import AssistantAxisChat from './assistant-axis-chat';
-import { Button } from '@/components/shadcn/button';
 import {
   ChatMessage,
   STEER_FREQUENCY_PENALTY,
   STEER_METHOD_ASSISTANT_CAP,
-  STEER_N_COMPLETION_TOKENS,
   STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS,
   STEER_SEED,
   STEER_SPECIAL_TOKENS,
@@ -18,50 +14,27 @@ import {
   STEER_TEMPERATURE,
   SteerFeature,
 } from '@/lib/utils/steer';
-import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
-import { ExternalLinkIcon } from 'lucide-react';
-import { NPSteerMethod } from 'neuronpedia-inference-client';
-import Link from 'next/link';
+import { NPSteerMethod, SteerCompletionChatPost200ResponseAssistantAxisInner } from 'neuronpedia-inference-client';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import AssistantAxisWelcomeModal from './assistant-axis-welcome-modal';
-import { ChartData } from './persona-chart';
-import { buildChartData } from './persona-chart';
-import { combineChartData } from './persona-chart';
-import PersonaChart from './persona-chart';
+import AssistantAxisChat from './assistant-axis-chat';
+import { ChartData, buildChartData, combineChartData } from './persona-chart';
+
+type PersonaCheckResult = SteerCompletionChatPost200ResponseAssistantAxisInner;
 
 const PERSONA_MODELS = ['llama3.3-70b-it'];
 
-export const CAP_GITHUB_URL = 'https://github.com/safety-research/assistant-axis';
-export const CAP_PAPER_URL = 'https://arxiv.org/abs/2601.10387';
-export const CAP_BLOG_URL = 'https://www.anthropic.com/research/assistant-axis';
-export const CAP_CONTACT_EMAIL = 'jacklindsey@anthropic.com,christina.lu@cs.ox.ac.uk';
-export const CAP_VECTOR_URL = '/llama3.3-70b-it/40-neuronpedia-resid-post/101874252';
-
-export const DEMO_BUTTONS = [
-  { id: 'cmkjhhsu0000fgfu5pkv3zlmv', emoji: '😢', label: 'Isolation' },
-  { id: 'cmkhii9hk0015ruw6zpzwan1z', emoji: '🌀', label: 'Sycophancy' },
-  { id: 'cmkhj4zb5000vmj34bcicslcg', emoji: '💸', label: 'Tax Fraud' },
-  { id: null, emoji: '✏️', label: 'Free Chat' },
-] as const;
-
-import { PersonaCheckResult } from './types';
-
-export type { PersonaCheckTurn, PersonaCheckResult } from './types';
-
 export default function AssistantAxisSteerer({
   initialSavedId,
-  hideInitialSettingsOnMobile = false,
   initialSteerFeatures,
 }: {
   initialSavedId?: string;
-  hideInitialSettingsOnMobile?: boolean;
   initialSteerFeatures?: SteerFeature[];
 }) {
   const { showToastServerError } = useGlobalContext();
   const searchParams = useSearchParams();
   // this should never be blank
-  const [modelId, setModelId] = useState(PERSONA_MODELS[0]);
+  const [modelId] = useState(PERSONA_MODELS[0]);
   const [typedInText, setTypedInText] = useState('');
   const [defaultChatMessages, setDefaultChatMessages] = useState<ChatMessage[]>([]);
   const [steeredChatMessages, setSteeredChatMessages] = useState<ChatMessage[]>([]);
@@ -74,53 +47,26 @@ export default function AssistantAxisSteerer({
   const [steerSpecialTokens, setSteerSpecialTokens] = useState(STEER_SPECIAL_TOKENS);
   const [seed, setSeed] = useState(STEER_SEED);
   const [steerMethod, setSteerMethod] = useState<NPSteerMethod>(STEER_METHOD_ASSISTANT_CAP);
-  const [randomSeed, setRandomSeed] = useState(false);
+  const [randomSeed] = useState(false);
 
   const [selectedFeatures, setSelectedFeatures] = useState<SteerFeature[]>(initialSteerFeatures || []);
   const [currentSavedId, setCurrentSavedId] = useState<string | null>(initialSavedId || null);
   const [isSteering, setIsSteering] = useState(false);
-  const [showSettingsOnMobile, setShowSettingsOnMobile] = useState(
-    initialSavedId === undefined && !hideInitialSettingsOnMobile,
-  );
   const isMount = useIsMount();
 
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [loadingChartData, setLoadingChartData] = useState(false);
   const skipChartAnimationRef = useRef(false);
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const [chartWidth, setChartWidth] = useState(340);
-  const [chartHeight, setChartHeight] = useState(600);
+  const [usePostCap, setUsePostCap] = useState(false);
+  // Store raw persona check results so we can rebuild chart data when toggling pre/post cap
+  const [rawSteeredAxis, setRawSteeredAxis] = useState<PersonaCheckResult | null>(null);
+  const [rawDefaultAxis, setRawDefaultAxis] = useState<PersonaCheckResult | null>(null);
   const [scrollToTurnIndex, setScrollToTurnIndex] = useState<number | null>(null);
 
   // Callback for when a point on the persona chart is clicked
   const handleChartPointClick = useCallback((turn: number) => {
     setScrollToTurnIndex(turn);
   }, []);
-
-  // Track container width and height for responsive chart
-  useEffect(() => {
-    const container = chartContainerRef.current;
-    if (!container) return;
-
-    const updateDimensions = (entries?: ResizeObserverEntry[]) => {
-      if (entries && entries[0]) {
-        const { width, height } = entries[0].contentRect;
-        setChartWidth(width || container.offsetWidth);
-        // Use a minimum height of 300px if container height is too small
-        setChartHeight(Math.max(height || container.offsetHeight, 300));
-      } else {
-        setChartWidth(container.offsetWidth);
-        setChartHeight(Math.max(container.offsetHeight, 300));
-      }
-    };
-
-    updateDimensions();
-    const resizeObserver = new ResizeObserver(updateDimensions);
-    resizeObserver.observe(container);
-
-    return () => resizeObserver.disconnect();
-  }, []);
-
 
   function setUrl(steerOutputId: string | null) {
     if (steerOutputId === null) {
@@ -143,7 +89,6 @@ export default function AssistantAxisSteerer({
     }
   }
 
-
   function reset() {
     setDefaultChatMessages([]);
     setSteeredChatMessages([]);
@@ -151,8 +96,10 @@ export default function AssistantAxisSteerer({
     setLoadingChartData(false);
     setChartData(null);
     setCurrentSavedId(null);
+    setRawSteeredAxis(null);
+    setRawDefaultAxis(null);
 
-    let newUrl = `/${modelId}/assistant-axis`;
+    const newUrl = `/${modelId}/assistant-axis`;
     window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
   }
 
@@ -160,9 +107,12 @@ export default function AssistantAxisSteerer({
   const handleAssistantAxisData = useCallback(
     (steeredData: PersonaCheckResult | null, defaultData: PersonaCheckResult | null) => {
       setLoadingChartData(true);
+      // Store raw data for later rebuilding when toggling pre/post cap
+      setRawSteeredAxis(steeredData);
+      setRawDefaultAxis(defaultData);
       try {
-        const steeredChartData = steeredData ? buildChartData(steeredData, 'steered') : null;
-        const defaultChartData = defaultData ? buildChartData(defaultData, 'default') : null;
+        const steeredChartData = steeredData ? buildChartData(steeredData, 'steered', usePostCap) : null;
+        const defaultChartData = defaultData ? buildChartData(defaultData, 'default', usePostCap) : null;
         const combinedData = combineChartData(steeredChartData, defaultChartData);
         setChartData(combinedData);
       } catch (error) {
@@ -171,8 +121,18 @@ export default function AssistantAxisSteerer({
         setLoadingChartData(false);
       }
     },
-    [],
+    [usePostCap],
   );
+
+  // Rebuild chart data when usePostCap changes
+  useEffect(() => {
+    if (rawSteeredAxis || rawDefaultAxis) {
+      const steeredChartData = rawSteeredAxis ? buildChartData(rawSteeredAxis, 'steered', usePostCap) : null;
+      const defaultChartData = rawDefaultAxis ? buildChartData(rawDefaultAxis, 'default', usePostCap) : null;
+      const combinedData = combineChartData(steeredChartData, defaultChartData);
+      setChartData(combinedData);
+    }
+  }, [usePostCap, rawSteeredAxis, rawDefaultAxis]);
 
   async function loadSavedSteerOutput(steerOutputId: string) {
     setIsSteering(true);
@@ -231,17 +191,16 @@ export default function AssistantAxisSteerer({
         if (resp.assistant_axis && Array.isArray(resp.assistant_axis)) {
           let steeredAxis: PersonaCheckResult | null = null;
           let defaultAxis: PersonaCheckResult | null = null;
-          for (const axisItem of resp.assistant_axis) {
-            const result: PersonaCheckResult = {
-              pc_titles: axisItem.pc_titles,
-              turns: axisItem.turns,
-            };
+          for (const axisItem of resp.assistant_axis as PersonaCheckResult[]) {
             if (axisItem.type === 'STEERED') {
-              steeredAxis = result;
+              steeredAxis = axisItem;
             } else if (axisItem.type === 'DEFAULT') {
-              defaultAxis = result;
+              defaultAxis = axisItem;
             }
           }
+          // Store raw data for toggle functionality
+          setRawSteeredAxis(steeredAxis);
+          setRawDefaultAxis(defaultAxis);
           handleAssistantAxisData(steeredAxis, defaultAxis);
         }
       })
@@ -261,18 +220,16 @@ export default function AssistantAxisSteerer({
     }
   }, [initialSavedId]);
 
-
   return (
-    <div className="relative flex  h-[calc(100dvh)] sm:h-full w-full flex-col items-start justify-center overflow-hidden sm:flex-row">
-
+    <div className="relative flex h-[calc(100dvh)] w-full flex-col items-start justify-center overflow-hidden sm:h-full sm:flex-row">
       <AssistantAxisChat
         currentSavedId={currentSavedId}
+        // eslint-disable-next-line react/jsx-no-bind
         loadSavedSteerOutput={loadSavedSteerOutput}
         chartData={chartData}
         loadingChartData={loadingChartData}
         skipChartAnimationRef={skipChartAnimationRef}
         onChartPointClick={handleChartPointClick}
-        showSettingsOnMobile={showSettingsOnMobile}
         isSteering={isSteering}
         setIsSteering={setIsSteering}
         defaultChatMessages={defaultChatMessages}
@@ -299,6 +256,10 @@ export default function AssistantAxisSteerer({
         onAssistantAxisData={handleAssistantAxisData}
         initialSavedId={initialSavedId}
         setChartData={setChartData}
+        usePostCap={usePostCap}
+        setUsePostCap={setUsePostCap}
+        rawSteeredAxis={rawSteeredAxis}
+        rawDefaultAxis={rawDefaultAxis}
       />
     </div>
   );

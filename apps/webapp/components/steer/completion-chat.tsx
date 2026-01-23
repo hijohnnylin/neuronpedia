@@ -3,15 +3,15 @@ import { useGlobalContext } from '@/components/provider/global-provider';
 import SteerChatMessage from '@/components/steer/chat-message';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
-import { ChatMessage, STEER_MAX_PROMPT_CHARS_THINKING, SteerFeature } from '@/lib/utils/steer';
+import { ChatMessage, STEER_MAX_PROMPT_CHARS, STEER_MAX_PROMPT_CHARS_THINKING, SteerFeature } from '@/lib/utils/steer';
 import copy from 'copy-to-clipboard';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import { ArrowUp, RotateCcw, Share, X } from 'lucide-react';
 import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { useEffect, useRef } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
-import { STEER_MAX_PROMPT_CHARS } from '@/lib/utils/steer';
-import { NNSIGHT_MODELS } from './steerer';
+
+export const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 
 export default function SteerCompletionChat({
   showSettingsOnMobile,
@@ -89,6 +89,15 @@ export default function SteerCompletionChat({
   async function stopSteering() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+    }
+  }
+
+  function removeLastFailedUserMessage(defaultMsgs: ChatMessage[], steeredMsgs: ChatMessage[]) {
+    if (defaultMsgs.length > 0 && defaultMsgs[defaultMsgs.length - 1].role === 'user') {
+      setDefaultChatMessages(defaultMsgs.slice(0, -1));
+    }
+    if (steeredMsgs.length > 0 && steeredMsgs[steeredMsgs.length - 1].role === 'user') {
+      setSteeredChatMessages(steeredMsgs.slice(0, -1));
     }
   }
 
@@ -219,19 +228,11 @@ export default function SteerCompletionChat({
     }
   }
 
-  function removeLastFailedUserMessage(defaultMsgs: ChatMessage[], steeredMsgs: ChatMessage[]) {
-    if (defaultMsgs.length > 0 && defaultMsgs[defaultMsgs.length - 1].role === 'user') {
-      setDefaultChatMessages(defaultMsgs.slice(0, -1));
-    }
-    if (steeredMsgs.length > 0 && steeredMsgs[steeredMsgs.length - 1].role === 'user') {
-      setSteeredChatMessages(steeredMsgs.slice(0, -1));
-    }
-  }
-
   return (
     <div
-      className={`relative h-full max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] w-full min-w-0 flex-col text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)] sm:w-auto sm:basis-2/3 ${showSettingsOnMobile ? 'hidden sm:flex' : 'flex'
-        }`}
+      className={`relative h-full max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] w-full min-w-0 flex-col text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)] sm:w-auto sm:basis-2/3 ${
+        showSettingsOnMobile ? 'hidden sm:flex' : 'flex'
+      }`}
     >
       {/* background for large screen and multiline input */}
       <div className="absolute top-0 flex h-full w-full flex-row">
@@ -278,13 +279,11 @@ export default function SteerCompletionChat({
                       .replaceAll('_', ' ')
                       .toLowerCase()
                       .replace(/\b\w/g, (c) => c.toUpperCase())}":`}
-                    {selectedFeatures.slice(0, 5).map((f) => {
-                      return (
-                        <div key={f.index} className="ml-3 mt-1">
-                          - {f.explanation}
-                        </div>
-                      );
-                    })}
+                    {selectedFeatures.slice(0, 5).map((f) => (
+                      <div key={f.index} className="ml-3 mt-1">
+                        - {f.explanation}
+                      </div>
+                    ))}
                     {selectedFeatures.length > 5 && (
                       <div className="ml-3 mt-1">
                         - and {selectedFeatures.length - 5} other feature

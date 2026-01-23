@@ -107,7 +107,7 @@
     "mjml": "^5.0.0-alpha.6",
     "ms": "^2.1.3",
     "neuronpedia-autointerp-client": "^1.0.0",
-    "neuronpedia-inference-client": "^1.9.0",
+    "neuronpedia-inference-client": "^1.9.1",
     "next": "14.2.35",
     "next-auth": "^4.22.1",
     "next-mdx-remote": "^5.0.0",

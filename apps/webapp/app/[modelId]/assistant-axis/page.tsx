@@ -1,10 +1,10 @@
 import { FEATURE_PRESETS } from '@/app/api/steer/presets/route';
 import { AssistantAxisModalProvider } from '@/components/provider/assistant-axis-modal-provider';
 import { REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT } from '@/lib/db/model';
+import { ASSET_BASE_URL } from '@/lib/env';
+import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import AssistantAxisSteerer from './assistant-axis-steerer';
-import { Metadata } from 'next';
-import { ASSET_BASE_URL } from '@/lib/env';
 
 const SUPPORTED_MODELS = ['llama3.3-70b-it'];
 const ASSISTANT_CAP_PRESET = 'assistant-cap';
@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      images: [`${ASSET_BASE_URL}/cap/monitor.png`]
+      images: [`${ASSET_BASE_URL}/cap/monitor.png`],
     },
   };
 }
@@ -52,11 +52,7 @@ export default async function Page({
   return (
     <AssistantAxisModalProvider>
       <div className="flex h-full w-full flex-col items-center overflow-y-scroll bg-white">
-        <AssistantAxisSteerer
-          initialSavedId={searchParams.saved}
-          hideInitialSettingsOnMobile={searchParams.hideInitialSettingsOnMobile === 'true'}
-          initialSteerFeatures={assistantCapPreset?.features}
-        />
+        <AssistantAxisSteerer initialSavedId={searchParams.saved} initialSteerFeatures={assistantCapPreset?.features} />
       </div>
     </AssistantAxisModalProvider>
   );

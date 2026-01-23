@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 export default function NotFoundFeature() {
   const pathSegments = window.location.pathname.split('/').filter(Boolean);
   const modelId = pathSegments[0] || '';
@@ -21,12 +23,12 @@ export default function NotFoundFeature() {
         </div>
         <div className="mt-4 flex flex-row gap-x-1 text-base">
           Please{' '}
-          <a
+          <Link
             href="/contact"
             className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 text-base text-sky-700 transition-all hover:underline sm:px-0 sm:py-0"
           >
             report this
-          </a>{' '}
+          </Link>{' '}
           if you think it&#39;s a bug.
         </div>
       </h2>

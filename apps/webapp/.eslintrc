@@ -5,10 +5,11 @@
     "es2021": true,
     "node": true
   },
-  "extends": ["airbnb", "airbnb/hooks", "airbnb-typescript", "next/core-web-vitals", "prettier"],
+  "extends": ["airbnb", "airbnb-typescript", "next/core-web-vitals", "prettier"],
   "parserOptions": { "project": "./tsconfig.json" },
   "plugins": ["react"],
   "rules": {
+    "@next/next/no-html-link-for-pages": "off",
     "no-nested-ternary": "off",
     "react/no-array-index-key": "off",
     "react/require-default-props": "off",

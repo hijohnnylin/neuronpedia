@@ -35,14 +35,13 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import SteerAdvancedSettings from './advanced-settings';
 import SteerCompletion from './completion';
-import SteerCompletionChat from './completion-chat';
+import SteerCompletionChat, { NNSIGHT_MODELS } from './completion-chat';
 import SteerPresetSelector from './preset-selector';
 import SteerSelectedFeature from './selected-feature';
 import SteerTooltip from './tooltip';
 
 const MODELS_TO_FILTER_OUT: string[] = []; // ['gpt-oss-20b']
 const MODELS_TO_FILTER_OUT_PREFIX = ['gemma-3-'];
-export const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 
 export default function Steerer({
   initialModelId,
@@ -454,12 +453,14 @@ export default function Steerer({
         </div>
       </div>
       <div
-        className={`w-full flex-col overflow-hidden px-5 pt-14 sm:h-full sm:basis-1/3 sm:pt-5 ${showSettingsOnMobile ? 'flex' : 'hidden sm:flex'
-          }`}
+        className={`w-full flex-col overflow-hidden px-5 pt-14 sm:h-full sm:basis-1/3 sm:pt-5 ${
+          showSettingsOnMobile ? 'flex' : 'hidden sm:flex'
+        }`}
       >
         <div
-          className={`${hideModelSelector ? 'mb-0.5' : 'mb-4'
-            } mt-2 flex w-full flex-row items-center justify-center gap-x-1 text-xl font-semibold leading-none tracking-tight text-slate-700 sm:mt-0 sm:justify-between`}
+          className={`${
+            hideModelSelector ? 'mb-0.5' : 'mb-4'
+          } mt-2 flex w-full flex-row items-center justify-center gap-x-1 text-xl font-semibold leading-none tracking-tight text-slate-700 sm:mt-0 sm:justify-between`}
         >
           Steer Models
           <SteerTooltip />

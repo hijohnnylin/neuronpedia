@@ -2,7 +2,10 @@ import { prisma } from '@/lib/db';
 import { NEXT_PUBLIC_URL } from '@/lib/env';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputType } from '@prisma/client';
-import { NPSteerMethod } from 'neuronpedia-inference-client';
+import {
+  NPSteerMethod,
+  SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON,
+} from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';
 import { SteerResultChat } from '../steer-chat/route';
@@ -104,22 +107,25 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     // Handle assistant_axis (capMonitorOutput) for PROJECTION_CAP steer method
     const isAssistantAxis = savedSteerSteeredOutput.steerMethod === NPSteerMethod.ProjectionCap;
     if (isAssistantAxis) {
-      const assistantAxisArray: any[] = [];
+      toReturnResult.assistant_axis = [];
 
       // Get capMonitorOutput for steered output (use cached data only)
+      // Use FromJSON to transform snake_case (stored in DB) to camelCase (TypeScript client types)
       const steeredCapMonitor = savedSteerSteeredOutput.capMonitorOutput;
       if (steeredCapMonitor) {
-        assistantAxisArray.push(JSON.parse(steeredCapMonitor));
+        const parsed = JSON.parse(steeredCapMonitor);
+        toReturnResult.assistant_axis.push(SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON(parsed));
       }
 
       // Get capMonitorOutput for default output (use cached data only)
       const defaultCapMonitor = savedSteerDefaultOutput.capMonitorOutput;
       if (defaultCapMonitor) {
-        assistantAxisArray.push(JSON.parse(defaultCapMonitor));
+        const parsed = JSON.parse(defaultCapMonitor);
+        toReturnResult.assistant_axis.push(SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON(parsed));
       }
 
-      if (assistantAxisArray.length > 0) {
-        toReturnResult.assistant_axis = assistantAxisArray;
+      if (toReturnResult.assistant_axis.length === 0) {
+        toReturnResult.assistant_axis = undefined;
       }
     }
 

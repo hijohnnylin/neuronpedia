@@ -26,11 +26,14 @@ export default function SteerChatMessage({
               key={i}
               ref={(el) => {
                 if (messageRefs?.current) {
+                  // eslint-disable-next-line no-param-reassign
                   messageRefs.current[i] = el;
                 }
               }}
             >
-              <div className={`max-w-[85%] whitespace-pre-wrap rounded-lg bg-slate-500 px-3 py-2 ${overrideTextSize || 'text-[12.5px]'} text-white sm:max-w-[90%] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[12.5px]`}>
+              <div
+                className={`max-w-[85%] whitespace-pre-wrap rounded-lg bg-slate-500 px-3 py-2 ${overrideTextSize || 'text-[12.5px]'} text-white sm:max-w-[90%] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[12.5px]`}
+              >
                 {s.content}
               </div>
             </div>
@@ -43,15 +46,17 @@ export default function SteerChatMessage({
               key={i}
               ref={(el) => {
                 if (messageRefs?.current) {
+                  // eslint-disable-next-line no-param-reassign
                   messageRefs.current[i] = el;
                 }
               }}
             >
               <div
-                className={`max-w-[85%] rounded-lg sm:max-w-[90%] sm:rounded-xl ${steered
-                  ? overrideSteeredColors || 'bg-sky-300 text-sky-700'
-                  : overrideDefaultColors || 'bg-slate-300 text-slate-700'
-                  } whitespace-pre-wrap break-words px-3 py-2 ${overrideTextSize || 'text-[12.5px]'} sm:text-[12.5px]`}
+                className={`max-w-[85%] rounded-lg sm:max-w-[90%] sm:rounded-xl ${
+                  steered
+                    ? overrideSteeredColors || 'bg-sky-300 text-sky-700'
+                    : overrideDefaultColors || 'bg-slate-300 text-slate-700'
+                } whitespace-pre-wrap break-words px-3 py-2 ${overrideTextSize || 'text-[12.5px]'} sm:text-[12.5px]`}
               >
                 {s.content.startsWith('<think>') ? (
                   <>
@@ -62,8 +67,9 @@ export default function SteerChatMessage({
                         <>
                           <div className="-mx-3 -mt-2 mb-2 bg-white/25 px-3 py-2 text-[11.5px]">
                             <div
-                              className={`pb-1.5 pt-0.5 text-left text-[8px] font-bold leading-none ${steered ? 'text-sky-700/50' : 'text-slate-700/50'
-                                }`}
+                              className={`pb-1.5 pt-0.5 text-left text-[8px] font-bold leading-none ${
+                                steered ? 'text-sky-700/50' : 'text-slate-700/50'
+                              }`}
                             >
                               THINKING
                             </div>

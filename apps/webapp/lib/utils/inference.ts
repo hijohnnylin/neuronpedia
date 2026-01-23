@@ -141,7 +141,7 @@ function createRunpodStreamingResponse(
                   const parsed = JSON.parse(jsonStr);
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
                 } catch {
-                  controller.enqueue(encoder.encode(innerOutput + '\n\n'));
+                  controller.enqueue(encoder.encode(`${innerOutput}\n\n`));
                 }
               } else {
                 controller.enqueue(encoder.encode(`data: ${innerOutput}\n\n`));
@@ -151,7 +151,7 @@ function createRunpodStreamingResponse(
             }
           } else if (typeof output === 'string') {
             if (output.startsWith('data: ')) {
-              controller.enqueue(encoder.encode(output + '\n\n'));
+              controller.enqueue(encoder.encode(`${output}\n\n`));
             } else {
               try {
                 const data = JSON.parse(output);

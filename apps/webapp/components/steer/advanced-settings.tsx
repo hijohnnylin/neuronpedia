@@ -45,7 +45,6 @@ export default function SteerAdvancedSettings({
   setSteerSpecialTokens,
   steerMethod,
   setSteerMethod,
-  isPersonaSpace = false,
 }: {
   isNnSightModel: boolean;
   thinking: boolean;
@@ -66,7 +65,6 @@ export default function SteerAdvancedSettings({
   setSteerSpecialTokens: (steerSpecialTokens: boolean) => void;
   steerMethod: NPSteerMethod;
   setSteerMethod: (steerMethod: NPSteerMethod) => void;
-  isPersonaSpace?: boolean;
 }) {
   return (
     <div className="flex w-full flex-col pb-5 pt-3 sm:pt-0">
@@ -201,7 +199,7 @@ export default function SteerAdvancedSettings({
               <Select.Content className="overflow-hidden rounded-md border bg-white shadow-lg">
                 <Select.Viewport>
                   {Object.entries(NPSteerMethod)
-                    // @ts-ignore
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
                     .filter(([_, value]) => STEER_METHODS_ALLOWED.includes(value))
                     .map(([key, value]) => (
                       <Select.Item

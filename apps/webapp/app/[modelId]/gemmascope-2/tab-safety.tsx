@@ -1,49 +1,11 @@
 'use client';
 
-import { useGlobalContext } from '@/components/provider/global-provider';
-import { SearchTopKResult } from '@/lib/utils/inference';
-import { FormikProps } from 'formik';
 import { ArrowUpRight, CircuitBoard, HelpCircle, Notebook, ScrollText, Smile } from 'lucide-react';
 import Link from 'next/link';
-import { NeuronWithPartialRelations } from 'prisma/generated/zod';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { blogPostLink, codingTutorialLink, hfLink } from './tab-main';
 
-const DOGS_INDEX = 14838;
-
-export default function TabSafety({
-  modelId,
-  layer,
-  tabUpdater,
-}: {
-  modelId: string;
-  layer: string;
-  tabUpdater: (tab: string) => void;
-}) {
-  const [topkResult, setTopkResult] = useState<SearchTopKResult | undefined>();
-  type TopKFeature = {
-    index: number;
-    feature: NeuronWithPartialRelations;
-    activation_value: number;
-    frequency: number;
-  };
-  const [topkFeatures, setTopkFeatures] = useState<TopKFeature[] | undefined>(undefined);
-  const [hoveredTokenPosition, setHoveredTokenPosition] = useState<number>(-1);
-  const [lockedTokenPosition, setLockedTokenPosition] = useState<number>(-1);
-  const [hoveredNeuronIndex, setHoveredNeuronIndex] = useState<number>(-1);
-  const formRef = useRef<
-    FormikProps<{
-      searchQuery: string;
-    }>
-  >(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const [forceExtraCredit, setForceExtraCredit] = useState(false);
-  const [forceWhatsNext, setForceWhatsNext] = useState(false);
-  const { showToastServerError, setFeatureModalFeature, setFeatureModalOpen } = useGlobalContext();
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [sortNeurons, setSortNeurons] = useState<'frequency' | 'strength'>('frequency');
-
+export default function TabSafety({ tabUpdater }: { tabUpdater: (tab: string) => void }) {
   const featureTuples = [
     [40, 13029, 'AI safety & existential risk'],
     [53, 57326, 'AI safety & inner alignment'],
@@ -115,7 +77,8 @@ export default function TabSafety({
             <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-6">
               {featureTuples.map((featureTuple) => (
                 <iframe
-                  key={featureTuple[0] + '-' + featureTuple[1]}
+                  key={`${featureTuple[0]}-${featureTuple[1]}`}
+                  title={`Gemma 3 27B IT feature ${featureTuple[1]}`}
                   src={`/gemma-3-27b-it/${featureTuple[0]}-gemmascope-2-res-262k/${featureTuple[1]}?embed=true`}
                   className="col-span-2 h-[540px] w-full max-w-[540px] rounded-lg border bg-slate-50 px-2 sm:col-span-1"
                   scrolling={typeof window !== 'undefined' && window.innerWidth < 640 ? 'no' : 'yes'}
@@ -126,7 +89,7 @@ export default function TabSafety({
         </div>
       </div>
 
-      <div className={`mb-5 flex w-full flex-row items-center justify-start px-2 sm:px-5`}>
+      <div className="mb-5 flex w-full flex-row items-center justify-start px-2 sm:px-5">
         <div className="flex w-full flex-col items-start justify-start gap-x-4 gap-y-1.5 rounded px-2 py-1 sm:flex-row">
           <span className="w-[105px] min-w-[105px] max-w-[105px] whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-center text-[10px] font-bold uppercase text-slate-600">
             🎁 Next

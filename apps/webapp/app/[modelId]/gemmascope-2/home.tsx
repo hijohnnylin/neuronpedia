@@ -19,7 +19,6 @@ export default function GemmaScope2Home({ release }: { release: SourceReleaseWit
   const session = useSession();
   const { setSignInModalOpen } = useGlobalContext();
 
-  const defaultModelId = 'gemma-3-4b-it';
   const defaultModelIdNonSteer = 'gemma-3-4b-it';
 
   const { defaultSourceSet, defaultSource } = getDefaultSourceSetAndSourceForRelease(release);
@@ -236,7 +235,7 @@ export default function GemmaScope2Home({ release }: { release: SourceReleaseWit
             ref={safetyRef}
             className="flex h-full w-full flex-col items-center overflow-y-scroll border-slate-400 bg-white px-0 pb-1"
           >
-            <TabSafety modelId={defaultModelIdNonSteer} layer={defaultSource?.id || ''} tabUpdater={setTabValue} />
+            <TabSafety tabUpdater={setTabValue} />
           </div>
         </Tabs.Content>
 

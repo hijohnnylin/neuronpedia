@@ -41,6 +41,7 @@ export default function SteerSelectedFeature({
   // Using base 1.01 for very gentle exponential scaling
   function strengthToSlider(strength: number): number {
     if (strength === 0) return 0;
+    // eslint-disable-next-line no-param-reassign
     strength = Math.min(
       strength,
       MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX,
@@ -68,6 +69,7 @@ export default function SteerSelectedFeature({
   // Convert exponential slider position to linear strength value
   function sliderToStrength(sliderValue: number): number {
     if (sliderValue === 0) return 0;
+    // eslint-disable-next-line no-param-reassign
     sliderValue = Math.min(
       sliderValue,
       MODELS_FOR_ALT_MAX_STEER_STRENGTH.includes(feature.modelId) ? ALT_MAX_STEER_STRENGTH : STEER_STRENGTH_MAX,
