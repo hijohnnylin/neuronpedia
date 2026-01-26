@@ -14,6 +14,7 @@ psycopg2 = "^2.9.9"
 automated-interpretability = "^0.0.18"
 openai = "^1.63.2"
 google-genai = "^1.57.0"
+boto3 = "^1.35.0"
 
 [tool.poetry.group.dev.dependencies]
 line-profiler = "^5.0.0"

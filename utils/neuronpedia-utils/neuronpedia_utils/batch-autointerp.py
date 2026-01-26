@@ -6,13 +6,17 @@ import json
 import logging
 import os
 import shutil
+import tempfile
 import time
 from dataclasses import asdict, dataclass
 from typing import Dict, List
 
+import boto3
 import dotenv
 import openai
 import typer
+from botocore import UNSIGNED
+from botocore.config import Config
 from cuid2 import Cuid
 from neuronpedia_utils.db_models.activation import Activation
 from neuronpedia_utils.db_models.explanation import Explanation
@@ -25,10 +29,6 @@ logging.getLogger("neuron_explainer").setLevel(logging.CRITICAL)
 
 # openai requires us to set the openai api key before the neuron_explainer imports
 dotenv.load_dotenv()
-if not os.getenv("OPENAI_API_KEY"):
-    raise ValueError(
-        "OPENAI_API_KEY is not set. Please set it in the .env file or export it as an environment variable."
-    )
 from neuron_explainer.activations.activation_records import calculate_max_activation
 
 # ruff: noqa: E402
@@ -79,12 +79,13 @@ GEMINI_MODEL_NAMES = [
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # we should use this one (ai studio, simpler) but we're super rate limited
-# GEMINI_BASE_API_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_BASE_API_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+GEMINI_VERTEX = False
 # so we use vertex instead. when we are not rate limited on AI studio, remove the following 4 properties
-GEMINI_PROJECT_ID = os.getenv("GEMINI_PROJECT_ID")
-GEMINI_LOCATION = os.getenv("GEMINI_LOCATION")
-GEMINI_BASE_API_URL = f"https://{GEMINI_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/{GEMINI_PROJECT_ID}/locations/{GEMINI_LOCATION}/endpoints/openapi"
-GEMINI_VERTEX = True
+# GEMINI_PROJECT_ID = os.getenv("GEMINI_PROJECT_ID")
+# GEMINI_LOCATION = os.getenv("GEMINI_LOCATION")
+# GEMINI_BASE_API_URL = f"https://{GEMINI_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/{GEMINI_PROJECT_ID}/locations/{GEMINI_LOCATION}/endpoints/openapi"
+# GEMINI_VERTEX = True
 
 # the following two are overwritten by the command line arguments
 # the number of parallel autointerps to do
@@ -128,12 +129,87 @@ HTML_ANOMALY_AND_SPECIAL_CHARS_REPLACEMENTS = {
 
 CUID_GENERATOR: Cuid = Cuid(length=25)
 
+# S3 constants for public bucket access
+S3_BUCKET_NAME = "neuronpedia-datasets"
+S3_REGION = "us-east-1"
+
 queuedToSave: List[Explanation] = []
 
 FAILED_FEATURE_INDEXES_QUEUED: List[int] | None = None
 FAILED_FEATURE_INDEXES_OUTPUT: List[str] = []
 
 IGNORE_FIRST_N_TOKENS: int = 0
+GENERATE_EMBEDDINGS: bool = True
+
+
+def normalize_s3_path(path: str) -> str:
+    """Ensure S3 path starts with v1/ (without leading slash)."""
+    # Remove leading slash if present
+    path = path.lstrip("/")
+    # Prepend v1/ if not already present
+    if not path.startswith("v1/"):
+        path = "v1/" + path
+    return path
+
+
+def download_s3_exports(s3_path: str, local_dir: str) -> str:
+    """
+    Download exports from the public S3 bucket to a local directory.
+
+    Args:
+        s3_path: Path within the bucket (will be normalized to start with v1/)
+        local_dir: Local directory to download files to
+
+    Returns:
+        Path to the local directory containing the downloaded exports
+    """
+    s3_path = normalize_s3_path(s3_path)
+
+    print(f"Downloading from s3://{S3_BUCKET_NAME}/{s3_path} to {local_dir}")
+
+    # Create S3 client with anonymous access (public bucket)
+    s3_client = boto3.client(
+        "s3",
+        region_name=S3_REGION,
+        config=Config(signature_version=UNSIGNED),
+    )
+
+    # List all objects in the path
+    paginator = s3_client.get_paginator("list_objects_v2")
+
+    total_files = 0
+    files_to_download = []
+
+    for page in paginator.paginate(Bucket=S3_BUCKET_NAME, Prefix=s3_path):
+        if "Contents" not in page:
+            continue
+        for obj in page["Contents"]:
+            files_to_download.append(obj["Key"])
+            total_files += 1
+
+    if total_files == 0:
+        raise ValueError(f"No files found at s3://{S3_BUCKET_NAME}/{s3_path}")
+
+    print(f"Found {total_files} files to download")
+
+    # Download each file
+    for s3_key in tqdm(files_to_download, desc="Downloading from S3"):
+        # Calculate relative path from the s3_path prefix
+        relative_path = s3_key[len(s3_path) :].lstrip("/")
+        local_file_path = os.path.join(local_dir, relative_path)
+
+        # Create parent directories if needed
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+
+        # Download the file
+        try:
+            s3_client.download_file(S3_BUCKET_NAME, s3_key, local_file_path)
+        except Exception as e:
+            print(f"Error downloading {s3_key}: {e}")
+            raise
+
+    print(f"Successfully downloaded {total_files} files to {local_dir}")
+    return local_dir
 
 
 def replace_html_anomalies_and_special_chars_single(text: str) -> str:
@@ -549,6 +625,7 @@ async def start(activations_dir: str):
 @dataclass
 class AutoInterpConfig:
     input_dir_with_source_exports: str
+    s3_exports_path: str | None
     start_index: int
     end_index: int | None
     explainer_model_name: str
@@ -558,6 +635,7 @@ class AutoInterpConfig:
     autointerp_batch_size: int
     gzip_output: bool
     ignore_first_n_tokens: int
+    generate_embeddings: bool
 
 
 def is_gemini_model(model_name: str) -> bool:
@@ -565,10 +643,13 @@ def is_gemini_model(model_name: str) -> bool:
 
 
 def main(
-    input_dir_with_source_exports: str = typer.Option(
-        ...,
-        help="The directory where you exported your activations and features",
-        prompt=True,
+    input_dir_with_source_exports: str | None = typer.Option(
+        None,
+        help="The directory where you exported your activations and features. Either this or --s3-exports-path must be provided.",
+    ),
+    s3_exports_path: str | None = typer.Option(
+        None,
+        help=f"S3 path in the {S3_BUCKET_NAME} bucket (e.g., 'v1/model/layer'). Will be downloaded to a local temp directory. Either this or --input-dir-with-source-exports must be provided.",
     ),
     start_index: int = typer.Option(
         0, help="The starting index to process", prompt=True
@@ -615,6 +696,11 @@ def main(
         help="Optional number of tokens to ignore from the beginning of the text so that autointerp doesn't see it",
         prompt=True,
     ),
+    generate_embeddings: bool = typer.Option(
+        True,
+        help="Whether to generate OpenAI embeddings for explanations. If False, skips embedding generation and doesn't require OPENAI_API_KEY.",
+        prompt=True,
+    ),
 ):
     if explainer_type_name not in VALID_EXPLAINER_TYPE_NAMES:
         raise ValueError(f"Invalid explainer type name: {explainer_type_name}")
@@ -639,8 +725,45 @@ def main(
         EXPLANATIONS_OUTPUT_DIR, \
         GZIP_OUTPUT, \
         IGNORE_FIRST_N_TOKENS, \
-        REASONING_EFFORT
-    INPUT_DIR_WITH_SOURCE_EXPORTS = input_dir_with_source_exports
+        REASONING_EFFORT, \
+        GENERATE_EMBEDDINGS
+
+    GENERATE_EMBEDDINGS = generate_embeddings
+    if GENERATE_EMBEDDINGS and not os.getenv("OPENAI_API_KEY"):
+        raise ValueError(
+            "OPENAI_API_KEY is not set. Please set it in the .env file or export it as an environment variable. "
+            "Or set --generate-embeddings=False to skip embedding generation."
+        )
+
+    # Validate that either input_dir_with_source_exports or s3_exports_path is provided
+    if input_dir_with_source_exports is None and s3_exports_path is None:
+        raise ValueError(
+            "Either --input-dir-with-source-exports or --s3-exports-path must be provided."
+        )
+    if input_dir_with_source_exports is not None and s3_exports_path is not None:
+        raise ValueError(
+            "Only one of --input-dir-with-source-exports or --s3-exports-path should be provided, not both."
+        )
+    if s3_exports_path is not None and output_dir is None:
+        raise ValueError(
+            "--output-dir is required when using --s3-exports-path, otherwise outputs would be written to a temp directory that gets deleted."
+        )
+
+    # If s3_exports_path is provided, download to a temp directory
+    temp_dir = None
+    if s3_exports_path is not None:
+        temp_dir = tempfile.mkdtemp(prefix="neuronpedia_autointerp_")
+        print(f"Created temporary directory: {temp_dir}")
+        try:
+            download_s3_exports(s3_exports_path, temp_dir)
+            INPUT_DIR_WITH_SOURCE_EXPORTS = temp_dir
+        except Exception as e:
+            # Clean up temp dir on failure
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise ValueError(f"Failed to download from S3: {e}")
+    else:
+        INPUT_DIR_WITH_SOURCE_EXPORTS = input_dir_with_source_exports
+
     if not os.path.exists(INPUT_DIR_WITH_SOURCE_EXPORTS):
         raise ValueError(
             f"Input directory does not exist: {INPUT_DIR_WITH_SOURCE_EXPORTS}"
@@ -679,6 +802,7 @@ def main(
 
     config = AutoInterpConfig(
         input_dir_with_source_exports=INPUT_DIR_WITH_SOURCE_EXPORTS,
+        s3_exports_path=s3_exports_path,
         start_index=START_INDEX,
         end_index=END_INDEX,
         explainer_model_name=EXPLAINER_MODEL_NAME,
@@ -688,6 +812,7 @@ def main(
         autointerp_batch_size=AUTOINTERP_BATCH_SIZE,
         gzip_output=gzip_output,
         ignore_first_n_tokens=IGNORE_FIRST_N_TOKENS,
+        generate_embeddings=GENERATE_EMBEDDINGS,
     )
 
     print("Auto-Interp Config\n", json.dumps(asdict(config), indent=2))
@@ -731,6 +856,11 @@ def main(
     total_time_minutes = total_time_seconds / 60
     print(f"--- {total_time_minutes:.2f} minutes total ---")
 
+    # Clean up temp directory if we created one from S3 download
+    if temp_dir is not None and os.path.exists(temp_dir):
+        print(f"Cleaning up temporary directory: {temp_dir}")
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 def get_next_batch_number() -> int:
     existing_batch_numbers = [
@@ -751,26 +881,28 @@ def generate_embeddings_and_flush_explanations_to_file(explanations: List[Explan
     # remove all explanations with empty descriptions
     explanations = [exp for exp in explanations if exp.description.strip() != ""]
 
-    descriptions = [exp.description for exp in explanations]
-    try:
-        embeddings = openai.embeddings.create(
-            model=DEFAULT_EMBEDDING_MODEL,
-            input=descriptions,
-            dimensions=DEFAULT_EMBEDDING_DIMENSIONS,
-        )
-    except Exception as e:
-        print(f"Error generating embeddings: {str(e)}")
-        print(f"Descriptions: {json.dumps(descriptions)}")
-        print(f"Length of descriptions: {len(descriptions)}")
-        # add all the description indexes to the failed_feature_indexes
-        global FAILED_FEATURE_INDEXES_OUTPUT
-        FAILED_FEATURE_INDEXES_OUTPUT.extend([exp.index for exp in explanations])
-        return
-    if len(embeddings.data) != len(explanations):
-        raise Exception("Number of embeddings doesn't match number of explanations")
-    for exp, emb in zip(explanations, embeddings.data):
-        exp.embedding = [round(value, 9) for value in emb.embedding]
-    # print(f"Generated {len(embeddings.data)} embeddings")
+    global FAILED_FEATURE_INDEXES_OUTPUT
+
+    if GENERATE_EMBEDDINGS:
+        descriptions = [exp.description for exp in explanations]
+        try:
+            embeddings = openai.embeddings.create(
+                model=DEFAULT_EMBEDDING_MODEL,
+                input=descriptions,
+                dimensions=DEFAULT_EMBEDDING_DIMENSIONS,
+            )
+        except Exception as e:
+            print(f"Error generating embeddings: {str(e)}")
+            print(f"Descriptions: {json.dumps(descriptions)}")
+            print(f"Length of descriptions: {len(descriptions)}")
+            # add all the description indexes to the failed_feature_indexes
+            FAILED_FEATURE_INDEXES_OUTPUT.extend([exp.index for exp in explanations])
+            return
+        if len(embeddings.data) != len(explanations):
+            raise Exception("Number of embeddings doesn't match number of explanations")
+        for exp, emb in zip(explanations, embeddings.data):
+            exp.embedding = [round(value, 9) for value in emb.embedding]
+        # print(f"Generated {len(embeddings.data)} embeddings")
 
     batch_number = get_next_batch_number()
     filename = f"batch-{batch_number}.jsonl"
@@ -782,6 +914,9 @@ def generate_embeddings_and_flush_explanations_to_file(explanations: List[Explan
             for key, value in explanation_dict.items():
                 if isinstance(value, datetime.datetime):
                     explanation_dict[key] = value.isoformat()
+            # Remove embedding field if embeddings were not generated
+            if not GENERATE_EMBEDDINGS and "embedding" in explanation_dict:
+                del explanation_dict["embedding"]
             json.dump(explanation_dict, f)
             f.write("\n")
 
