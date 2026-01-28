@@ -120,7 +120,7 @@ export default function Page() {
                   <div className="mb-2 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
                   <div>
                     Neuronpedia is finalizing data uploads and feature label generation, a process which we expect to be
-                    completed by <strong>January 26, 2026</strong>.
+                    completed by <strong>February 14, 2026</strong>.
                   </div>
                   <div className="mt-1">
                     The artifacts in Gemma Scope 2{' '}

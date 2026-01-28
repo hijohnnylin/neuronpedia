@@ -45,6 +45,17 @@ import {
 import { INFERENCE_RUNPOD_API_KEY, INFERENCE_SERVER_SECRET, USE_LOCALHOST_INFERENCE } from '../env';
 import { NeuronIdentifier } from './neuron-identifier';
 
+// ============================================================================
+// RUNPOD MODE CONFIGURATION
+// Set to true to use RunPod Load Balancing mode (direct HTTP, better concurrency)
+// Set to false to use RunPod Queue-based mode (SDK with job polling)
+// ============================================================================
+const USE_RUNPOD_LOAD_BALANCING = true;
+
+// Maximum retries for load balancing mode cold starts
+const RUNPOD_LB_MAX_RETRIES = 3;
+const RUNPOD_LB_RETRY_DELAY_MS = 2000;
+
 export const makeInferenceServerApiWithServerHost = (serverHost: string) =>
   new DefaultApi(
     new Configuration({
@@ -170,6 +181,129 @@ function createRunpodStreamingResponse(
         console.error('RunPod streaming error:', error);
         controller.error(error);
       }
+    },
+  });
+}
+
+/**
+ * Creates a ReadableStream from a RunPod Load Balancing endpoint.
+ * This uses direct HTTP requests instead of the SDK for better concurrency.
+ * URL format: https://{endpointId}.api.runpod.ai/generate
+ */
+function createRunpodLoadBalancingStreamingResponse(
+  runpodServerlessUrl: string,
+  payload: Record<string, unknown>,
+): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+  // Extract endpoint ID from the stored URL format (https://api.runpod.ai/v2/{endpointId})
+  const endpointId = extractRunpodEndpointId(runpodServerlessUrl);
+  // Construct load balancing URL format
+  const loadBalancingUrl = `https://${endpointId}.api.runpod.ai/generate`;
+
+  return new ReadableStream({
+    async start(controller) {
+      let lastError: Error | null = null;
+
+      // eslint-disable-next-line no-plusplus
+      for (let attempt = 0; attempt < RUNPOD_LB_MAX_RETRIES; attempt += 1) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const response = await fetch(loadBalancingUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${INFERENCE_RUNPOD_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          // Handle cold start / no workers available (400 error)
+          if (response.status === 400) {
+            // eslint-disable-next-line no-await-in-loop
+            const errorText = await response.text();
+            // eslint-disable-next-line no-console
+            console.warn(
+              `RunPod LB attempt ${attempt + 1}/${RUNPOD_LB_MAX_RETRIES}: No workers available, retrying...`,
+              errorText,
+            );
+            lastError = new Error(`No workers available: ${errorText}`);
+            if (attempt < RUNPOD_LB_MAX_RETRIES - 1) {
+              // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+              await new Promise<void>((resolve) => {
+                setTimeout(resolve, RUNPOD_LB_RETRY_DELAY_MS * (attempt + 1));
+              });
+            } else {
+              throw lastError;
+            }
+          } else if (!response.ok) {
+            throw new Error(`RunPod LB error: ${response.status} ${response.statusText}`);
+          } else if (!response.body) {
+            throw new Error('No response body from RunPod LB');
+          } else {
+            // Stream the SSE response directly
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = ''; // Buffer for incomplete messages
+
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+              // eslint-disable-next-line no-await-in-loop
+              const { done, value } = await reader.read();
+              if (done) {
+                // Process any remaining data in buffer
+                if (buffer.trim()) {
+                  if (buffer.startsWith('data: ')) {
+                    controller.enqueue(encoder.encode(`${buffer}\n\n`));
+                  } else {
+                    controller.enqueue(encoder.encode(`data: ${buffer}\n\n`));
+                  }
+                }
+                break;
+              }
+
+              // Append new data to buffer
+              buffer += decoder.decode(value, { stream: true });
+
+              // Split by double newlines to find complete SSE messages
+              const parts = buffer.split('\n\n');
+
+              // Process all complete messages (all but the last part)
+              for (let i = 0; i < parts.length - 1; i += 1) {
+                const message = parts[i].trim();
+                if (message) {
+                  if (message.startsWith('data: ')) {
+                    controller.enqueue(encoder.encode(`${message}\n\n`));
+                  } else {
+                    controller.enqueue(encoder.encode(`data: ${message}\n\n`));
+                  }
+                }
+              }
+
+              // Keep the last part (potentially incomplete) in buffer
+              buffer = parts[parts.length - 1];
+            }
+
+            controller.close();
+            return; // Success, exit retry loop
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(`RunPod LB attempt ${attempt + 1}/${RUNPOD_LB_MAX_RETRIES} failed:`, error);
+          lastError = error instanceof Error ? error : new Error(String(error));
+
+          if (attempt < RUNPOD_LB_MAX_RETRIES - 1) {
+            // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+            await new Promise<void>((resolve) => {
+              setTimeout(resolve, RUNPOD_LB_RETRY_DELAY_MS * (attempt + 1));
+            });
+          }
+        }
+      }
+
+      // All retries exhausted
+      // eslint-disable-next-line no-console
+      console.error('RunPod LB streaming failed after all retries:', lastError);
+      controller.error(lastError);
     },
   });
 }
@@ -525,12 +659,13 @@ export const steerCompletionChat = async (
       const runpodServerlessUrl = await getRunpodServerlessUrlForModel(modelId, InferenceEngine.CSPACE);
 
       if (runpodServerlessUrl) {
-        console.log('Using RunPod serverless for assistant axis streaming request');
+        const mode = USE_RUNPOD_LOAD_BALANCING ? 'load-balancing' : 'queue-based';
+        console.log(`Using RunPod serverless (${mode}) for assistant axis streaming request`);
 
         // Always send separate requests for each type to enable parallel streaming
         // Even when messages are equal, we want two simultaneous requests for better parallelism
         const runpodStreams = steerTypesToRun.map((type) => {
-          console.log(`completion chat (runpod) - sending ${type} request`);
+          console.log(`completion chat (runpod ${mode}) - sending ${type} request`);
           const payload = {
             prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
             types: [type === SteerOutputType.DEFAULT ? 'DEFAULT' : 'STEERED'],
@@ -543,6 +678,11 @@ export const steerCompletionChat = async (
             n_logprobs,
             steer_special_tokens: steerSpecialTokens,
           };
+
+          // Use load balancing or queue-based mode based on flag
+          if (USE_RUNPOD_LOAD_BALANCING) {
+            return createRunpodLoadBalancingStreamingResponse(runpodServerlessUrl, payload);
+          }
           return createRunpodStreamingResponse(runpodServerlessUrl, payload);
         });
         return runpodStreams;
