@@ -84,11 +84,11 @@ export default async function Page({ params }: Props) {
               height={400}
               className="w-full rounded-md border border-slate-100"
             />
-            <CardTitle className="pb-0 pt-5 text-[22px] font-bold text-slate-800 sm:text-[28px]">
+            <CardTitle className="pb-0 pt-5 text-[22px] font-bold leading-snug text-slate-800 sm:text-[28px]">
               {meta.title}
             </CardTitle>
             <div className="mb-2 text-[15px] font-medium text-slate-800">{meta.description}</div>
-            <div className="font-mono text-[12px] font-medium text-slate-400">
+            <div className="font-sans text-[12px] font-medium text-slate-400">
               By {meta.author} · {getBlogDateString(meta.date)}
             </div>
           </CardHeader>

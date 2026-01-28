@@ -1,0 +1,120 @@
+---
+title: 'Assistant Axis, Gemma Scope 2, SAELens, New Circuit Tracing, and NNsight'
+description: 'A Public Ask, and Collaborations with Anthropic, Google DeepMind, NDIF'
+date: 2026-1-28
+author: David Chanin, Michael Hanna, Jaden Fiotto-Kaufman, Clément Dumas, Johnny Lin
+image: ASSET_BASE_URL/blog/its10pm.gif
+imagePreview: ASSET_BASE_URL/blog/its10pm.gif
+---
+
+<div className="mt-2"></div>
+
+Happy new year! Two big collaborations in this one.
+
+<div className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-0">
+  First, a **public ask**: We urgently need help resolving an issue with Google Cloud that's blocking a key part of our
+  work. Standard support channels haven't been able to help. If you can connect us with someone senior and/or in
+  management at Google Cloud, we'd be incredibly grateful. Reach out [via
+  email](mailto:cloud@neuronpedia.org?subject=Google%20Cloud). Thanks!
+</div>
+
+Onto the good stuff:
+
+[Assistant Axis (Anthropic)](https://www.neuronpedia.org/assistant-axis) is pretty interesting. Try to red-team it and watch the capped model resist drifting to harmful behaviors or sycophancy - it's not unbreakable of course, but I'm curious how easily it can be done. Warning that the "Isolation" example has a reference to self-harm, so please avoid that if you're sensitive to it.
+
+[Gemma Scope 2 (Google DeepMind)](https://neuronpedia.org/gemma-scope-2) is the sequel to the original Gemma Scope, now for Gemma 3. We have many of the dashboards and auto-interp labels up, but unfortunately we're still finishing this up for some models. We expect this to be done by Feb 14th, and we'll announce this again in the next blog post.
+
+We also feature initiatives by folks who do the real work behind the scenes to make Neuronpedia possible. **David Chanin** is our SAE whisperer, **Michael Hanna** is future-proofing circuit tracing by extending it to any Transformers model, and **Jaden Fiotto-Kaufman** and **Clément Dumas'** work on NNsight/NNterp powers many of our new inference backends. Our thanks to them all for dedicating their time and resources.
+
+Finally, it'll soon be Neuronpedia's 1000th day of existence. We'll be doing something cool for it. Stay tuned!
+
+# In This Edition
+
+- 🤵🏻 Assistant Axis (Anthropic) [**➡️ Launch**](https://www.neuronpedia.org/assistant-axis) - Monitoring and capping to the assistant persona.
+- 🔬 Gemma Scope 2 (Google DeepMind) [**➡️ Launch**](https://neuronpedia.org/gemma-scope-2) - Gemma Scope for Gemma 3. WIP, ETA Feb 14th.
+- 🔍 SAELens (David Chanin) [**➡️ GitHub**](https://github.com/decoderesearch/SAELens) - Toy SAEs, Matching Pursuit, Matryoshka, JumpReLU SAEs, v6.
+- ⚡️ Circuit Tracer (Michael Hanna) [**➡️ GitHub**](https://github.com/safety-research/circuit-tracer) - Support for any Transformer model, tests++.
+- 👁️ NNsight (Jaden Fiotto-Kaufman) [**➡️ GitHub**](https://github.com/ndif-team/nnsight) - Neuronpedia now uses nnsight for many models.
+
+🔊 Summary by NotebookLM - The Babble on [[Apple]](https://podcasts.apple.com/us/podcast/the-babble-a-neuronpedia-podcast-by-notebooklm/id1809283401) [[Spotify]](https://open.spotify.com/show/5n0RlvZTMmW5hDNf0OYYdd)
+
+---
+
+## 🤵🏻 Assistant Axis
+
+<img
+  src="ASSET_BASE_URL/blog/its10pm.gif"
+  alt="It's 10pm. Do you know if your model's drifting?"
+  className="h-auto w-full"
+/>
+
+<figcaption className="-mt-2 whitespace-nowrap text-center text-xs text-slate-50">
+  It's [10PM](https://en.wikipedia.org/wiki/Do_you_know_where_your_children_are%3F). Do you know if your model's
+  drifting? [[Example]](https://www.neuronpedia.org/llama3.3-70b-it/assistant-axis?saved=cmkw37j98000pmz6rbqh05p04)
+</figcaption>
+
+In collaboration [with Anthropic](https://www.anthropic.com/research/assistant-axis), our interactive demo lets you visualize the difference between the default and "activation capped" Llama 70B, which is better at producing less [harmful (trigger warning: self-harm)](https://www.neuronpedia.org/llama3.3-70b-it/assistant-axis?saved=cmkjhhsu0000fgfu5pkv3zlmv), [sycophantic](https://www.neuronpedia.org/llama3.3-70b-it/assistant-axis?saved=cmkhii9hk0015ruw6zpzwan1z), and [jailbroken](https://www.neuronpedia.org/llama3.3-70b-it/assistant-axis?saved=cmkhj4zb5000vmj34bcicslcg) responses. Like any other Neuronpedia steering model, you can also use your own [custom chats](https://www.neuronpedia.org/llama3.3-70b-it/assistant-axis) to red-team it and share the results.
+
+- [**➡️ Launch Demo**](https://www.neuronpedia.org/assistant-axis) - Compare example conversations, or use your own custom prompts.
+- [Anthropic Blog](https://www.anthropic.com/research/assistant-axis), [Paper (Lu et al)](https://arxiv.org/abs/2601.10387), and [GitHub](https://github.com/safety-research/assistant-axis)
+- [Vector Dashboard](https://www.neuronpedia.org/llama3.3-70b-it/40-neuronpedia-resid-post/101874252)
+
+---
+
+## 🔬 Gemma Scope 2 (ETA Feb 14)
+
+<img
+  src="ASSET_BASE_URL/blog/ai.png"
+  alt="Gemma Scope 2 feature in gemma-3-27b-it about AI"
+  className="h-auto w-full"
+/>
+
+<figcaption className="whitespace-nowrap text-center text-xs text-slate-50">
+  Gemma Scope 2 feature in gemma-3-27b-it about AI.
+  [[Example]](https://www.neuronpedia.org/gemma-3-27b-it/40-gemmascope-2-res-262k/432)
+</figcaption>
+
+In collaboration [with Google DeepMind](https://deepmind.google/blog/gemma-scope-2-helping-the-ai-safety-community-deepen-understanding-of-complex-language-model-behavior/), our support for this sequel to Gemma Scope 1 is focused on all sizes of Gemma 3. While [the weights](https://huggingface.co/google/gemma-scope-2) have been finalized, we're still finishing uploading dashboards and autointerp labels. We'll include this in the next newsletter as well, after everything's complete (ETA Feb 14th).
+
+- [**➡️ Gemma Scope 2 Demo**](https://neuronpedia.org/gemma-scope-2#main) - Notable safety-relevant features and circuit tracing - we recommend starting with the original [Gemma Scope 1 Demo](https://www.neuronpedia.org/gemma-scope#main) if you haven't seen it yet.
+- [Browse & Search](https://neuronpedia.org/gemma-scope-2#browse) - Browse and search dashboards for 64+ million SAEs and transcoder latents across 10 Gemma 3 models, including both pretrained and instruct.
+- [Google DeepMind Blog](https://deepmind.google/blog/gemma-scope-2-helping-the-ai-safety-community-deepen-understanding-of-complex-language-model-behavior/), [HuggingFace weights](https://huggingface.co/google/gemma-scope-2), and [Tutorial Notebook](https://colab.research.google.com/drive/1NhWjg7n0nhfW--CjtsOdw5A5J_-Bzn4r)
+
+---
+
+## 🔍 SAELens
+
+<img
+  src="ASSET_BASE_URL/blog/sae_training-crop.gif"
+  alt="Training a Toy SAE on Synthetic Data with SAELens"
+  className="h-auto w-full"
+/>
+
+[**SAELens**](https://github.com/decoderesearch/SAELens) is Decode's library for training and using Sparse Autoencoders, actively developed by David Chanin. Since SAELens and Neuronpedia are the same organization, and Neuronpedia uses SAELens heavily, we'll now also cover SAELens updates in this blog, starting with these:
+
+- Training Toy SAEs on Synthetic Data - [Docs](https://decoderesearch.github.io/SAELens/latest/synthetic_data/) and [Colab](https://colab.research.google.com/github/decoderesearch/SAELens/blob/main/tutorials/training_saes_on_synthetic_data.ipynb)
+- Matching Pursuit SAEs - [Docs](https://decoderesearch.github.io/SAELens/latest/training_saes/#training-matching-pursuit-saes), [Post](https://www.lesswrong.com/posts/rE43EfHigXcjTmomJ/training-matching-pursuit-saes-on-llms), and [Paper](https://arxiv.org/abs/2506.03093)
+- [Matryoshka SAEs](https://decoderesearch.github.io/SAELens/latest/training_saes/#training-matryoshkabatchtopk-saes)
+- Anthropic's JumpReLU SAEs - [Docs](https://decoderesearch.github.io/SAELens/latest/training_saes/#training-jumprelu-saes) and [Post](https://www.lesswrong.com/posts/fG2gFYX2Wo49tRrap/anthropic-s-jumprelu-training-method-is-really-good)
+- Major Version v6 - [Summary + Migration Doc](https://decoderesearch.github.io/SAELens/latest/migrating/)
+
+---
+
+## ⚡️ Circuit Tracer
+
+[**circuit-tracer**](https://github.com/safety-research/circuit-tracer) is Anthropic's open sourced library for generating and pruning [attribution](https://transformer-circuits.pub/2025/attribution-graphs/methods.html) [graphs](https://transformer-circuits.pub/2025/attribution-graphs/biology.html). Thanks to the excellent work by Michael Hanna, Jaden Fiotto-Kaufman, and David Chanin for the v0.3.1 release, Neuronpedia can now do [Gemma 3 circuit tracing](https://www.neuronpedia.org/gemma-3-4b-it/graph?slug=fact-dallas-austin). Details on the new version:
+
+- Use any Transformers model - circuit-tracer is no longer limited to select models - with the new nnsight engine support, you can now generate graphs for any model, as long as you create a simple [mapping (instructions here)](https://github.com/safety-research/circuit-tracer/blob/9317b2aaca533dad6cdef9b206b8acc3d542eb5b/circuit_tracer/utils/MAPPING_INFO.md).
+- Significantly improved test suite - Dozens of new tests ensure that attributions, interventions, and the new engine works as expected.
+
+---
+
+## 👁️ NNsight
+
+[**nnsight**](https://github.com/ndif-team/nnsight) is a library for interpreting and intervening on models, created by NDIF. Neuronpedia is now using nnsight for several models, including [gpt-oss](https://www.neuronpedia.org/gpt-oss-20b/steer?saved=cmjt45nub001n7gd3tx4h3gfu), Gemma 3, and Llama 3.3 70B.
+
+We're grateful to Jaden Fiotto-Kaufman and David Bau for their support and tireless work on nnsight, and also to Clement Dumas for his terrific work on [**nnterp**](https://github.com/ndif-team/nnterp), which makes it easy to access the the hook points of different models. We look forward to working more deeply with them in the future.
+
+---
+
+As always, please [contact us](https://www.neuronpedia.org/contact) with your questions, feedback, and suggestions.
