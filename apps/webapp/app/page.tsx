@@ -94,6 +94,16 @@ export default function Page() {
           </Link>
         </div>
       )}
+      <div className="mx-5 mb-3.5 max-w-screen-sm rounded-lg border border-amber-600 bg-amber-50 px-4 py-3 text-center text-xs leading-snug text-amber-900">
+        <div className="mb-1 font-bold">⚠️ Google Cloud Issue</div>
+        We need help resolving an issue with Google Cloud that&apos;s blocking a key part of our work.
+        <br />
+        If you know someone senior and/or in management at Google Cloud, please{' '}
+        <a href="mailto:cloud@neuronpedia.org?subject=Google%20Cloud" className="underline">
+          email us
+        </a>
+        . Thanks!
+      </div>
 
       <div className="flex flex-col items-center justify-center gap-x-5 gap-y-2 sm:flex-row">
         <svg style={{ display: 'none' }}>
