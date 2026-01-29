@@ -202,14 +202,17 @@ export default function AssistantAxisChat({
   }, [scrollToTurnIndex]);
 
   const scrollToNewestChatMessage = () => {
-    normalEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end',
-    });
-    if (steeredEndRef.current && steeredEndRef.current?.scrollHeight > 400) {
-      steeredEndRef.current?.scrollIntoView({
+    // Scroll both containers to the bottom
+    if (defaultScrollContainerRef.current) {
+      defaultScrollContainerRef.current.scrollTo({
+        top: defaultScrollContainerRef.current.scrollHeight,
         behavior: 'smooth',
-        block: 'end',
+      });
+    }
+    if (steeredScrollContainerRef.current) {
+      steeredScrollContainerRef.current.scrollTo({
+        top: steeredScrollContainerRef.current.scrollHeight,
+        behavior: 'smooth',
       });
     }
   };
