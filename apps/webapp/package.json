@@ -225,5 +225,8 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.40.1"
+  },
+  "overrides": {
+    "fast-xml-parser": "5.3.4"
   }
 }
