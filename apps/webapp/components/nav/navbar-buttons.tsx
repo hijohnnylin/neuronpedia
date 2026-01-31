@@ -13,7 +13,7 @@ import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/sourc
 import { SourceReleaseWithPartialRelations } from '@/prisma/generated/zod';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Select from '@radix-ui/react-select';
-import { ChevronDown, ChevronDownIcon, ChevronUpIcon, Plus } from 'lucide-react';
+import { ChevronDown, ChevronDownIcon, ChevronUpIcon, MessagesSquare, Plus, RssIcon } from 'lucide-react';
 import { useRouter } from 'next-nprogress-bar';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -406,15 +406,15 @@ export default function NavBarButtons() {
         href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3m2fulfeu-0LnVnF8yCrKJYQvWLuCQaQ"
         target="_blank"
         rel="noreferrer"
-        className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className="flex cursor-pointer items-center whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-medium text-emerald-700 transition-all hover:bg-emerald-200 hover:text-emerald-700 focus:outline-none data-[state=open]:bg-emerald-700 data-[state=open]:text-white sm:mr-1"
       >
-        Slack
+        <MessagesSquare className="mr-1.5 h-3.5 w-3.5" /> Community
       </Link>
       <Link
         href="/blog"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full bg-sky-100 px-4 py-1 text-[13px] font-medium text-sky-700 transition-all hover:bg-sky-200 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full bg-sky-100 px-3 py-1 text-[13px] font-medium text-sky-700 transition-all hover:bg-sky-200 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
-        Blog
+        <RssIcon className="mr-1.5 h-3.5 w-3.5" /> Blog
       </Link>
 
       <Link
