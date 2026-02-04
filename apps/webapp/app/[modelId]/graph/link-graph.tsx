@@ -118,6 +118,7 @@ export default function LinkGraph() {
   const middleRef = useRef<SVGSVGElement>(null);
   const bottomRef = useRef<SVGSVGElement>(null);
   const [allowScroll, setAllowScroll] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const canvasRefs = useRef<Array<HTMLCanvasElement | null>>([null, null, null, null, null]);
   const { visState, selectedGraph, updateVisStateField, togglePin, isEditingLabel, makeTooltipText } =
     useGraphContext();
@@ -1225,6 +1226,7 @@ export default function LinkGraph() {
     visState.pinnedIds,
     visState.subgraph,
     allowScroll,
+    isExpanded,
   ]);
 
   const shouldDoHorizontalScroll = useMemo(() => {
@@ -1241,15 +1243,49 @@ export default function LinkGraph() {
   }, [selectedGraph, allowScroll]);
 
   return (
-    <div
-      className={`link-graph relative -mr-4 flex-1 select-none overscroll-none sm:mr-0 ${shouldDoHorizontalScroll ? 'forceShowScrollBarHorizontal mt-1 max-w-full overflow-y-hidden overflow-x-scroll' : 'mt-1 w-full'}`}
-      style={{
-        ...(shouldDoHorizontalScroll && {
-          WebkitMask: 'linear-gradient(to right, black calc(100% - 25px), transparent 100%)',
-          mask: 'linear-gradient(to right, black calc(100% - 25px), transparent 100%)',
-        }),
-      }}
-    >
+    <>
+      {/* Backdrop for dismissing overlay on background click */}
+      {isExpanded && (
+        <div
+          className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsExpanded(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setIsExpanded(false)}
+          role="button"
+          tabIndex={0}
+          aria-label="Close expanded view"
+        />
+      )}
+      <div
+        className={`link-graph select-none overscroll-none ${
+          isExpanded
+            ? 'bg-white'
+            : `relative -mr-4 flex-1 sm:mr-0 ${shouldDoHorizontalScroll ? 'forceShowScrollBarHorizontal mt-1 max-w-full overflow-y-hidden overflow-x-scroll' : 'mt-1 w-full'}`
+        }`}
+        style={{
+          ...(isExpanded && {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'calc(100vw - 80px)',
+            height: 'calc(100vh - 120px)',
+            maxWidth: '1800px',
+            maxHeight: '1000px',
+            zIndex: 9999,
+            borderTop: '20px solid white',
+            borderBottom: '8px solid white',
+            borderLeft: '20px solid white',
+            borderRight: '6px solid white',
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          }),
+          ...(shouldDoHorizontalScroll &&
+            !isExpanded && {
+              WebkitMask: 'linear-gradient(to right, black calc(100% - 25px), transparent 100%)',
+              mask: 'linear-gradient(to right, black calc(100% - 25px), transparent 100%)',
+            }),
+        }}
+      >
       {/* <div className="mb-3 mt-2 flex w-full flex-row items-center justify-start gap-x-2">
         <div className="text-sm font-bold text-slate-600">Link Graph</div>
         <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4 text-slate-500" />}>
@@ -1266,6 +1302,8 @@ export default function LinkGraph() {
         allowScroll={allowScroll}
         setAllowScroll={setAllowScroll}
         shouldDoHorizontalScroll={shouldDoHorizontalScroll}
+        isExpanded={isExpanded}
+        setIsExpanded={setIsExpanded}
       />
       <div className="tooltip tooltip-hidden" />
       <svg
@@ -1305,5 +1343,6 @@ export default function LinkGraph() {
         ref={svgRef}
       />
     </div>
+    </>
   );
 }

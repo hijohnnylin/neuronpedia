@@ -10,9 +10,11 @@ import { useScreenSize } from '@/lib/hooks/use-screen-size';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
   Circle,
+  Expand,
   FolderOpen,
   Fullscreen,
   Joystick,
+  Minimize2,
   PinIcon,
   PinOffIcon,
   Save,
@@ -1211,6 +1213,8 @@ export default function Subgraph() {
   ]);
 
   const [showSubgraphHelp, setShowSubgraphHelp] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isEmbed = clientCheckIsEmbed();
 
   useEffect(() => {
     if (visState.pinnedIds.length === 0) {
@@ -1298,387 +1302,420 @@ export default function Subgraph() {
   }
 
   return (
-    <Card
-      className={`h-full w-full flex-1 bg-white transition-all sm:block ${clickedIdRef.current ? 'hidden' : ''} ${
-        visState.subgraph?.activeGrouping.isActive ? 'border-sky-600' : ''
-      }`}
-    >
-      <CardContent className="relative h-full px-0 py-0">
-        {selectedGraph && MODELS_TO_CALCULATE_REPLACEMENT_SCORES.has(selectedModelId) && (
-          <div className="absolute bottom-1 left-0 hidden w-full flex-row items-center justify-center gap-x-1.5 px-5 text-[9px] text-slate-500 sm:flex">
-            <div className="flex flex-1 flex-row items-center justify-center gap-x-3">
-              <div className="z-10 flex flex-row items-center justify-center gap-x-0.5">
-                <div className="text-center font-bold leading-tight">Replacement Score</div>
-                <CustomTooltip
-                  trigger={
-                    <div className="flex h-3 w-3 cursor-pointer items-center justify-center rounded-full bg-slate-200 font-bold leading-none">
-                      ?
+    <>
+      {/* Backdrop for dismissing overlay on background click */}
+      {isExpanded && (
+        <div
+          className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsExpanded(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setIsExpanded(false)}
+          role="button"
+          tabIndex={0}
+          aria-label="Close expanded view"
+        />
+      )}
+      <Card
+        className={`h-full w-full flex-1 bg-white transition-all sm:block ${clickedIdRef.current ? 'hidden' : ''} ${
+          visState.subgraph?.activeGrouping.isActive ? 'border-sky-600' : ''
+        }`}
+        style={{
+          ...(isExpanded && {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'calc(100vw - 80px)',
+            height: 'calc(100vh - 60px)',
+            maxWidth: '1400px',
+            maxHeight: '900px',
+            zIndex: 9999,
+            border: '20px solid white',
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          }),
+        }}
+      >
+        <CardContent className="relative h-full px-0 py-0">
+          {selectedGraph && MODELS_TO_CALCULATE_REPLACEMENT_SCORES.has(selectedModelId) && (
+            <div className="absolute bottom-1 left-0 hidden w-full flex-row items-center justify-center gap-x-1.5 px-5 text-[9px] text-slate-500 sm:flex">
+              <div className="flex flex-1 flex-row items-center justify-center gap-x-3">
+                <div className="z-10 flex flex-row items-center justify-center gap-x-0.5">
+                  <div className="text-center font-bold leading-tight">Replacement Score</div>
+                  <CustomTooltip
+                    trigger={
+                      <div className="flex h-3 w-3 cursor-pointer items-center justify-center rounded-full bg-slate-200 font-bold leading-none">
+                        ?
+                      </div>
+                    }
+                    side="right"
+                  >
+                    <div className="text-[11px] text-slate-700">
+                      Measures the fraction of end-to-end influence from input tokens to output logits that flows
+                      through feature nodes rather than error nodes. This is a strict metric that rewards complete
+                      explanations where tokens influence logits entirely through features.
+                      <br />
+                      <br />
+                      The graph score is for the entire pruned attribution graph, while the subgraph score is only for
+                      your pinned nodes and the nodes that are connected to them. It treats features not included in the
+                      subgraph as error nodes by merging their edge weights with the corresponding error nodes (based on
+                      layer and position), then computes replacement and completeness scores using the modified
+                      adjacency matrix.
                     </div>
-                  }
-                  side="right"
-                >
-                  <div className="text-[11px] text-slate-700">
-                    Measures the fraction of end-to-end influence from input tokens to output logits that flows through
-                    feature nodes rather than error nodes. This is a strict metric that rewards complete explanations
-                    where tokens influence logits entirely through features.
-                    <br />
-                    <br />
-                    The graph score is for the entire pruned attribution graph, while the subgraph score is only for
-                    your pinned nodes and the nodes that are connected to them. It treats features not included in the
-                    subgraph as error nodes by merging their edge weights with the corresponding error nodes (based on
-                    layer and position), then computes replacement and completeness scores using the modified adjacency
-                    matrix.
-                  </div>
-                </CustomTooltip>
-              </div>
-              <div className="flex flex-row items-center justify-center gap-x-2">
-                <div className="font-medium text-slate-600">
-                  Graph: {graphScores.replacementScore?.toFixed(4) || 'N/A'}
+                  </CustomTooltip>
                 </div>
-                <div className="font-medium text-slate-600">
-                  Subgraph*: {visState.pinnedIds.length > 0 ? subgraphScores.replacementScore?.toFixed(4) : 'N/A'}
+                <div className="flex flex-row items-center justify-center gap-x-2">
+                  <div className="font-medium text-slate-600">
+                    Graph: {graphScores.replacementScore?.toFixed(4) || 'N/A'}
+                  </div>
+                  <div className="font-medium text-slate-600">
+                    Subgraph*: {visState.pinnedIds.length > 0 ? subgraphScores.replacementScore?.toFixed(4) : 'N/A'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-1 flex-row items-center justify-center gap-x-3">
+                <div className="z-10 flex flex-row items-center justify-center gap-x-0.5">
+                  <div className="text-center font-bold leading-tight">Completeness Score</div>
+                  <CustomTooltip
+                    trigger={
+                      <div className="flex h-3 w-3 cursor-pointer items-center justify-center rounded-full bg-slate-200 font-bold leading-none">
+                        ?
+                      </div>
+                    }
+                    side="right"
+                  >
+                    <div className="text-[11px] text-slate-700">
+                      Measures the fraction of incoming edges to all nodes (weighted by each node{`'`}s influence on the
+                      output) that originate from feature or token nodes rather than error nodes. This metric gives
+                      partial credit for nodes that are mostly explained by features, even if some error influence
+                      remains.
+                      <br />
+                      <br />
+                      The graph score is for the entire pruned attribution graph, while the subgraph score is only for
+                      your pinned nodes and the nodes that are connected to them. It treats features not included in the
+                      subgraph as error nodes by merging their edge weights with the corresponding error nodes (based on
+                      layer and position), then computes replacement and completeness scores using the modified
+                      adjacency matrix.
+                    </div>
+                  </CustomTooltip>
+                </div>
+                <div className="flex flex-row items-center justify-center gap-x-2">
+                  <div className="font-medium text-slate-500">
+                    Graph: {graphScores.completenessScore?.toFixed(4) || 'N/A'}
+                  </div>
+                  <div className="font-medium text-slate-500">
+                    Subgraph*: {visState.pinnedIds.length > 0 ? subgraphScores.completenessScore?.toFixed(4) : 'N/A'}
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="flex flex-1 flex-row items-center justify-center gap-x-3">
-              <div className="z-10 flex flex-row items-center justify-center gap-x-0.5">
-                <div className="text-center font-bold leading-tight">Completeness Score</div>
-                <CustomTooltip
-                  trigger={
-                    <div className="flex h-3 w-3 cursor-pointer items-center justify-center rounded-full bg-slate-200 font-bold leading-none">
-                      ?
+          )}
+          {visState.subgraph?.activeGrouping.isActive && (
+            <div className="absolute right-0 top-0 z-10 flex w-40 flex-col items-center justify-center gap-y-0 overflow-hidden rounded-bl-lg rounded-tr-lg bg-sky-600 text-[11px] font-bold text-white">
+              <div className="pt-2.5 text-center text-[12px]">Grouping Mode</div>
+              <div className="px-2 pb-1.5 pt-0.5 text-center">
+                {visState.subgraph.activeGrouping.selectedNodeIds.size === 0 ? (
+                  <div className="flex flex-col gap-y-0 pt-1 text-[9.5px] font-medium">
+                    <div>Click subgraph nodes to select.</div>
+                    <div className="pt-1">{visState.subgraph.supernodes.length > 0 ? ' Click ✕ to ungroup.' : ' '}</div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-y-0 pt-1 text-[9.5px] font-medium">
+                    <div>
+                      {getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds)} node
+                      {getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds) === 1 ? '' : 's'}{' '}
+                      selected for grouping.
                     </div>
-                  }
-                  side="right"
-                >
-                  <div className="text-[11px] text-slate-700">
-                    Measures the fraction of incoming edges to all nodes (weighted by each node{`'`}s influence on the
-                    output) that originate from feature or token nodes rather than error nodes. This metric gives
-                    partial credit for nodes that are mostly explained by features, even if some error influence
-                    remains.
-                    <br />
-                    <br />
-                    The graph score is for the entire pruned attribution graph, while the subgraph score is only for
-                    your pinned nodes and the nodes that are connected to them. It treats features not included in the
-                    subgraph as error nodes by merging their edge weights with the corresponding error nodes (based on
-                    layer and position), then computes replacement and completeness scores using the modified adjacency
-                    matrix.
                   </div>
-                </CustomTooltip>
+                )}
               </div>
-              <div className="flex flex-row items-center justify-center gap-x-2">
-                <div className="font-medium text-slate-500">
-                  Graph: {graphScores.completenessScore?.toFixed(4) || 'N/A'}
-                </div>
-                <div className="font-medium text-slate-500">
-                  Subgraph*: {visState.pinnedIds.length > 0 ? subgraphScores.completenessScore?.toFixed(4) : 'N/A'}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        {visState.subgraph?.activeGrouping.isActive && (
-          <div className="absolute right-0 top-0 z-10 flex w-40 flex-col items-center justify-center gap-y-0 overflow-hidden rounded-bl-lg rounded-tr-lg bg-sky-600 text-[11px] font-bold text-white">
-            <div className="pt-2.5 text-center text-[12px]">Grouping Mode</div>
-            <div className="px-2 pb-1.5 pt-0.5 text-center">
-              {visState.subgraph.activeGrouping.selectedNodeIds.size === 0 ? (
-                <div className="flex flex-col gap-y-0 pt-1 text-[9.5px] font-medium">
-                  <div>Click subgraph nodes to select.</div>
-                  <div className="pt-1">{visState.subgraph.supernodes.length > 0 ? ' Click ✕ to ungroup.' : ' '}</div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-y-0 pt-1 text-[9.5px] font-medium">
-                  <div>
-                    {getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds)} node
-                    {getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds) === 1 ? '' : 's'}{' '}
-                    selected for grouping.
-                  </div>
+              {visState.subgraph.activeGrouping.selectedNodeIds.size > 0 && (
+                <div className="mb-[1px] flex flex-row gap-x-0 rounded border-slate-400 bg-slate-200 p-[4px]">
+                  {Array.from({
+                    length: getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds),
+                  }).map((_, i) => (
+                    <div key={i} className="h-[9px] w-[9px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+                  ))}
                 </div>
               )}
+              <div className="mt-2 flex w-full flex-row">
+                <Button
+                  onClick={() => setGroupingModeActive(false)}
+                  variant="outline"
+                  size="xs"
+                  className="flex-1 rounded-none border-0 bg-slate-300 py-2 text-[9px] font-medium uppercase text-slate-600 hover:bg-slate-400 hover:text-slate-800"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (visState.subgraph) {
+                      if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
+                        groupSelectedNodes(visState.subgraph.activeGrouping.selectedNodeIds);
+                      } else {
+                        alert('Select at least two nodes to group them.');
+                      }
+                    }
+                  }}
+                  variant="outline"
+                  size="xs"
+                  className="flex-1 rounded-none border-0 bg-sky-200 py-2 text-[9px] font-semibold uppercase text-sky-800 hover:bg-sky-300 hover:text-sky-800"
+                >
+                  Save Group
+                </Button>
+              </div>
             </div>
-            {visState.subgraph.activeGrouping.selectedNodeIds.size > 0 && (
-              <div className="mb-[1px] flex flex-row gap-x-0 rounded border-slate-400 bg-slate-200 p-[4px]">
-                {Array.from({
-                  length: getTotalNodesFromNodeIds(visState.subgraph.activeGrouping.selectedNodeIds),
-                }).map((_, i) => (
-                  <div key={i} className="h-[9px] w-[9px] rounded-full border-[1.5px] border-slate-700 bg-white" />
-                ))}
+          )}
+          <div className="subgraph relative h-full w-full">
+            <svg className="absolute h-full w-full" ref={svgRef} />
+            <div className="absolute h-full w-full" ref={divRef} />
+
+            {(visState.pinnedIds.length === 0 || showSubgraphHelp) && (
+              <div className="absolute hidden h-[calc(100%-20px)] min-h-[calc(100%-20px)] w-full flex-col items-start justify-center gap-y-3 rounded-xl bg-white/70 px-5 text-sm text-slate-700 backdrop-blur-sm sm:flex">
+                <div className="flex w-full flex-col items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-base font-medium">
+                  Subgraph (Solution){' '}
+                  {!clientCheckIsEmbed() && (
+                    <Button
+                      variant="slateLight"
+                      size="xs"
+                      onClick={() => openWelcomeModalToStep(4)}
+                      className="hidden rounded-full px-3 hover:bg-sky-200 hover:text-sky-700 sm:block"
+                    >
+                      Video Demo
+                    </Button>
+                  )}
+                </div>
+                <div className="flex w-full flex-col items-center gap-y-0.5">
+                  <strong>Pin Node to Subgraph</strong>
+                  <div className="ml-8 text-xs">
+                    Click a <Circle className="mb-1 mr-0.5 inline h-3 w-3" />
+                    node in the link graph above, then click <strong>Pin Node</strong>.
+                  </div>
+                </div>
+                <div className="flex w-full flex-col items-center gap-y-0.5">
+                  <strong>Grouping</strong>
+                  <div className="ml-8 text-center text-xs">
+                    Click <strong>Grouping Mode</strong>, select subgraph nodes, and click <strong>Save Group</strong>.
+                  </div>
+                </div>
+                <div className="flex w-full flex-col items-center gap-y-0.5">
+                  <strong>Label Group</strong>
+                  <div className="ml-8 text-xs">Click the label under a group to give it a custom label.</div>
+                </div>
+                <div className="flex w-full flex-col items-center gap-y-0.5">
+                  <strong>Save & Share</strong>
+                  <div className="ml-8 text-xs">
+                    Use the tools at the top left to load, save, and share your subgraph.
+                  </div>
+                </div>
               </div>
             )}
-            <div className="mt-2 flex w-full flex-row">
+            {(visState.pinnedIds.length === 0 || showSubgraphHelp) && (
+              <div className="mt-10 block w-full px-4 text-center text-sm font-medium text-slate-500 sm:hidden">
+                Subgraph functionality is reduced on mobile.
+                <br />
+                Please use a larger screen with a keyboard.
+              </div>
+            )}
+
+            <div className="absolute bottom-3 left-3 flex flex-col gap-x-1.5 gap-y-1.5">
               <Button
-                onClick={() => setGroupingModeActive(false)}
                 variant="outline"
-                size="xs"
-                className="flex-1 rounded-none border-0 bg-slate-300 py-2 text-[9px] font-medium uppercase text-slate-600 hover:bg-slate-400 hover:text-slate-800"
+                size="sm"
+                onClick={zoomIn}
+                className="h-8 w-8 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                aria-label="Zoom In"
               >
-                Cancel
+                <ZoomInIcon className="h-4 w-4" />
               </Button>
               <Button
+                variant="outline"
+                size="sm"
+                onClick={zoomOut}
+                className="h-8 w-8 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                aria-label="Zoom Out"
+              >
+                <ZoomOutIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetZoom}
+                className="h-8 w-8 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                aria-label="Reset Zoom"
+              >
+                <Fullscreen className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="absolute right-3 top-3 flex flex-col gap-x-2 gap-y-2">
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
-                  if (visState.subgraph) {
+                  if (clickedIdRef.current) {
+                    togglePin(clickedIdRef.current);
+                  }
+                }}
+                className="hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-sky-600 bg-sky-100 px-0 text-[9.5px] font-semibold leading-none text-sky-700 shadow transition-all hover:bg-sky-200 hover:text-sky-700 sm:flex"
+                aria-label="Pin/Unpin Node"
+                disabled={clickedIdRef.current === null || visState.subgraph?.activeGrouping.isActive}
+              >
+                {clickedIdRef.current && visState.pinnedIds.includes(clickedIdRef.current) ? (
+                  <>
+                    <div className="flex flex-row items-center justify-center gap-x-0">
+                      <PinOffIcon className="h-3.5 w-3.5" />
+                      <div className="h-[11px] w-[11px] rounded-full border-[1.5px] border-[#f0f] bg-white" />
+                    </div>
+                    Unpin Node
+                  </>
+                ) : (
+                  <>
+                    <div className="flex flex-row items-center justify-center gap-x-0">
+                      <PinIcon className="h-3.5 w-3.5" />
+                      <div className="h-[11px] w-[11px] rounded-full border-[1.5px] border-[#f0f] bg-white" />
+                    </div>
+                    Pin Node
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (visState.subgraph?.activeGrouping.isActive) {
                     if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
                       groupSelectedNodes(visState.subgraph.activeGrouping.selectedNodeIds);
                     } else {
-                      alert('Select at least two nodes to group them.');
+                      setGroupingModeActive(false);
                     }
-                  }
-                }}
-                variant="outline"
-                size="xs"
-                className="flex-1 rounded-none border-0 bg-sky-200 py-2 text-[9px] font-semibold uppercase text-sky-800 hover:bg-sky-300 hover:text-sky-800"
-              >
-                Save Group
-              </Button>
-            </div>
-          </div>
-        )}
-        <div className="subgraph relative h-full w-full">
-          <svg className="absolute h-full w-full" ref={svgRef} />
-          <div className="absolute h-full w-full" ref={divRef} />
-
-          {(visState.pinnedIds.length === 0 || showSubgraphHelp) && (
-            <div className="absolute hidden h-[calc(100%-20px)] min-h-[calc(100%-20px)] w-full flex-col items-start justify-center gap-y-3 rounded-xl bg-white/70 px-5 text-sm text-slate-700 backdrop-blur-sm sm:flex">
-              <div className="flex w-full flex-col items-center justify-center gap-x-1.5 gap-y-0.5 text-center text-base font-medium">
-                Subgraph (Solution){' '}
-                {!clientCheckIsEmbed() && (
-                  <Button
-                    variant="slateLight"
-                    size="xs"
-                    onClick={() => openWelcomeModalToStep(4)}
-                    className="hidden rounded-full px-3 hover:bg-sky-200 hover:text-sky-700 sm:block"
-                  >
-                    Video Demo
-                  </Button>
-                )}
-              </div>
-              <div className="flex w-full flex-col items-center gap-y-0.5">
-                <strong>Pin Node to Subgraph</strong>
-                <div className="ml-8 text-xs">
-                  Click a <Circle className="mb-1 mr-0.5 inline h-3 w-3" />
-                  node in the link graph above, then click <strong>Pin Node</strong>.
-                </div>
-              </div>
-              <div className="flex w-full flex-col items-center gap-y-0.5">
-                <strong>Grouping</strong>
-                <div className="ml-8 text-center text-xs">
-                  Click <strong>Grouping Mode</strong>, select subgraph nodes, and click <strong>Save Group</strong>.
-                </div>
-              </div>
-              <div className="flex w-full flex-col items-center gap-y-0.5">
-                <strong>Label Group</strong>
-                <div className="ml-8 text-xs">Click the label under a group to give it a custom label.</div>
-              </div>
-              <div className="flex w-full flex-col items-center gap-y-0.5">
-                <strong>Save & Share</strong>
-                <div className="ml-8 text-xs">
-                  Use the tools at the top left to load, save, and share your subgraph.
-                </div>
-              </div>
-            </div>
-          )}
-          {(visState.pinnedIds.length === 0 || showSubgraphHelp) && (
-            <div className="mt-10 block w-full px-4 text-center text-sm font-medium text-slate-500 sm:hidden">
-              Subgraph functionality is reduced on mobile.
-              <br />
-              Please use a larger screen with a keyboard.
-            </div>
-          )}
-
-          <div className="absolute bottom-3 left-3 flex flex-col gap-x-1.5 gap-y-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={zoomIn}
-              className="h-8 w-8 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
-              aria-label="Zoom In"
-            >
-              <ZoomInIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={zoomOut}
-              className="h-8 w-8 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
-              aria-label="Zoom Out"
-            >
-              <ZoomOutIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetZoom}
-              className="h-8 w-8 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
-              aria-label="Reset Zoom"
-            >
-              <Fullscreen className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="absolute right-3 top-3 flex flex-col gap-x-2 gap-y-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (clickedIdRef.current) {
-                  togglePin(clickedIdRef.current);
-                }
-              }}
-              className="hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-sky-600 bg-sky-100 px-0 text-[9.5px] font-semibold leading-none text-sky-700 shadow transition-all hover:bg-sky-200 hover:text-sky-700 sm:flex"
-              aria-label="Pin/Unpin Node"
-              disabled={clickedIdRef.current === null || visState.subgraph?.activeGrouping.isActive}
-            >
-              {clickedIdRef.current && visState.pinnedIds.includes(clickedIdRef.current) ? (
-                <>
-                  <div className="flex flex-row items-center justify-center gap-x-0">
-                    <PinOffIcon className="h-3.5 w-3.5" />
-                    <div className="h-[11px] w-[11px] rounded-full border-[1.5px] border-[#f0f] bg-white" />
-                  </div>
-                  Unpin Node
-                </>
-              ) : (
-                <>
-                  <div className="flex flex-row items-center justify-center gap-x-0">
-                    <PinIcon className="h-3.5 w-3.5" />
-                    <div className="h-[11px] w-[11px] rounded-full border-[1.5px] border-[#f0f] bg-white" />
-                  </div>
-                  Pin Node
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (visState.subgraph?.activeGrouping.isActive) {
-                  if (visState.subgraph.activeGrouping.selectedNodeIds.size > 1) {
-                    groupSelectedNodes(visState.subgraph.activeGrouping.selectedNodeIds);
                   } else {
-                    setGroupingModeActive(false);
+                    if (visState.pinnedIds.length < 2) {
+                      alert(
+                        'You need at least two pinned nodes to group them.\nPin nodes by selecting them in the link graph above, then clicking "Pin Node".',
+                      );
+                      return;
+                    }
+                    setGroupingModeActive(true);
                   }
-                } else {
-                  if (visState.pinnedIds.length < 2) {
-                    alert(
-                      'You need at least two pinned nodes to group them.\nPin nodes by selecting them in the link graph above, then clicking "Pin Node".',
-                    );
-                    return;
-                  }
-                  setGroupingModeActive(true);
-                }
-              }}
-              className="hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-sky-600 bg-sky-100 px-0 text-[9.5px] font-semibold leading-none text-sky-700 shadow transition-all hover:bg-sky-200 hover:text-sky-700 sm:flex"
-              aria-label="Grouping Mode"
-            >
-              <div className="flex h-3.5 max-h-3.5 min-h-3.5 flex-row items-center justify-center gap-x-0 rounded border-[1.5px] border-slate-400 bg-slate-200 px-[3px] py-[0px]">
-                <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
-                <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
-                <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
-              </div>
-              Grouping Mode
-            </Button>
-            {selectedGraph && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsSteerModalOpen(true);
                 }}
-                className={`hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-emerald-600 bg-emerald-100 px-0 text-[9.5px] font-semibold leading-none text-emerald-700 shadow transition-all hover:bg-emerald-200 hover:text-emerald-700 ${
-                  visState.subgraph?.activeGrouping.isActive
-                    ? ''
-                    : !STEER_MODEL_IDS.includes(selectedGraph.metadata.scan) || isOldQwenGraph(selectedGraph)
+                className="hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-sky-600 bg-sky-100 px-0 text-[9.5px] font-semibold leading-none text-sky-700 shadow transition-all hover:bg-sky-200 hover:text-sky-700 sm:flex"
+                aria-label="Grouping Mode"
+              >
+                <div className="flex h-3.5 max-h-3.5 min-h-3.5 flex-row items-center justify-center gap-x-0 rounded border-[1.5px] border-slate-400 bg-slate-200 px-[3px] py-[0px]">
+                  <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+                  <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+                  <div className="h-[7px] w-[7px] rounded-full border-[1.5px] border-slate-700 bg-white" />
+                </div>
+                Grouping Mode
+              </Button>
+              {selectedGraph && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsSteerModalOpen(true);
+                  }}
+                  className={`hidden h-11 w-[86px] flex-col items-center justify-center gap-y-[4px] whitespace-nowrap border border-emerald-600 bg-emerald-100 px-0 text-[9.5px] font-semibold leading-none text-emerald-700 shadow transition-all hover:bg-emerald-200 hover:text-emerald-700 ${
+                    visState.subgraph?.activeGrouping.isActive
                       ? ''
-                      : 'sm:flex'
-                }`}
-                disabled={visState.pinnedIds.length === 0}
-                aria-label="Steer"
-              >
-                <Joystick className="h-3.5 w-3.5" />
-                Steer
-              </Button>
-            )}
-          </div>
+                      : !STEER_MODEL_IDS.includes(selectedGraph.metadata.scan) || isOldQwenGraph(selectedGraph)
+                        ? ''
+                        : 'sm:flex'
+                  }`}
+                  disabled={visState.pinnedIds.length === 0}
+                  aria-label="Steer"
+                >
+                  <Joystick className="h-3.5 w-3.5" />
+                  Steer
+                </Button>
+              )}
+            </div>
 
-          <div className="absolute left-3 top-3 hidden flex-row items-center justify-center gap-x-1.5 sm:flex">
-            {!clientCheckIsEmbed() && (
+            <div className="absolute left-3 top-3 hidden flex-row items-center justify-center gap-x-1.5 sm:flex">
+              {!clientCheckIsEmbed() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (isExpanded) {
+                      setIsExpanded(false);
+                    }
+                    openWelcomeModalToStep(4);
+                  }}
+                  className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                  aria-label="Open User Guide"
+                >
+                  <QuestionMarkCircledIcon className="h-4 w-4" />
+                  Help
+                </Button>
+              )}
+              {!clientCheckIsEmbed() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="Load Subgraph"
+                  aria-label="Load Subgraph"
+                  className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                  onClick={() => {
+                    setIsLoadSubgraphModalOpen(true);
+                  }}
+                >
+                  <FolderOpen className="h-4 w-4" /> Load
+                </Button>
+              )}
+              {!clientCheckIsEmbed() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="Save Subgraph"
+                  aria-label="Save Subgraph"
+                  className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                  onClick={() => {
+                    setIsSaveSubgraphModalOpen(true);
+                  }}
+                  disabled={visState.pinnedIds.length === 0}
+                >
+                  <Save className="h-4 w-4" />
+                  Save
+                </Button>
+              )}
+
+              {!clientCheckIsEmbed() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  title="Copy Graph + Subgraph + Custom Labels to Clipboard"
+                  aria-label="Copy Graph + Subgraph + Custom Labels to Clipboard"
+                  className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                  onClick={() => {
+                    setIsCopyModalOpen(true);
+                  }}
+                  disabled={visState.pinnedIds.length === 0}
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => openWelcomeModalToStep(4)}
-                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
-                aria-label="Open User Guide"
-              >
-                <QuestionMarkCircledIcon className="h-4 w-4" />
-                Help
-              </Button>
-            )}
-            {!clientCheckIsEmbed() && (
-              <Button
-                variant="outline"
-                size="sm"
-                title="Load Subgraph"
-                aria-label="Load Subgraph"
-                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
+                title="Clear Subgraph"
+                aria-label="Clear Subgraph"
+                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none border-slate-300 bg-slate-100 px-0 text-[8px] font-medium leading-none text-red-500 hover:bg-red-100 hover:text-red-600"
                 onClick={() => {
-                  setIsLoadSubgraphModalOpen(true);
-                }}
-              >
-                <FolderOpen className="h-4 w-4" /> Load
-              </Button>
-            )}
-            {!clientCheckIsEmbed() && (
-              <Button
-                variant="outline"
-                size="sm"
-                title="Save Subgraph"
-                aria-label="Save Subgraph"
-                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
-                onClick={() => {
-                  setIsSaveSubgraphModalOpen(true);
+                  // eslint-disable-next-line
+                  if (confirm('Are you sure you want to clear this subgraph?')) {
+                    resetSelectedGraphToBlankVisState();
+                  }
                 }}
                 disabled={visState.pinnedIds.length === 0}
               >
-                <Save className="h-4 w-4" />
-                Save
+                <TrashIcon className="h-4 w-4" />
+                Clear
               </Button>
-            )}
+            </div>
 
-            {!clientCheckIsEmbed() && (
-              <Button
-                variant="outline"
-                size="sm"
-                title="Copy Graph + Subgraph + Custom Labels to Clipboard"
-                aria-label="Copy Graph + Subgraph + Custom Labels to Clipboard"
-                className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600"
-                onClick={() => {
-                  setIsCopyModalOpen(true);
-                }}
-                disabled={visState.pinnedIds.length === 0}
-              >
-                <Share2 className="h-4 w-4" />
-                Share
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              title="Clear Subgraph"
-              aria-label="Clear Subgraph"
-              className="h-9 w-9 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none border-slate-300 bg-slate-100 px-0 text-[8px] font-medium leading-none text-red-500 hover:bg-red-100 hover:text-red-600"
-              onClick={() => {
-                // eslint-disable-next-line
-                if (confirm('Are you sure you want to clear this subgraph?')) {
-                  resetSelectedGraphToBlankVisState();
-                }
-              }}
-              disabled={visState.pinnedIds.length === 0}
-            >
-              <TrashIcon className="h-4 w-4" />
-              Clear
-            </Button>
-          </div>
-
-          {/* <Button
+            {/* <Button
             variant="outline"
             size="sm"
             title="Reset Graph to Defaults"
@@ -1694,8 +1731,23 @@ export default function Subgraph() {
           >
             <ResetIcon className="h-4 w-4" />
           </Button> */}
-        </div>
-      </CardContent>
-    </Card>
+
+            {/* Expand button - bottom right, hidden on small screens and embed */}
+            {!isEmbed && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="absolute bottom-3 right-3 hidden h-8 w-8 flex-col items-center justify-center gap-y-[1px] whitespace-nowrap border-none bg-slate-100 px-0 text-[8px] font-medium leading-none text-slate-500 hover:bg-slate-200 hover:text-slate-600 sm:flex"
+                aria-label={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+                title={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+              >
+                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }

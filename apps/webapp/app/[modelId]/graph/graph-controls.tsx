@@ -5,6 +5,7 @@ import { Label } from '@/components/shadcn/label';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import * as RadixSlider from '@radix-ui/react-slider';
 import { debounce } from 'lodash';
+import { Expand, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { CltVisState } from './graph-types';
 import { clientCheckIsEmbed, CLTGraphExtended, graphModelHasNpDashboards } from './utils';
@@ -18,6 +19,8 @@ export default function GraphControls({
   allowScroll,
   setAllowScroll,
   shouldDoHorizontalScroll,
+  isExpanded,
+  setIsExpanded,
 }: {
   selectedGraph: CLTGraphExtended | null;
   visState: {
@@ -28,6 +31,8 @@ export default function GraphControls({
   allowScroll: boolean;
   setAllowScroll: (allowScroll: boolean) => void;
   shouldDoHorizontalScroll: boolean;
+  isExpanded: boolean;
+  setIsExpanded: (isExpanded: boolean) => void;
 }) {
   // Check if we're in embed mode
   const isEmbed = clientCheckIsEmbed();
@@ -75,13 +80,32 @@ export default function GraphControls({
       {!isEmbed && (
         <button
           type="button"
-          onClick={() => openWelcomeModalToStep(2)}
+          onClick={() => {
+            if (isExpanded) {
+              setIsExpanded(false);
+            }
+            openWelcomeModalToStep(2);
+          }}
           className="hidden h-[24px] w-[24px] items-center justify-center gap-x-1 rounded-full bg-slate-200 py-0.5 text-[12px] font-medium transition-colors hover:bg-slate-300 sm:flex"
           aria-label="Open User Guide"
         >
           ?
         </button>
       )}
+
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="hidden h-[24px] w-[24px] items-center justify-center gap-x-1 rounded-full bg-slate-200 py-0.5 text-[12px] font-medium transition-colors hover:bg-slate-300 sm:flex"
+        aria-label={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+        title={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+      >
+        {isExpanded ? (
+          <Minimize2 className="h-3.5 w-3.5 text-slate-600" />
+        ) : (
+          <Expand className="h-3.5 w-3.5 text-slate-600" />
+        )}
+      </button>
 
       {selectedGraph && selectedGraph.metadata.prompt_tokens.length > MIN_TOKENS_TO_ALLOW_HORIZONTAL_SCROLL && (
         <div className="flex h-[24px] flex-row items-center justify-start gap-x-1.5 rounded bg-slate-200 px-1 py-0.5 sm:px-2">

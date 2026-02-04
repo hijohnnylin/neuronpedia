@@ -1,7 +1,7 @@
 import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { useGraphStateContext } from '@/components/provider/graph-state-provider';
-import { Circle } from 'lucide-react';
+import { Circle, Expand, Minimize2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { CLTGraphNode } from './graph-types';
@@ -151,6 +151,7 @@ export default function GraphNodeConnections() {
 
   const [clickedNode, setClickedNode] = useState<CLTGraphNode | null>(null);
   const [localHoveredId, setLocalHoveredId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Register for hover change notifications from other components
   useEffect(() => {
@@ -204,76 +205,149 @@ export default function GraphNodeConnections() {
   }, [clickedNode]);
 
   return (
-    <div className="node-connections relative mt-2 hidden max-w-[420px] flex-1 flex-row overflow-y-hidden rounded-lg border border-slate-200 bg-white px-2 py-2 shadow-sm transition-all sm:flex">
-      {/* <div className="absolute top-0 mx-auto h-3 w-24 rounded-b bg-[#f0f] text-[6px] text-white">Clicked Node</div> */}
+    <>
+      {/* Backdrop for dismissing overlay on background click */}
+      {isExpanded && (
+        <div
+          className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
+          onClick={() => setIsExpanded(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setIsExpanded(false)}
+          role="button"
+          tabIndex={0}
+          aria-label="Close expanded view"
+        />
+      )}
+      <div
+        className={`node-connections relative overflow-y-hidden rounded-lg border border-slate-200 bg-white px-2 py-2 shadow-sm transition-all ${
+          isExpanded ? '' : 'mt-2 hidden max-w-[420px] flex-1 flex-row sm:flex'
+        }`}
+        style={{
+          ...(isExpanded && {
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 'calc(100vw - 80px)',
+            height: 'calc(100vh - 60px)',
+            maxWidth: '800px',
+            maxHeight: '800px',
+            zIndex: 9999,
+            border: '20px solid white',
+            borderRadius: '12px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          }),
+        }}
+      >
+        {/* <div className="absolute top-0 mx-auto h-3 w-24 rounded-b bg-[#f0f] text-[6px] text-white">Clicked Node</div> */}
 
-      <div className="flex w-full flex-col text-slate-700">
-        {clickedNode ? (
-          <div className="flex flex-row items-center gap-x-2 text-xs font-medium text-slate-600">
-            {/* {!clickedNode?.featureDetailNP && <div className="">F#{clickedNode?.feature}</div>} */}
-            <Circle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
-            <div className="flex-1 leading-tight">{getNodeSupernodeAndOverrideLabel(clickedNode)}</div>
-            <GraphFeatureLink selectedGraph={selectedGraph} node={clickedNode} />
-            {!clientCheckIsEmbed() && (
-              <button
-                type="button"
-                onClick={() => openWelcomeModalToStep(3)}
-                className="flex h-[24px] w-[24px] items-center justify-center gap-x-1 self-start rounded-full bg-slate-200 px-0 py-0.5 text-[12px] font-medium transition-colors hover:bg-slate-300"
-                aria-label="Open User Guide"
-              >
-                ?
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="relative flex h-[100%] flex-col items-center justify-center text-center text-sm font-medium text-slate-700">
-            <div className="mb-2 text-lg font-bold">Node Connections</div>
-            <div className="">Click a node on the left to see its connections.</div>
-            {!clientCheckIsEmbed() && (
-              <button
-                type="button"
-                onClick={() => openWelcomeModalToStep(3)}
-                className="absolute right-0 top-0 flex h-[24px] w-[24px] items-center justify-center gap-x-1 rounded-full bg-slate-200 py-0.5 text-[12px] font-medium transition-colors hover:bg-slate-300"
-                aria-label="Open User Guide"
-              >
-                ?
-              </button>
-            )}
-          </div>
-        )}
-        {clickedNode && (
-          <div
-            className={`mt-2 flex h-full w-full flex-1 flex-row gap-x-0 ${clickedNode?.featureDetailNP ? 'pb-0' : 'pb-0'}`}
-          >
-            <FeatureList
-              title="Input Features"
-              nodes={selectedGraph?.nodes || []}
-              linkType="source"
-              hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
-              visState={visState}
-              isEditingLabel={isEditingLabel}
-              getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
-              hoveredId={localHoveredId}
-              onHoverNode={handleHoverNode}
-              onClearHover={handleClearHover}
-              onClickNode={handleClickNode}
-            />
-            <FeatureList
-              title="Output Features"
-              nodes={selectedGraph?.nodes || []}
-              linkType="target"
-              hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
-              visState={visState}
-              isEditingLabel={isEditingLabel}
-              getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
-              hoveredId={localHoveredId}
-              onHoverNode={handleHoverNode}
-              onClearHover={handleClearHover}
-              onClickNode={handleClickNode}
-            />
-          </div>
-        )}
+        <div className="flex h-full w-full flex-col text-slate-700">
+          {clickedNode ? (
+            <div className="flex flex-row items-center gap-x-1.5 text-xs font-medium text-slate-600">
+              {/* {!clickedNode?.featureDetailNP && <div className="">F#{clickedNode?.feature}</div>} */}
+              <Circle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
+              <div className="flex-1 leading-tight">{getNodeSupernodeAndOverrideLabel(clickedNode)}</div>
+              <GraphFeatureLink selectedGraph={selectedGraph} node={clickedNode} />
+              {!clientCheckIsEmbed() && (
+                <div className="flex flex-col gap-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isExpanded) {
+                        setIsExpanded(false);
+                      }
+                      openWelcomeModalToStep(3);
+                    }}
+                    className="flex h-[20px] w-[20px] items-center justify-center gap-x-1 self-start rounded-full bg-slate-200 px-0 py-0.5 text-[11px] font-medium transition-colors hover:bg-slate-300"
+                    aria-label="Open User Guide"
+                  >
+                    ?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="flex h-[20px] w-[20px] items-center justify-center gap-x-1 self-start rounded-full bg-slate-200 px-0 py-0.5 text-[12px] font-medium transition-colors hover:bg-slate-300"
+                    aria-label={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+                    title={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  >
+                    {isExpanded ? (
+                      <Minimize2 className="h-2.5 w-2.5 text-slate-600" />
+                    ) : (
+                      <Expand className="h-2.5 w-2.5 text-slate-600" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="relative flex h-[100%] flex-col items-center justify-center text-center text-sm font-medium text-slate-700">
+              <div className="mb-2 text-lg font-bold">Node Connections</div>
+              <div className="">Click a node on the left to see its connections.</div>
+              {!clientCheckIsEmbed() && (
+                <div className="absolute right-0 top-0 flex flex-col gap-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isExpanded) {
+                        setIsExpanded(false);
+                      }
+                      openWelcomeModalToStep(3);
+                    }}
+                    className="flex h-[20px] w-[20px] items-center justify-center gap-x-1 rounded-full bg-slate-200 py-0.5 text-[11px] font-medium transition-colors hover:bg-slate-300"
+                    aria-label="Open User Guide"
+                  >
+                    ?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="flex h-[20px] w-[20px] items-center justify-center gap-x-1 rounded-full bg-slate-200 py-0.5 text-[11px] font-medium transition-colors hover:bg-slate-300"
+                    aria-label={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+                    title={isExpanded ? 'Exit fullscreen' : 'Enter fullscreen'}
+                  >
+                    {isExpanded ? (
+                      <Minimize2 className="h-2.5 w-2.5 text-slate-600" />
+                    ) : (
+                      <Expand className="h-2.5 w-2.5 text-slate-600" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {clickedNode && (
+            <div
+              className={`mt-2 flex h-full w-full flex-1 flex-row gap-x-0 ${clickedNode?.featureDetailNP ? 'pb-0' : 'pb-0'}`}
+            >
+              <FeatureList
+                title="Input Features"
+                nodes={selectedGraph?.nodes || []}
+                linkType="source"
+                hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
+                visState={visState}
+                isEditingLabel={isEditingLabel}
+                getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
+                hoveredId={localHoveredId}
+                onHoverNode={handleHoverNode}
+                onClearHover={handleClearHover}
+                onClickNode={handleClickNode}
+              />
+              <FeatureList
+                title="Output Features"
+                nodes={selectedGraph?.nodes || []}
+                linkType="target"
+                hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
+                visState={visState}
+                isEditingLabel={isEditingLabel}
+                getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
+                hoveredId={localHoveredId}
+                onHoverNode={handleHoverNode}
+                onClearHover={handleClearHover}
+                onClickNode={handleClickNode}
+              />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
