@@ -21,8 +21,29 @@ export default async function Page({
 
   const { name } = searchParams;
   const featuresParam = searchParams.features;
+  let featuresArray: NeuronIdentifier[] = [];
+  const parsedFeatures = JSON.parse(featuresParam);
 
-  const featuresArray = JSON.parse(featuresParam) as NeuronIdentifier[];
+  // Handle edge case where index is a stringified array of arrays
+  if (Array.isArray(parsedFeatures) && parsedFeatures.length > 0) {
+    for (const feature of parsedFeatures) {
+      if (typeof feature.index === 'string' && feature.index.startsWith('[[')) {
+        // Parse the nested array structure
+        const nestedIndices = JSON.parse(feature.index) as number[][];
+        // Create a NeuronIdentifier for each number in each inner array
+        for (const indexArray of nestedIndices) {
+          for (const index of indexArray) {
+            featuresArray.push(new NeuronIdentifier(feature.modelId, feature.layer, String(index)));
+          }
+        }
+      } else {
+        featuresArray.push(new NeuronIdentifier(feature.modelId, feature.layer, feature.index));
+      }
+    }
+  } else {
+    featuresArray = parsedFeatures as NeuronIdentifier[];
+  }
+
   if (featuresArray.length === 0) {
     notFound();
   }
@@ -40,7 +61,7 @@ export default async function Page({
     if (foundFeature) {
       return foundFeature;
     }
-    throw new Error('Feature not found');
+    throw new Error(`Feature not found: ${feature.modelId}-${feature.layer}-${feature.index}`);
   });
 
   return (
