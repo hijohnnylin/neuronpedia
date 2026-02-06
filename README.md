@@ -25,8 +25,6 @@
 </p>
 
 - [About Neuronpedia](#about-neuronpedia)
-- [Instant Start - Vercel Deploy](#instant-start---vercel-deploy)
-- [Quick Start - Local Webapp + Demo Environment](#quick-start---local-webapp--demo-environment)
 - [Setting Up Your Local Environment](#setting-up-your-local-environment)
   - ["I Want to Use a Local Database / Import More Neuronpedia Data"](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
   - ["I Want to Do Webapp (Frontend + API) Development"](#i-want-to-do-webapp-frontend--api-development)
@@ -46,9 +44,9 @@
 - [Contact / Support](#contact--support)
 - [Contributing](#contributing)
 - [Appendix](#appendix)
-  - ['Make' Commands Reference](#make-commands-reference)
-  - [Import Data Into Your Local Database](#import-data-into-your-local-database)
-  - [Why an OpenAI API Key Is Needed for Search Explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
+    - ['Make' Commands Reference](#make-commands-reference)
+    - [Import Data Into Your Local Database](#import-data-into-your-local-database)
+    - [Why an OpenAI API Key Is Needed for Search Explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
 
 # About Neuronpedia
 
@@ -59,80 +57,9 @@ Check out our [blog post](https://www.neuronpedia.org/blog/neuronpedia-is-now-op
 A diagram showing the main features of Neuronpedia as of March 2025.
 ![neuronpedia-features](https://github.com/user-attachments/assets/13e07a93-e046-4e1c-b670-2d26d251d55d)
 
-# Instant Start - Vercel Deploy
-
-Click the `Deploy` button to instantly deploy a custom Neuronpedia. A [free vercel account](https://vercel.com/signup) is required.
-
-<p align="left">
-  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fhijohnnylin%2Fneuronpedia&env=NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY&envDescription=***Your%20Custom%20Website%20Name.%20For%20example%3A%20PuppyNeurons***&root-directory=apps/webapp&build-command=npx%20prisma%20generate%20%26%26%20npm%20run%20build%3Ademo&project-name=my-neuronpedia&repository-name=my-neuronpedia&demo-title=Neuronpedia&demo-description=Deploy%20your%20own%20custom%20Neuronpedia%20%F0%9F%9A%80%F0%9F%A7%A0%F0%9F%A7%90&demo-url=https%3A%2F%2Fneuronpedia.org">
-    <img src="https://vercel.com/button" width="160" alt="Deploy with Vercel"/>
-  </a>
-</p>
-
-Here's how easy it is to deploy a "PuppyNeurons" fork of Neuronpedia:
-
-https://github.com/user-attachments/assets/707deaed-02b4-442b-8c1f-bf44d193b9fa
-
-# Quick Start - Local Webapp + Demo Environment
-
-#### What This Does
-
-This sets up the webapp (frontend + api) locally, and connects to a public remote demo database and public inference servers
-
-#### What You'll Get
-
-After following the quick start, you will be able to use Neuronpedia for some sources/SAEs we have preloaded in `gpt2-small` and `gemma-2-2b/-it`.
-
-> ⚠️ **warning:** since you are connecting to a public, read-only demo database, you will not be able to add new data immediately. you will need to follow [subsequent steps](#i-want-to-use-my-own-database--import-more-neuronpedia-data) to configure your own database that you can write to.
-
-#### Steps
-
-1. Install [docker desktop (UI)](https://docs.docker.com/desktop/) or [docker engine (no UI)](https://docs.docker.com/engine/), and launch it.
-2. generate your local `.env`
-   ```
-   make init-env
-   ```
-3. build the webapp (this will take ~10 min the first time)
-   ```
-   make webapp-demo-build
-   ```
-4. bring up the webapp
-   ```
-   make webapp-demo-run
-   ```
-5. once everything is up, open [localhost:3000](http://localhost:3000) to load the home page.
-6. your local instance is connected to the remote demo database and inference servers, with the following SAEs/sources data available:
-
-| model                          | source/sae                            | comment                                        |
-| ------------------------------ | ------------------------------------- | ---------------------------------------------- |
-| `gpt2-small`                   | `res-jb`, all layers                  | a small starter SAE set                        |
-| `gemma-2-2b` / `gemma-2-2b-it` | `gemmascope-res-16k`, all layers      | the SAEs used in the Gemma Scope demo          |
-| `deepseek-r1-distill-llama-8b` | `llamascope-slimpj-res-32k`, layer 15 | SAE for a reasoning model, trained by OpenMOSS |
-
-7. example things you can do (links work after `make webapp-demo-run`)
-
-   i. steering - [steer gpt2-small on cats](http://localhost:3000/gpt2-small/steer?source=10-res-jb&index=16899&strength=40)
-
-   ii. activation tests/search - [test activation for a gemma-2-2b feature](http://localhost:3000/gemma-2-2b/20-gemmascope-res-16k/502?defaulttesttext=what's%20the%20deal%20with%20airplane%20food%3F)
-
-   iii. search by explanation, [if you configured](<(#why-an-openai-api-key-is-needed-for-search-explanations)>) an `OPENAI_API_KEY` - [search for parrots features](http://localhost:3000/search-explanations/?q=parrots)
-
-   iv. browse dashboards - [a parrot feature](http://localhost:3000/gpt2-small/11-res-jb/23687)
-
-   v. run the [gemma-scope demo](http://localhost:3000/gemma-scope#main)
-
-8. Now that we've set up a local webapp that's usable, this is a good time to quickly review Neuronpedia's [simple architecture](#architecture) and its [individual services](#services), so that you can get a better understanding of what you'll set up later. Then, keep going to [setting up your local environment](#setting-up-your-local-environment).
-
-> 🔥 **pro-tip:** see all the available `make` commands by running `make help`
-
 # Setting Up Your Local Environment
 
-Once you've played around with the demo, you will start running into limitations, like having a limited number of models/SAEs to use, or not being able to generate new explanations. This is because the public demo database is read-only.
-
-Ideally, you will probably eventually want to do all of the sub-sections below, so you can have everything running locally. However, you may only be interested in specific parts of Neuronpedia to start:
-
-1. If you want to jump into developing webapp frontend or api with the demo environment, follow [webapp dev](#i-want-to-do-webapp-frontend--api-development)
-2. If you want to start loading more sources/data and relying on your own local database, follow [local database](#i-want-to-use-a-local-database--import-more-neuronpedia-data)
+Start by setting up your [local database](#i-want-to-use-a-local-database--import-more-neuronpedia-data).
 
 > 🔥 **pro-tip:** Neuronpedia is configured for AI agent development. Here's an example using a [single prompt](https://github.com/hijohnnylin/neuronpedia/blob/main/apps/experiments/steerify/README.md#claude-code-prompt) to build a custom app (Steerify) using Neuronpedia's inference server as a backend:
 
@@ -142,7 +69,7 @@ https://github.com/user-attachments/assets/bc82f88b-8155-4c1d-948a-ea5d987ae0f8
 
 #### What This Does + What You'll Get
 
-Relying on the demo environment means you are limited to read-only access to a specific set of SAEs. These steps show you how to configure and connect to your own local database. You can then download sources/SAEs of your choosing:
+These steps show you how to configure and connect to your own local database. You can then download sources/SAEs of your choosing:
 
 https://github.com/user-attachments/assets/d7fbb46e-8522-4f98-aa08-21c6529424af
 
@@ -205,7 +132,7 @@ Once you do this section, you'll be able to do local development and quickly see
 
 #### What This Does + What You'll Get
 
-Once you start using a local environment, you won't be connected to the demo environment's inference instances. This subsection shows you how to run an inference instance locally so you can do things like steering, activation testing, etc on the sources/SAEs you've downloaded.
+This subsection shows you how to run an inference instance locally so you can do things like steering, activation testing, etc on the sources/SAEs you've downloaded.
 
 > ⚠️ **warning:** for the local environment, we only support running one inference server at a time. this is because you are unlikely to be running multiple models simultaneously on one machine, as they are memory and compute intensive.
 
@@ -315,7 +242,6 @@ The graph server powers the attribution graph generation functionality, built on
    make graph-localhost-install
    ```
 3. Within the `apps/graph` directory, create a `.env` file with `SECRET` and `HF_TOKEN` (see `apps/graph/.env.example`)
-
    - `SECRET` is the server secret that needs to be passed in the `x-secret-key` request header
    - Make sure your `HF_TOKEN` has access to the [Gemma-2-2B model](https://huggingface.co/google/gemma-2-2b) on Huggingface.
 
