@@ -1,5 +1,23 @@
 # compose.yaml
 name: neuronpedia
+
+# Extension fields (reusable configuration blocks)
+x-shared-build-args: &shared-build-args
+  CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.nocustomca}
+  # NEXT_PUBLIC_* variables are inlined into JS bundle at build time
+  NEXT_PUBLIC_URL: ${NEXT_PUBLIC_URL}
+  NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS: ${NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS}
+  NEXT_PUBLIC_DEFAULT_MODELID: ${NEXT_PUBLIC_DEFAULT_MODELID}
+  NEXT_PUBLIC_DEFAULT_SOURCESET: ${NEXT_PUBLIC_DEFAULT_SOURCESET}
+  NEXT_PUBLIC_DEFAULT_SOURCE: ${NEXT_PUBLIC_DEFAULT_SOURCE}
+  NEXT_PUBLIC_DEFAULT_RELEASE_NAME: ${NEXT_PUBLIC_DEFAULT_RELEASE_NAME}
+  NEXT_PUBLIC_DEFAULT_STEER_MODEL: ${NEXT_PUBLIC_DEFAULT_STEER_MODEL}
+  NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS: ${NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS}
+  NEXT_PUBLIC_ENABLE_SIGNIN: ${NEXT_PUBLIC_ENABLE_SIGNIN}
+  NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE}
+  NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH: ${NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH}
+  NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY: ${NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY}
+
 services:
   webapp:
     image: neuronpedia-webapp:latest
@@ -8,8 +26,7 @@ services:
       dockerfile: apps/webapp/Dockerfile
       target: runner
       args:
-        ENV_FILE: ${ENV_FILE:-.env.localhost}
-        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.nocustomca}
+        <<: *shared-build-args
     ports:
       - "3000:3000"
     env_file:
@@ -25,9 +42,9 @@ services:
       dockerfile: apps/webapp/Dockerfile
       target: db-init
       args:
-        ENV_FILE: ${ENV_FILE:-.env.localhost}
-        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.nocustomca}
+        <<: *shared-build-args
     restart: "no"
+    # Environment variables injected via --env-file flag (see Makefile targets)
     environment:
       - POSTGRES_URL_NON_POOLING=${POSTGRES_URL_NON_POOLING}
       - POSTGRES_PRISMA_URL=${POSTGRES_PRISMA_URL}
@@ -87,6 +104,7 @@ services:
         BUILD_TYPE: ${BUILD_TYPE:-nocuda}
         CUDA_VERSION: "12.1.0"
         UBUNTU_VERSION: "22.04"
+        CUSTOM_CA_BUNDLE: ${CUSTOM_CA_BUNDLE:-.nocustomca}
     ports:
       - "5003:5003"
     env_file:

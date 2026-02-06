@@ -1,11 +1,11 @@
 import { config } from 'dotenv';
 import { z } from 'zod';
 
-// If it's not undefined, then it's a one click deploy. It doesn't matter what the value itself is.
+// If it's not undefined and not an empty string, then it's a one click deploy.
 // Also, if it's one-click-deploy on Vercel, we always use the demo environment variables.
 export const SITE_NAME_VERCEL_DEPLOY = process.env.NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY;
-export const IS_ONE_CLICK_VERCEL_DEPLOY = SITE_NAME_VERCEL_DEPLOY !== undefined;
-if (SITE_NAME_VERCEL_DEPLOY) {
+export const IS_ONE_CLICK_VERCEL_DEPLOY = SITE_NAME_VERCEL_DEPLOY !== undefined && SITE_NAME_VERCEL_DEPLOY !== '';
+if (IS_ONE_CLICK_VERCEL_DEPLOY) {
   // @ts-ignore
   if (typeof EdgeRuntime !== 'string') {
     config({ path: '.env.demo', override: true });

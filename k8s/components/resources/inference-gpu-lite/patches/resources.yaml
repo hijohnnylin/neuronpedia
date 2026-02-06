@@ -13,9 +13,11 @@ spec:
           requests:
             nvidia.com/gpu: 1
             cpu: "7"
-            memory: "26Gi"
+            memory: "32Gi"
+            ephemeral-storage: "35Gi"
           limits:
             nvidia.com/gpu: 1
             cpu: "8"
-            memory: "26Gi"
+            memory: "48Gi"
+            ephemeral-storage: "40Gi"
 ---

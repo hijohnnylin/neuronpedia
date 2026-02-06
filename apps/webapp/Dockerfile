@@ -35,6 +35,38 @@ RUN if [ -n "${CUSTOM_CA_BUNDLE}" ] && [ "${CUSTOM_CA_BUNDLE}" != ".nocustomca" 
 # Install OpenSSL and bash
 RUN apk add --no-cache openssl bash
 
+# Build-time environment variables (only NEXT_PUBLIC_* are inlined into JS bundle)
+# Reference: https://nextjs.org/docs/pages/building-your-application/configuring/environment-variables
+# For local/Docker Compose: Uses env_file at runtime (simpler)
+# For K8s/production: Pass these as build args in CI, inject others via ConfigMaps/Secrets at runtime
+ARG NEXT_PUBLIC_URL
+ARG NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS
+ARG NEXT_PUBLIC_DEFAULT_MODELID
+ARG NEXT_PUBLIC_DEFAULT_SOURCESET
+ARG NEXT_PUBLIC_DEFAULT_SOURCE
+ARG NEXT_PUBLIC_DEFAULT_RELEASE_NAME
+ARG NEXT_PUBLIC_DEFAULT_STEER_MODEL
+ARG NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS
+ARG NEXT_PUBLIC_ENABLE_SIGNIN
+ARG NEXT_PUBLIC_DEMO_MODE
+ARG NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH
+ARG NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY
+
+# Convert ARGs to ENVs so they're available in child stages during build
+# Note: All other (non-NEXT_PUBLIC_*) variables should be injected at runtime
+ENV NEXT_PUBLIC_URL=${NEXT_PUBLIC_URL} \
+    NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS=${NEXT_PUBLIC_CONTACT_EMAIL_ADDRESS} \
+    NEXT_PUBLIC_DEFAULT_MODELID=${NEXT_PUBLIC_DEFAULT_MODELID} \
+    NEXT_PUBLIC_DEFAULT_SOURCESET=${NEXT_PUBLIC_DEFAULT_SOURCESET} \
+    NEXT_PUBLIC_DEFAULT_SOURCE=${NEXT_PUBLIC_DEFAULT_SOURCE} \
+    NEXT_PUBLIC_DEFAULT_RELEASE_NAME=${NEXT_PUBLIC_DEFAULT_RELEASE_NAME} \
+    NEXT_PUBLIC_DEFAULT_STEER_MODEL=${NEXT_PUBLIC_DEFAULT_STEER_MODEL} \
+    NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS=${NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS} \
+    NEXT_PUBLIC_ENABLE_SIGNIN=${NEXT_PUBLIC_ENABLE_SIGNIN} \
+    NEXT_PUBLIC_DEMO_MODE=${NEXT_PUBLIC_DEMO_MODE} \
+    NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH=${NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH} \
+    NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY=${NEXT_PUBLIC_SITE_NAME_VERCEL_DEPLOY}
+
 ###############################################################################################
 # Install dependencies only when needed
 FROM base AS deps
@@ -56,12 +88,9 @@ COPY apps/webapp ./
 # Ensure startup script is executable
 RUN chmod +x ./init.sh
 
-# Load environment variables from dotenv file
-ARG ENV_FILE=.env.localhost
-COPY ${ENV_FILE} .env
-
 # Build without database operations - only generate Prisma client and build Next.js
-RUN bash -c 'set -a && source .env && set +a && npm run build:simple'
+# Environment variables are inherited from base stage
+RUN npm run build:simple
 
 ###############################################################################################
 # Database initialization image (has access to ts-node and dev dependencies)
@@ -75,16 +104,11 @@ COPY apps/webapp ./
 # Install ts-node globally for seeding
 RUN npm install -g ts-node typescript
 
-# Load environment variables from dotenv file
-ARG ENV_FILE=.env.localhost
-COPY ${ENV_FILE} .env
-
-# Generate Prisma client for db operations
-RUN bash -c 'set -a && source .env && set +a && npx prisma generate'
-
 # Make db-init script executable
 RUN chmod +x db-init.sh
 
+# Note: Prisma client is already generated in builder stage (via npm run build:simple)
+# This stage only runs db push, migrations, and seeding against live database
 CMD ["./db-init.sh"]
 
 ###############################################################################################
@@ -108,8 +132,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 # Copy startup script for runtime
 COPY --from=builder --chown=nextjs:nodejs /app/init.sh ./init.sh
 
-# Copy environment file for runtime
-COPY --from=builder --chown=nextjs:nodejs /app/.env ./.env
+# NOTE: .env files are NOT copied to production image
+# Environment variables are injected at runtime via:
+# - Kubernetes: ConfigMaps/Secrets
+# - Docker Compose: --env-file flag (e.g., docker compose --env-file .env.localhost up)
 
 USER nextjs
 

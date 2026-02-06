@@ -2,6 +2,11 @@
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 
+configMapGenerator:
+- name: corporate-ca-certificates
+  files:
+  - ca-certificates.crt
+
 patchesStrategicMerge:
 - statefulset-patch.yaml
-- job-patch.yaml
+- deployment-patch.yaml
