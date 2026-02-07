@@ -249,7 +249,7 @@ export default function AssistantAxisWelcomeModal({
                         <div
                           key={index}
                           className={`transition-opacity duration-300 ${
-                            currentPanel === index ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'
+                            currentPanel === index ? 'opacity-100' : 'pointer-events-none inset-0 hidden opacity-0'
                           }`}
                         >
                           <p className="pl-0.5 text-[12px] leading-normal text-slate-700 sm:pl-1.5 sm:text-[14px]">
