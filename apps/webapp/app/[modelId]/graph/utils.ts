@@ -103,7 +103,7 @@ export function getLayerFromCantorValue(feature: number): number {
 }
 
 export function getLayerFromFeatureAndGraph(modelId: string, node: CLTGraphNode, selectedGraph: CLTGraph | null) {
-  if (selectedGraph?.metadata.schema_version === 1) {
+  if (selectedGraph?.metadata.schema_version === 1 || modelId === 'gemma-3-27b-it') {
     return getLayerFromCantorValue(node.feature);
   }
   // cases
@@ -121,7 +121,7 @@ export function getLayerFromFeatureAndGraph(modelId: string, node: CLTGraphNode,
 }
 
 export function getIndexFromFeatureAndGraph(modelId: string, node: CLTGraphNode, selectedGraph: CLTGraph | null) {
-  if (selectedGraph?.metadata.schema_version === 1) {
+  if (selectedGraph?.metadata.schema_version === 1 || modelId === 'gemma-3-27b-it') {
     return getIndexFromCantorValue(node.feature);
   }
   // cases
