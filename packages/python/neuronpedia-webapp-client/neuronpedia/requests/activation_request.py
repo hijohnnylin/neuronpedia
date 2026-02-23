@@ -3,7 +3,6 @@ from typing import List, Optional
 from neuronpedia.np_activation import Activation
 from neuronpedia.requests.base_request import NPRequest
 from requests import Response
-import dataclasses
 
 
 class ActivationRequest(NPRequest):
