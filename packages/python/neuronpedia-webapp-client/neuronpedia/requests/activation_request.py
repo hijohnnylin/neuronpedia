@@ -82,10 +82,14 @@ class ActivationRequest(NPRequest):
         index: str,
         activations: List[Activation],
     ) -> Response:
+
+        # Format activations payload
+        activations_payload = [{"tokens": a.tokens, "values": a.values} for a in activations]
+
         payload = {
             "modelId": model_id,
             "source": source,
             "index": index,
-            "activations": activations,
+            "activations": activations_payload,
         }
         return self.send_request(method="POST", json=payload, uri="upload-batch")
