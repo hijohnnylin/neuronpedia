@@ -48,7 +48,7 @@ import { useGraphStateContext } from './graph-state-provider';
 
 const ANTHROPIC_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 32;
 const NEURONPEDIA_FEATURE_DETAIL_DOWNLOAD_BATCH_SIZE = 2048;
-export const GRAPH_PREFETCH_ACTIVATIONS_COUNT = 3;
+export const GRAPH_PREFETCH_ACTIVATIONS_COUNT = 1;
 const DEFAULT_DENSITY_THRESHOLD = 0.99;
 export const PREFERRED_EXPLANATION_TYPES_NAMES = ['np_max-act-logits', 'np_max-act'];
 
