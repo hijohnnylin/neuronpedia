@@ -1,15 +1,8 @@
 from typing import Any
 
-import torch
 from sae_lens.saes.sae import SAE
 
 from neuronpedia_inference.saes.base import BaseSAE
-
-DTYPE_MAP = {
-    "float16": torch.float16,
-    "float32": torch.float32,
-    "bfloat16": torch.bfloat16,
-}
 
 
 class SaeLensSAE(BaseSAE):
@@ -19,8 +12,8 @@ class SaeLensSAE(BaseSAE):
             release=release,
             sae_id=sae_id,
             device=device,
+            dtype=dtype,
         )
-        loaded_sae.to(device, dtype=DTYPE_MAP[dtype])
         if loaded_sae.cfg.architecture() in ["temporal"]:
             print("Temporal architecture detected, skipping fold_W_dec_norm")
         else:
