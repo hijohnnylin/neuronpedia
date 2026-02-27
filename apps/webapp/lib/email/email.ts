@@ -155,12 +155,12 @@ export const sendEmail = async (
 
 export const sendLoginEmail = async (emailAddress: string, signInURL: string) => {
   const buttonColor = '#0369a1';
-  const subject = `Confirm Sign In to Neuronpedia`;
+  const subject = `Confirm Neuronpedia Sign Up / Sign In`;
   const html = `<body style="background: #f9f9f9;">
       <table width="100%" border="0" cellspacing="15" cellpadding="0" style="background: #efefef; max-width: 400px; margin: auto; border-radius: 10px;">
         <tr>
           <td align="center" style="padding: 10px 0px 0px 0px; font-size: 18px; font-family: Helvetica, Arial, sans-serif; color: #444;">
-            Finish signing in to Neuronpedia.
+            Confirm signing up or signing in to Neuronpedia.
           </td>
         </tr>
         <tr>

@@ -6,14 +6,15 @@ import { ASSET_BASE_URL } from '@/lib/env';
 import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import HomeNewsletterSignup from '../home/home-newsletter-signup';
 import BlogSidebar from './blog-sidebar';
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    title: `The Residual Stream - Neuronpedia's Blog`,
+    title: `The Residual Stream - Neuronpedia Blog`,
     description: 'The Residual Stream is Neuronpedia&apos;s blog.',
     openGraph: {
-      title: `The Residual Stream - Neuronpedia's Blog`,
+      title: `The Residual Stream - Neuronpedia Blog`,
       description: 'The Residual Stream is Neuronpedia&apos;s blog.',
       url: `/blog`,
       images: [
@@ -37,6 +38,9 @@ export default async function Page() {
           </BreadcrumbLink>,
         ]}
       />
+      <div className="-mb-4 mt-4 flex w-full max-w-screen-lg justify-center px-2 sm:px-0">
+        <HomeNewsletterSignup />
+      </div>
       <div className="flex h-full w-full max-w-screen-lg flex-col items-start justify-start px-2 pt-4 text-slate-800 sm:flex-row sm:items-center sm:justify-center sm:gap-x-7 sm:px-0">
         <BlogSidebar />
 

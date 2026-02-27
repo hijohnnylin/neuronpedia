@@ -22,6 +22,7 @@ const NORMAL_RATE_LIMITS = [
   { endpoint: '/api/model/new', limit: 5 },
   { endpoint: '/api/source-set/new', limit: 10 },
   { endpoint: '/api/graph/tokenize', limit: 300 },
+  { endpoint: '/api/auth/signin', limit: 5 },
 ];
 
 const HIGHER_RATE_LIMITS = [
@@ -37,6 +38,7 @@ const HIGHER_RATE_LIMITS = [
   { endpoint: '/api/model/new', limit: 5 },
   { endpoint: '/api/source-set/new', limit: 10 },
   { endpoint: '/api/graph/tokenize', limit: 300 },
+  { endpoint: '/api/auth/signin', limit: 5 },
 ];
 
 const normalRateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];

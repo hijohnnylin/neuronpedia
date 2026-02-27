@@ -1,0 +1,109 @@
+'use client';
+
+import { Button } from '@/components/shadcn/button';
+import { NEXT_PUBLIC_ENABLE_SIGNIN } from '@/lib/env';
+import emailSpellChecker from '@zootools/email-spell-checker';
+import { MailIcon } from 'lucide-react';
+import { signIn, useSession } from 'next-auth/react';
+import { useState } from 'react';
+import { generateFromEmail } from 'unique-username-generator';
+import isEmail from 'validator/lib/isEmail';
+
+export default function HomeNewsletterSignup() {
+  const { data: session } = useSession();
+  const [email, setEmail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!NEXT_PUBLIC_ENABLE_SIGNIN || session) {
+    return null;
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError('');
+    if (!isEmail(email)) {
+      setError('Invalid email. Please try again.');
+      setSubmitting(false);
+      return;
+    }
+    let finalEmail = email;
+    const suggestedEmail = emailSpellChecker.run({ email });
+    if (
+      suggestedEmail &&
+      window.confirm(
+        `You typed "${email}", which seems like a typo.\nDid you mean "${suggestedEmail.full}"?\nClick OK to use the corrected email.`,
+      )
+    ) {
+      finalEmail = suggestedEmail.full;
+    }
+    const result = await signIn('email', {
+      email: finalEmail,
+      name: generateFromEmail(finalEmail),
+      redirect: false,
+    });
+    if (result?.error) {
+      setError('Something went wrong. Please try again.');
+      setSubmitting(false);
+    } else {
+      setSubmitted(true);
+    }
+  }
+
+  return (
+    <div className="mb-3 flex w-full max-w-screen-sm flex-col items-center gap-y-2 rounded-xl border border-slate-400 bg-white px-6 py-4 shadow-sm sm:flex-row sm:gap-x-4 sm:gap-y-0">
+      <div className="flex flex-col items-center text-center sm:items-start sm:gap-y-0 sm:text-left">
+        <div className="mb-1 flex flex-row items-center justify-center text-sm font-semibold text-slate-700">
+          <MailIcon className="mr-1.5 h-4 w-4" /> Get Updates
+        </div>
+        <div className="text-xs text-slate-500">
+          Quarterly newsletter from our{' '}
+          <a href="/blog" className="text-sky-600 hover:underline">
+            blog
+          </a>
+          .
+          <br />{' '}
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="text-[11px] text-sky-600 hover:underline"
+          >
+            No spam
+          </a>
+          , unsubscribe any time.
+        </div>
+      </div>
+      {submitted ? (
+        <div className="flex flex-1 items-center justify-center text-sm font-medium text-emerald-600">
+          Check your email for a confirmation link.
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col gap-y-1">
+          <div className="flex flex-row items-center gap-x-2">
+            <input
+              type="email"
+              placeholder="your-email@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyUp={(e) => {
+                if (e.key === 'Enter') handleSubmit();
+              }}
+              className="h-9 flex-1 rounded-md border border-slate-300 px-3 text-xs focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600 sm:text-[13px]"
+            />
+            <Button
+              disabled={submitting}
+              onClick={() => handleSubmit()}
+              className="gap-x-1.5 bg-sky-600 text-white hover:bg-sky-700"
+              size="sm"
+            >
+              <span>Submit</span>
+            </Button>
+          </div>
+          {error && <div className="text-xs text-red-500">{error}</div>}
+        </div>
+      )}
+    </div>
+  );
+}

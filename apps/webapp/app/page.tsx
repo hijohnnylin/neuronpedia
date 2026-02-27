@@ -43,6 +43,7 @@ import FeatureSelector from '../components/feature-selector/feature-selector';
 import InferenceSearcher from '../components/inference-searcher/inference-searcher';
 import { CAP_BLOG_URL, CAP_PAPER_URL } from './[modelId]/assistant-axis/shared';
 import HomeModels from './home/home-models';
+import HomeNewsletterSignup from './home/home-newsletter-signup';
 import HomeReleases from './home/home-releases';
 
 export const viewport = {
@@ -94,6 +95,8 @@ export default function Page() {
           </Link>
         </div>
       )}
+
+      <HomeNewsletterSignup />
 
       <div className="flex flex-col items-center justify-center gap-x-5 gap-y-2 sm:flex-row">
         <svg style={{ display: 'none' }}>

@@ -20,7 +20,7 @@ export default function BlogSidebar() {
               The Residual Stream
             </h1>
           </a>
-          <h2 className="mt-0 text-xs font-medium text-slate-600 sm:text-[13px]">Neuronpedia&apos;s Blog</h2>{' '}
+          <h2 className="mt-0 text-xs font-medium text-slate-600 sm:text-[13px]">Neuronpedia Blog</h2>{' '}
           <a href="/feed.xml" className="hidden sm:block">
             <img
               src="https://img.shields.io/badge/rss-F88900?style=for-the-badge&logo=rss&logoColor=white"
