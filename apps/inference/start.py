@@ -116,6 +116,12 @@ def parse_args():
         help="Use nnsight. Not all models are currently supported.",
     )
     parser.add_argument(
+        "--nnsight_max_memory",
+        type=int,
+        default=None,
+        help="Max GPU memory in GB for nnsight model loading. If not specified, uses the nnsight default (~90%% of available memory).",
+    )
+    parser.add_argument(
         "--chatspace",
         action="store_true",
         help="Use chatspace engine.",
@@ -153,6 +159,8 @@ def main():
         os.environ["CUSTOM_HF_MODEL_ID"] = str(args.custom_hf_model_id)
     if "NNSIGHT" not in os.environ:
         os.environ["NNSIGHT"] = "true" if args.nnsight else "false"
+    if "NNSIGHT_MAX_MEMORY" not in os.environ and args.nnsight_max_memory is not None:
+        os.environ["NNSIGHT_MAX_MEMORY"] = str(args.nnsight_max_memory)
     if "CHATSPACE" not in os.environ:
         os.environ["CHATSPACE"] = "true" if args.chatspace else "false"
         

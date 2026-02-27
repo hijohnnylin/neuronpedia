@@ -230,10 +230,17 @@ async def initialize(
                 else config.model_id
             )
             logger.info("Model to load: %s", model_to_load)
+            nnsight_kwargs = {}
+            if args.nnsight_max_memory is not None:
+                nnsight_kwargs["max_memory"] = {
+                    i: f"{args.nnsight_max_memory}GiB" for i in range(torch.cuda.device_count())
+                }
+                logger.info("nnsight max_memory: %s", nnsight_kwargs["max_memory"])
             model = StandardizedTransformer(
                 replace_tlens_model_id_with_hf_model_id(model_to_load),
                 dtype=STR_TO_DTYPE[config.model_dtype],
                 trust_remote_code=True,
+                **nnsight_kwargs,
             )
         elif args.chatspace:
             if not VLLM_AVAILABLE:
