@@ -184,6 +184,8 @@ class ActivationProcessor:
                             outputs = model.embeddings_output.save()
                         else:
                             outputs = model.layers_output[layer_num - 1].save()
+                    elif "hook_mlp_in" in hook_name:
+                        outputs = model.mlps_input[layer_num].save()
                     else:
                         raise ValueError(
                             f"Unsupported hook name for nnsight: {hook_name}"

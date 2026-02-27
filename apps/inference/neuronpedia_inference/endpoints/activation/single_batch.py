@@ -292,6 +292,8 @@ def process_activations_batch(
         with model.trace(padded_tokens):
             if "resid_post" in hook_name:
                 outputs = model.layers_output[layer_num].save()
+            elif "hook_mlp_in" in hook_name:
+                outputs = model.mlps_input[layer_num].save()
             else:
                 raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
         cache = {hook_name: outputs}

@@ -220,6 +220,8 @@ class ActivationProcessor:
                         hook_name = sae_manager.get_sae_hook(selected_source)
                         if "resid_post" in hook_name:
                             outputs = model.layers_output[layer_num].save()
+                        elif "hook_mlp_in" in hook_name:
+                            outputs = model.mlps_input[layer_num].save()
                         else:
                             raise ValueError(
                                 f"Unsupported hook name for nnsight: {hook_name}"
