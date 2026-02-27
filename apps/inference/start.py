@@ -117,9 +117,9 @@ def parse_args():
     )
     parser.add_argument(
         "--nnsight_max_memory",
-        type=int,
+        type=str,
         default=None,
-        help="Max GPU memory in GB for nnsight model loading. If not specified, uses the nnsight default (~90%% of available memory).",
+        help="Max GPU memory in GB for nnsight model loading. Single value applies to all GPUs (e.g. '48'), comma-separated for per-GPU (e.g. '16,46'). If not specified, uses the nnsight default (~90%% of available memory).",
     )
     parser.add_argument(
         "--chatspace",
@@ -160,7 +160,7 @@ def main():
     if "NNSIGHT" not in os.environ:
         os.environ["NNSIGHT"] = "true" if args.nnsight else "false"
     if "NNSIGHT_MAX_MEMORY" not in os.environ and args.nnsight_max_memory is not None:
-        os.environ["NNSIGHT_MAX_MEMORY"] = str(args.nnsight_max_memory)
+        os.environ["NNSIGHT_MAX_MEMORY"] = args.nnsight_max_memory
     if "CHATSPACE" not in os.environ:
         os.environ["CHATSPACE"] = "true" if args.chatspace else "false"
         

@@ -232,9 +232,20 @@ async def initialize(
             logger.info("Model to load: %s", model_to_load)
             nnsight_kwargs = {}
             if args.nnsight_max_memory is not None:
-                nnsight_kwargs["max_memory"] = {
-                    i: f"{args.nnsight_max_memory}GiB" for i in range(torch.cuda.device_count())
-                }
+                mem_values = [v.strip() for v in args.nnsight_max_memory.split(",")]
+                num_gpus = torch.cuda.device_count()
+                if len(mem_values) == 1:
+                    nnsight_kwargs["max_memory"] = {
+                        i: f"{mem_values[0]}GiB" for i in range(num_gpus)
+                    }
+                else:
+                    if len(mem_values) != num_gpus:
+                        raise ValueError(
+                            f"nnsight_max_memory has {len(mem_values)} values but found {num_gpus} GPUs"
+                        )
+                    nnsight_kwargs["max_memory"] = {
+                        i: f"{mem_values[i]}GiB" for i in range(num_gpus)
+                    }
                 logger.info("nnsight max_memory: %s", nnsight_kwargs["max_memory"])
             model = StandardizedTransformer(
                 replace_tlens_model_id_with_hf_model_id(model_to_load),
