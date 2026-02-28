@@ -14,14 +14,23 @@ export default function Footer() {
     <div className="hidden w-full flex-row items-center justify-between gap-x-5 bg-slate-50 px-5 py-1 text-[11px] text-slate-400 sm:flex">
       <div className="-mt-1.5 hidden flex-row items-center justify-center sm:flex">
         {IS_ACTUALLY_NEURONPEDIA_ORG ? (
+          // <iframe
+          //   title="Neuronpedia Status"
+          //   src="https://status.neuronpedia.org/badge?theme=light"
+          //   className="scale-75"
+          //   width="250"
+          //   height="24"
+          //   frameBorder="0"
+          //   scrolling="no"
+          // />
           <iframe
-            title="Neuronpedia Status"
-            src="https://status.neuronpedia.org/badge?theme=light"
-            className="scale-75"
+            src="https://uptimemonitor-production.up.railway.app/api/public/badge?theme=light"
             width="250"
+            className="scale-75"
             height="24"
             frameBorder="0"
             scrolling="no"
+            title="Neuronpedia Status"
           />
         ) : (
           <div className="">{NEXT_PUBLIC_URL}</div>
