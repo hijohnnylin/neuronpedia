@@ -195,33 +195,35 @@ export default function GraphToolbar() {
                   <ChevronUpIcon className="w-5 text-slate-500" />
                 </Select.ScrollUpButton>
                 <Select.Viewport className="w-full divide-y divide-slate-100 p-0 text-slate-700">
-                  {Object.keys(modelIdToMetadataMap).map((modelId) => (
-                    <Select.Item
-                      key={modelId}
-                      value={modelId}
-                      className="relative flex h-12 w-full cursor-pointer select-none flex-row items-center overflow-x-hidden whitespace-pre rounded py-0 pl-4 pr-6 text-xs hover:bg-slate-100 data-[highlighted]:bg-slate-100 data-[highlighted]:outline-none"
-                    >
-                      <Select.ItemText className="flex w-full flex-1">
-                        <div className="flex w-full flex-1 flex-row items-center gap-x-3">
-                          <div className="flex w-full flex-1 flex-col items-start justify-start gap-y-0">
-                            <div className="w-full truncate text-left font-mono font-medium text-sky-700">
-                              {ANTHROPIC_MODEL_TO_DISPLAY_NAME.get(modelId) ||
-                                globalModels[modelId]?.displayName ||
-                                modelId}
-                            </div>
-                            {globalModels[modelId] && (
-                              <div
-                                key={globalModels[modelId].id}
-                                className="w-full text-[9px] font-normal text-slate-400"
-                              >
-                                {globalModels[modelId].owner}
+                  {Object.keys(modelIdToMetadataMap)
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((modelId) => (
+                      <Select.Item
+                        key={modelId}
+                        value={modelId}
+                        className="relative flex h-12 w-full cursor-pointer select-none flex-row items-center overflow-x-hidden whitespace-pre rounded py-0 pl-4 pr-6 text-xs hover:bg-slate-100 data-[highlighted]:bg-slate-100 data-[highlighted]:outline-none"
+                      >
+                        <Select.ItemText className="flex w-full flex-1">
+                          <div className="flex w-full flex-1 flex-row items-center gap-x-3">
+                            <div className="flex w-full flex-1 flex-col items-start justify-start gap-y-0">
+                              <div className="w-full truncate text-left font-mono font-medium text-sky-700">
+                                {ANTHROPIC_MODEL_TO_DISPLAY_NAME.get(modelId) ||
+                                  globalModels[modelId]?.displayName ||
+                                  modelId}
                               </div>
-                            )}
+                              {globalModels[modelId] && (
+                                <div
+                                  key={globalModels[modelId].id}
+                                  className="w-full text-[9px] font-normal text-slate-400"
+                                >
+                                  {globalModels[modelId].owner}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </Select.ItemText>
-                    </Select.Item>
-                  ))}
+                        </Select.ItemText>
+                      </Select.Item>
+                    ))}
                 </Select.Viewport>
                 <Select.ScrollDownButton className="flex h-7 cursor-pointer items-center justify-center bg-white text-slate-700 hover:bg-slate-100">
                   <ChevronDownIcon className="w-5 text-slate-500" />

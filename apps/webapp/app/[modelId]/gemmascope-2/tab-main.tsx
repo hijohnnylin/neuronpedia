@@ -9,40 +9,6 @@ export const techReportLink = 'https://storage.googleapis.com/gemma-scope/gemma-
 export default function TabMain({ tabUpdater }: { tabUpdater: (tab: string) => void }) {
   return (
     <div className="relative mt-0 flex h-full w-full max-w-screen-xl flex-col items-start justify-start bg-white pb-24 pt-1 sm:items-center">
-      <div className="mt-0 flex w-full flex-col gap-y-6 px-5">
-        <div className="flex items-start gap-x-3 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4">
-          <div className="flex w-full flex-col gap-y-1 text-center text-[13px]">
-            <div className="mb-1.5 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
-            <div>
-              {`Significant issues with Google Cloud were blocking Gemma Scope 2 rollout on Neuronpedia, so we've
-              switched to AWS. We're now about ~85% complete.`}
-              <br />
-              Track final progress in the{' '}
-              <a
-                href="https://docs.google.com/spreadsheets/d/1eVjelj5Kzv7rTA688hYXhKFfit3UXCPDKPo9UfNEOaU/edit?usp=sharing"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-sky-700"
-              >
-                shared document
-              </a>
-              .
-            </div>
-            <div>
-              The artifacts in Gemma Scope 2{' '}
-              <a
-                href="https://huggingface.co/google/gemma-scope-2"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="text-sky-700"
-              >
-                HuggingFace
-              </a>{' '}
-              are complete and available for use.
-            </div>
-          </div>
-        </div>
-      </div>
       <div className="mt-5 flex w-full flex-row items-center justify-start gap-x-2 px-3 text-2xl font-bold text-slate-600 sm:mt-5 sm:justify-center sm:text-3xl">
         <div className="inline-block bg-clip-text text-gBlue">Gemma Scope 2</div> Demo
       </div>
