@@ -1,12 +1,7 @@
 import { removeUserSecret, updateUserSecret } from '@/lib/db/userSecret';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
-import Anthropic from '@anthropic-ai/sdk';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { UserSecretType } from '@prisma/client';
 import { NextResponse } from 'next/server';
-import OpenAI from 'openai';
-
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
   const body = await request.json();
@@ -15,45 +10,39 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     await removeUserSecret(request.user.name, type);
     return NextResponse.json({ message: 'API key removed' }, { status: 200 });
   }
-  if (type === UserSecretType.OPENAI || type === UserSecretType.OPENROUTER) {
-    // test the openai api key
+  if (type === UserSecretType.OPENAI) {
     try {
-      const openai = new OpenAI({
-        baseURL: type === UserSecretType.OPENAI ? undefined : OPENROUTER_BASE_URL,
-        apiKey: value,
+      const res = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${value}` },
       });
-      await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 1,
-        temperature: 0,
-      });
+      if (!res.ok) throw new Error();
     } catch (e) {
-      return NextResponse.json({ message: 'Invalid OpenAI or OpenRouter API key' }, { status: 400 });
+      return NextResponse.json({ message: 'Invalid OpenAI API key' }, { status: 400 });
+    }
+  } else if (type === UserSecretType.OPENROUTER) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/key', {
+        headers: { Authorization: `Bearer ${value}` },
+      });
+      if (!res.ok) throw new Error();
+    } catch (e) {
+      return NextResponse.json({ message: 'Invalid OpenRouter API key' }, { status: 400 });
     }
   } else if (type === UserSecretType.ANTHROPIC) {
     try {
-      const anthropic = new Anthropic({ apiKey: value });
-      await anthropic.messages.create({
-        model: 'claude-haiku-4-5',
-        messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 1,
-        temperature: 0,
+      const res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: { 'x-api-key': value, 'anthropic-version': '2023-06-01' },
       });
+      if (!res.ok) throw new Error();
     } catch (e) {
       return NextResponse.json({ message: 'Invalid Anthropic API key' }, { status: 400 });
     }
   } else if (type === UserSecretType.GOOGLE) {
     try {
-      const gemini = new GoogleGenerativeAI(value);
-      const model = gemini.getGenerativeModel({
-        model: 'gemini-1.5-pro',
-      });
-      const chat = model.startChat({
-        history: [],
-      });
-      const result = await chat.sendMessage('hi');
-      result.response.text();
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(value)}`,
+      );
+      if (!res.ok) throw new Error();
     } catch (e) {
       return NextResponse.json({ message: 'Invalid Google API key' }, { status: 400 });
     }

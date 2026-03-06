@@ -215,25 +215,25 @@ export default function EditProfileForm({
         <EditProfileFormAutointerpKeyField
           keyLabel="OpenRouter Key (Required for Some Auto-Interp Types)"
           keyType={UserSecretType.OPENROUTER}
-          keyMessage={`By adding your OpenRouter API key, you agree that Neuronpedia will store it and use it when you perform OpenRouter calls for auto-interp or other OpenRouter-necessary features.\n\nYou agree that requests to OpenRouter on your behalf will incur charges to your OpenRouter account. A test, one-token 'hi' call will be made with your key to ensure it's valid, which will incur charges of a fraction of a cent.`}
+          keyMessage={`By adding your OpenRouter API key, you agree that Neuronpedia will store it and use it when you perform OpenRouter calls for auto-interp or other OpenRouter-necessary features.\n\nYou agree that requests to OpenRouter on your behalf will incur charges to your OpenRouter account, and that you will ensure your key has access to the specific models that you use. A test API call will be made with your key to ensure it's valid.`}
         />
 
         <EditProfileFormAutointerpKeyField
           keyLabel="OpenAI Key"
           keyType={UserSecretType.OPENAI}
-          keyMessage={`By adding your OpenAI API key, you agree that Neuronpedia will store it and use it when you perform OpenAI calls for auto-interp or other OpenAI-necessary features.\n\nYou agree that requests to OpenAI on your behalf will incur charges to your OpenAI account. A test, one-token 'hi' call will be made with your key to ensure it's valid, which will incur charges of a fraction of a cent.\n\nEnsure that your key has access to the 'gpt-4o-mini' model.`}
+          keyMessage={`By adding your OpenAI API key, you agree that Neuronpedia will store it and use it when you perform OpenAI calls for auto-interp or other OpenAI-necessary features.\n\nYou agree that requests to OpenAI on your behalf will incur charges to your OpenAI account, and that you will ensure your key has access to the specific models that you use. A test API call will be made with your key to ensure it's valid.`}
         />
 
         <EditProfileFormAutointerpKeyField
           keyLabel="Anthropic Key"
           keyType={UserSecretType.ANTHROPIC}
-          keyMessage={`By adding your Anthropic API key, you agree that Neuronpedia will store it and use it when you perform Anthropic calls for auto-interp or other Anthropic-necessary features.\n\nYou agree that requests to Anthropic on your behalf will incur charges to your Anthropic account. A test, one-token 'hi' call will be made with your key to ensure it's valid, which will incur charges of a fraction of a cent.`}
+          keyMessage={`By adding your Anthropic API key, you agree that Neuronpedia will store it and use it when you perform Anthropic calls for auto-interp or other Anthropic-necessary features.\n\nYou agree that requests to Anthropic on your behalf will incur charges to your Anthropic account, and that you will ensure your key has access to the specific models that you use. A test API call will be made with your key to ensure it's valid.`}
         />
 
         <EditProfileFormAutointerpKeyField
           keyLabel="Google Gemini Key"
           keyType={UserSecretType.GOOGLE}
-          keyMessage={`By adding your Google Gemini API key, you agree that Neuronpedia will store it and use it when you perform Google Gemini calls for auto-interp or other Google Gemini-necessary features.\n\nYou agree that requests to Google Gemini on your behalf will incur charges to your Google Gemini account. A test, one-token 'hi' call will be made with your key to ensure it's valid, which will incur charges of a fraction of a cent.`}
+          keyMessage={`By adding your Google Gemini API key, you agree that Neuronpedia will store it and use it when you perform Google Gemini calls for auto-interp or other Google Gemini-necessary features.\n\nYou agree that requests to Google Gemini on your behalf will incur charges to your Google Gemini account, and that you will ensure your key has access to the specific models that you use. A test API call will be made with your key to ensure it's valid.`}
         />
       </div>
 

@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, Neuron, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { AutoInterpModelType, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import { AutoInterpModelType, getAnthropicModelId, OPENROUTER_BASE_URL } from '../utils/autointerp';
 import { makeAnthropicMessage, makeGeminiMessage, makeOaiMessage } from './autointerp-shared';
 
 const TOKENS_AROUND_MAX_ACTIVATING_TOKEN = 24;
@@ -427,7 +427,7 @@ Explanation of neuron 5 behavior: `;
       makeAnthropicMessage('user', newMessage),
     ];
     const msg = await anthropic.messages.create({
-      model: explanationModel.name,
+      model: getAnthropicModelId(explanationModel.name),
       max_tokens: 240,
       temperature: 1.0,
       system: systemMessage,

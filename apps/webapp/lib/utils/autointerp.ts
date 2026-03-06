@@ -61,6 +61,17 @@ export function getKeyTypeForAutoInterpModelType(modelType: AutoInterpModelType)
   }
   return UserSecretType.OPENROUTER;
 }
+// DB has model names with version-first ordering (e.g. claude-4-5-haiku) but
+// the Anthropic API expects family-first ordering (e.g. claude-haiku-4-5-20251001).
+const ANTHROPIC_MODEL_ID_FIXES: Record<string, string> = {
+  'claude-4-5-haiku': 'claude-haiku-4-5-20251001',
+  'claude-4-5-sonnet': 'claude-sonnet-4-5-20250929',
+};
+
+export function getAnthropicModelId(modelName: string): string {
+  return ANTHROPIC_MODEL_ID_FIXES[modelName] || modelName;
+}
+
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export function requiresOpenRouterForExplanationType(explanationType: string) {
   return explanationType === 'eleuther_acts_top20';

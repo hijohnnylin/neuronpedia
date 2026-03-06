@@ -473,6 +473,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     if (error instanceof ValidationError) {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }
+    console.error('autointerp generate error', error);
     return NextResponse.json({ message: 'Unknown Error' }, { status: 500 });
   }
 });

@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { AutoInterpModelType, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import { AutoInterpModelType, getAnthropicModelId, OPENROUTER_BASE_URL } from '../utils/autointerp';
 import {
   makeAnthropicMessage,
   makeGeminiMessage,
@@ -215,7 +215,7 @@ Explanation of attention head 5 behavior: this attention head`;
       makeAnthropicMessage('user', newMessage),
     ];
     const msg = await anthropic.messages.create({
-      model: explanationModel.name,
+      model: getAnthropicModelId(explanationModel.name),
       max_tokens: 60,
       temperature: 1.0,
       system: systemMessage,
