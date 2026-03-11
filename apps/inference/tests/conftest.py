@@ -2,6 +2,7 @@ import asyncio
 import gc
 import json
 import os
+from dataclasses import dataclass
 
 import pytest
 import torch
@@ -14,12 +15,48 @@ from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.server import app, initialize
 from neuronpedia_inference.shared import Model
 
-BOS_TOKEN_STR = "<|endoftext|>"
+
+@dataclass
+class ModelTestConfig:
+    """Configuration for a model under test."""
+
+    model_id: str
+    sae_source_set: str
+    sae_selected_sources: list[str]
+    bos_token_str: str
+    # Feature index known to exist in the selected SAE
+    steer_feature_index: int
+
+
+# Model configurations for testing
+MODEL_CONFIGS = {
+    "gpt2-small": ModelTestConfig(
+        model_id="gpt2-small",
+        sae_source_set="res-jb",
+        sae_selected_sources=["7-res-jb"],
+        bos_token_str="<|endoftext|>",
+        steer_feature_index=5,
+    ),
+    "gemma-3-270m": ModelTestConfig(
+        model_id="google/gemma-3-270m",
+        sae_source_set="gemmascope-2-res-16k",
+        sae_selected_sources=["5-gemmascope-2-res-16k"],
+        bos_token_str="<bos>",
+        steer_feature_index=5,
+    ),
+}
+
+# Select which model to test via environment variable, default to gpt2-small
+_model_key = os.environ.get("TEST_MODEL", "gpt2-small")
+ACTIVE_MODEL_CONFIG = MODEL_CONFIGS[_model_key]
+
+# Export constants for backward compatibility with existing tests
+BOS_TOKEN_STR = ACTIVE_MODEL_CONFIG.bos_token_str
 TEST_PROMPT = "Hello, world!"
 X_SECRET_KEY = "cat"
-MODEL_ID = "gpt2-small"
-SAE_SOURCE_SET = "res-jb"
-SAE_SELECTED_SOURCES = ["7-res-jb"]
+MODEL_ID = ACTIVE_MODEL_CONFIG.model_id
+SAE_SOURCE_SET = ACTIVE_MODEL_CONFIG.sae_source_set
+SAE_SELECTED_SOURCES = ACTIVE_MODEL_CONFIG.sae_selected_sources
 ABS_TOLERANCE = 0.1
 N_COMPLETION_TOKENS = 10
 TEMPERATURE = 0
@@ -28,7 +65,7 @@ STRENGTH_MULTIPLIER = 10.0  # Multiplier across all steering mechanisms
 FREQ_PENALTY = 0.0
 SEED = 42
 STEER_SPECIAL_TOKENS = False
-STEER_FEATURE_INDEX = 5
+STEER_FEATURE_INDEX = ACTIVE_MODEL_CONFIG.steer_feature_index
 INVALID_SAE_SOURCE = "fake-source"
 
 
@@ -40,18 +77,22 @@ def initialize_models():
     This fixture will be run once per test session and will be available to all tests
     that need an initialized model. It uses the same initialization logic as the
     /initialize endpoint.
+
+    The model to test can be selected via TEST_MODEL environment variable:
+        TEST_MODEL=gpt2-small pytest ...   (default)
+        TEST_MODEL=gemma-3-270m pytest ...
     """
-    # Set environment variables for testing
+    # Set environment variables for testing using the active model config
     os.environ.update(
         {
-            "MODEL_ID": "gpt2-small",
-            "SAE_SETS": json.dumps(["res-jb"]),
+            "MODEL_ID": ACTIVE_MODEL_CONFIG.model_id,
+            "SAE_SETS": json.dumps([ACTIVE_MODEL_CONFIG.sae_source_set]),
             "MODEL_DTYPE": "float16",
             "SAE_DTYPE": "float32",
             "TOKEN_LIMIT": "500",
             "DEVICE": "cpu",
             "INCLUDE_SAE": json.dumps(
-                ["7-res-jb"]
+                ACTIVE_MODEL_CONFIG.sae_selected_sources
             ),  # Only load the specific SAE we want
             "EXCLUDE_SAE": json.dumps([]),
             "MAX_LOADED_SAES": "1",
