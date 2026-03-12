@@ -26,6 +26,8 @@ class ModelTestConfig:
     bos_token_str: str
     # Feature index known to exist in the selected SAE
     steer_feature_index: int
+    # Model embedding dimension (residual stream width)
+    dim_model: int
 
 
 # Model configurations for testing
@@ -36,6 +38,7 @@ MODEL_CONFIGS = {
         sae_selected_sources=["7-res-jb"],
         bos_token_str="<|endoftext|>",
         steer_feature_index=5,
+        dim_model=768,
     ),
     "gemma-3-270m": ModelTestConfig(
         model_id="google/gemma-3-270m",
@@ -43,6 +46,7 @@ MODEL_CONFIGS = {
         sae_selected_sources=["5-gemmascope-2-res-16k"],
         bos_token_str="<bos>",
         steer_feature_index=5,
+        dim_model=1152,
     ),
 }
 
@@ -57,6 +61,7 @@ X_SECRET_KEY = "cat"
 MODEL_ID = ACTIVE_MODEL_CONFIG.model_id
 SAE_SOURCE_SET = ACTIVE_MODEL_CONFIG.sae_source_set
 SAE_SELECTED_SOURCES = ACTIVE_MODEL_CONFIG.sae_selected_sources
+DIM_MODEL = ACTIVE_MODEL_CONFIG.dim_model
 ABS_TOLERANCE = 0.1
 N_COMPLETION_TOKENS = 10
 TEMPERATURE = 0
