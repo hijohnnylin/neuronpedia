@@ -1,3 +1,5 @@
+import pytest
+import torch
 from fastapi.testclient import TestClient
 from neuronpedia_inference.shared import Model
 from neuronpedia_inference_client.models.np_steer_chat_message import NPSteerChatMessage
@@ -69,19 +71,63 @@ def _patch_generate_stream_cache(
 ) -> None:
     model = Model.get_instance()
     assert isinstance(model, HookedTransformer)
-    original_generate_stream = type(model).generate_stream.__get__(model, type(model))
+    _ensure_generate_stream_compat(model)
+    original_generate_stream = getattr(model, "generate_stream")
 
     def wrapped_generate_stream(*args, **kwargs):
         kwargs["use_past_kv_cache"] = use_past_kv_cache
+        kwargs["do_sample"] = False
         return original_generate_stream(*args, **kwargs)
 
-    monkeypatch.setattr(model, "generate_stream", wrapped_generate_stream)
+    monkeypatch.setattr(model, "generate_stream", wrapped_generate_stream, raising=False)
+
+
+def _has_native_generate_stream(model: HookedTransformer) -> bool:
+    return callable(getattr(type(model), "generate_stream", None))
+
+
+def _ensure_generate_stream_compat(model: HookedTransformer) -> None:
+    if hasattr(model, "generate_stream"):
+        return
+
+    def generate_stream_compat(*args, **kwargs):
+        input_tokens = kwargs.pop("input")
+        max_new_tokens = kwargs.pop("max_new_tokens")
+        stop_at_eos = kwargs.pop("stop_at_eos", True)
+        do_sample = kwargs.pop("do_sample", True)
+        temperature = kwargs.pop("temperature", 1.0)
+        freq_penalty = kwargs.pop("freq_penalty", 0.0)
+        use_past_kv_cache = kwargs.pop("use_past_kv_cache", True)
+        return_logits = kwargs.pop("return_logits", False)
+        kwargs.pop("max_tokens_per_yield", None)
+
+        generated = model.generate(
+            input=input_tokens,
+            max_new_tokens=max_new_tokens,
+            stop_at_eos=stop_at_eos,
+            do_sample=do_sample,
+            temperature=temperature,
+            freq_penalty=freq_penalty,
+            use_past_kv_cache=use_past_kv_cache,
+            return_type="tokens",
+            verbose=False,
+        )
+        logits = None
+        if return_logits:
+            with torch.no_grad():
+                logits = model(generated[:, -1:].clone())
+        yield generated, logits
+
+    setattr(model, "generate_stream", generate_stream_compat)
 
 
 def _run_chat_request(
     client: TestClient,
     request: SteerCompletionChatPostRequest,
 ) -> dict[NPSteerType, str]:
+    model = Model.get_instance()
+    assert isinstance(model, HookedTransformer)
+    _ensure_generate_stream_compat(model)
     response = client.post(
         ENDPOINT, json=request.model_dump(), headers={"X-SECRET-KEY": X_SECRET_KEY}
     )
@@ -120,6 +166,11 @@ def test_completion_chat_feature_additive_cache_parity(client: TestClient, monke
     """
     Cache should not change deterministic chat steering outputs.
     """
+    model = Model.get_instance()
+    assert isinstance(model, HookedTransformer)
+    if not _has_native_generate_stream(model):
+        pytest.skip("cache parity test requires a native generate_stream implementation")
+
     with monkeypatch.context() as cache_on_patch:
         _patch_generate_stream_cache(cache_on_patch, use_past_kv_cache=True)
         cached_outputs = _run_chat_request(client, _make_additive_feature_request())
