@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from neuronpedia_inference.shared import Model
 from neuronpedia_inference_client.models.np_steer_chat_message import NPSteerChatMessage
 from neuronpedia_inference_client.models.np_steer_feature import NPSteerFeature
 from neuronpedia_inference_client.models.np_steer_method import NPSteerMethod
@@ -10,6 +11,7 @@ from neuronpedia_inference_client.models.steer_completion_chat_post200_response 
 from neuronpedia_inference_client.models.steer_completion_chat_post_request import (
     SteerCompletionChatPostRequest,
 )
+from transformer_lens import HookedTransformer
 
 from tests.conftest import (
     FREQ_PENALTY,
@@ -25,6 +27,7 @@ from tests.conftest import (
     TEST_PROMPT,
     X_SECRET_KEY,
 )
+from tests.utils.assertions import assert_deterministic_output_match
 
 ENDPOINT = "/v1/steer/completion-chat"
 
@@ -42,11 +45,8 @@ TEST_STEER_VECTOR = NPSteerVector(
 )
 
 
-def test_completion_chat_steered_with_features_additive(client: TestClient):
-    """
-    Test steering using features with additive method for chat completion.
-    """
-    request = SteerCompletionChatPostRequest(
+def _make_additive_feature_request() -> SteerCompletionChatPostRequest:
+    return SteerCompletionChatPostRequest(
         prompt=[NPSteerChatMessage(content=TEST_PROMPT, role="user")],
         model=MODEL_ID,
         steer_method=NPSteerMethod.SIMPLE_ADDITIVE,
@@ -61,15 +61,41 @@ def test_completion_chat_steered_with_features_additive(client: TestClient):
         steer_special_tokens=STEER_SPECIAL_TOKENS,
     )
 
+
+def _patch_generate_stream_cache(
+    monkeypatch,
+    *,
+    use_past_kv_cache: bool,
+) -> None:
+    model = Model.get_instance()
+    assert isinstance(model, HookedTransformer)
+    original_generate_stream = type(model).generate_stream.__get__(model, type(model))
+
+    def wrapped_generate_stream(*args, **kwargs):
+        kwargs["use_past_kv_cache"] = use_past_kv_cache
+        return original_generate_stream(*args, **kwargs)
+
+    monkeypatch.setattr(model, "generate_stream", wrapped_generate_stream)
+
+
+def _run_chat_request(
+    client: TestClient,
+    request: SteerCompletionChatPostRequest,
+) -> dict[NPSteerType, str]:
     response = client.post(
         ENDPOINT, json=request.model_dump(), headers={"X-SECRET-KEY": X_SECRET_KEY}
     )
     assert response.status_code == 200
     data = response.json()
     response_model = SteerCompletionChatPost200Response(**data)
+    return {output.type: output.raw for output in response_model.outputs}
 
-    # Create a mapping of output type to output text
-    outputs_by_type = {output.type: output.raw for output in response_model.outputs}
+
+def test_completion_chat_steered_with_features_additive(client: TestClient):
+    """
+    Test steering using features with additive method for chat completion.
+    """
+    outputs_by_type = _run_chat_request(client, _make_additive_feature_request())
 
     # Test basic API contract
     assert len(outputs_by_type) == 2
@@ -88,6 +114,32 @@ def test_completion_chat_steered_with_features_additive(client: TestClient):
 
     assert outputs_by_type[NPSteerType.STEERED] == expected_steered_output
     assert outputs_by_type[NPSteerType.DEFAULT] == expected_default_output
+
+
+def test_completion_chat_feature_additive_cache_parity(client: TestClient, monkeypatch):
+    """
+    Cache should not change deterministic chat steering outputs.
+    """
+    with monkeypatch.context() as cache_on_patch:
+        _patch_generate_stream_cache(cache_on_patch, use_past_kv_cache=True)
+        cached_outputs = _run_chat_request(client, _make_additive_feature_request())
+
+    with monkeypatch.context() as cache_off_patch:
+        _patch_generate_stream_cache(cache_off_patch, use_past_kv_cache=False)
+        uncached_outputs = _run_chat_request(client, _make_additive_feature_request())
+
+    assert_deterministic_output_match(
+        cached_outputs[NPSteerType.DEFAULT],
+        uncached_outputs[NPSteerType.DEFAULT],
+        left_label="cached default output",
+        right_label="uncached default output",
+    )
+    assert_deterministic_output_match(
+        cached_outputs[NPSteerType.STEERED],
+        uncached_outputs[NPSteerType.STEERED],
+        left_label="cached steered output",
+        right_label="uncached steered output",
+    )
 
 
 def test_completion_chat_steered_with_vectors_additive(client: TestClient):

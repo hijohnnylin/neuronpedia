@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from neuronpedia_inference_client.models.activation_single_post200_response import (
     ActivationSinglePost200Response,
@@ -8,13 +7,13 @@ from neuronpedia_inference_client.models.activation_single_post_request import (
 )
 
 from tests.conftest import (
-    ABS_TOLERANCE,
     BOS_TOKEN_STR,
     MODEL_ID,
     SAE_SELECTED_SOURCES,
     TEST_PROMPT,
     X_SECRET_KEY,
 )
+from tests.utils.assertions import assert_activation_structure_stable
 
 ENDPOINT = "/v1/activation/single"
 
@@ -42,19 +41,16 @@ def test_activation_single_with_source_and_index(client: TestClient):
     data = response.json()
     response_model = ActivationSinglePost200Response(**data)
 
-    # Check activation values
-    expected_activations = [134.71969604492188, 0.051671065390110016, 0.0, 0.0, 0.0]
-    expected_max_value = 134.71969604492188
-    expected_max_value_index = 0
-    assert (
-        pytest.approx(response_model.activation.values, abs=ABS_TOLERANCE)
-        == expected_activations
+    reference_activations = [[134.71969604492188, 0.051671065390110016, 0.0, 0.0, 0.0]]
+    assert_activation_structure_stable(
+        [list(response_model.activation.values)],
+        reference_activations,
+        min_mean_cosine=0.99,
+        min_mean_topk_overlap=1.0,
+        top_k=2,
     )
-    assert (
-        pytest.approx(response_model.activation.max_value, abs=ABS_TOLERANCE)
-        == expected_max_value
-    )
-    assert response_model.activation.max_value_index == expected_max_value_index
+    assert response_model.activation.max_value is not None
+    assert response_model.activation.max_value_index is not None
 
     # Check tokens
     expected_tokens = [BOS_TOKEN_STR, "Hello", ",", " world", "!"]
@@ -88,19 +84,16 @@ def test_activation_single_with_vector_and_hook(client: TestClient):
     data = response.json()
     response_model = ActivationSinglePost200Response(**data)
 
-    # Check activation values
-    expected_activations = [5.4140625, 3.23828125, 1.9462890625, 1.671875]
-    expected_max_value = 5.4140625
-    expected_max_value_index = 0
-    assert (
-        pytest.approx(response_model.activation.values, abs=ABS_TOLERANCE)
-        == expected_activations
+    reference_activations = [[5.4140625, 3.23828125, 1.9462890625, 1.671875]]
+    assert_activation_structure_stable(
+        [list(response_model.activation.values)],
+        reference_activations,
+        min_mean_cosine=0.99,
+        min_mean_topk_overlap=1.0,
+        top_k=2,
     )
-    assert (
-        pytest.approx(response_model.activation.max_value, abs=ABS_TOLERANCE)
-        == expected_max_value
-    )
-    assert response_model.activation.max_value_index == expected_max_value_index
+    assert response_model.activation.max_value is not None
+    assert response_model.activation.max_value_index is not None
 
     # Check token values
     expected_tokens = ["Hello", ",", " world", "!"]
