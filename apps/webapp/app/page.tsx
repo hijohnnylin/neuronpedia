@@ -110,43 +110,11 @@ export default function Page() {
           <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gradient-to-t from-white via-white to-gBlue/40 px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
             <div className="content">
               <div className="flex items-center justify-center text-xs font-bold text-sky-800">
-                <CustomTooltip
-                  side="right"
-                  trigger={
-                    <span className="flex flex-col items-center justify-center gap-y-[5px] text-xs font-semibold text-slate-600">
-                      <div className="flex flex-row items-center justify-center gap-x-1 rounded-full px-4 py-0.5 text-[10px] font-bold text-gBlue transition-all">
-                        Dec 2025
-                      </div>
-                    </span>
-                  }
-                >
-                  <div className="mb-2 text-center text-sm font-bold text-slate-800">⚠️ Rolling Release</div>
-                  <div>
-                    {`Significant issues with Google Cloud were blocking Gemma Scope 2 rollout on Neuronpedia, so we've
-                    switched to AWS. See `}{' '}
-                    <a
-                      href="https://docs.google.com/spreadsheets/d/1eVjelj5Kzv7rTA688hYXhKFfit3UXCPDKPo9UfNEOaU/edit?usp=sharing"
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-sky-700"
-                    >
-                      shared document
-                    </a>{' '}
-                    for available resources.
+                <span className="flex flex-col items-center justify-center gap-y-[5px] text-xs font-semibold text-slate-600">
+                  <div className="flex flex-row items-center justify-center gap-x-1 rounded-full px-4 py-0.5 text-[10px] font-bold text-gBlue transition-all">
+                    Dec 2025
                   </div>
-                  <div className="mt-1">
-                    The artifacts in Gemma Scope 2{' '}
-                    <a
-                      href="https://huggingface.co/google/gemma-scope-2"
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-sky-700"
-                    >
-                      HuggingFace
-                    </a>{' '}
-                    are complete and available for use.
-                  </div>
-                </CustomTooltip>
+                </span>
               </div>
               <div className="mt-2 text-[24px] font-bold text-sky-700 sm:mt-3">
                 <span className="font-bold text-gBlue">Gemma Scope 2</span>
