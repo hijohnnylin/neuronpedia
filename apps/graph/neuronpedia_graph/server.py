@@ -369,12 +369,18 @@ async def steer_handler(req: Request):
         ]
         steered_generation = "".join(steered_tokenized_str_tokens)
 
+        # Cross-layer transcoders return 2D logits (seq, vocab) — normalize to 3D
+        if steered_logits.dim() == 2:
+            steered_logits = steered_logits.unsqueeze(0)
+
         # get the logits at each step
         topk_default_by_token = []
         topk_steered_by_token = []
 
         with torch.inference_mode():
             default_logits = model(default_generation)
+            if default_logits.dim() == 2:
+                default_logits = default_logits.unsqueeze(0)
 
             # iterate through the tokens and get the logits
             for i in range(len(default_tokenized_str_tokens)):
