@@ -223,7 +223,7 @@ async def check_busy():
 
 
 def get_topk(logits: torch.Tensor, tokenizer, k: int = 5):
-    probs = torch.softmax(logits.squeeze()[-1], dim=-1)
+    probs = torch.softmax(logits[0, -1, :], dim=-1)
     topk = torch.topk(probs, k)
     return [
         (tokenizer.decode([topk.indices[i]]), topk.values[i].item()) for i in range(k)
@@ -369,12 +369,20 @@ async def steer_handler(req: Request):
         ]
         steered_generation = "".join(steered_tokenized_str_tokens)
 
+        # Cross-layer transcoders return 2D logits (seq, vocab) — normalize to 3D
+        if steered_logits.dim() == 2:
+            steered_logits = steered_logits.unsqueeze(0)
+
         # get the logits at each step
         topk_default_by_token = []
         topk_steered_by_token = []
 
         with torch.inference_mode():
-            default_logits = model(default_generation)
+            # Pass token IDs directly to avoid retokenization (which can
+            # prepend a duplicate BOS and shift logit positions by one).
+            default_logits = model(default_tokenized.unsqueeze(0))
+            if default_logits.dim() == 2:
+                default_logits = default_logits.unsqueeze(0)
 
             # iterate through the tokens and get the logits
             for i in range(len(default_tokenized_str_tokens)):
@@ -399,19 +407,18 @@ async def steer_handler(req: Request):
                         ],
                     }
                 )
-            # we use the default tokenized str length because max_new_tokens is not +1 for default
-            # we need +1 on steered because we want the logits for the last token
-            for i in range(
-                len(default_tokenized_str_tokens)
-            ):  # If we're still processing the original prompt tokens (before generation),
-                # append a blank item since we're only interested in generated tokens
+            # steered_logits only contains generation-step logits (no prompt positions),
+            # so we offset the index: position 0 in steered_logits = sequence_length - 1
+            # in the full token sequence.
+            for i in range(len(default_tokenized_str_tokens)):
                 if i < sequence_length - 1:
                     topk_steered_by_token.append(
                         {"token": steered_tokenized_str_tokens[i], "top_logits": []}
                     )
                     continue
+                gen_idx = i - (sequence_length - 1)
                 topk_steered = get_topk(
-                    steered_logits[:, : i + 1, :], model.tokenizer, req_data.top_k
+                    steered_logits[:, : gen_idx + 1, :], model.tokenizer, req_data.top_k
                 )
                 topk_steered_by_token.append(
                     {

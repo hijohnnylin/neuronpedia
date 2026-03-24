@@ -26,6 +26,8 @@ const MESSAGE_TOKEN = ['<|message|>', '<|end_header_id|>'];
 const CHANNEL_TOKEN = '<|channel|>';
 const BOS_TOKEN = ['<bos>'];
 
+const CHAT_ROLE_NAMES = ['system', 'user', 'assistant'];
+
 const BOTTOM_ACTIVATION_DATA_SOURCE = 'bottom';
 
 export default function ActivationItem({
@@ -81,6 +83,8 @@ export default function ActivationItem({
   // For bottom activations, center around the most negative value; otherwise center around max
   const anchorTokenIndex = isBottomActivation ? minActivationTokenIndex : maxActivationTokenIndex;
 
+  const hasImStartToken = activation.tokens?.some((t) => t === '<|im_start|>') || false;
+
   let firstTokenShown = -1;
 
   useEffect(() => {
@@ -119,13 +123,22 @@ export default function ActivationItem({
   function tokenIsRoleToken(tokenIndex: number) {
     const modelId = activation.modelId || '';
     const isGemmaInstruct = modelId.startsWith('gemma-2-') || modelId.startsWith('gemma-3-');
+    // Qwen format can start with a bare role name (e.g. "system") without a preceding <|im_start|>
+    if (
+      hasImStartToken &&
+      tokenIndex === 0 &&
+      CHAT_ROLE_NAMES.includes(activation.tokens?.[0] || '') &&
+      activation.tokens?.[1] === '\n'
+    ) {
+      return true;
+    }
     return (
       tokenIndex > 0 &&
       START_TOKEN.includes(activation.tokens?.[tokenIndex - 1] || '') &&
       (END_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
         MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
         (isGemmaInstruct && activation.tokens?.[tokenIndex + 1] === '\n') ||
-        (activation.modelId === 'qwen2.5-7b-it' && activation.tokens?.[tokenIndex + 1] === '\n') ||
+        (hasImStartToken && activation.tokens?.[tokenIndex + 1] === '\n') ||
         CHANNEL_TOKEN === activation.tokens?.[tokenIndex + 1])
     );
   }
