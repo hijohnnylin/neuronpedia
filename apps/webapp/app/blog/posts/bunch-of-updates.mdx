@@ -1,6 +1,6 @@
 ---
 title: 'New Features, Tools, and Our Podcast: The Babble'
-description: 'TopK By Token Search, Matryoshka SAEs, Probity, and Auto-Interp with Latest GPTs/Claudes'
+description: 'TopK By Token Search, Matryoshka SAEs, and Auto-Interp with Latest GPTs/Claudes'
 date: 2025-04-21
 author: Johnny Lin & Curt Tigges
 image: ASSET_BASE_URL/blog/search-topk.gif
@@ -24,9 +24,9 @@ Of course, you can still subscribe to our [regular text RSS](https://www.neuronp
 - **New Stuff**
   - **TopK Search By Token**: Find, filter, and sort top features/latents by token. [[Demo]](/blog/bunch-of-updates#demo-topk-search-by-token) [[Try It]](http://neuronpedia.org/search-topk-by-token?modelId=gemma-2-2b&source=20-gemmascope-res-16k&text=The+Magna+Carta%2C+signed+in+1215%2C+was+a+significant+early+step+in+the+process+of+constitutional+development+in+England.+It+laid+the+groundwork+for+the+development+of+parliamentary+democracy.&densityThreshold=0.0075&ignoreBos=true&sortBy=frequency) [[API]](https://neuronpedia.org/api-doc#tag/search-topk-by-token/POST/api/search-topk-by-token)
   - **Matryoshka SAEs**: Trained by David Chanin, [absorption paper](https://arxiv.org/abs/2409.14507) author. [[Demo]](/blog/bunch-of-updates#demo-catching-z-using-a-starts-with-z-latent) [[Browse]](https://www.neuronpedia.org/res-matryoshka-dc) [[LW]](https://www.lesswrong.com/posts/3EQQpB7i2o3nu2Di6/a-bunch-of-matryoshka-saes) [[HF]](https://huggingface.co/chanind/gemma-2-2b-batch-topk-matryoshka-saes-w-32k-l0-40)
-  - **Probity**: Python library to generate and use probes on Neuronpedia. [[Github]](https://github.com/curt-tigges/probity) [[Demo]](https://github.com/curt-tigges/probity/blob/main/tutorials/1-probity-basics.py)
   - **New Auto-Interp Models**: GPT-4.1, o3/o4-mini, Claude 3.7 Sonnet/3.5 Haiku. [[Example]](https://www.neuronpedia.org/gpt2-small/8-res-jb/56)
   - **Domain**: Neuronpedia supporter @sheikheddy generously donated [residual.stream](https://residual.stream). Thanks! 🤩
+  - (No Longer Maintained) Probity: Python library to generate and use probes on Neuronpedia. [[Github]](https://github.com/curt-tigges/probity) [[Demo]](https://github.com/curt-tigges/probity/blob/main/tutorials/1-probity-basics.py)
 - **Stuff We're Working On**: Making Development Suck Less, Docs, Tests, etc. [[Github]](https://github.com/hijohnnylin/neuronpedia)
 - **Asks**: Feedback, Feature Requests, Collaborations. [[Contact]](https://neuronpedia.org/contact)
 
@@ -97,7 +97,9 @@ But that's not an exhaustive test. So, we took the experiment further by using a
 
 Of course, this does not mean we have solved feature absorption or other issues with SAEs. But by providing the tools and data, we allow anyone to quickly spin up experiments to make real advances. And remember, now that Neuronpedia is [open source](/blog/neuronpedia-is-now-open-source), you can do all this (and more, if you customize) on your own data too.
 
-# New Library: Probity - Create Probes, Test/Share on Neuronpedia
+# (No Longer Maintained) Probity - Create Probes, Test/Share on Neuronpedia
+
+**Probity is no longer maintained. We recommend that you use a different library or roll your own probing libary. We apologize for any inconvenience this may cause.**
 
 [[Github]](https://github.com/curt-tigges/probity) [[Demo]](https://github.com/curt-tigges/probity/blob/main/tutorials/1-probity-basics.py)
 

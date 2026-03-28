@@ -18,8 +18,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     return NextResponse.json({ error: 'path and tableName are required' }, { status: 400 });
   }
 
-  if (!IS_LOCALHOST && request.user && !(await getAuthedAdminUser(request as RequestAuthedAdminUser))) {
-    return NextResponse.json({ error: 'This route is only available on localhost or to admin users' }, { status: 400 });
+  if (!IS_LOCALHOST && (!request.user || !(await getAuthedAdminUser(request as RequestAuthedAdminUser)))) {
+    return NextResponse.json({ error: 'This route is only available on localhost or to admin users' }, { status: 403 });
   }
   const linesJsonlString = await downloadAndDecompressFile(path);
   await importJsonlString(tableName, linesJsonlString);
