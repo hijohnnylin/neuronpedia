@@ -8,7 +8,6 @@ resources:
   - deployments/inference.yaml
   - deployments/autointerp.yaml
   - statefulsets/postgres.yaml
-  - jobs/db-init.yaml
   - networking/ingress.yaml
   - services/postgres.yaml
 

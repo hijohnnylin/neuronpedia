@@ -1,6 +1,20 @@
 # Default to nocuda
 BUILD_TYPE ?= nocuda
 
+# optional build argument, useful for zero trust environments
+CUSTOM_CA_BUNDLE ?= .nocustomca
+
+# Environment files to load (can be overridden, e.g., make webapp-prod-build ENV_FILES=".env.custom .env")
+# Multiple files can be specified, later files take precedence
+ENV_FILES ?= .env.localhost .env
+
+# Helper function to generate --env-file flags for docker compose
+# Usage: $(call env_file_flags,$(ENV_FILES))
+# Note: Only includes files that exist to avoid errors
+define env_file_flags
+$(foreach file,$(1),--env-file $(file) )
+endef
+
 help:  ## Show available commands
 	@echo "\n\033[1;35mThe pattern for commands is generally 'make [app]-[environment]-[action]''.\nFor example, 'make webapp-demo-build' will _build_ the _webapp for the demo environment.\033[0m"
 	@awk 'BEGIN {FS = ":.*## "; printf "\n"} /^[a-zA-Z_-]+:.*## / { printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -34,28 +48,36 @@ init-env: ## Initialize the environment
 	fi
 	@echo "Environment initialized successfully."
 
-webapp-demo-build: ## Webapp: Public Demo Environment - Build
+webapp-demo-build: ## Webapp: Public Demo Environment - Build. Usage: make webapp-demo-build [ENV_FILES=".env.demo .env"]
 	@echo "Building the webapp for connecting to the public demo database and servers..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
-	ENV_FILE=../.env.demo docker compose -f docker/compose.yaml build webapp
+	@echo "Using environment files: $(or $(ENV_FILES_DEMO),.env.demo .env)"
+	ENV_FILE=../.env.demo docker compose -f docker/compose.yaml \
+		$(call env_file_flags,$(or $(ENV_FILES_DEMO),.env.demo .env)) \
+		build webapp
 
-webapp-demo-run: ## Webapp: Public Demo Environment - Run
+webapp-demo-run: ## Webapp: Public Demo Environment - Run. Usage: make webapp-demo-run [ENV_FILES=".env.demo .env"]
 	@echo "Bringing up the webapp and connecting to the demo database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
-	ENV_FILE=../.env.demo docker compose -f docker/compose.yaml --env-file .env.demo --env-file .env up webapp
+	@echo "Using environment files: $(or $(ENV_FILES_DEMO),.env.demo .env)"
+	docker compose -f docker/compose.yaml \
+		$(call env_file_flags,$(or $(ENV_FILES_DEMO),.env.demo .env)) \
+		up webapp
 
-webapp-demo-check: ## Webapp: Public Demo Environment - Check Config
+webapp-demo-check: ## Webapp: Public Demo Environment - Check Config. Usage: make webapp-demo-check [ENV_FILES=".env.demo .env"]
 	@echo "Printing the webapp configuration - this is useful to see if your environment variables are set correctly."
-	ENV_FILE=../.env.demo docker compose -f docker/compose.yaml config webapp
+	@echo "Using environment files: $(or $(ENV_FILES_DEMO),.env.demo .env)"
+	docker compose -f docker/compose.yaml \
+		$(call env_file_flags,$(or $(ENV_FILES_DEMO),.env.demo .env)) \
+		config webapp
 
-CUSTOM_CA_BUNDLE ?= .nocustomca
-webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Build)
+webapp-prod-build: ## Webapp: Localhost Environment - Build (Production Build). Usage: make webapp-prod-build [ENV_FILES=".env.localhost .env"]
 	@echo "Building the webapp for connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -64,23 +86,28 @@ webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Bui
 	@if [ "$(CUSTOM_CA_BUNDLE)" != ".nocustomca" ]; then \
 		echo "Using custom CA bundle: $(CUSTOM_CA_BUNDLE)"; \
 	fi
-	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) ENV_FILE=../.env.localhost \
-		docker compose -f docker/compose.yaml build webapp db-init postgres
+	@echo "Using environment files: $(ENV_FILES)"
+	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) \
+		docker compose -f docker/compose.yaml \
+		$(call env_file_flags,$(ENV_FILES)) \
+		build --no-cache webapp db-init postgres
 
-webapp-localhost-run: ## Webapp: Localhost Environment - Run (Production Build)
+webapp-prod-run: ## Webapp: Localhost Environment - Run (Production Run)
 	@echo "Bringing up the webapp and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
 		exit 1; \
 	fi
-	docker compose -f docker/compose.yaml --env-file .env.localhost --env-file .env up webapp db-init postgres
+	docker compose -f docker/compose.yaml \
+	$(call env_file_flags,$(ENV_FILES)) \
+	up webapp db-init postgres
 
 install-nodejs: # Install Node.js for Webapp
 	curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 	# Need to source NVM in the same shell
 	. ${HOME}/.nvm/nvm.sh && nvm install 22
 
-webapp-localhost-install: ## Webapp: Localhost Environment - Install Dependencies (Development Build)
+webapp-install: ## Webapp: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the webapp dependencies for development in the localhost environment..."
 	# check if npm exists
 	if ! which npm > /dev/null 2>&1; then \
@@ -90,7 +117,24 @@ webapp-localhost-install: ## Webapp: Localhost Environment - Install Dependencie
 	cd apps/webapp && \
 	npm install
 	
-webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
+webapp-dev-build: ## Webapp: Localhost Environment - Run (Development Build). Usage: make webapp-dev-build [ENV_FILES=".env.localhost .env"]
+	@echo "Bringing up the webapp for development and connecting to the localhost database..."
+	@if ! which docker > /dev/null 2>&1; then \
+		echo "Error: Docker is not installed. Please install Docker first."; \
+		exit 1; \
+	fi
+	@if [ "$(CUSTOM_CA_BUNDLE)" != ".nocustomca" ]; then \
+		echo "Using custom CA bundle: $(CUSTOM_CA_BUNDLE)"; \
+	fi
+	@echo "Using environment files: $(ENV_FILES)"
+	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) \
+		docker compose \
+		-f docker/compose.yaml \
+		-f docker/compose.webapp.dev.yaml \
+		$(call env_file_flags,$(ENV_FILES)) \
+		build webapp db-init postgres
+
+webapp-dev-run: ## Webapp: Localhost Environment - Run (Development Run)
 	@echo "Bringing up the webapp for development and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -103,7 +147,7 @@ webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
 		--env-file .env \
 		up webapp db-init postgres
 
-webapp-localhost-test: ## Webapp: Localhost Environment - Run (Playwright)
+webapp-test: ## Webapp: Localhost Environment - Run (Playwright)
 	@echo "Bringing up the webapp for development and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -116,14 +160,30 @@ webapp-localhost-test: ## Webapp: Localhost Environment - Run (Playwright)
 		--env-file .env \
 		up webapp db-init postgres
 
-inference-localhost-install: ## Inference: Localhost Environment - Install Dependencies (Development Build)
+db-run: ## Database: Localhost Environment - Run
+	@echo "Bringing up the database..."
+	@if ! which docker > /dev/null 2>&1; then \
+		echo "Error: Docker is not installed. Please install Docker first."; \
+		exit 1; \
+	fi
+	docker compose -f docker/compose.yaml --env-file .env.localhost --env-file .env up db-init postgres -d
+
+db-down: ## Database: Localhost Environment - Down
+	@echo "Bringing down the database..."
+	@if ! which docker > /dev/null 2>&1; then \
+		echo "Error: Docker is not installed. Please install Docker first."; \
+		exit 1; \
+	fi
+	docker compose -f docker/compose.yaml --env-file .env.localhost --env-file .env down postgres
+
+inference-install: ## Inference: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the inference dependencies for development in the localhost environment..."
 	cd apps/inference && \
 	poetry remove neuronpedia-inference-client || true && \
 	poetry add ../../packages/python/neuronpedia-inference-client && \
 	poetry lock && poetry install
 
-inference-localhost-build: ## Inference: Localhost Environment - Build
+inference-build: ## Inference: Localhost Environment - Build
 	@echo "Building the inference server for the localhost environment..."
 	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) \
 	ENV_FILE=../.env.localhost \
@@ -133,10 +193,10 @@ inference-localhost-build: ## Inference: Localhost Environment - Build
 		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
 		build inference
 
-inference-localhost-build-gpu: ## Inference: Localhost Environment - Build (CUDA). Usage: make inference-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
-	$(MAKE) inference-localhost-build BUILD_TYPE=cuda CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE)
+inference-build-gpu: ## Inference: Localhost Environment - Build (CUDA). Usage: make inference-build-gpu [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) inference-build BUILD_TYPE=cuda CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE)
 
-inference-localhost-dev: ## Inference: Localhost Environment - Run (Development Build). Usage: make inference-localhost-dev [MODEL_SOURCESET=gpt2-small.res-jb] [AUTORELOAD=1]
+inference-dev: ## Inference: Localhost Environment - Run (Development Build). Usage: make inference-dev [MODEL_SOURCESET=gpt2-small.res-jb] [AUTORELOAD=1]
 	@echo "Bringing up the inference server for development in the localhost environment..."
 	@if [ "$(MODEL_SOURCESET)" != "" ]; then \
 		if [ ! -f ".env.inference.$(MODEL_SOURCESET)" ]; then \
@@ -157,13 +217,13 @@ inference-localhost-dev: ## Inference: Localhost Environment - Run (Development 
 			--env-file .env \
 			up inference; \
 	else \
-		echo "Error: MODEL_SOURCESET not specified. Please specify a model+source configuration, e.g. to load .env.inference.gpt2-small.res-jb, run: make inference-localhost-dev MODEL_SOURCESET=gpt2-small.res-jb"; \
+		echo "Error: MODEL_SOURCESET not specified. Please specify a model+source configuration, e.g. to load .env.inference.gpt2-small.res-jb, run: make inference-dev MODEL_SOURCESET=gpt2-small.res-jb"; \
 		echo "Please run 'make inference-list-configs' to see available configurations."; \
 		exit 1; \
 	fi
 
-inference-localhost-dev-gpu: ## Inference: Localhost Environment - Run (Development Build with CUDA). Usage: make inference-localhost-dev-gpu [MODEL_SOURCESET=gpt2-small.res-jb] [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
-	$(MAKE) inference-localhost-dev ENABLE_GPU=1 MODEL_SOURCESET=$(MODEL_SOURCESET) AUTORELOAD=$(AUTORELOAD)
+inference-dev-gpu: ## Inference: Localhost Environment - Run (Development Build with CUDA). Usage: make inference-dev-gpu [MODEL_SOURCESET=gpt2-small.res-jb] [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) inference-dev ENABLE_GPU=1 MODEL_SOURCESET=$(MODEL_SOURCESET) AUTORELOAD=$(AUTORELOAD)
 
 inference-list-configs: ## Inference: List Configurations (possible values for MODEL_SOURCESET)
 	@echo "\nAvailable Inference Configurations (.env.inference.*)\n================================================\n"
@@ -174,20 +234,24 @@ inference-list-configs: ## Inference: List Configurations (possible values for M
 		sae_sets=$$(grep "^SAE_SETS=" $$config | cut -d'=' -f2); \
 		echo "    Model: \033[33m$$model_id\033[0m"; \
 		echo "    Source/SAE Sets: \033[32m$$sae_sets\033[0m"; \
-		echo "    \033[1;35mmake inference-localhost-dev MODEL_SOURCESET=$$name\033[0m"; \
-		echo "    \033[1;35mmake inference-localhost-dev-gpu MODEL_SOURCESET=$$name\033[0m"; \
+		echo "    \033[1;35mmake inference-dev MODEL_SOURCESET=$$name\033[0m"; \
+		echo "    \033[1;35mmake inference-dev-gpu MODEL_SOURCESET=$$name\033[0m"; \
 		echo ""; \
 	done
 
-autointerp-localhost-install: ## Autointerp: Localhost Environment - Install Dependencies (Development Build)
+autointerp-install: ## Autointerp: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the autointerp dependencies for development in the localhost environment..."
 	cd apps/autointerp && \
 	poetry remove neuronpedia-autointerp-client || true && \
 	poetry add ../../packages/python/neuronpedia-autointerp-client && \
 	poetry lock && poetry install
 
-autointerp-localhost-build: ## Autointerp: Localhost Environment - Build
+autointerp-build: ## Autointerp: Localhost Environment - Build
 	@echo "Building the autointerp server for the localhost environment..."
+	@if [ "$(CUSTOM_CA_BUNDLE)" != ".nocustomca" ]; then \
+		echo "Using custom CA bundle: $(CUSTOM_CA_BUNDLE)"; \
+	fi
+	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) \
 	ENV_FILE=../.env.localhost \
 		BUILD_TYPE=$(BUILD_TYPE) \
 		docker compose \
@@ -195,10 +259,10 @@ autointerp-localhost-build: ## Autointerp: Localhost Environment - Build
 		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
 		build autointerp
 
-autointerp-localhost-build-gpu: ## Autointerp: Localhost Environment - Build (CUDA). Usage: make autointerp-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
-	$(MAKE) autointerp-localhost-build BUILD_TYPE=cuda
+autointerp-build-gpu: ## Autointerp: Localhost Environment - Build (CUDA). Usage: make autointerp-build-gpu [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) autointerp-build BUILD_TYPE=cuda CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE)
 
-autointerp-localhost-dev: ## Autointerp: Localhost Environment - Run (Development Build). Usage: make autointerp-localhost-dev [AUTORELOAD=1]
+autointerp-dev: ## Autointerp: Localhost Environment - Run (Development Build). Usage: make autointerp-dev [AUTORELOAD=1]
 	@echo "Bringing up the autointerp server for development in the localhost environment..."
 	RELOAD=$$([ "$(AUTORELOAD)" = "1" ] && echo "1" || echo "0") \
 	ENV_FILE=../.env.localhost \
@@ -211,8 +275,8 @@ autointerp-localhost-dev: ## Autointerp: Localhost Environment - Run (Developmen
 		--env-file .env \
 		up autointerp
 
-autointerp-localhost-dev-gpu: ## Autointerp: Localhost Environment - Run (Development Build with CUDA). Usage: make autointerp-localhost-dev-gpu [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
-	$(MAKE) autointerp-localhost-dev ENABLE_GPU=1 AUTORELOAD=$(AUTORELOAD)
+autointerp-dev-gpu: ## Autointerp: Localhost Environment - Run (Development Build with CUDA). Usage: make autointerp-dev-gpu [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) autointerp-dev ENABLE_GPU=1 AUTORELOAD=$(AUTORELOAD)
 
 reset-docker-data: ## Reset Docker Data - this deletes your local database!
 	@echo "WARNING: This will delete all your local neuronpedia Docker data and databases!"
@@ -224,13 +288,13 @@ reset-docker-data: ## Reset Docker Data - this deletes your local database!
 	@echo "Resetting Docker data..."
 	ENV_FILE=../.env.localhost docker compose -f docker/compose.yaml down -v
 
-graph-localhost-install: ## Graph: Localhost Environment - Install Dependencies (Development Build)
+graph-install: ## Graph: Localhost Environment - Install Dependencies (Development Build)
 	@echo "Installing the graph server dependencies for development in the localhost environment..."
 	cd apps/graph && \
 	poetry lock && poetry install
 
 
-graph-localhost-build: ## Graph: Localhost Environment - Build
+graph-build: ## Graph: Localhost Environment - Build
 	@echo "Building the graph server for the localhost environment..."
 	ENV_FILE=.env.localhost \
 		BUILD_TYPE=$(BUILD_TYPE) \
@@ -239,10 +303,10 @@ graph-localhost-build: ## Graph: Localhost Environment - Build
 		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
 		build graph
 
-graph-localhost-build-gpu: ## Graph: Localhost Environment - Build (CUDA). Usage: make graph-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
-	$(MAKE) graph-localhost-build BUILD_TYPE=cuda
+graph-build-gpu: ## Graph: Localhost Environment - Build (CUDA). Usage: make graph-build-gpu [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) graph-build BUILD_TYPE=cuda
 
-graph-localhost-dev: ## Graph: Localhost Environment - Run (Development Build). Usage: make graph-localhost-dev [AUTORELOAD=1]
+graph-dev: ## Graph: Localhost Environment - Run (Development Build). Usage: make graph-dev [AUTORELOAD=1]
 	@echo "Bringing up the graph server for development in the localhost environment..."
 	RELOAD=$$([ "$(AUTORELOAD)" = "1" ] && echo "1" || echo "0") \
 	ENV_FILE=.env.localhost \
@@ -256,5 +320,5 @@ graph-localhost-dev: ## Graph: Localhost Environment - Run (Development Build). 
 		--env-file apps/graph/.env \
 		up graph
 
-graph-localhost-dev-gpu: ## Graph: Localhost Environment - Run (Development Build with CUDA). Usage: make graph-localhost-dev-gpu [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
-	$(MAKE) graph-localhost-dev ENABLE_GPU=1 AUTORELOAD=$(AUTORELOAD)
+graph-dev-gpu: ## Graph: Localhost Environment - Run (Development Build with CUDA). Usage: make graph-dev-gpu [AUTORELOAD=1] [USE_LOCAL_HF_CACHE=1]
+	$(MAKE) graph-dev ENABLE_GPU=1 AUTORELOAD=$(AUTORELOAD)
