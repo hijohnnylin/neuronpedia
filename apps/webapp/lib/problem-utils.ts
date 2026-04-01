@@ -32,7 +32,7 @@ const MAX_RESPONSE_BYTES = 512 * 1024; // 512KB
 function isPrivateUrl(urlString: string): boolean {
   try {
     const parsed = new URL(urlString);
-    const hostname = parsed.hostname;
+    const { hostname } = parsed;
     if (hostname === 'localhost' || hostname === '[::1]') return true;
     if (BLOCKED_IP_RANGES.some((re) => re.test(hostname))) return true;
     // Block cloud metadata endpoints
