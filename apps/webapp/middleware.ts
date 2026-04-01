@@ -5,9 +5,7 @@ import { API_KEY_HEADER_NAME, CONTACT_EMAIL_ADDRESS, ENABLE_RATE_LIMITER, HIGHER
 
 const RATE_LIMIT_WINDOW = '60 m';
 
-const NO_LIMIT_ENDPOINTS = [
-  '/api/steer-load',
-];
+const NO_LIMIT_ENDPOINTS = ['/api/steer-load'];
 
 const NORMAL_RATE_LIMITS = [
   { endpoint: '/', limit: 25000 },
@@ -23,6 +21,16 @@ const NORMAL_RATE_LIMITS = [
   { endpoint: '/api/source-set/new', limit: 10 },
   { endpoint: '/api/graph/tokenize', limit: 300 },
   { endpoint: '/api/auth/signin', limit: 5 },
+  { endpoint: '/api/problem/url-metadata', limit: 120 },
+  { endpoint: '/api/problem/node/submit-urls', limit: 30 },
+  { endpoint: '/api/problem/node/new', limit: 60 },
+  { endpoint: '/api/problem/node/update', limit: 120 },
+  { endpoint: '/api/problem/node/delete', limit: 60 },
+  { endpoint: '/api/problem/node/approve', limit: 60 },
+  { endpoint: '/api/problem/comment/new', limit: 120 },
+  { endpoint: '/api/problem/comment/delete', limit: 60 },
+  { endpoint: '/api/problem/edge/new', limit: 60 },
+  { endpoint: '/api/problem/edge/delete', limit: 60 },
 ];
 
 const HIGHER_RATE_LIMITS = [

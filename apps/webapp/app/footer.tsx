@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 export default function Footer() {
   const pathname = usePathname();
 
-  if (pathname.toLowerCase().includes('sae-bench-anonymized')) {
+  if (pathname.toLowerCase().includes('sae-bench-anonymized') || pathname.toLowerCase().startsWith('/problems')) {
     return <div />;
   }
   return (

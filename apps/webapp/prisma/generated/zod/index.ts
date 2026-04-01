@@ -58,7 +58,7 @@ export const SessionScalarFieldEnumSchema = z.enum(['id','sessionToken','userId'
 
 export const UserSecretScalarFieldEnumSchema = z.enum(['id','username','type','value','createdAt','updatedAt']);
 
-export const UserScalarFieldEnumSchema = z.enum(['id','name','bio','email','emailVerified','githubUsername','bot','image','admin','canTriggerExplanations','emailNewsletterNotification','emailUnsubscribeAll','emailUnsubscribeCode','createdAt']);
+export const UserScalarFieldEnumSchema = z.enum(['id','name','bio','email','emailVerified','githubUsername','bot','image','admin','canTriggerExplanations','isProblemEditor','emailNewsletterNotification','emailUnsubscribeAll','emailUnsubscribeCode','createdAt']);
 
 export const GraphMetadataSubgraphScalarFieldEnumSchema = z.enum(['id','displayName','graphMetadataId','pinnedIds','supernodes','clerps','pruningThreshold','densityThreshold','userId','isFeaturedSolution','createdAt','updatedAt']);
 
@@ -130,6 +130,14 @@ export const SteerOutputToNeuronScalarFieldEnumSchema = z.enum(['modelId','layer
 
 export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextMd5','inputTextChatTemplate','inputTextChatTemplateMd5','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds','capMonitorOutput']);
 
+export const ProblemNodeScalarFieldEnumSchema = z.enum(['id','nodeTypes','parentId','title','description','author','mainUrl','additionalUrls','applicationTags','approvalState','approverId','createdById','createdAt','updatedAt']);
+
+export const ProblemEdgeScalarFieldEnumSchema = z.enum(['id','sourceNodeId','targetNodeId','type','approvalState','approverId','createdById','createdAt']);
+
+export const ProblemNodeCommentScalarFieldEnumSchema = z.enum(['id','problemNodeId','parentCommentId','text','userId','createdAt','updatedAt']);
+
+export const ProblemNodeLogScalarFieldEnumSchema = z.enum(['id','timestamp','userId','problemNodeId','action','details']);
+
 export const SortOrderSchema = z.enum(['asc','desc']);
 
 export const JsonNullValueInputSchema = z.enum(['JsonNull',]);
@@ -157,6 +165,18 @@ export type SteerOutputTypeType = `${z.infer<typeof SteerOutputTypeSchema>}`
 export const VisibilitySchema = z.enum(['PUBLIC','UNLISTED','PRIVATE']);
 
 export type VisibilityType = `${z.infer<typeof VisibilitySchema>}`
+
+export const ProblemNodeTypeSchema = z.enum(['topic','paper','tool','dataset','eval','replication','model']);
+
+export type ProblemNodeTypeType = `${z.infer<typeof ProblemNodeTypeSchema>}`
+
+export const ProblemNodeApprovalStateSchema = z.enum(['APPROVED','REJECTED','PENDING']);
+
+export type ProblemNodeApprovalStateType = `${z.infer<typeof ProblemNodeApprovalStateSchema>}`
+
+export const ProblemEdgeTypeSchema = z.enum(['raises','addresses','extends','replicates','related_to']);
+
+export type ProblemEdgeTypeType = `${z.infer<typeof ProblemEdgeTypeSchema>}`
 
 /////////////////////////////////////////
 // MODELS
@@ -346,6 +366,7 @@ export const UserSchema = z.object({
   image: z.string().nullable(),
   admin: z.boolean(),
   canTriggerExplanations: z.boolean(),
+  isProblemEditor: z.boolean(),
   emailNewsletterNotification: z.boolean(),
   emailUnsubscribeAll: z.boolean(),
   emailUnsubscribeCode: z.string().cuid(),
@@ -392,6 +413,12 @@ export type UserRelations = {
   graphMetadatas: GraphMetadataWithRelations[];
   graphMetadataDataPutRequests: GraphMetadataDataPutRequestWithRelations[];
   graphMetadataSubgraphs: GraphMetadataSubgraphWithRelations[];
+  problemNodesCreated: ProblemNodeWithRelations[];
+  problemNodesApproved: ProblemNodeWithRelations[];
+  problemEdgesCreated: ProblemEdgeWithRelations[];
+  problemEdgesApproved: ProblemEdgeWithRelations[];
+  problemNodeComments: ProblemNodeCommentWithRelations[];
+  problemNodeLogs: ProblemNodeLogWithRelations[];
 };
 
 export type UserWithRelations = z.infer<typeof UserSchema> & UserRelations
@@ -423,6 +450,12 @@ export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.
   graphMetadatas: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
+  problemNodesCreated: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
+  problemNodesApproved: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
+  problemEdgesCreated: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
+  problemEdgesApproved: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
+  problemNodeComments: z.lazy(() => ProblemNodeCommentWithRelationsSchema).array(),
+  problemNodeLogs: z.lazy(() => ProblemNodeLogWithRelationsSchema).array(),
 }))
 
 // USER PARTIAL RELATION SCHEMA
@@ -455,6 +488,12 @@ export type UserPartialRelations = {
   graphMetadatas?: GraphMetadataPartialWithRelations[];
   graphMetadataDataPutRequests?: GraphMetadataDataPutRequestPartialWithRelations[];
   graphMetadataSubgraphs?: GraphMetadataSubgraphPartialWithRelations[];
+  problemNodesCreated?: ProblemNodePartialWithRelations[];
+  problemNodesApproved?: ProblemNodePartialWithRelations[];
+  problemEdgesCreated?: ProblemEdgePartialWithRelations[];
+  problemEdgesApproved?: ProblemEdgePartialWithRelations[];
+  problemNodeComments?: ProblemNodeCommentPartialWithRelations[];
+  problemNodeLogs?: ProblemNodeLogPartialWithRelations[];
 };
 
 export type UserPartialWithRelations = z.infer<typeof UserPartialSchema> & UserPartialRelations
@@ -486,6 +525,12 @@ export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+  problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
+  problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
+  problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+  problemEdgesApproved: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+  problemNodeComments: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).array(),
+  problemNodeLogs: z.lazy(() => ProblemNodeLogPartialWithRelationsSchema).array(),
 })).partial()
 
 export type UserWithPartialRelations = z.infer<typeof UserSchema> & UserPartialRelations
@@ -517,6 +562,12 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+  problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
+  problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
+  problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+  problemEdgesApproved: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+  problemNodeComments: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).array(),
+  problemNodeLogs: z.lazy(() => ProblemNodeLogPartialWithRelationsSchema).array(),
 }).partial())
 
 /////////////////////////////////////////
@@ -3017,4 +3068,305 @@ export const SteerOutputWithPartialRelationsSchema: z.ZodType<SteerOutputWithPar
   creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
   connectedDefaultOutput: z.lazy(() => SteerOutputPartialWithRelationsSchema).nullable(),
   connectedSteerOutputs: z.lazy(() => SteerOutputPartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// PROBLEM NODE SCHEMA
+/////////////////////////////////////////
+
+export const ProblemNodeSchema = z.object({
+  nodeTypes: ProblemNodeTypeSchema.array(),
+  approvalState: ProblemNodeApprovalStateSchema,
+  id: z.number().int(),
+  parentId: z.number().int().nullable(),
+  title: z.string().nullable(),
+  description: z.string().nullable(),
+  author: z.string().nullable(),
+  mainUrl: z.string().nullable(),
+  additionalUrls: z.string().array(),
+  applicationTags: z.string().array(),
+  approverId: z.string().nullable(),
+  createdById: z.string(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type ProblemNode = z.infer<typeof ProblemNodeSchema>
+
+/////////////////////////////////////////
+// PROBLEM NODE PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProblemNodePartialSchema = ProblemNodeSchema.partial()
+
+export type ProblemNodePartial = z.infer<typeof ProblemNodePartialSchema>
+
+// PROBLEM NODE RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemNodeRelations = {
+  parent?: ProblemNodeWithRelations | null;
+  children: ProblemNodeWithRelations[];
+  approver?: UserWithRelations | null;
+  createdBy: UserWithRelations;
+  comments: ProblemNodeCommentWithRelations[];
+  logs: ProblemNodeLogWithRelations[];
+  edgesAsSource: ProblemEdgeWithRelations[];
+  edgesAsTarget: ProblemEdgeWithRelations[];
+};
+
+export type ProblemNodeWithRelations = z.infer<typeof ProblemNodeSchema> & ProblemNodeRelations
+
+export const ProblemNodeWithRelationsSchema: z.ZodType<ProblemNodeWithRelations> = ProblemNodeSchema.merge(z.object({
+  parent: z.lazy(() => ProblemNodeWithRelationsSchema).nullable(),
+  children: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
+  approver: z.lazy(() => UserWithRelationsSchema).nullable(),
+  createdBy: z.lazy(() => UserWithRelationsSchema),
+  comments: z.lazy(() => ProblemNodeCommentWithRelationsSchema).array(),
+  logs: z.lazy(() => ProblemNodeLogWithRelationsSchema).array(),
+  edgesAsSource: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
+  edgesAsTarget: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
+}))
+
+// PROBLEM NODE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemNodePartialRelations = {
+  parent?: ProblemNodePartialWithRelations | null;
+  children?: ProblemNodePartialWithRelations[];
+  approver?: UserPartialWithRelations | null;
+  createdBy?: UserPartialWithRelations;
+  comments?: ProblemNodeCommentPartialWithRelations[];
+  logs?: ProblemNodeLogPartialWithRelations[];
+  edgesAsSource?: ProblemEdgePartialWithRelations[];
+  edgesAsTarget?: ProblemEdgePartialWithRelations[];
+};
+
+export type ProblemNodePartialWithRelations = z.infer<typeof ProblemNodePartialSchema> & ProblemNodePartialRelations
+
+export const ProblemNodePartialWithRelationsSchema: z.ZodType<ProblemNodePartialWithRelations> = ProblemNodePartialSchema.merge(z.object({
+  parent: z.lazy(() => ProblemNodePartialWithRelationsSchema).nullable(),
+  children: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
+  approver: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+  createdBy: z.lazy(() => UserPartialWithRelationsSchema),
+  comments: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).array(),
+  logs: z.lazy(() => ProblemNodeLogPartialWithRelationsSchema).array(),
+  edgesAsSource: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+  edgesAsTarget: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+})).partial()
+
+export type ProblemNodeWithPartialRelations = z.infer<typeof ProblemNodeSchema> & ProblemNodePartialRelations
+
+export const ProblemNodeWithPartialRelationsSchema: z.ZodType<ProblemNodeWithPartialRelations> = ProblemNodeSchema.merge(z.object({
+  parent: z.lazy(() => ProblemNodePartialWithRelationsSchema).nullable(),
+  children: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
+  approver: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+  createdBy: z.lazy(() => UserPartialWithRelationsSchema),
+  comments: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).array(),
+  logs: z.lazy(() => ProblemNodeLogPartialWithRelationsSchema).array(),
+  edgesAsSource: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+  edgesAsTarget: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// PROBLEM EDGE SCHEMA
+/////////////////////////////////////////
+
+export const ProblemEdgeSchema = z.object({
+  type: ProblemEdgeTypeSchema,
+  approvalState: ProblemNodeApprovalStateSchema,
+  id: z.string().cuid(),
+  sourceNodeId: z.number().int(),
+  targetNodeId: z.number().int(),
+  approverId: z.string().nullable(),
+  createdById: z.string(),
+  createdAt: z.coerce.date(),
+})
+
+export type ProblemEdge = z.infer<typeof ProblemEdgeSchema>
+
+/////////////////////////////////////////
+// PROBLEM EDGE PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProblemEdgePartialSchema = ProblemEdgeSchema.partial()
+
+export type ProblemEdgePartial = z.infer<typeof ProblemEdgePartialSchema>
+
+// PROBLEM EDGE RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemEdgeRelations = {
+  sourceNode: ProblemNodeWithRelations;
+  targetNode: ProblemNodeWithRelations;
+  approver?: UserWithRelations | null;
+  createdBy: UserWithRelations;
+};
+
+export type ProblemEdgeWithRelations = z.infer<typeof ProblemEdgeSchema> & ProblemEdgeRelations
+
+export const ProblemEdgeWithRelationsSchema: z.ZodType<ProblemEdgeWithRelations> = ProblemEdgeSchema.merge(z.object({
+  sourceNode: z.lazy(() => ProblemNodeWithRelationsSchema),
+  targetNode: z.lazy(() => ProblemNodeWithRelationsSchema),
+  approver: z.lazy(() => UserWithRelationsSchema).nullable(),
+  createdBy: z.lazy(() => UserWithRelationsSchema),
+}))
+
+// PROBLEM EDGE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemEdgePartialRelations = {
+  sourceNode?: ProblemNodePartialWithRelations;
+  targetNode?: ProblemNodePartialWithRelations;
+  approver?: UserPartialWithRelations | null;
+  createdBy?: UserPartialWithRelations;
+};
+
+export type ProblemEdgePartialWithRelations = z.infer<typeof ProblemEdgePartialSchema> & ProblemEdgePartialRelations
+
+export const ProblemEdgePartialWithRelationsSchema: z.ZodType<ProblemEdgePartialWithRelations> = ProblemEdgePartialSchema.merge(z.object({
+  sourceNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
+  targetNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
+  approver: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+  createdBy: z.lazy(() => UserPartialWithRelationsSchema),
+})).partial()
+
+export type ProblemEdgeWithPartialRelations = z.infer<typeof ProblemEdgeSchema> & ProblemEdgePartialRelations
+
+export const ProblemEdgeWithPartialRelationsSchema: z.ZodType<ProblemEdgeWithPartialRelations> = ProblemEdgeSchema.merge(z.object({
+  sourceNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
+  targetNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
+  approver: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+  createdBy: z.lazy(() => UserPartialWithRelationsSchema),
+}).partial())
+
+/////////////////////////////////////////
+// PROBLEM NODE COMMENT SCHEMA
+/////////////////////////////////////////
+
+export const ProblemNodeCommentSchema = z.object({
+  id: z.string().cuid(),
+  problemNodeId: z.number().int(),
+  parentCommentId: z.string().nullable(),
+  text: z.string(),
+  userId: z.string(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type ProblemNodeComment = z.infer<typeof ProblemNodeCommentSchema>
+
+/////////////////////////////////////////
+// PROBLEM NODE COMMENT PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProblemNodeCommentPartialSchema = ProblemNodeCommentSchema.partial()
+
+export type ProblemNodeCommentPartial = z.infer<typeof ProblemNodeCommentPartialSchema>
+
+// PROBLEM NODE COMMENT RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemNodeCommentRelations = {
+  problemNode: ProblemNodeWithRelations;
+  parentComment?: ProblemNodeCommentWithRelations | null;
+  replies: ProblemNodeCommentWithRelations[];
+  user: UserWithRelations;
+};
+
+export type ProblemNodeCommentWithRelations = z.infer<typeof ProblemNodeCommentSchema> & ProblemNodeCommentRelations
+
+export const ProblemNodeCommentWithRelationsSchema: z.ZodType<ProblemNodeCommentWithRelations> = ProblemNodeCommentSchema.merge(z.object({
+  problemNode: z.lazy(() => ProblemNodeWithRelationsSchema),
+  parentComment: z.lazy(() => ProblemNodeCommentWithRelationsSchema).nullable(),
+  replies: z.lazy(() => ProblemNodeCommentWithRelationsSchema).array(),
+  user: z.lazy(() => UserWithRelationsSchema),
+}))
+
+// PROBLEM NODE COMMENT PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemNodeCommentPartialRelations = {
+  problemNode?: ProblemNodePartialWithRelations;
+  parentComment?: ProblemNodeCommentPartialWithRelations | null;
+  replies?: ProblemNodeCommentPartialWithRelations[];
+  user?: UserPartialWithRelations;
+};
+
+export type ProblemNodeCommentPartialWithRelations = z.infer<typeof ProblemNodeCommentPartialSchema> & ProblemNodeCommentPartialRelations
+
+export const ProblemNodeCommentPartialWithRelationsSchema: z.ZodType<ProblemNodeCommentPartialWithRelations> = ProblemNodeCommentPartialSchema.merge(z.object({
+  problemNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
+  parentComment: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).nullable(),
+  replies: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).array(),
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+})).partial()
+
+export type ProblemNodeCommentWithPartialRelations = z.infer<typeof ProblemNodeCommentSchema> & ProblemNodeCommentPartialRelations
+
+export const ProblemNodeCommentWithPartialRelationsSchema: z.ZodType<ProblemNodeCommentWithPartialRelations> = ProblemNodeCommentSchema.merge(z.object({
+  problemNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
+  parentComment: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).nullable(),
+  replies: z.lazy(() => ProblemNodeCommentPartialWithRelationsSchema).array(),
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+}).partial())
+
+/////////////////////////////////////////
+// PROBLEM NODE LOG SCHEMA
+/////////////////////////////////////////
+
+export const ProblemNodeLogSchema = z.object({
+  id: z.string().cuid(),
+  timestamp: z.coerce.date(),
+  userId: z.string(),
+  problemNodeId: z.number().int(),
+  action: z.string(),
+  details: z.string().nullable(),
+})
+
+export type ProblemNodeLog = z.infer<typeof ProblemNodeLogSchema>
+
+/////////////////////////////////////////
+// PROBLEM NODE LOG PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProblemNodeLogPartialSchema = ProblemNodeLogSchema.partial()
+
+export type ProblemNodeLogPartial = z.infer<typeof ProblemNodeLogPartialSchema>
+
+// PROBLEM NODE LOG RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemNodeLogRelations = {
+  user: UserWithRelations;
+  problemNode: ProblemNodeWithRelations;
+};
+
+export type ProblemNodeLogWithRelations = z.infer<typeof ProblemNodeLogSchema> & ProblemNodeLogRelations
+
+export const ProblemNodeLogWithRelationsSchema: z.ZodType<ProblemNodeLogWithRelations> = ProblemNodeLogSchema.merge(z.object({
+  user: z.lazy(() => UserWithRelationsSchema),
+  problemNode: z.lazy(() => ProblemNodeWithRelationsSchema),
+}))
+
+// PROBLEM NODE LOG PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProblemNodeLogPartialRelations = {
+  user?: UserPartialWithRelations;
+  problemNode?: ProblemNodePartialWithRelations;
+};
+
+export type ProblemNodeLogPartialWithRelations = z.infer<typeof ProblemNodeLogPartialSchema> & ProblemNodeLogPartialRelations
+
+export const ProblemNodeLogPartialWithRelationsSchema: z.ZodType<ProblemNodeLogPartialWithRelations> = ProblemNodeLogPartialSchema.merge(z.object({
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+  problemNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
+})).partial()
+
+export type ProblemNodeLogWithPartialRelations = z.infer<typeof ProblemNodeLogSchema> & ProblemNodeLogPartialRelations
+
+export const ProblemNodeLogWithPartialRelationsSchema: z.ZodType<ProblemNodeLogWithPartialRelations> = ProblemNodeLogSchema.merge(z.object({
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+  problemNode: z.lazy(() => ProblemNodePartialWithRelationsSchema),
 }).partial())

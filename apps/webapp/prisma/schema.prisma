@@ -119,6 +119,14 @@ model User {
   graphMetadataDataPutRequests GraphMetadataDataPutRequest[]
   graphMetadataSubgraphs       GraphMetadataSubgraph[]
 
+  isProblemEditor      Boolean              @default(false)
+  problemNodesCreated  ProblemNode[]        @relation(name: "problemNodeCreatedBy")
+  problemNodesApproved ProblemNode[]        @relation(name: "problemNodeApprover")
+  problemEdgesCreated  ProblemEdge[]        @relation(name: "problemEdgeCreatedBy")
+  problemEdgesApproved ProblemEdge[]        @relation(name: "problemEdgeApprover")
+  problemNodeComments  ProblemNodeComment[] @relation(name: "problemNodeComment")
+  problemNodeLogs      ProblemNodeLog[]     @relation(name: "problemNodeLog")
+
   emailNewsletterNotification Boolean @default(true)
   emailUnsubscribeAll         Boolean @default(false)
   emailUnsubscribeCode        String  @default(cuid())
@@ -352,7 +360,7 @@ enum InferenceEngine {
 }
 
 model InferenceHostSource {
-  id      String @id @default(cuid())
+  id      String          @id @default(cuid())
   name    String
   hostUrl String
   engine  InferenceEngine @default(TRANSFORMER_LENS)
@@ -458,7 +466,7 @@ model SourceSet {
   releases     SourceRelease? @relation(fields: [releaseName], references: [name], onDelete: Cascade)
 
   // we may have graphs even if we are not actively allowing generation of new graphs for this sourceSet
-  hasGraphs        Boolean @default(false)
+  hasGraphs        Boolean                      @default(false)
   graphEnabled     Boolean                      @default(false)
   graphHostSources GraphHostSourceOnSourceSet[]
   graphMetadata    GraphMetadata[]
@@ -954,30 +962,30 @@ model SteerOutputToNeuron {
 }
 
 model SteerOutput {
-  id                     String                @id @default(cuid())
-  type                   SteerOutputType
-  modelId                String
-  model                  Model                 @relation(fields: [modelId], references: [id], onDelete: Cascade)
-  steerSpecialTokens     Boolean               @default(false)
-  inputText              String
-  inputTextMd5           String?
-  inputTextChatTemplate  String?
+  id                       String                @id @default(cuid())
+  type                     SteerOutputType
+  modelId                  String
+  model                    Model                 @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  steerSpecialTokens       Boolean               @default(false)
+  inputText                String
+  inputTextMd5             String?
+  inputTextChatTemplate    String?
   inputTextChatTemplateMd5 String?
-  outputText             String
-  outputTextChatTemplate String?
-  toNeurons              SteerOutputToNeuron[] // features used in this steer output
-  temperature            Float
-  numTokens              Int
-  freqPenalty            Float
-  seed                   Float
-  strengthMultiplier     Float
-  steerMethod            String                @default("SIMPLE_ADDITIVE")
-  createdAt              DateTime              @default(now())
-  creatorId              String?
-  creator                User?                 @relation(fields: [creatorId], references: [id], onDelete: SetNull)
-  version                Int                   @default(1)
+  outputText               String
+  outputTextChatTemplate   String?
+  toNeurons                SteerOutputToNeuron[] // features used in this steer output
+  temperature              Float
+  numTokens                Int
+  freqPenalty              Float
+  seed                     Float
+  strengthMultiplier       Float
+  steerMethod              String                @default("SIMPLE_ADDITIVE")
+  createdAt                DateTime              @default(now())
+  creatorId                String?
+  creator                  User?                 @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+  version                  Int                   @default(1)
   // JSON string
-  logprobs               String?
+  logprobs                 String?
 
   // this is only set for STEERED outputs. it points to the DEFAULT output that was associated with it
   // one STEERED output can only be connected to one DEFAULT output
@@ -989,7 +997,7 @@ model SteerOutput {
   connectedSteerOutputIds String[]      @default([])
   connectedSteerOutputs   SteerOutput[] @relation(name: "steeredOutput")
 
-  capMonitorOutput        String?
+  capMonitorOutput String?
 
   // to do lookups, we should also check Neurons to ensure they match
   @@index([modelId, type, inputTextMd5, temperature, numTokens, freqPenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndex")
@@ -1008,4 +1016,114 @@ enum Visibility {
   PUBLIC
   UNLISTED
   PRIVATE
+}
+
+// ── Problems Feature ──────────────────────────────────────────────────
+
+enum ProblemNodeType {
+  topic
+  paper
+  tool
+  dataset
+  eval
+  replication
+  model
+}
+
+enum ProblemNodeApprovalState {
+  APPROVED
+  REJECTED
+  PENDING
+}
+
+enum ProblemEdgeType {
+  raises
+  addresses
+  extends
+  replicates
+  related_to
+}
+
+model ProblemNode {
+  id              Int                      @id @default(autoincrement())
+  nodeTypes       ProblemNodeType[]         @default([topic])
+  parentId        Int?
+  parent          ProblemNode?             @relation(name: "ProblemNodeParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children        ProblemNode[]            @relation(name: "ProblemNodeParent")
+  title           String?
+  description     String?
+  author          String?
+  mainUrl         String?
+  additionalUrls  String[]                 @default([])
+  applicationTags String[]                 @default([])
+  approvalState   ProblemNodeApprovalState @default(PENDING)
+  approverId      String?
+  approver        User?                    @relation(name: "problemNodeApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  createdById     String
+  createdBy       User                     @relation(name: "problemNodeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  comments        ProblemNodeComment[]
+  logs            ProblemNodeLog[]
+  edgesAsSource   ProblemEdge[]            @relation(name: "problemEdgeSource")
+  edgesAsTarget   ProblemEdge[]            @relation(name: "problemEdgeTarget")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([approvalState])
+  @@index([createdById])
+}
+
+model ProblemEdge {
+  id           String          @id @default(cuid())
+  sourceNodeId Int
+  sourceNode   ProblemNode     @relation(name: "problemEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNodeId Int
+  targetNode   ProblemNode     @relation(name: "problemEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  type          ProblemEdgeType
+  approvalState ProblemNodeApprovalState @default(PENDING)
+  approverId    String?
+  approver      User?                   @relation(name: "problemEdgeApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  createdById   String
+  createdBy     User                    @relation(name: "problemEdgeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([sourceNodeId, targetNodeId, type])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+}
+
+model ProblemNodeComment {
+  id              String               @id @default(cuid())
+  problemNodeId   Int
+  problemNode     ProblemNode          @relation(fields: [problemNodeId], references: [id], onDelete: Cascade)
+  parentCommentId String?
+  parentComment   ProblemNodeComment?  @relation(name: "ProblemCommentReply", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         ProblemNodeComment[] @relation(name: "ProblemCommentReply")
+  text            String
+  userId          String
+  user            User                 @relation(name: "problemNodeComment", fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([problemNodeId])
+  @@index([parentCommentId])
+  @@index([userId])
+}
+
+model ProblemNodeLog {
+  id            String      @id @default(cuid())
+  timestamp     DateTime    @default(now())
+  userId        String
+  user          User        @relation(name: "problemNodeLog", fields: [userId], references: [id], onDelete: Cascade)
+  problemNodeId Int
+  problemNode   ProblemNode @relation(fields: [problemNodeId], references: [id], onDelete: Cascade)
+  action        String
+  details       String?
+
+  @@index([problemNodeId])
+  @@index([userId])
+  @@index([timestamp])
 }

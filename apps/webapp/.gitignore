@@ -65,6 +65,9 @@ firebase-debug.log
 # apple secret
 .secret.*
 
+# temp files
+/tmp/
+
 # Playwright
 node_modules/
 /test-results/
