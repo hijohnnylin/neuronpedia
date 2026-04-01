@@ -117,9 +117,15 @@ async function assertUserCanEditNode(nodeId: number, user: AuthenticatedUser) {
 
 // ─── Nodes ──────────────────────────────────────────────────────────────────
 
-export async function getProblemNodes(includeUnapproved = false) {
+export async function getProblemNodes(includeUnapproved = false, currentUserId?: string) {
+  const where = includeUnapproved
+    ? {}
+    : currentUserId
+      ? { OR: [{ approvalState: ProblemNodeApprovalState.APPROVED }, { createdById: currentUserId }] }
+      : { approvalState: ProblemNodeApprovalState.APPROVED };
+
   return prisma.problemNode.findMany({
-    where: includeUnapproved ? {} : { approvalState: ProblemNodeApprovalState.APPROVED },
+    where,
     include: problemNodeInclude,
     orderBy: { title: 'asc' },
   });

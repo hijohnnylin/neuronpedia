@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 export default async function ProblemsPage() {
   const session = await getServerSession(authOptions);
 
-  // Fetch all approved nodes server-side
-  const initialNodes = await getProblemNodes(false);
+  // Fetch all approved nodes server-side (plus user's own nodes if logged in)
+  const initialNodes = await getProblemNodes(false, session?.user?.id);
 
   // Check if user is editor/admin
   let canEdit = false;

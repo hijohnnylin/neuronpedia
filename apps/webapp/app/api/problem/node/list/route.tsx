@@ -17,6 +17,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     canSeeUnapproved = dbUser?.admin === true || dbUser?.isProblemEditor === true;
   }
 
-  const nodes = await getProblemNodes(canSeeUnapproved);
+  const nodes = await getProblemNodes(canSeeUnapproved, request.user?.id);
   return NextResponse.json(nodes);
 });
