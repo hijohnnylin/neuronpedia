@@ -15,7 +15,7 @@ export default async function Page({ searchParams }: { searchParams?: { [key: st
             required
             className="form-input mt-1 block w-24 rounded-md border-slate-200 text-center font-mono text-base text-slate-700 focus:border-slate-200"
           />
-          Click the button below to confirm signup.
+          Click the button below to complete signing in.
         </label>
         <input type="hidden" name="callbackUrl" value={query?.callbackUrl} />
         <input type="hidden" name="email" value={query?.email} />
@@ -23,7 +23,7 @@ export default async function Page({ searchParams }: { searchParams?: { [key: st
           type="submit"
           className="mx-auto mt-2.5 rounded-lg bg-sky-600 px-6 py-3 text-lg text-white shadow-lg transition-all hover:scale-105 hover:bg-sky-500"
         >
-          Confirm
+          Continue
         </button>
       </form>
       <p className="mt-2 flex flex-row items-center justify-center gap-1 text-center text-sm text-slate-600" />
