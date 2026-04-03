@@ -594,7 +594,7 @@ function ProblemsGraphInner({
             connectionLineType={ConnectionLineType.Bezier}
             panOnScroll
             zoomOnScroll={false}
-            zoomOnDoubleClick
+            zoomOnDoubleClick={false}
             minZoom={0.7}
             maxZoom={2}
             proOptions={{ hideAttribution: true }}
