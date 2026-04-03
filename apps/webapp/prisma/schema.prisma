@@ -315,6 +315,7 @@ model Model {
   sourceInferenceHosts InferenceHostSource[]
   graphHostSources     GraphHostSource[]
   graphMetadata        GraphMetadata[]
+  nlaSources           NlaSource[]
 
   @@unique([defaultSourceSetName, id])
   @@unique([defaultSourceId, id])
@@ -1126,4 +1127,36 @@ model ProblemNodeLog {
   @@index([problemNodeId])
   @@index([userId])
   @@index([timestamp])
+}
+
+model NlaSource {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  url         String   @default("")
+  author      String   @default("")
+  modelId     String
+  model       Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  actor       String
+  critic      String
+  servers     String[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([modelId, name])
+  @@unique([modelId, actor, critic])
+  @@index([modelId])
+}
+
+model NlaExplainCache {
+  id                  String   @id @default(cuid())
+  text                String
+  numCompletionTokens Int      @default(0)
+  temperature         Float
+  modelId             String
+  nlaSourceName       String
+  resultJson          String
+  createdAt           DateTime @default(now())
+
+  @@unique([text, numCompletionTokens, temperature, modelId, nlaSourceName], name: "nla_explain_cache_key")
 }
