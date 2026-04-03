@@ -138,7 +138,7 @@ export const ProblemNodeCommentScalarFieldEnumSchema = z.enum(['id','problemNode
 
 export const ProblemNodeLogScalarFieldEnumSchema = z.enum(['id','timestamp','userId','problemNodeId','action','details']);
 
-export const NlaSourceScalarFieldEnumSchema = z.enum(['id','name','description','url','author','modelId','actor','critic','servers','createdAt']);
+export const NlaSourceScalarFieldEnumSchema = z.enum(['id','name','description','url','author','modelId','actor','critic','servers','norm','createdAt']);
 
 export const NlaExplainCacheScalarFieldEnumSchema = z.enum(['id','text','numCompletionTokens','temperature','modelId','nlaSourceName','resultJson','createdAt']);
 
@@ -3394,6 +3394,7 @@ export const NlaSourceSchema = z.object({
   actor: z.string(),
   critic: z.string(),
   servers: z.string().array(),
+  norm: z.number(),
   createdAt: z.coerce.date(),
 })
 

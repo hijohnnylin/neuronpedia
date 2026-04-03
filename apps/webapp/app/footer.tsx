@@ -37,7 +37,7 @@ export default function Footer() {
         )}
       </div>
       <div className="flex flex-1 flex-row items-center justify-end gap-x-3 sm:gap-x-5">
-        <div className="whitespace-nowrap">© Neuronpedia 2025</div>
+        <div className="whitespace-nowrap">© Neuronpedia 2026</div>
         <Link
           href="/privacy"
           className="flex cursor-pointer items-center whitespace-nowrap px-0 py-0.5 transition-all hover:text-sky-700 hover:underline sm:px-0 sm:py-0"

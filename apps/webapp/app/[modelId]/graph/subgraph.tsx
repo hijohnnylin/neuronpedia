@@ -846,6 +846,12 @@ export default function Subgraph() {
       .data((d: ForceNode) => d.node.memberNodes || [])
       .join('div.member-circle')
       .classed('not-clt-feature', (d) => d.feature_type !== 'cross layer transcoder' && d.feature_type !== 'lorsa')
+      .classed(
+        'is-error',
+        (d) => d.feature_type === 'mlp reconstruction error' || d.feature_type === 'lorsa error',
+      )
+      .classed('is-lorsa', (d) => d.feature_type === 'lorsa')
+      .text((d) => (d.feature_type === 'lorsa' ? '▲' : ''))
       .st({
         marginLeft(d: CLTGraphNode, i: number) {
           // @ts-ignore
@@ -1200,8 +1206,14 @@ export default function Subgraph() {
     memberNodeSel
       .classed('clicked', (d: CLTGraphNode) => d.nodeId === currentClickedId)
       .classed('hovered', (d: CLTGraphNode) => d.featureId === currentHoveredId)
-      .style('background', (d: CLTGraphNode) => d?.tmpClickedLink?.pctInputColor || '#fff')
-      .style('color', (d: CLTGraphNode) => bgColorToTextColor(d?.tmpClickedLink?.pctInputColor) || 'black');
+      .style('background', (d: CLTGraphNode) =>
+        d.feature_type === 'lorsa' ? 'transparent' : d?.tmpClickedLink?.pctInputColor || '#fff',
+      )
+      .style('color', (d: CLTGraphNode) =>
+        d.feature_type === 'lorsa'
+          ? d?.tmpClickedLink?.pctInputColor || '#fff'
+          : bgColorToTextColor(d?.tmpClickedLink?.pctInputColor) || 'black',
+      );
 
     // NOTE: This effect intentionally avoids restarting the simulation or changing layout.
   }, [

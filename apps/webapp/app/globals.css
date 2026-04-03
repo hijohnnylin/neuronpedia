@@ -1003,6 +1003,26 @@ foreignObject canvas {
       border-radius: 1.5px;
     }
 
+    .is-error.member-circle {
+      border-radius: 1px;
+      transform: rotate(45deg);
+    }
+
+    .is-lorsa.member-circle {
+      border-radius: 0;
+      border: none;
+      outline: none;
+      background: transparent !important;
+      width: 9px;
+      height: 9px;
+      font-size: 9px;
+      line-height: 9px;
+      text-align: center;
+      color: #fff;
+      -webkit-text-stroke: 3px #000;
+      paint-order: stroke fill;
+    }
+
     .member-circle:first-child {
       margin-left: 0;
     }
@@ -1023,10 +1043,24 @@ foreignObject canvas {
     z-index: 100;
   }
 
+  .hovered.is-lorsa.member-circle {
+    outline: none;
+    text-shadow:
+      0 0 2px #f0f,
+      0 0 2px #f0f;
+  }
+
   .clicked.node .member-circles,
   .clicked.member-circle {
     border-color: rgba(0, 0, 0, 0);
     outline: 1.5px solid #f0f;
+  }
+
+  .clicked.is-lorsa.member-circle {
+    outline: none;
+    text-shadow:
+      0 0 2px #f0f,
+      0 0 2px #f0f;
   }
 
   .grouping-selected .member-circles {

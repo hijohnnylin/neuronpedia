@@ -1140,6 +1140,7 @@ model NlaSource {
   actor       String
   critic      String
   servers     String[]
+  norm        Float    @default(0.0)
 
   createdAt DateTime @default(now())
 

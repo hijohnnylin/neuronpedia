@@ -1012,7 +1012,7 @@ export default function LinkGraph() {
         return `translate(${pos[0]},${pos[1]})`;
       })
       .attr('r', 6)
-      .attr('cy', 0.5)
+      .attr('cy', (d) => (d.feature_type === 'lorsa' ? 1 : 0.5))
       .attr('stroke', '#f0f')
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '2 2')
@@ -1288,7 +1288,7 @@ export default function LinkGraph() {
             }),
         }}
       >
-      {/* <div className="mb-3 mt-2 flex w-full flex-row items-center justify-start gap-x-2">
+        {/* <div className="mb-3 mt-2 flex w-full flex-row items-center justify-start gap-x-2">
         <div className="text-sm font-bold text-slate-600">Link Graph</div>
         <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4 text-slate-500" />}>
           <div className="flex flex-col">
@@ -1297,54 +1297,54 @@ export default function LinkGraph() {
         </CustomTooltip>
       </div> */}
 
-      <GraphControls
-        selectedGraph={selectedGraph}
-        visState={visState}
-        updateVisStateField={updateVisStateField}
-        allowScroll={allowScroll}
-        setAllowScroll={setAllowScroll}
-        shouldDoHorizontalScroll={shouldDoHorizontalScroll}
-        isExpanded={isExpanded}
-        setIsExpanded={setIsExpanded}
-      />
-      <div className="tooltip tooltip-hidden" />
-      <svg
-        className="absolute top-0 z-0 h-full"
-        style={{
-          ...(shouldDoHorizontalScroll
-            ? {
-                overflowX: 'scroll',
-                width: `${svgWidth}%`,
-              }
-            : { width: '100%', height: 'calc(100% - 6px)' }),
-        }}
-        ref={bottomRef}
-      />
-      <svg
-        className="absolute top-0 z-0 h-full"
-        style={{
-          ...(shouldDoHorizontalScroll
-            ? {
-                overflowX: 'scroll',
-                width: `${svgWidth}%`,
-              }
-            : { width: '100%', height: 'calc(100% - 6px)' }),
-        }}
-        ref={middleRef}
-      />
-      <svg
-        className="absolute top-0 z-0 h-full"
-        style={{
-          ...(shouldDoHorizontalScroll
-            ? {
-                overflowX: 'scroll',
-                width: `${svgWidth}%`,
-              }
-            : { width: '100%', height: 'calc(100% - 6px)' }),
-        }}
-        ref={svgRef}
-      />
-    </div>
+        <GraphControls
+          selectedGraph={selectedGraph}
+          visState={visState}
+          updateVisStateField={updateVisStateField}
+          allowScroll={allowScroll}
+          setAllowScroll={setAllowScroll}
+          shouldDoHorizontalScroll={shouldDoHorizontalScroll}
+          isExpanded={isExpanded}
+          setIsExpanded={setIsExpanded}
+        />
+        <div className="tooltip tooltip-hidden" />
+        <svg
+          className="absolute top-0 z-0 h-full"
+          style={{
+            ...(shouldDoHorizontalScroll
+              ? {
+                  overflowX: 'scroll',
+                  width: `${svgWidth}%`,
+                }
+              : { width: '100%', height: 'calc(100% - 6px)' }),
+          }}
+          ref={bottomRef}
+        />
+        <svg
+          className="absolute top-0 z-0 h-full"
+          style={{
+            ...(shouldDoHorizontalScroll
+              ? {
+                  overflowX: 'scroll',
+                  width: `${svgWidth}%`,
+                }
+              : { width: '100%', height: 'calc(100% - 6px)' }),
+          }}
+          ref={middleRef}
+        />
+        <svg
+          className="absolute top-0 z-0 h-full"
+          style={{
+            ...(shouldDoHorizontalScroll
+              ? {
+                  overflowX: 'scroll',
+                  width: `${svgWidth}%`,
+                }
+              : { width: '100%', height: 'calc(100% - 6px)' }),
+          }}
+          ref={svgRef}
+        />
+      </div>
     </>
   );
 }
