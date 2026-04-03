@@ -24,7 +24,7 @@ export const MAX_GRAPH_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024;
 // ============ Neuronpedia Specific =============
 
 export const DEFAULT_GRAPH_MODEL_ID = 'gemma-2-2b';
-export const ADDITIONAL_MODELS_TO_LOAD = new Set(['qwen3-4b', 'gemma-3-4b-it']);
+export const ADDITIONAL_MODELS_TO_LOAD = new Set(['qwen3-4b', 'gemma-3-4b-it', 'qwen3-1.7b']);
 export const MODELS_WITH_NP_DASHBOARDS = new Set(['gemma-2-2b', 'qwen3-4b', 'gemma-3-4b-it', 'gemma-3-27b-it']);
 export const MODELS_TO_CALCULATE_REPLACEMENT_SCORES = MODELS_WITH_NP_DASHBOARDS;
 export const ANTHROPIC_MODELS = new Set(['jackl-circuits-runs-1-4-sofa-v3_0']);
@@ -189,6 +189,7 @@ export function nodeTypeHasFeatureDetail(node: CLTGraphNode): boolean {
   return (
     node.feature_type !== 'embedding' &&
     node.feature_type !== 'mlp reconstruction error' &&
+    node.feature_type !== 'lorsa error' &&
     node.feature_type !== 'logit'
   );
 }
@@ -337,10 +338,13 @@ export function formatCLTGraphData(data: CLTGraph, logitDiff: string | null): CL
     if (d.feature_type.includes('error')) {
       d.isError = true;
 
-      if (!d.featureId.includes('__err_idx_')) d.featureId = `${d.featureId}__err_idx_${d.ctx_from_end}`;
+      if (!d.featureId.includes('__err_idx_'))
+        d.featureId = `${d.featureId}_${d.feature_type.includes('lorsa') ? 'attn' : 'mlp'}__err_idx_${d.ctx_from_end}`;
 
       if (d.feature_type === 'mlp reconstruction error') {
-        d.clerp = `Err: mlp " ${data.metadata.prompt_tokens[d.ctx_idx]}"`; // deleted ppToken, it doesn't do anything
+        d.clerp = `Err: mlp " ${data.metadata.prompt_tokens[d.ctx_idx]}"`;
+      } else if (d.feature_type === 'lorsa error') {
+        d.clerp = `Err: attn " ${data.metadata.prompt_tokens[d.ctx_idx]}"`;
       }
     } else if (d.feature_type === 'embedding') {
       d.clerp = `Emb: " ${data.metadata.prompt_tokens[d.ctx_idx]}"`; // deleted ppToken, it doesn't do anything
@@ -507,12 +511,17 @@ export function featureTypeToText(type: string): string {
   if (type === 'logit') return '■';
   if (type === 'embedding') return '■';
   if (type === 'mlp reconstruction error') return '◆';
+  if (type === 'lorsa error') return '◆';
+  if (type === 'lorsa') return '▴';
   return '●';
 }
 
 export function featureTypeToTextSize(isMobile: boolean, type: string): number {
-  if (isMobile && type === 'mlp reconstruction error') {
+  if (isMobile && (type === 'mlp reconstruction error' || type === 'lorsa error')) {
     return 7;
+  }
+  if (type === 'lorsa') {
+    return 18;
   }
   return 14;
 }
@@ -617,7 +626,7 @@ export function filterNodes(
     shouldShowNodeForDensityThreshold(graphModelHasNpDashboards(selectedGraph), d, visState, clickedId),
   );
   if (hideMlpErrors) {
-    nodes = nodes.filter((d) => d.feature_type !== 'mlp reconstruction error');
+    nodes = nodes.filter((d) => d.feature_type !== 'mlp reconstruction error' && d.feature_type !== 'lorsa error');
   }
   return nodes;
 }
@@ -701,8 +710,10 @@ function reconstructAdjacencyMatrix(
 } {
   // Define the expected order of feature types
   const featureTypeOrder = [
-    'cross layer transcoder', // Feature nodes (indices 0 to n_features-1)
-    'mlp reconstruction error', // Error nodes
+    'cross layer transcoder', // MLP feature nodes
+    'lorsa', // Attention feature nodes
+    'mlp reconstruction error', // MLP error nodes
+    'lorsa error', // Attention error nodes
     'embedding', // Token/embedding nodes
     'logit', // Logit nodes (last n_logits positions)
   ];
@@ -788,6 +799,14 @@ export function computeGraphScoresFromGraphData(
   replacementScore: number;
   completenessScore: number;
 } {
+  const hasLorsa = graphData.nodes.some((n) => n.feature_type === 'lorsa' || n.feature_type === 'lorsa error');
+  if (hasLorsa) {
+    console.warn(
+      'Score computation skipped: graph contains lorsa nodes which are not yet supported by the scoring algorithm.',
+    );
+    return { replacementScore: -1, completenessScore: -1 };
+  }
+
   let graphNodesToUse = graphData.nodes;
   // if we have pinned IDs, then we need to filter the features to only include the pinned IDs, and the mlp errors to only include ones connected to pinned IDs
   if (pinnedIds.length > 0) {
@@ -797,14 +816,14 @@ export function computeGraphScoresFromGraphData(
     const filteredGraphNodes: CLTGraphNode[] = [];
     // iterate through all nodes
     for (const node of graphData.nodes) {
-      // if it's pinnedId and it's a cross layer transcoder, then add it to filteredGraphNodes
-      if (node.feature_type === 'cross layer transcoder') {
+      // if it's a feature node (CLT or lorsa) and pinned, add it
+      if (node.feature_type === 'cross layer transcoder' || node.feature_type === 'lorsa') {
         if (pinnedIds.includes(node.node_id)) {
           filteredGraphNodes.push(node);
         }
       }
-      // if it's a mlp error and connected to a pinned ID, then add it to filteredGraphNodes
-      else if (node.feature_type === 'mlp reconstruction error') {
+      // if it's an error node and connected to a pinned ID, add it
+      else if (node.feature_type === 'mlp reconstruction error' || node.feature_type === 'lorsa error') {
         // check each pinned node
         for (const pinnedNode of pinnedNodes) {
           // check in the graphData.links if there's a link from the pinned node to the mlp error
@@ -824,8 +843,10 @@ export function computeGraphScoresFromGraphData(
       }
     }
     graphNodesToUse = filteredGraphNodes;
-    // if the graphNodes don't have any cross layer transcoders, then return 0, 0
-    if (graphNodesToUse.filter((node) => node.feature_type === 'cross layer transcoder').length === 0) {
+    if (
+      graphNodesToUse.filter((node) => node.feature_type === 'cross layer transcoder' || node.feature_type === 'lorsa')
+        .length === 0
+    ) {
       return { replacementScore: 0, completenessScore: 0 };
     }
   }
@@ -842,8 +863,9 @@ export function computeGraphScoresFromGraphData(
   // Filter by feature_type "embedding" in nodes to get n_tokens
   const nTokens = graphNodesToUse.filter((node) => node.feature_type === 'embedding').length;
 
-  // Filter by feature_type "cross layer transcoder" in nodes to get n_features
-  const nFeatures = graphNodesToUse.filter((node) => node.feature_type === 'cross layer transcoder').length;
+  const nFeatures = graphNodesToUse.filter(
+    (node) => node.feature_type === 'cross layer transcoder' || node.feature_type === 'lorsa',
+  ).length;
 
   const errorStart = nFeatures;
 

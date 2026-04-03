@@ -44,6 +44,11 @@
               "type": "string",
               "description": "Specifies which source set on Neuronpedia your features correspond to. For example, a source set of gemmascope-transcoder-16k when combined with scan/modelId, corresponds to: https://www.neuronpedia.org/gemma-2-2b/gemmascope-transcoder-16k",
               "examples": ["gemmascope-transcoder-16k"]
+            },
+            "neuronpedia_lorsa_source_set": {
+              "type": "string",
+              "description": "Source set for lorsa (attention) features on Neuronpedia, when different from the main neuronpedia_source_set used for transcoder/MLP features.",
+              "examples": ["llama-scope-2-lorsa-8x-k64"]
             }
           }
         },

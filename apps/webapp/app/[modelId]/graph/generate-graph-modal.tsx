@@ -30,6 +30,8 @@ import {
   GRAPH_NODETHRESHOLD_MIN,
   graphGenerateSchemaClient,
   GraphTokenizeResponse,
+  LORSA_MAX_TOKENS,
+  LORSA_MODELS,
   RUNPOD_BUSY_ERROR,
 } from '@/lib/utils/graph';
 import * as RadixSelect from '@radix-ui/react-select';
@@ -50,6 +52,31 @@ const isBoringToken = (token: string) => {
   const trimmedToken = token.trim();
   return BORING_TOKENS.includes(trimmedToken) || BORING_SYMBOLS.includes(trimmedToken);
 };
+
+const LOWER_NODE_THRESHOLD_OFFSET = 0;
+const LOWER_EDGE_THRESHOLD_OFFSET = 0.2;
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const getNodeThresholdDefault = (modelId: string) =>
+  LORSA_MODELS.includes(modelId)
+    ? round2(GRAPH_NODETHRESHOLD_DEFAULT - LOWER_NODE_THRESHOLD_OFFSET)
+    : GRAPH_NODETHRESHOLD_DEFAULT;
+
+const getNodeThresholdMax = (modelId: string) =>
+  LORSA_MODELS.includes(modelId)
+    ? round2(GRAPH_NODETHRESHOLD_MAX - LOWER_NODE_THRESHOLD_OFFSET)
+    : GRAPH_NODETHRESHOLD_MAX;
+
+const getEdgeThresholdDefault = (modelId: string) =>
+  LORSA_MODELS.includes(modelId)
+    ? round2(GRAPH_EDGETHRESHOLD_DEFAULT - LOWER_EDGE_THRESHOLD_OFFSET)
+    : GRAPH_EDGETHRESHOLD_DEFAULT;
+
+const getEdgeThresholdMax = (modelId: string) =>
+  LORSA_MODELS.includes(modelId)
+    ? round2(GRAPH_EDGETHRESHOLD_MAX - LOWER_EDGE_THRESHOLD_OFFSET)
+    : GRAPH_EDGETHRESHOLD_MAX;
 
 interface FormValues {
   prompt: string;
@@ -125,6 +152,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
   const [countdownTime, setCountdownTime] = useState<number | null>(null);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [chatPrompts, setChatPrompts] = useState<ChatMessage[]>([]);
+  const [tokenizeError, setTokenizeError] = useState<string | null>(null);
 
   const session = useSession();
   const { setSignInModalOpen, getHasGraphsSourceSetsForModelId } = useGlobalContext();
@@ -142,8 +170,8 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     sourceSetName: selectedSourceSetName || '',
     maxNLogits: GRAPH_MAXNLOGITS_DEFAULT,
     desiredLogitProb: GRAPH_DESIREDLOGITPROB_DEFAULT,
-    nodeThreshold: GRAPH_NODETHRESHOLD_DEFAULT,
-    edgeThreshold: GRAPH_EDGETHRESHOLD_DEFAULT,
+    nodeThreshold: getNodeThresholdDefault(selectedModelId),
+    edgeThreshold: getEdgeThresholdDefault(selectedModelId),
     maxFeatureNodes: GRAPH_MAXFEATURENODES_DEFAULT,
     slug: '',
   };
@@ -151,6 +179,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
   // these are used for custom UI elements for instruct models
   const GRAPH_INSTRUCT_QWEN = ['qwen3-4b'];
   const GRAPH_INSTRUCT_GEMMA_3 = ['gemma-3-4b-it'];
+  const SLOWER_MODELS = ['gemma-3-4b-it', 'qwen3-1.7b'];
 
   const convertPromptToChatPromptsQwen = (prompt: string): ChatMessage[] => {
     const prompts: ChatMessage[] = [];
@@ -273,22 +302,13 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
         if (!prompt.trim() || !modelId) {
           setGraphTokenizeResponse(null);
           setEstimatedTime(null);
+          setTokenizeError(null);
           setIsTokenizing(false);
           return;
         }
         try {
           setIsTokenizing(true);
-          console.log(`tokenizing: ${prompt}`);
-          console.log(
-            'request: ',
-            JSON.stringify({
-              modelId,
-              prompt,
-              sourceSetName,
-              maxNLogits,
-              desiredLogitProb,
-            }),
-          );
+          setTokenizeError(null);
           const response = await fetch('/api/graph/tokenize', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -301,10 +321,18 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
             }),
           });
           if (!response.ok) {
-            console.log('response not ok');
-            const errorData = await response.json();
-            console.log('errorData: ', errorData);
-            throw new Error(errorData.message || 'Failed to tokenize prompt');
+            let errorMessage = `Tokenization failed (HTTP ${response.status})`;
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.message || errorData.error || errorMessage;
+              if (errorData.details) {
+                errorMessage += `: ${Array.isArray(errorData.details) ? errorData.details.join(', ') : errorData.details}`;
+              }
+            } catch {
+              const text = await response.text().catch(() => '');
+              if (text) errorMessage += `: ${text.slice(0, 200)}`;
+            }
+            throw new Error(errorMessage);
           }
           if (prompt.endsWith(' ')) {
             setEndsWithSpace(true);
@@ -315,7 +343,11 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
           setGraphTokenizeResponse(data);
           if (data.input_tokens) {
             setEstimatedTime(
-              getEstimatedTimeFromNumTokens(data.input_tokens.length, GRAPH_INSTRUCT_GEMMA_3.includes(modelId)),
+              getEstimatedTimeFromNumTokens(
+                data.input_tokens.length,
+                SLOWER_MODELS.includes(modelId),
+                LORSA_MODELS.includes(modelId),
+              ),
             );
           } else {
             setEstimatedTime(null);
@@ -324,6 +356,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
           console.error('Tokenization error:', e);
           setGraphTokenizeResponse(null);
           setEstimatedTime(null);
+          setTokenizeError(e instanceof Error ? e.message : 'An unknown error occurred during tokenization.');
         } finally {
           setIsTokenizing(false);
         }
@@ -438,6 +471,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
         setChatPrompts([]);
         setEstimatedTime(null);
         setError(null);
+        setTokenizeError(null);
         if (formikRef.current) {
           formikRef.current.resetForm();
         }
@@ -445,6 +479,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     } else if (generationResult) {
       setGenerationResult(null);
       setError(null);
+      setTokenizeError(null);
       if (formikRef.current) {
         formikRef.current.resetForm();
       }
@@ -576,6 +611,8 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                               value={values.modelId}
                               onValueChange={(value: string) => {
                                 setFieldValue('modelId', value);
+                                setFieldValue('nodeThreshold', getNodeThresholdDefault(value));
+                                setFieldValue('edgeThreshold', getEdgeThresholdDefault(value));
                                 setTimeout(() => {
                                   setFieldValue('sourceSetName', getHasGraphsSourceSetsForModelId(value)[0].name);
                                 }, 100);
@@ -637,7 +674,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                             >
                               <RadixSelect.Trigger
                                 id="sourceSetName"
-                                className="mt-1 flex w-full items-center justify-between rounded-md border border-slate-300 px-2 py-2 text-[11px] text-slate-500 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="mt-1 flex w-full items-center justify-between rounded-md border border-slate-300 px-2 py-2 text-[10px] text-slate-500 placeholder-slate-400 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
                               >
                                 <RadixSelect.Value
                                   placeholder={<span className="text-red-500">Select a source set</span>}
@@ -869,7 +906,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     disabled={isGenerating}
                                     className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
                                     min={GRAPH_NODETHRESHOLD_MIN}
-                                    max={GRAPH_NODETHRESHOLD_MAX}
+                                    max={getNodeThresholdMax(values.modelId)}
                                     step={0.01}
                                   />
                                   <RadixSlider.Root
@@ -877,7 +914,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     value={[values.nodeThreshold]}
                                     onValueChange={(newVal: number[]) => setFieldValue('nodeThreshold', newVal[0])}
                                     min={GRAPH_NODETHRESHOLD_MIN}
-                                    max={GRAPH_NODETHRESHOLD_MAX}
+                                    max={getNodeThresholdMax(values.modelId)}
                                     disabled={isGenerating}
                                     step={0.01}
                                     className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
@@ -910,7 +947,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     disabled={isGenerating}
                                     className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
                                     min={GRAPH_EDGETHRESHOLD_MIN}
-                                    max={GRAPH_EDGETHRESHOLD_MAX}
+                                    max={getEdgeThresholdMax(values.modelId)}
                                     step={0.01}
                                   />
                                   <RadixSlider.Root
@@ -918,7 +955,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     value={[values.edgeThreshold]}
                                     onValueChange={(newVal: number[]) => setFieldValue('edgeThreshold', newVal[0])}
                                     min={GRAPH_EDGETHRESHOLD_MIN}
-                                    max={GRAPH_EDGETHRESHOLD_MAX}
+                                    max={getEdgeThresholdMax(values.modelId)}
                                     disabled={isGenerating}
                                     step={0.01}
                                     className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
@@ -1254,6 +1291,12 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                       </div>
                     </div>
                     <div className="flex-1">
+                      {tokenizeError && (
+                        <div className="mb-2 mt-1.5 rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-600">
+                          <span className="font-medium">Tokenization error: </span>
+                          {tokenizeError}
+                        </div>
+                      )}
                       {isTokenizing ? (
                         <div className="mt-1.5 flex w-full flex-row items-center justify-start gap-x-0.5 pb-2 text-xs text-sky-700">
                           <LoadingSquare className="mr-1 h-5 w-5" size={20} />
@@ -1358,9 +1401,11 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                       {errors.prompt && touched.prompt && <p className="mt-1 text-xs text-red-500">{errors.prompt}</p>}
                       {graphTokenizeResponse &&
                         !isTokenizing &&
-                        graphTokenizeResponse.input_tokens.length > GRAPH_MAX_TOKENS && (
+                        graphTokenizeResponse.input_tokens.length >
+                          (LORSA_MODELS.includes(values.modelId) ? LORSA_MAX_TOKENS : GRAPH_MAX_TOKENS) && (
                           <p className="mt-1 text-xs text-red-500">
-                            Prompt exceeds maximum token limit of {GRAPH_MAX_TOKENS}.
+                            Prompt exceeds maximum token limit of{' '}
+                            {LORSA_MODELS.includes(values.modelId) ? LORSA_MAX_TOKENS : GRAPH_MAX_TOKENS}.
                           </p>
                         )}
                       {isInstructAndDoesntStartWithSpecialToken(values.modelId, values.prompt) && (
@@ -1415,6 +1460,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                             setGraphTokenizeResponse(null);
                             setEstimatedTime(null);
                             setError(null);
+                            setTokenizeError(null);
                             setChatPrompts([]);
                           }
                         }}
@@ -1432,7 +1478,8 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                           !dirty ||
                           Object.keys(errors).length > 0 ||
                           (graphTokenizeResponse !== null &&
-                            graphTokenizeResponse.input_tokens.length > GRAPH_MAX_TOKENS)
+                            graphTokenizeResponse.input_tokens.length >
+                              (LORSA_MODELS.includes(values.modelId) ? LORSA_MAX_TOKENS : GRAPH_MAX_TOKENS))
                         }
                         className="w-full text-xs sm:w-auto"
                       >
@@ -1485,6 +1532,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                   setGraphTokenizeResponse(null);
                   setEstimatedTime(null);
                   setError(null);
+                  setTokenizeError(null);
                   setChatPrompts([]);
                 }}
                 disabled={isGenerating}

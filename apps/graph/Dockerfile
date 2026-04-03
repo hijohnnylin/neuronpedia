@@ -3,7 +3,7 @@ ARG CUDA_VERSION=12.1.0
 ARG UBUNTU_VERSION=22.04
 
 # NON-CUDA base
-FROM python:3.10-slim AS base-nocuda
+FROM python:3.12-slim AS base-nocuda
 
 # CUDA base
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${UBUNTU_VERSION} AS base-cuda
@@ -17,11 +17,11 @@ RUN curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearm
 RUN apt-get update && apt-get install -y \
     nvidia-container-toolkit
 RUN apt-get update && apt-get install -y \
-    python3.10 \
+    python3.12 \
     python3-pip \
-    python3.10-venv \
+    python3.12-venv \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -s /usr/bin/python3.10 /usr/bin/python
+    && ln -sf /usr/bin/python3.12 /usr/bin/python
 
 # Main build stage
 FROM base-${BUILD_TYPE:-nocuda} AS final

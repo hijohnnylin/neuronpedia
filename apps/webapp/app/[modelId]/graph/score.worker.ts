@@ -55,7 +55,14 @@ function reconstructAdjacencyMatrix(
   nodes: CLTGraphNode[],
   edges: CLTGraphLink[],
 ): { matrix: number[][]; sortedNodes: CLTGraphNode[] } {
-  const featureTypeOrder = ['cross layer transcoder', 'mlp reconstruction error', 'embedding', 'logit'];
+  const featureTypeOrder = [
+    'cross layer transcoder',
+    'lorsa',
+    'mlp reconstruction error',
+    'lorsa error',
+    'embedding',
+    'logit',
+  ];
 
   function getSortKey(node: CLTGraphNode) {
     let typePriority = featureTypeOrder.indexOf(node.feature_type);
@@ -100,6 +107,16 @@ function computeGraphScoresFromGraphData(
   graphData: WorkerGraph,
   pinnedIds: string[] = [],
 ): { replacementScore: number; completenessScore: number } {
+  const hasLorsa = graphData.nodes.some(
+    (n) => n.feature_type === 'lorsa' || n.feature_type === 'lorsa error',
+  );
+  if (hasLorsa) {
+    console.warn(
+      'Score computation skipped: graph contains lorsa nodes which are not yet supported by the scoring algorithm.',
+    );
+    return { replacementScore: -1, completenessScore: -1 };
+  }
+
   const graphNodesToUse = graphData.nodes;
 
   const { matrix: adjacencyMatrix, sortedNodes } = reconstructAdjacencyMatrix(graphNodesToUse, graphData.links);

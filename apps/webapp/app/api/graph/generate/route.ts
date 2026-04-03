@@ -1,7 +1,10 @@
 import { CLTGraph } from '@/app/[modelId]/graph/graph-types';
 import { ATTRIBUTION_GRAPH_SCHEMA, makeGraphPublicAccessGraphUrl, NP_GRAPH_BUCKET } from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
-import { getGraphServerRunpodHostForSourceSet, getIsRunpodServerlessHostForSourceSet } from '@/lib/db/graph-host-source';
+import {
+  getGraphServerRunpodHostForSourceSet,
+  getIsRunpodServerlessHostForSourceSet,
+} from '@/lib/db/graph-host-source';
 import { getModelById } from '@/lib/db/model';
 import {
   checkRunpodQueueJobs,
@@ -12,6 +15,8 @@ import {
   GRAPH_S3_USER_GRAPHS_DIR,
   GRAPH_SLUG_MIN,
   graphGenerateSchemaClient,
+  LORSA_MAX_TOKENS,
+  LORSA_MODELS,
   MAX_RUNPOD_JOBS_IN_QUEUE,
   RUNPOD_BUSY_ERROR,
 } from '@/lib/utils/graph';
@@ -182,6 +187,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       }
     }
 
+    let numTokens: number | undefined;
     try {
       const tokenized = await getGraphTokenize(
         validatedData.prompt,
@@ -190,17 +196,19 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         validatedData.modelId,
         validatedData.sourceSetName,
       );
-      if (tokenized.input_tokens.length > GRAPH_MAX_TOKENS) {
+      numTokens = tokenized.input_tokens.length;
+      const maxTokens = LORSA_MODELS.includes(validatedData.modelId) ? LORSA_MAX_TOKENS : GRAPH_MAX_TOKENS;
+      if (numTokens > maxTokens) {
         return NextResponse.json(
           {
             error: 'Prompt Too Long',
-            message: `Max tokens supported is ${GRAPH_MAX_TOKENS}, your prompt was ${tokenized.input_tokens.length} tokens.`,
+            message: `Max tokens supported is ${maxTokens}, your prompt was ${numTokens} tokens.`,
           },
           { status: 400 },
         );
       }
 
-      console.log(`Tokens in text: ${tokenized.input_tokens.length}`);
+      console.log(`Tokens in text: ${numTokens}`);
     } catch (error) {
       console.error('Error tokenizing text, continuing:', error);
     }
@@ -275,7 +283,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     });
 
     // check the queue
-    const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(validatedData.modelId, validatedData.sourceSetName);
+    const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(
+      validatedData.modelId,
+      validatedData.sourceSetName,
+    );
     if (isRunpodServerlessHost) {
       const host = await getGraphServerRunpodHostForSourceSet(validatedData.modelId, validatedData.sourceSetName);
       if (!host) {

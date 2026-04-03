@@ -73,9 +73,14 @@ export async function POST(request: Request) {
     if (error instanceof yup.ValidationError) {
       return NextResponse.json({ error: 'Validation error', details: error.errors }, { status: 400 });
     }
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isGraphServerError = errorMessage.includes('Graph server') || errorMessage.includes('External API');
     return NextResponse.json(
-      { error: 'Failed to tokenize text', message: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
+      {
+        error: isGraphServerError ? 'Graph server error' : 'Failed to tokenize text',
+        message: errorMessage,
+      },
+      { status: isGraphServerError ? 502 : 500 },
     );
   }
 }

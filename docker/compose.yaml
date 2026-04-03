@@ -114,6 +114,24 @@ services:
       - HF_TOKEN=${HF_TOKEN}
       - SECRET=${GRAPH_SERVER_SECRET}      
 
+  graph-crm:
+    platform: linux/amd64
+    image: neuronpedia-graph-crm:latest
+    build:
+      context: ..
+      dockerfile: apps/graph-crm/Dockerfile
+      args:
+        BUILD_TYPE: ${BUILD_TYPE:-nocuda}
+        CUDA_VERSION: "12.1.0"
+        UBUNTU_VERSION: "22.04"
+    ports:
+      - "5005:5005"
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - SECRET=${GRAPH_SERVER_SECRET}
+
 volumes:
   postgres_data:
 

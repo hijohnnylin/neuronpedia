@@ -1,11 +1,17 @@
 #### neuronpedia 🧠🔍 graph server
 
-This is the attribution graph generation server based on [circuit-tracer](https://github.com/safety-research/circuit-tracer) by Piotrowski & Hanna. These endpoints are what's called when you click `+ New Graph` on the [Neuronpedia Circuit Tracer](https://www.neuronpedia.org/gemma-2-2b/graph) page.
+This is the attribution graph generation server. It supports two backends:
+
+1. **circuit-tracer** (default) - Based on [circuit-tracer](https://github.com/safety-research/circuit-tracer) by Piotrowski & Hanna. Decomposes MLP layers using transcoders/CLTs.
+2. **lm-saes-crm** - Based on [Language-Model-SAEs](https://github.com/OpenMOSS/Language-Model-SAEs) by OpenMOSS. Uses Complete Replacement Models (CRM) that decompose both MLP layers (transcoders) and attention layers (Lorsa), producing richer graphs with attention-circuit features.
 
 - [Install](#install)
 - [Config](#config)
 - [Start Server](#start-server)
+- [Start Server - CRM Backend (Lorsa + Transcoders)](#start-server---crm-backend-lorsa--transcoders)
+- [Example Request - Forward Pass (Tokenize + Salient Logits)](#example-request---forward-pass-tokenize--salient-logits)
 - [Example Request - Output Graph JSON Directly](#example-request---output-graph-json-directly)
+- [Example Request - CRM Graph with Lorsa Features](#example-request---crm-graph-with-lorsa-features)
 - [Example Request - Output Graph JSON to S3 with presigned URL](#example-request---output-graph-json-to-s3-with-presigned-url)
 - [Example Request - Steering (Interventions) With Top Logits](#example-request---steering-interventions-with-top-logits)
 - [Runpod Serverless](#runpod-serverless)
@@ -16,8 +22,11 @@ This is the attribution graph generation server based on [circuit-tracer](https:
 # Navigate to the graph app directory
 cd apps/graph
 
-# Install dependencies using Poetry
+# Install dependencies using Poetry (circuit-tracer backend only)
 poetry install
+
+# Install with CRM backend support (includes lm-saes and its dependencies)
+poetry install --extras crm
 ```
 
 ### Config
@@ -44,6 +53,34 @@ poetry run python start.py --model_id Qwen/Qwen3-4B --transcoder_set mwhanna/qwe
 poetry run python start.py --model_id google/gemma-2-2b --transcoder_set mntss/clt-gemma-2-2b-2.5M
 ```
 
+### Start Server - CRM Backend (Lorsa + Transcoders)
+
+The CRM backend uses [lm-saes](https://github.com/OpenMOSS/Language-Model-SAEs) to generate Complete Replacement Model graphs. These graphs include both transcoder features (MLP decomposition) and Lorsa features (attention decomposition), enabling complete circuit tracing as described in [Bridging the Attention Gap](https://interp.open-moss.com/posts/complete-replacement).
+
+Requires `poetry install --extras crm` first.
+
+Available checkpoints are hosted at [OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B](https://huggingface.co/OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B) with configurations: expansion `8x` or `32x`, top-k `k64`, `k128`, or `k256`.
+
+```
+# Qwen3-1.7B with 8x expansion, K=64 (smallest, fastest - good for testing)
+poetry run python start.py \
+  --backend lm-saes-crm \
+  --model_id Qwen/Qwen3-1.7B \
+  --sae_repo OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B \
+  --sae_expansion 8x \
+  --sae_topk k64
+
+# Qwen3-1.7B with 8x expansion, K=128 (higher quality graphs)
+poetry run python start.py \
+  --backend lm-saes-crm \
+  --model_id Qwen/Qwen3-1.7B \
+  --sae_repo OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B \
+  --sae_expansion 8x \
+  --sae_topk k128
+```
+
+This loads 28 transcoder modules + 28 Lorsa modules (one per layer). The 8x/k64 config requires ~24GB VRAM; 32x configs require ~40GB+.
+
 ### Example Request - Output Graph JSON Directly
 
 This will run a graph generation for the prompt "1 2 " on Gemma-2-2B.
@@ -66,6 +103,37 @@ curl -X POST http://localhost:5004/generate-graph \
     "max_feature_nodes" : 5000
   }'
 ```
+
+### Example Request - CRM Graph with Lorsa Features
+
+This generates a CRM attribution graph for an acronym completion prompt on Qwen3-1.7B. The output includes both `cross layer transcoder` nodes (MLP features) and `lorsa` nodes (attention features).
+
+Start the server with `--backend lm-saes-crm` first (see above).
+
+```
+curl -X POST http://localhost:5004/generate-graph \
+  -H "Content-Type: application/json" \
+  -H "x-secret-key: YOUR_SECRET" \
+  -d '{
+    "prompt": "The National Digital Analytics Group (ND",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "batch_size": 16,
+    "max_n_logits": 10,
+    "desired_logit_prob": 0.95,
+    "node_threshold": 0.8,
+    "edge_threshold": 0.85,
+    "slug_identifier": "acronym-ndag",
+    "max_feature_nodes": 5000
+  }' > acronym-ndag.json
+```
+
+The output graph JSON will contain nodes with `feature_type` values including `"lorsa"` (attention features rendered as triangles in the UI) and `"lorsa error"` (attention reconstruction errors), in addition to the standard `"cross layer transcoder"`, `"mlp reconstruction error"`, `"embedding"`, and `"logit"` types.
+
+Other test prompts from the [CRM paper](https://interp.open-moss.com/posts/complete-replacement):
+
+- `a="Craig"\nassert a[0]=='` (string indexing, expects `C`)
+- `I always loved visiting Aunt Sally. Whenever I was feeling sad, Aunt` (induction, expects ` Sally`)
+- `The capital of France is` (factual, expects ` Paris`)
 
 ### Example Request - Output Graph JSON to S3 with presigned URL
 
@@ -285,6 +353,21 @@ Response (Arrays Truncated)
     ]
   ]
 }
+```
+
+### Example Request - Forward Pass (Tokenize + Salient Logits)
+
+The `/forward-pass` endpoint tokenizes a prompt and returns the top predicted next tokens with their probabilities. This is used by the webapp to preview token counts and salient logits before generating a full graph.
+
+```
+curl -X POST http://localhost:5004/forward-pass \
+  -H "Content-Type: application/json" \
+  -H "x-secret-key: YOUR_SECRET" \
+  -d '{
+    "prompt": "The capital of France is",
+    "max_n_logits": 5,
+    "desired_logit_prob": 0.9
+  }'
 ```
 
 ## Documentation / Usage (Swagger)

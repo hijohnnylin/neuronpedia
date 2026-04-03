@@ -657,25 +657,20 @@ export function GraphProvider({
     };
 
     const isCantor = data.metadata.schema_version === 1 || data.metadata.feature_details?.neuronpedia_source_set;
-    // if it specifies source_set, then it's cantor
     if (isCantor) {
       const model = data.metadata.scan;
       const sourceSet = data.metadata.feature_details?.neuronpedia_source_set || graph.sourceSetName;
+      const lorsaSourceSet = data.metadata.feature_details?.neuronpedia_lorsa_source_set;
 
-      // make an array of features to call /api/features
-      // for neuronpedia fetches we only get the first 10 and then load more on demand
       const features = formattedData.nodes
         .filter((d) => nodeTypeHasFeatureDetail(d))
         .map((d) => {
-          let layerNum = -1;
-          let index = -1;
-
-          // convert from feature id to layer and index using cantor pairing
-          layerNum = parseInt(d.layer, 10);
-          index = getIndexFromCantorValue(d.feature);
+          const layerNum = parseInt(d.layer, 10);
+          const index = getIndexFromCantorValue(d.feature);
+          const nodeSourceSet = d.feature_type === 'lorsa' && lorsaSourceSet ? lorsaSourceSet : sourceSet;
           return {
             modelId: model,
-            layer: `${layerNum}-${sourceSet}`,
+            layer: `${layerNum}-${nodeSourceSet}`,
             index,
             maxActsToReturn: GRAPH_PREFETCH_ACTIVATIONS_COUNT,
           };
@@ -710,14 +705,16 @@ export function GraphProvider({
       const featureDetails = batchesOfDetails.flat(1);
       formattedData.nodes.forEach((d) => {
         // eslint-disable-next-line no-param-reassign
-        const feature = featureDetails.find(
-          (f) =>
+        const feature = featureDetails.find((f) => {
+          const nodeSourceSet = d.feature_type === 'lorsa' && lorsaSourceSet ? lorsaSourceSet : sourceSet;
+          return (
             f &&
             'index' in f &&
             f.index === getIndexFromCantorValue(d.feature).toString() &&
             'layer' in f &&
-            f.layer === `${d.layer}-${sourceSet}`,
-        );
+            f.layer === `${d.layer}-${nodeSourceSet}`
+          );
+        });
         if (feature) {
           // eslint-disable-next-line no-param-reassign
           d.featureDetailNP = feature as NeuronWithPartialRelations;

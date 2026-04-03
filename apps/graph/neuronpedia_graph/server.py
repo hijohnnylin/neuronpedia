@@ -1,6 +1,3 @@
-# currently we only support one transcoder set per model.
-# we should augment to support multiple transcoder sets per model
-
 import gc
 import gzip
 import json
@@ -12,15 +9,6 @@ from typing import Any
 import psutil
 import requests
 import torch
-from circuit_tracer import attribute
-from circuit_tracer.graph import prune_graph
-from circuit_tracer.replacement_model import ReplacementModel
-from circuit_tracer.utils.create_graph_files import (
-    build_model,
-    create_nodes,
-    create_used_nodes_and_edges,
-)
-from circuit_tracer.utils.salient_logits import compute_salient_logits
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -30,6 +18,25 @@ from starlette.concurrency import run_in_threadpool
 from transformers import AutoTokenizer
 
 load_dotenv()
+
+BACKEND = os.getenv("BACKEND", "circuit-tracer")
+
+if BACKEND == "circuit-tracer":
+    from circuit_tracer import attribute
+    from circuit_tracer.graph import prune_graph
+    from circuit_tracer.replacement_model import ReplacementModel
+    from circuit_tracer.utils.create_graph_files import (
+        build_model,
+        create_nodes,
+        create_used_nodes_and_edges,
+    )
+    from circuit_tracer.utils.salient_logits import compute_salient_logits
+elif BACKEND == "lm-saes-crm":
+    from neuronpedia_graph.crm_backend import (
+        forward_pass_crm,
+        generate_graph_crm,
+        load_crm_model,
+    )
 
 
 LIMIT_TOKENS = int(os.getenv("TOKEN_LIMIT", 64))
@@ -128,30 +135,39 @@ if not loaded_model_arg:
         + ", ".join(TLENS_MODEL_ID_TO_NP_MODEL_ID.keys())
     )
 
-transcoder_set = os.getenv("TRANSCODER_SET")
-print(f"Transcoder set: {transcoder_set}")
-if not transcoder_set:
-    raise ValueError("Transcoder set is required. Please specify a transcoders set.")
-
 device = get_device()
 model_dtype = get_model_dtype()
 
+# CRM backend: lm-saes with Lorsa + Transcoders
+crm_model: Any = None
+crm_replacement_modules: Any = None
+crm_sae_metadata: Any = None
 
-def check_is_nnsight_model(model_id: str) -> bool:
-    return model_id.startswith("google/gemma-3-")
+if BACKEND == "lm-saes-crm":
+    print(f"[CRM] Loading CRM backend for model: {loaded_model_arg}")
+    crm_model, crm_replacement_modules, crm_sae_metadata = load_crm_model()
+    model = crm_model
+else:
+    # Circuit-tracer backend (default)
+    transcoder_set = os.getenv("TRANSCODER_SET")
+    print(f"Transcoder set: {transcoder_set}")
+    if not transcoder_set:
+        raise ValueError("Transcoder set is required. Please specify a transcoders set.")
 
+    def check_is_nnsight_model(model_id: str) -> bool:
+        return model_id.startswith("google/gemma-3-")
 
-is_nnsight_model = check_is_nnsight_model(loaded_model_arg)
+    is_nnsight_model = check_is_nnsight_model(loaded_model_arg)
 
-model = ReplacementModel.from_pretrained(
-    loaded_model_arg,
-    transcoder_set,
-    device=device,
-    dtype=model_dtype,
-    lazy_encoder=is_nnsight_model,
-    lazy_decoder=True,
-    backend="nnsight" if is_nnsight_model else "transformerlens",
-)
+    model = ReplacementModel.from_pretrained(
+        loaded_model_arg,
+        transcoder_set,
+        device=device,
+        dtype=model_dtype,
+        lazy_encoder=is_nnsight_model,
+        lazy_decoder=True,
+        backend="nnsight" if is_nnsight_model else "transformerlens",
+    )
 
 
 def printMemory():
@@ -487,28 +503,29 @@ async def forward_pass_handler(req: Request):
     try:
         print(f"Received forward pass request: prompt='{req_data.prompt}'")
 
-        # Tokenize prompt
-        # Only add special tokens if prompt doesn't already start with BOS
+        if BACKEND == "lm-saes-crm":
+            return forward_pass_crm(
+                req_data.prompt,
+                crm_model,
+                max_n_logits=req_data.max_n_logits,
+                desired_logit_prob=req_data.desired_logit_prob,
+            )
+
+        # Circuit-tracer backend
         tokens = model.tokenizer.encode(req_data.prompt, add_special_tokens=False)
         if tokens and tokens[0] != model.tokenizer.bos_token_id:
             tokens = model.tokenizer.encode(req_data.prompt, add_special_tokens=True)
         print(f"Tokens: {tokens}")
 
-        # Convert to tensor and run forward pass
         input_ids = torch.tensor([tokens]).to(get_device())
 
         with torch.no_grad():
-            # Get model output
             output = model(input_ids)
-            # Check if output has logits property (nnsight case)
             if hasattr(output, "logits"):
                 output = output.logits
 
-            logits = output[0, -1, :]  # Get logits for last token
+            logits = output[0, -1, :]
 
-            # Get unembedding matrix
-            # Compute salient logits
-            # For models without unembed attribute, use lm_head weight matrix
             if hasattr(model, "unembed"):
                 unembed_matrix = model.unembed.W_U
             elif hasattr(model, "lm_head"):
@@ -525,7 +542,6 @@ async def forward_pass_handler(req: Request):
                 desired_logit_prob=req_data.desired_logit_prob,
             )
 
-        # Decode tokens and create result
         results = []
         for idx, prob in zip(logit_indices.tolist(), logit_probs.tolist()):
             token = model.tokenizer.decode([idx])
@@ -533,7 +549,6 @@ async def forward_pass_handler(req: Request):
                 {"token": token, "token_id": idx, "probability": float(prob)}
             )
 
-        # Also include some metadata
         response = {
             "prompt": req_data.prompt,
             "input_tokens": [model.tokenizer.decode([token]) for token in tokens],
@@ -620,9 +635,9 @@ async def generate_graph(req: Request):
         print(f"  desired_logit_prob: {desired_logit_prob}")
         print(f"  node_threshold: {node_threshold}")
         print(f"  edge_threshold: {edge_threshold}")
-        print(f"  transcoder_set: {transcoder_set}")
         print(f"  slug_identifier: {slug_identifier}")
         print(f"  max_feature_nodes: {max_feature_nodes}")
+        print(f"  backend: {BACKEND}")
 
         def _blocking_graph_generation_task():
             print(
@@ -645,6 +660,24 @@ async def generate_graph(req: Request):
                     f"Thread {threading.get_ident()} (worker): Tokenization error: {e}"
                 )
                 raise HTTPException(status_code=500, detail="Failed to tokenize prompt")
+
+            if BACKEND == "lm-saes-crm":
+                return generate_graph_crm(
+                    prompt,
+                    crm_model,
+                    crm_replacement_modules,
+                    crm_sae_metadata,
+                    slug_identifier=slug_identifier,
+                    max_n_logits=max_n_logits,
+                    desired_logit_prob=desired_logit_prob,
+                    batch_size=batch_size,
+                    max_feature_nodes=max_feature_nodes,
+                    node_threshold=node_threshold,
+                    edge_threshold=edge_threshold,
+                    signed_url=req_data.signed_url,
+                    user_id=req_data.user_id,
+                    compress=req_data.compress,
+                )
 
             print(f"Thread {threading.get_ident()} (worker): Prompt: '{prompt}'")
 

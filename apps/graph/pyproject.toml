@@ -8,15 +8,19 @@ readme = "README.md"
 package-mode = false
 
 [tool.poetry.dependencies]
-python = ">=3.10,<4.0"
+python = ">=3.12,<3.13.dev0"
 fastapi = ">=0.115.12"
 uvicorn = {extras = ["standard"], version = ">=0.34.2"}
 pydantic = ">=2.11.4"
-torch = ">=2.0.0"
-transformers = ">=4.0.0"
+torch = ">=2.11.0"
+transformers = ">=4.57.1"
 circuit-tracer = { git = "https://github.com/safety-research/circuit-tracer.git", tag = "v0.3.1" }
+lm-saes = { git = "https://github.com/hijohnnylin/Language-Model-SAEs.git", branch = "dtype_fix", optional = true }
 python-dotenv = "^1.1.0"
 hf-transfer = "^0.1.9"
+
+[tool.poetry.extras]
+crm = ["lm-saes"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

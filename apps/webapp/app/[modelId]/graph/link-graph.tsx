@@ -715,7 +715,7 @@ export default function LinkGraph() {
     const data = selectedGraph as CLTGraphExtended;
     let nodes = filterNodes(data, data.nodes, selectedGraph, visState, clickedIdRef.current);
     if (clientCheckClaudeMode()) {
-      nodes = nodes.filter((d) => d.feature_type !== 'mlp reconstruction error');
+      nodes = nodes.filter((d) => d.feature_type !== 'mlp reconstruction error' && d.feature_type !== 'lorsa error');
     }
 
     // Set up the base SVG container
@@ -989,7 +989,9 @@ export default function LinkGraph() {
         return `translate(${pos[0]},${pos[1]})`;
       })
       .text((d) => featureTypeToText(d.feature_type))
-      .attr('opacity', (d) => (d.feature_type === 'mlp reconstruction error' ? 0.35 : 1))
+      .attr('opacity', (d) =>
+        d.feature_type === 'mlp reconstruction error' || d.feature_type === 'lorsa error' ? 0.35 : 1,
+      )
       .attr('font-family', 'Arial')
       .attr('font-size', (d) => featureTypeToTextSize(isMobile, d.feature_type)) // weird safari mobile bug where it renders the diamond too large
       .attr('fill', (d) => d.nodeColor || '#000')

@@ -64,6 +64,7 @@ export type CLTGraphInnerMetadata = {
   feature_details?: {
     feature_json_base_url?: string;
     neuronpedia_source_set?: string;
+    neuronpedia_lorsa_source_set?: string;
   };
   info?: {
     description?: string;

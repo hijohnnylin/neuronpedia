@@ -27,14 +27,19 @@ export const GRAPH_MAX_PROMPT_LENGTH_CHARS = 10000;
 export const GRAPH_BATCH_SIZE = 48;
 // this time estimate comes from testing different prompt lengths with batch size 48, and is only valid for gemma-2-2b, for a40
 // with nnsight we are using lazy encoder, so we need to add time for this
-export const getEstimatedTimeFromNumTokens = (numTokens: number, nnsight: boolean = false) =>
-  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (nnsight ? 20 : 0); // add a few seconds buffer
+export const getEstimatedTimeFromNumTokens = (numTokens: number, slower: boolean = false, isLorsa: boolean = false) =>
+  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (slower ? 20 : 0) + (isLorsa ? 10 : 0);
 export const GRAPH_MAX_TOKENS = 64;
-export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'gemma-3-4b-it', 'qwen3-4b'];
+export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'gemma-3-4b-it', 'qwen3-4b', 'qwen3-1.7b'];
+
+export const LORSA_MODELS = ['qwen3-1.7b'];
+export const LORSA_BATCH_SIZE = 32;
+export const LORSA_MAX_TOKENS = 11;
 export const GRAPH_MODEL_MAP = {
   'gemma-2-2b': 'google/gemma-2-2b',
   'gemma-3-4b-it': 'google/gemma-3-4b-it',
   'qwen3-4b': 'Qwen/Qwen3-4B',
+  'qwen3-1.7b': 'Qwen/Qwen3-1.7B',
 };
 
 export const GRAPH_S3_USER_GRAPHS_DIR = 'user-graphs';
@@ -48,7 +53,7 @@ export const GRAPH_DESIREDLOGITPROB_DEFAULT = 0.95;
 export const GRAPH_NODETHRESHOLD_MIN = 0.5;
 export const GRAPH_NODETHRESHOLD_MAX = 0.95;
 export const GRAPH_NODETHRESHOLD_DEFAULT = 0.8;
-export const GRAPH_EDGETHRESHOLD_MIN = 0.8;
+export const GRAPH_EDGETHRESHOLD_MIN = 0.65;
 export const GRAPH_EDGETHRESHOLD_MAX = 0.98;
 export const GRAPH_EDGETHRESHOLD_DEFAULT = 0.85;
 export const GRAPH_MAXFEATURENODES_MIN = 3000;
@@ -167,7 +172,15 @@ export const getGraphTokenize = async (
     },
   );
 
-  let json = await response.json();
+  const responseText = await response.text();
+  let json;
+  try {
+    json = JSON.parse(responseText);
+  } catch {
+    throw new Error(
+      `Graph server returned non-JSON response (HTTP ${response.status}${responseText ? `: ${responseText.slice(0, 200)}` : ''})`,
+    );
+  }
   if (json.error) {
     throw new Error(json.error);
   }
@@ -211,10 +224,12 @@ export const generateGraphAndUploadToS3 = async (
 ) => {
   const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
   const action = 'generate-graph';
+  const batchSize = LORSA_MODELS.includes(modelId) ? LORSA_BATCH_SIZE : GRAPH_BATCH_SIZE;
+
   const body = {
     prompt,
     model_id: GRAPH_MODEL_MAP[modelId as keyof typeof GRAPH_MODEL_MAP],
-    batch_size: GRAPH_BATCH_SIZE,
+    batch_size: batchSize,
     max_n_logits: maxNLogits,
     desired_logit_prob: desiredLogitProb,
     node_threshold: nodeThreshold,

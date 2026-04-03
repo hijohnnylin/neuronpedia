@@ -49,8 +49,10 @@ function FeatureList({
         return false;
       }
 
-      // mlp reconstruction error = don't show
-      if (clientCheckClaudeMode() && node.feature_type === 'mlp reconstruction error') {
+      if (
+        clientCheckClaudeMode() &&
+        (node.feature_type === 'mlp reconstruction error' || node.feature_type === 'lorsa error')
+      ) {
         return false;
       }
 
@@ -86,7 +88,7 @@ function FeatureList({
           <svg width={10} height={14} className="mr-0 inline-block">
             <g>
               <g
-                className={`default-icon block fill-none ${node.feature_type === 'mlp reconstruction error' ? 'opacity-35' : ''} ${(node[linkProp]?.pctInput ?? 0) > 0.25 || (node[linkProp]?.pctInput ?? 0) < -0.25 ? 'stroke-white' : 'stroke-slate-800'} ${node.nodeId && visState.pinnedIds?.includes(node.nodeId) ? 'stroke-[1.7]' : 'stroke-[0.7]'}`}
+                className={`default-icon block fill-none ${node.feature_type === 'mlp reconstruction error' || node.feature_type === 'lorsa error' ? 'opacity-35' : ''} ${(node[linkProp]?.pctInput ?? 0) > 0.25 || (node[linkProp]?.pctInput ?? 0) < -0.25 ? 'stroke-white' : 'stroke-slate-800'} ${node.nodeId && visState.pinnedIds?.includes(node.nodeId) ? 'stroke-[1.7]' : 'stroke-[0.7]'}`}
               >
                 <text fontSize={15} textAnchor="middle" dominantBaseline="central" dx={5} dy={5}>
                   {featureTypeToText(node.feature_type)}

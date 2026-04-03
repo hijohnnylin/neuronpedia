@@ -845,7 +845,7 @@ export default function Subgraph() {
       .selectAll('div.member-circle')
       .data((d: ForceNode) => d.node.memberNodes || [])
       .join('div.member-circle')
-      .classed('not-clt-feature', (d) => d.feature_type !== 'cross layer transcoder')
+      .classed('not-clt-feature', (d) => d.feature_type !== 'cross layer transcoder' && d.feature_type !== 'lorsa')
       .st({
         marginLeft(d: CLTGraphNode, i: number) {
           // @ts-ignore
@@ -1365,10 +1365,13 @@ export default function Subgraph() {
                 </div>
                 <div className="flex flex-row items-center justify-center gap-x-2">
                   <div className="font-medium text-slate-600">
-                    Graph: {graphScores.replacementScore?.toFixed(4) || 'N/A'}
+                    Graph: {graphScores.replacementScore >= 0 ? graphScores.replacementScore?.toFixed(4) : 'N/A'}
                   </div>
                   <div className="font-medium text-slate-600">
-                    Subgraph*: {visState.pinnedIds.length > 0 ? subgraphScores.replacementScore?.toFixed(4) : 'N/A'}
+                    Subgraph*:{' '}
+                    {visState.pinnedIds.length > 0 && subgraphScores.replacementScore >= 0
+                      ? subgraphScores.replacementScore?.toFixed(4)
+                      : 'N/A'}
                   </div>
                 </div>
               </div>
@@ -1400,10 +1403,13 @@ export default function Subgraph() {
                 </div>
                 <div className="flex flex-row items-center justify-center gap-x-2">
                   <div className="font-medium text-slate-500">
-                    Graph: {graphScores.completenessScore?.toFixed(4) || 'N/A'}
+                    Graph: {graphScores.completenessScore >= 0 ? graphScores.completenessScore?.toFixed(4) : 'N/A'}
                   </div>
                   <div className="font-medium text-slate-500">
-                    Subgraph*: {visState.pinnedIds.length > 0 ? subgraphScores.completenessScore?.toFixed(4) : 'N/A'}
+                    Subgraph*:{' '}
+                    {visState.pinnedIds.length > 0 && subgraphScores.completenessScore >= 0
+                      ? subgraphScores.completenessScore?.toFixed(4)
+                      : 'N/A'}
                   </div>
                 </div>
               </div>
