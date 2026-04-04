@@ -66,9 +66,17 @@ function getVisibleNodesWithCollapse(
     }
   }
 
-  // A node is expanded (shows its children) if it's a root, on the ancestor path, or selected
+  // A node is expanded (shows its children) if it's a root, on the ancestor path, or a descendant of the selected node
   const expandedIds = new Set<number>([...ancestorIds]);
   roots.forEach((r) => expandedIds.add(r.id));
+  if (selectedId != null && selectedId !== DRAFT_ID) {
+    const descQueue = [selectedId];
+    while (descQueue.length > 0) {
+      const id = descQueue.shift()!;
+      expandedIds.add(id);
+      (childrenOf.get(id) || []).forEach((childId) => descQueue.push(childId));
+    }
+  }
 
   const visibleIds = new Set<number>();
   allNodes.forEach((n) => {

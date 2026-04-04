@@ -103,9 +103,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
       </div>
 
       <div className="my-0.5 mb-[0px] mt-[5px] flex w-full flex-col justify-start text-left">
-        <div
-          className={`font-sans text-[11px] font-normal leading-tight tracking-tight text-slate-800 ${data.isRoot ? 'whitespace-nowrap' : ''}`}
-        >
+        <div className="truncate font-sans text-[11px] font-normal leading-tight tracking-tight text-slate-800">
           {data.label || '(untitled)'}
         </div>
         {data.author && !types.every((t: string) => t === 'topic') && (
