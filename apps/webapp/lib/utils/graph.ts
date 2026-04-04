@@ -28,12 +28,12 @@ export const GRAPH_BATCH_SIZE = 48;
 // this time estimate comes from testing different prompt lengths with batch size 48, and is only valid for gemma-2-2b, for a40
 // with nnsight we are using lazy encoder, so we need to add time for this
 export const getEstimatedTimeFromNumTokens = (numTokens: number, slower: boolean = false, isLorsa: boolean = false) =>
-  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (slower ? 20 : 0) + (isLorsa ? 10 : 0);
+  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (slower ? 20 : 0) + (isLorsa ? 0 : 0);
 export const GRAPH_MAX_TOKENS = 64;
 export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'gemma-3-4b-it', 'qwen3-4b', 'qwen3-1.7b'];
 
 export const LORSA_MODELS = ['qwen3-1.7b'];
-export const LORSA_BATCH_SIZE = 32;
+export const LORSA_BATCH_SIZE = 16;
 export const LORSA_MAX_TOKENS = 11;
 export const GRAPH_MODEL_MAP = {
   'gemma-2-2b': 'google/gemma-2-2b',
@@ -56,7 +56,7 @@ export const GRAPH_NODETHRESHOLD_DEFAULT = 0.8;
 export const GRAPH_EDGETHRESHOLD_MIN = 0.65;
 export const GRAPH_EDGETHRESHOLD_MAX = 0.98;
 export const GRAPH_EDGETHRESHOLD_DEFAULT = 0.85;
-export const GRAPH_MAXFEATURENODES_MIN = 3000;
+export const GRAPH_MAXFEATURENODES_MIN = 1500;
 export const GRAPH_MAXFEATURENODES_MAX = 10000;
 export const GRAPH_MAXFEATURENODES_DEFAULT = 5000;
 export const GRAPH_SLUG_MIN = 2;

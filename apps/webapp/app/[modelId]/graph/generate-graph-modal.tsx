@@ -53,8 +53,8 @@ const isBoringToken = (token: string) => {
   return BORING_TOKENS.includes(trimmedToken) || BORING_SYMBOLS.includes(trimmedToken);
 };
 
-const LOWER_NODE_THRESHOLD_OFFSET = 0;
-const LOWER_EDGE_THRESHOLD_OFFSET = 0.2;
+const LOWER_NODE_THRESHOLD_OFFSET = 0.2;
+const LOWER_EDGE_THRESHOLD_OFFSET = 0.05;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
