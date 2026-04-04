@@ -4,14 +4,15 @@ import { useGlobalContext } from '@/components/provider/global-provider';
 import {
   ConnectionLineType,
   Controls,
-  type Edge,
-  type Node,
+  MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
   useReactFlow,
+  type Edge,
+  type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useSession } from 'next-auth/react';
@@ -27,7 +28,7 @@ import { getLayoutedElements } from './use-layout';
 const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 
 // Padding for fitView — adjust these to control spacing around the graph
-const FIT_VIEW_PADDING_TOP = 0.04;
+const FIT_VIEW_PADDING_TOP = 0.09;
 const FIT_VIEW_PADDING_BOTTOM = 0.03;
 
 function getVisibleNodesWithCollapse(
@@ -632,36 +633,36 @@ function ProblemsGraphInner({
             proOptions={{ hideAttribution: true }}
           >
             {/* <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e2e8f0" /> */}
-            <Controls showInteractive={false} position="bottom-right" />
-            {/* <Panel position="bottom-left" className="!mb-0.5 !ml-[52px]">
-            <button
-              type="button"
-              onClick={fitViewCustom}
-              className="react-flow__controls-button"
-              title="Fit view"
-              aria-label="Fit view"
-            >
-              <FullscreenIcon className="h-4 w-4" />
-            </button>
-          </Panel> */}
-            {/* <MiniMap
-            nodeColor={(node) => {
-              const colorMap: Record<string, string> = {
-                topic: '#3b82f6',
-                paper: '#10b981',
-                tool: '#4f46e5',
-                dataset: '#f59e0b',
-                eval: '#f43f5e',
-                replication: '#c026d3',
-                model: '#78716c',
-              };
-              return colorMap[(node.data as any)?.nodeTypes?.[0]] || '#94a3b8';
-            }}
-            maskColor="rgba(248, 250, 252, 0.7)"
-            style={{ height: 100, width: 160 }}
-          /> */}
+            <Panel position="top-right" className="flex items-start gap-2">
+              <Controls
+                showInteractive={false}
+                position="top-right"
+                className="!static !m-0 !shadow-none"
+                style={{ border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}
+              />
+              <MiniMap
+                pannable
+                zoomable
+                position="top-right"
+                className="!static !m-0"
+                nodeColor={(node) => {
+                  const colorMap: Record<string, string> = {
+                    topic: '#3b82f6',
+                    paper: '#10b981',
+                    tool: '#4f46e5',
+                    dataset: '#f59e0b',
+                    eval: '#f43f5e',
+                    replication: '#c026d3',
+                    model: '#78716c',
+                  };
+                  return colorMap[(node.data as any)?.nodeTypes?.[0]] || '#94a3b8';
+                }}
+                maskColor="rgba(100, 116, 139, 0.35)"
+                style={{ height: 100, width: 160, border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}
+              />
+            </Panel>
 
-            <div className="pointer-events-none absolute left-4 top-3 z-10 rounded-lg bg-white/50 px-4 py-2 backdrop-blur-[3px]">
+            <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg bg-white/50 px-4 py-2 text-center backdrop-blur-[3px]">
               <h1 className="text-sm font-semibold text-slate-800">Mech Interp Problems</h1>
               <p className="mt-0.5 text-[11px] text-slate-400">Seeded from Sharkey et al. 2025</p>
             </div>
@@ -710,7 +711,7 @@ function ProblemsGraphInner({
               </div>
             </Panel>
 
-            <Panel position="top-right">
+            <Panel position="bottom-right">
               <button
                 type="button"
                 onClick={handleAddNode}

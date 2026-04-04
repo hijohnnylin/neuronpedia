@@ -84,7 +84,7 @@ export async function getLayoutedElements(nodes: Node[], edges: Edge[]) {
       'elk.separateConnectedComponents': 'true',
       'elk.aspectRatio': '2',
       'elk.spacing.componentComponent': '30',
-      'elk.margins': '[top=30,left=30,bottom=30,right=30]',
+      'elk.margins': '[top=60,left=30,bottom=30,right=30]',
     },
     children: sortChildrenByParent(nodes, edges).map((node) => {
       const { width, height } = getNodeDimensions(node);
