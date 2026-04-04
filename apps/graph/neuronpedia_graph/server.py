@@ -4,6 +4,7 @@ import json
 import os
 import threading
 import time
+from importlib.metadata import version as pkg_version
 from typing import Any
 
 import psutil
@@ -123,7 +124,7 @@ TLENS_MODEL_ID_TO_NP_MODEL_ID = {
 
 GENERATOR_INFO = {
     "name": "circuit-tracer by Hanna & Piotrowski",
-    "version": "0.3.1 | e09b5f3",
+    "version": pkg_version("circuit-tracer"),
     "url": "https://github.com/safety-research/circuit-tracer",
 }
 

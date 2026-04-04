@@ -23,12 +23,6 @@ NP_MODEL_ID = os.getenv("NP_MODEL_ID", "qwen3-1.7b")
 NP_TRANSCODER_SOURCE_SET = os.getenv("NP_TRANSCODER_SOURCE_SET")
 NP_LORSA_SOURCE_SET = os.getenv("NP_LORSA_SOURCE_SET")
 
-CRM_GENERATOR_INFO = {
-    "name": "lm-saes (CRM) by OpenMOSS",
-    "version": "2.0.0b22",
-    "url": "https://github.com/OpenMOSS/Language-Model-SAEs",
-}
-
 
 def get_device() -> torch.device:
     device_env = os.environ.get("DEVICE")
