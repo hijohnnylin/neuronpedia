@@ -2,16 +2,13 @@ import re
 from collections import defaultdict
 
 import torch
-from neuronpedia_inference_client.models.np_steer_chat_message import (
-    NPSteerChatMessage,
-)
+from neuronpedia_inference_client.models.np_steer_chat_message import NPSteerChatMessage
 from neuronpedia_inference_client.models.np_steer_feature import NPSteerFeature
 from transformers import PreTrainedTokenizerBase
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import request_lock
-
 
 # Regex to match Llama 3's auto-injected knowledge cutoff preamble in system messages
 # This preamble is added by apply_chat_template and looks like:
@@ -21,12 +18,12 @@ from neuronpedia_inference.shared import request_lock
 # We strip it to prevent duplication when the conversation is sent back and
 # apply_chat_template is called again
 _LLAMA3_SYSTEM_PREAMBLE_PATTERN = re.compile(
-    r"^Cutting Knowledge Date:\s*[^\n]+\nToday Date:\s*[^\n]+\n*",
-    re.MULTILINE
+    r"^Cutting Knowledge Date:\s*[^\n]+\nToday Date:\s*[^\n]+\n*", re.MULTILINE
 )
 
 # no additional system prompt addition for assistant axis
 # _ASSISTANT_AXIS_SYSTEM_PROMPT_ADDITION = ""
+
 
 def _strip_llama3_system_preamble(content: str) -> str:
     """Strip Llama 3's auto-injected knowledge cutoff preamble and assistant axis system prompt addition from system message content."""
@@ -136,23 +133,45 @@ def convert_to_chat_array(
             else:
                 continue
 
-            if not role or not content:
+            if not role:
                 continue
 
-            # Handle assistant analysis channel - store for merging with final
+            # Handle assistant analysis channel - store for potential merging with final
             if role == "assistant" and channel == "analysis":
                 pending_analysis = content
+                # Continue processing to see if final channel follows in this parse
                 continue
 
-            # Handle assistant final channel - merge with pending analysis
-            if role == "assistant" and channel == "final" and pending_analysis:
-                content = f"<think>{pending_analysis}</think>{content}"
-                pending_analysis = None
+            # Handle assistant final channel - merge with pending analysis if present
+            if role == "assistant" and channel == "final":
+                if pending_analysis:
+                    content = f"<think>{pending_analysis}</think>{content}"
+                    pending_analysis = None
+                if content:
+                    conversation.append(
+                        NPSteerChatMessage(
+                            role=role,
+                            content=content,
+                        )
+                    )
+                continue
 
+            # Non-analysis, non-final messages
+            if content:
+                conversation.append(
+                    NPSteerChatMessage(
+                        role=role,
+                        content=content,
+                    )
+                )
+
+        # If there's pending analysis with no final yet, stream it as a think message
+        # This enables real-time streaming of thinking content before final arrives
+        if pending_analysis:
             conversation.append(
                 NPSteerChatMessage(
-                    role=role,
-                    content=content,
+                    role="assistant",
+                    content=f"<think>{pending_analysis}</think>",
                 )
             )
 
@@ -205,9 +224,12 @@ def convert_to_chat_array(
                     content=tokenizer.decode(current_content).strip(),
                 )
             )
-    
+
     # Llama 3.3 Instruct uses header tokens similar to Llama 3.1
-    elif hasattr(tokenizer, "name_or_path") and "llama-3" in tokenizer.name_or_path.lower():
+    elif (
+        hasattr(tokenizer, "name_or_path")
+        and "llama-3" in tokenizer.name_or_path.lower()
+    ):
         # Llama 3.3 uses special tokens: 128006 (start_header), 128007 (end_header)
         # Format: <|start_header_id|>role<|end_header_id|>\n\ncontent<|eot_id|>
         START_HEADER_ID = 128006

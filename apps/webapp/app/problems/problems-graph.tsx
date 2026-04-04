@@ -3,6 +3,7 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import {
   ConnectionLineType,
+  Controls,
   type Edge,
   type Node,
   Panel,
@@ -118,7 +119,7 @@ function ProblemsGraphInner({
     const container = flowContainerRef.current;
     const allNodes = getNodes();
     if (!container || allNodes.length === 0) {
-      fitView({ padding: FIT_VIEW_PADDING_TOP, duration: 400 });
+      fitView({ padding: FIT_VIEW_PADDING_TOP, duration: 300 });
       return;
     }
     // Calculate bounds of all nodes
@@ -147,7 +148,7 @@ function ProblemsGraphInner({
     const x = (rect.width - scaledW) / 2 - minX * zoom;
     const topPad = (rect.height - scaledH) * (FIT_VIEW_PADDING_TOP / (FIT_VIEW_PADDING_TOP + FIT_VIEW_PADDING_BOTTOM));
     const y = topPad - minY * zoom;
-    setViewport({ x, y, zoom }, { duration: 400 });
+    setViewport({ x, y, zoom }, { duration: 200 });
   }, [fitView, getNodes, setViewport]);
 
   const panToNode = useCallback(
@@ -345,7 +346,7 @@ function ProblemsGraphInner({
         if (target) {
           const width = target.measured?.width ?? 200;
           const height = target.measured?.height ?? 40;
-          panToNode(target.position.x, target.position.y, width, height, { duration: 400 });
+          panToNode(target.position.x, target.position.y, width, height, { duration: 200 });
         }
       }, 100);
     },
@@ -382,7 +383,7 @@ function ProblemsGraphInner({
         if (target) {
           const w = target.measured?.width ?? 200;
           const h = target.measured?.height ?? 40;
-          setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 400 }), 50);
+          setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200 }), 50);
         } else {
           setTimeout(() => fitViewCustom(), 50);
         }
@@ -544,7 +545,7 @@ function ProblemsGraphInner({
         if (target) {
           const w = target.measured?.width ?? 200;
           const h = target.measured?.height ?? 40;
-          setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 400 }), 50);
+          setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200 }), 50);
         } else {
           setTimeout(() => fitViewCustom(), 50);
         }
@@ -599,7 +600,7 @@ function ProblemsGraphInner({
             proOptions={{ hideAttribution: true }}
           >
             {/* <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#e2e8f0" /> */}
-            {/* <Controls showInteractive={false} showFitView={false} /> */}
+            <Controls showInteractive={false} position="bottom-right" />
             {/* <Panel position="bottom-left" className="!mb-0.5 !ml-[52px]">
             <button
               type="button"

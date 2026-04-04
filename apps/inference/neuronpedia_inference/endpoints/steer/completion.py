@@ -321,11 +321,13 @@ async def run_batched_generate(
 
                     # for nnsight we don't yield one token at a time (it hangs for some reason)
                     # so we just send one message at the end
+                    nnsight_temp = kwargs.get("temperature", 1.0)
+                    nnsight_do_sample = nnsight_temp > 0
                     with model.generate(
                         prompt,
-                        temperature=kwargs.get("temperature"),
+                        temperature=nnsight_temp if nnsight_do_sample else None,
                         max_new_tokens=kwargs.get("max_new_tokens"),
-                        do_sample=kwargs.get("do_sample", True),
+                        do_sample=nnsight_do_sample,
                     ) as tracer:
                         with tracer.all():
                             token = model.generator.streamer.output
@@ -493,11 +495,13 @@ async def run_batched_generate(
                         "freq_penalty is not supported for StandardizedTransformer models, it will be ignored"
                     )
 
+                nnsight_temp = kwargs.get("temperature", 1.0)
+                nnsight_do_sample = nnsight_temp > 0
                 with model.generate(
                     prompt,
-                    temperature=kwargs.get("temperature"),
+                    temperature=nnsight_temp if nnsight_do_sample else None,
                     max_new_tokens=kwargs.get("max_new_tokens"),
-                    do_sample=kwargs.get("do_sample", True),
+                    do_sample=nnsight_do_sample,
                 ) as tracer:
                     with tracer.all():
                         token = model.generator.streamer.output
