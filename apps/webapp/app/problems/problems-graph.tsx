@@ -469,11 +469,11 @@ function ProblemsGraphInner({
       setSignInModalOpen(true);
       return;
     }
-    if (!selectedNodeId || selectedNodeId === DRAFT_ID) {
-      // eslint-disable-next-line no-alert
-      window.alert('Before adding a node, click an existing node to choose its parent node.');
-      return;
-    }
+    // if (!selectedNodeId || selectedNodeId === DRAFT_ID) {
+    //   // eslint-disable-next-line no-alert
+    //   window.alert('Before adding a node, click an existing node to choose its parent node.');
+    //   return;
+    // }
     // eslint-disable-next-line no-alert
     if (draftNode && !window.confirm('This will discard your current node creation. Are you sure?')) return;
     const draft: ProblemNodeData = {
@@ -636,6 +636,8 @@ function ProblemsGraphInner({
             <Panel position="top-right" className="flex items-start gap-2">
               <Controls
                 showInteractive={false}
+                showFitView
+                onFitView={fitViewCustom}
                 position="top-right"
                 className="!static !m-0 !shadow-none"
                 style={{ border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}
