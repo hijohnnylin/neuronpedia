@@ -110,7 +110,9 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           <div className="mt-1 truncate text-[9px] leading-tight text-slate-400">{data.author}</div>
         )}
         {data.hiddenChildCount > 0 && (
-          <div className="-mt-2.5 text-right text-[8px] font-semibold text-slate-400">
+          <div
+            className={`${primaryType !== 'topic' ? '-mt-2.5' : 'mt-0.5'} text-right text-[8px] font-semibold text-slate-400`}
+          >
             +{data.hiddenChildCount} Children
           </div>
         )}
