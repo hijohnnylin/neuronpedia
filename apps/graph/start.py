@@ -180,7 +180,7 @@ def main():
 
     # Build uvicorn command
     uvicorn_args = [
-        "python",
+        sys.executable,
         "-m",
         "uvicorn",
         "neuronpedia_graph.server:app",
