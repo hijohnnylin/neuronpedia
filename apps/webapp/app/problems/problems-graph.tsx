@@ -30,6 +30,71 @@ const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 const FIT_VIEW_PADDING_TOP = 0.04;
 const FIT_VIEW_PADDING_BOTTOM = 0.03;
 
+function getVisibleNodesWithCollapse(
+  allNodes: ProblemNodeData[],
+  selectedId: number | null,
+): { visibleNodes: ProblemNodeData[]; hiddenChildCounts: Map<number, number> } {
+  const nodeById = new Map(allNodes.map((n) => [n.id, n]));
+
+  const childrenOf = new Map<number, number[]>();
+  allNodes.forEach((n) => {
+    if (n.parentId != null && nodeById.has(n.parentId)) {
+      const siblings = childrenOf.get(n.parentId) || [];
+      siblings.push(n.id);
+      childrenOf.set(n.parentId, siblings);
+    }
+  });
+
+  const depths = new Map<number, number>();
+  const roots = allNodes.filter((n) => !n.parentId || !nodeById.has(n.parentId));
+  const queue: [number, number][] = roots.map((r) => [r.id, 0]);
+  while (queue.length > 0) {
+    const [id, depth] = queue.shift()!;
+    if (!depths.has(id)) {
+      depths.set(id, depth);
+      (childrenOf.get(id) || []).forEach((childId) => queue.push([childId, depth + 1]));
+    }
+  }
+
+  const ancestorIds = new Set<number>();
+  if (selectedId != null && selectedId !== DRAFT_ID) {
+    let cur: number | null | undefined = selectedId;
+    while (cur != null) {
+      ancestorIds.add(cur);
+      cur = nodeById.get(cur)?.parentId;
+    }
+  }
+
+  // A node is expanded (shows its children) if it's a root, on the ancestor path, or selected
+  const expandedIds = new Set<number>([...ancestorIds]);
+  roots.forEach((r) => expandedIds.add(r.id));
+
+  const visibleIds = new Set<number>();
+  allNodes.forEach((n) => {
+    const depth = depths.get(n.id) ?? 0;
+    if (depth <= 1) {
+      visibleIds.add(n.id);
+    } else if (n.parentId != null && expandedIds.has(n.parentId)) {
+      visibleIds.add(n.id);
+    }
+  });
+
+  const hiddenChildCounts = new Map<number, number>();
+  allNodes.forEach((n) => {
+    if (!visibleIds.has(n.id)) return;
+    const children = childrenOf.get(n.id) || [];
+    const hiddenCount = children.filter((cId) => !visibleIds.has(cId)).length;
+    if (hiddenCount > 0) {
+      hiddenChildCounts.set(n.id, hiddenCount);
+    }
+  });
+
+  return {
+    visibleNodes: allNodes.filter((n) => visibleIds.has(n.id)),
+    hiddenChildCounts,
+  };
+}
+
 async function buildFlowGraph(
   problemNodes: ProblemNodeData[],
   onAddChild?: (parentId: number) => void,
@@ -41,6 +106,7 @@ async function buildFlowGraph(
     onCancel: () => void;
     saving: boolean;
   },
+  hiddenChildCounts?: Map<number, number>,
 ) {
   const nodes: Node[] = problemNodes.map((pn) => {
     if (pn.id === DRAFT_ID) {
@@ -79,6 +145,7 @@ async function buildFlowGraph(
         mainUrl: pn.mainUrl,
         isRoot: !pn.parentId || pn.parentId === 1,
         isDraft: false,
+        hiddenChildCount: hiddenChildCounts?.get(pn.id) ?? 0,
         onAddChild: onAddChild ? () => onAddChild(pn.id) : undefined,
         onEditNode: onEditNode ? () => onEditNode(pn.id) : undefined,
       },
@@ -141,7 +208,7 @@ function ProblemsGraphInner({
     // Calculate zoom with asymmetric padding
     const zoomX = rect.width / (graphW * (1 + FIT_VIEW_PADDING_TOP * 2));
     const zoomY = rect.height / (graphH * (1 + FIT_VIEW_PADDING_TOP + FIT_VIEW_PADDING_BOTTOM));
-    const zoom = Math.min(zoomX, zoomY, 1);
+    const zoom = Math.min(zoomX, zoomY, 1.5);
     // Center horizontally, apply asymmetric vertical padding
     const scaledW = graphW * zoom;
     const scaledH = graphH * zoom;
@@ -361,50 +428,6 @@ function ProblemsGraphInner({
     [selectNode],
   );
 
-  // Build layout from problemNodes (+ draft if present)
-  useEffect(() => {
-    if (problemNodes.length === 0 && !draftNode) return;
-    const allNodes = draftNode ? [...problemNodes, draftNode] : problemNodes;
-    buildFlowGraph(
-      allNodes,
-      addChildToNode,
-      canEdit ? editNode : undefined,
-      draftNode ? draftCallbacks : undefined,
-    ).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
-      const sid = selectedNodeIdRef.current;
-      setNodes(layoutedNodes.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
-      setEdges(layoutedEdges);
-      if (draftNode) {
-        const focusIds = [String(DRAFT_ID)];
-        if (draftNode.parentId) focusIds.push(String(draftNode.parentId));
-        setTimeout(() => fitView({ padding: 0.3, nodes: layoutedNodes.filter((n) => focusIds.includes(n.id)) }), 50);
-      } else if (sid != null) {
-        const target = layoutedNodes.find((n) => n.id === String(sid));
-        if (target) {
-          const w = target.measured?.width ?? 200;
-          const h = target.measured?.height ?? 40;
-          setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200 }), 50);
-        } else {
-          setTimeout(() => fitViewCustom(), 50);
-        }
-      } else {
-        setTimeout(() => fitViewCustom(), 50);
-      }
-    });
-  }, [
-    problemNodes,
-    draftNode,
-    addChildToNode,
-    canEdit,
-    editNode,
-    draftCallbacks,
-    setNodes,
-    setEdges,
-    fitView,
-    fitViewCustom,
-    panToNode,
-  ]);
-
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       const clickedId = Number(node.id);
@@ -413,9 +436,15 @@ function ProblemsGraphInner({
         if (!window.confirm('This will discard your current node creation. Are you sure?')) return;
         handleDraftCancelled();
       }
-      selectNode(clickedId);
+      if (clickedId === selectedNodeId) {
+        setSelectedNodeId(null);
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+        window.history.replaceState(null, '', '/problems');
+      } else {
+        selectNode(clickedId);
+      }
     },
-    [selectNode, draftNode, handleDraftCancelled],
+    [selectNode, draftNode, handleDraftCancelled, selectedNodeId, setNodes],
   );
 
   const handleClose = useCallback(() => {
@@ -513,7 +542,6 @@ function ProblemsGraphInner({
     if (problemNodes.length === 0 && !draftNode) return;
     const filtered = typeFilter === 'all' ? problemNodes : problemNodes.filter((n) => n.nodeTypes.includes(typeFilter));
     const includeIds = new Set(filtered.map((n) => n.id));
-    // Walk up ancestor chains so the path to root is always visible
     const nodeById = new Map(problemNodes.map((n) => [n.id, n]));
     filtered.forEach((n) => {
       let cur = n;
@@ -526,12 +554,14 @@ function ProblemsGraphInner({
       }
     });
     const withParents = problemNodes.filter((n) => includeIds.has(n.id));
-    const allNodes = draftNode ? [...withParents, draftNode] : withParents;
+    const { visibleNodes, hiddenChildCounts } = getVisibleNodesWithCollapse(withParents, selectedNodeId);
+    const allNodes = draftNode ? [...visibleNodes, draftNode] : visibleNodes;
     buildFlowGraph(
       allNodes,
       addChildToNode,
       canEdit ? editNode : undefined,
       draftNode ? draftCallbacks : undefined,
+      hiddenChildCounts,
     ).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
       const sid = selectedNodeIdRef.current;
       setNodes(layoutedNodes.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
@@ -553,8 +583,10 @@ function ProblemsGraphInner({
         setTimeout(() => fitViewCustom(), 50);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     typeFilter,
+    selectedNodeId,
     problemNodes,
     draftNode,
     addChildToNode,

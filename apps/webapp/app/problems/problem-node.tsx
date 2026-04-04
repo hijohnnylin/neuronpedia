@@ -111,6 +111,11 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
         {data.author && !types.every((t: string) => t === 'topic') && (
           <div className="mt-0.5 truncate text-[9px] leading-tight text-slate-400">{data.author}</div>
         )}
+        {data.hiddenChildCount > 0 && (
+          <div className="mt-0.5 text-right text-[8px] font-semibold text-slate-400">
+            +{data.hiddenChildCount} Children
+          </div>
+        )}
       </div>
       <Handle
         type="source"

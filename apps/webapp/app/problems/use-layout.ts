@@ -4,9 +4,9 @@ import ELK, { type ElkNode } from 'elkjs/lib/elk.bundled';
 import { DRAFT_NODE_HEIGHT_POPULATED, DRAFT_NODE_HEIGHT_URL } from './draft-node';
 import { DEFAULT_NODE_WIDTH, ROOT_NODE_WIDTH } from './problem-node';
 
-const NODE_HEIGHT_TOPIC = 30;
+const NODE_HEIGHT_TOPIC = 42;
 const NODE_HEIGHT_DEFAULT = 45;
-const SIBLING_GAP = 2;
+const SIBLING_GAP = 4;
 
 const elk = new ELK();
 
