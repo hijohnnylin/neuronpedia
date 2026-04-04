@@ -81,7 +81,10 @@ export async function getLayoutedElements(nodes: Node[], edges: Edge[]) {
       'elk.layered.spacing.nodeNodeBetweenLayers': '20',
       'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
-      'elk.margins': '[top=40,left=40,bottom=40,right=40]',
+      'elk.separateConnectedComponents': 'true',
+      'elk.aspectRatio': '2',
+      'elk.spacing.componentComponent': '30',
+      'elk.margins': '[top=30,left=30,bottom=30,right=30]',
     },
     children: sortChildrenByParent(nodes, edges).map((node) => {
       const { width, height } = getNodeDimensions(node);
