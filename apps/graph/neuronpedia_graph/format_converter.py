@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from importlib.metadata import version as pkg_version
 from typing import Any
 
 import torch
@@ -271,7 +272,7 @@ def convert_to_neuronpedia_graph(
         "info": {
             "generator": {
                 "name": "lm-saes (CRM) by OpenMOSS",
-                "version": "2.0.0b22",
+                "version": pkg_version("lm-saes"),
                 "url": "https://github.com/OpenMOSS/Language-Model-SAEs",
             },
         },
