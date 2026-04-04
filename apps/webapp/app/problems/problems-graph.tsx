@@ -28,7 +28,7 @@ import { getLayoutedElements } from './use-layout';
 const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 
 // Padding for fitView — adjust these to control spacing around the graph
-const FIT_VIEW_PADDING_TOP = 0.09;
+const FIT_VIEW_PADDING_TOP = 0.05;
 const FIT_VIEW_PADDING_BOTTOM = 0.03;
 
 function getVisibleNodesWithCollapse(
@@ -673,7 +673,7 @@ function ProblemsGraphInner({
             </Panel>
 
             <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg bg-white/50 px-4 py-2 text-center backdrop-blur-[3px]">
-              <h1 className="text-sm font-semibold text-slate-800">Mech Interp Problems</h1>
+              <h1 className="text-sm font-semibold text-slate-800">Mech Interp Problems & Explorer</h1>
               <p className="mt-0.5 text-[11px] text-slate-400">Seeded from Sharkey et al. 2025</p>
             </div>
             <Panel position="bottom-left">
