@@ -34,7 +34,7 @@ export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'gemma-3-4b-it', '
 
 export const LORSA_MODELS = ['qwen3-1.7b'];
 export const LORSA_BATCH_SIZE = 16;
-export const LORSA_MAX_TOKENS = 11;
+export const LORSA_MAX_TOKENS = 10;
 export const GRAPH_MODEL_MAP = {
   'gemma-2-2b': 'google/gemma-2-2b',
   'gemma-3-4b-it': 'google/gemma-3-4b-it',
@@ -51,14 +51,23 @@ export const GRAPH_DESIREDLOGITPROB_MIN = 0.6;
 export const GRAPH_DESIREDLOGITPROB_MAX = 0.99;
 export const GRAPH_DESIREDLOGITPROB_DEFAULT = 0.95;
 export const GRAPH_NODETHRESHOLD_MIN = 0.5;
+export const GRAPH_NODETHRESHOLD_MIN_LORSA = 0.3;
 export const GRAPH_NODETHRESHOLD_MAX = 0.95;
+export const GRAPH_NODETHRESHOLD_MAX_LORSA = 0.6;
 export const GRAPH_NODETHRESHOLD_DEFAULT = 0.8;
+export const GRAPH_NODETHRESHOLD_DEFAULT_LORSA = 0.6;
 export const GRAPH_EDGETHRESHOLD_MIN = 0.65;
+export const GRAPH_EDGETHRESHOLD_MIN_LORSA = 0.5;
 export const GRAPH_EDGETHRESHOLD_MAX = 0.98;
+export const GRAPH_EDGETHRESHOLD_MAX_LORSA = 0.8;
 export const GRAPH_EDGETHRESHOLD_DEFAULT = 0.85;
+export const GRAPH_EDGETHRESHOLD_DEFAULT_LORSA = 0.8;
 export const GRAPH_MAXFEATURENODES_MIN = 1500;
+export const GRAPH_MAXFEATURENODES_MIN_LORSA = 1500;
 export const GRAPH_MAXFEATURENODES_MAX = 10000;
+export const GRAPH_MAXFEATURENODES_MAX_LORSA = 5000;
 export const GRAPH_MAXFEATURENODES_DEFAULT = 5000;
+export const GRAPH_MAXFEATURENODES_DEFAULT_LORSA = 3000;
 export const GRAPH_SLUG_MIN = 2;
 
 export const GRAPH_DYNAMIC_PRUNING_THRESHOLD_DEFAULT = 0.6;

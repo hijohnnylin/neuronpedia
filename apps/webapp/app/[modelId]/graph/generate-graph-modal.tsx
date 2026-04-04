@@ -14,20 +14,29 @@ import {
   GRAPH_DESIREDLOGITPROB_MAX,
   GRAPH_DESIREDLOGITPROB_MIN,
   GRAPH_EDGETHRESHOLD_DEFAULT,
+  GRAPH_EDGETHRESHOLD_DEFAULT_LORSA,
   GRAPH_EDGETHRESHOLD_MAX,
+  GRAPH_EDGETHRESHOLD_MAX_LORSA,
   GRAPH_EDGETHRESHOLD_MIN,
+  GRAPH_EDGETHRESHOLD_MIN_LORSA,
   GRAPH_GENERATION_ENABLED_MODELS,
   GRAPH_MAX_PROMPT_LENGTH_CHARS,
   GRAPH_MAX_TOKENS,
   GRAPH_MAXFEATURENODES_DEFAULT,
+  GRAPH_MAXFEATURENODES_DEFAULT_LORSA,
   GRAPH_MAXFEATURENODES_MAX,
+  GRAPH_MAXFEATURENODES_MAX_LORSA,
   GRAPH_MAXFEATURENODES_MIN,
+  GRAPH_MAXFEATURENODES_MIN_LORSA,
   GRAPH_MAXNLOGITS_DEFAULT,
   GRAPH_MAXNLOGITS_MAX,
   GRAPH_MAXNLOGITS_MIN,
   GRAPH_NODETHRESHOLD_DEFAULT,
+  GRAPH_NODETHRESHOLD_DEFAULT_LORSA,
   GRAPH_NODETHRESHOLD_MAX,
+  GRAPH_NODETHRESHOLD_MAX_LORSA,
   GRAPH_NODETHRESHOLD_MIN,
+  GRAPH_NODETHRESHOLD_MIN_LORSA,
   graphGenerateSchemaClient,
   GraphTokenizeResponse,
   LORSA_MAX_TOKENS,
@@ -53,30 +62,28 @@ const isBoringToken = (token: string) => {
   return BORING_TOKENS.includes(trimmedToken) || BORING_SYMBOLS.includes(trimmedToken);
 };
 
-const LOWER_NODE_THRESHOLD_OFFSET = 0.2;
-const LOWER_EDGE_THRESHOLD_OFFSET = 0.05;
+const isLorsa = (modelId: string) => LORSA_MODELS.includes(modelId);
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
-const getNodeThresholdDefault = (modelId: string) =>
-  LORSA_MODELS.includes(modelId)
-    ? round2(GRAPH_NODETHRESHOLD_DEFAULT - LOWER_NODE_THRESHOLD_OFFSET)
-    : GRAPH_NODETHRESHOLD_DEFAULT;
-
+const getNodeThresholdMin = (modelId: string) =>
+  isLorsa(modelId) ? GRAPH_NODETHRESHOLD_MIN_LORSA : GRAPH_NODETHRESHOLD_MIN;
 const getNodeThresholdMax = (modelId: string) =>
-  LORSA_MODELS.includes(modelId)
-    ? round2(GRAPH_NODETHRESHOLD_MAX - LOWER_NODE_THRESHOLD_OFFSET)
-    : GRAPH_NODETHRESHOLD_MAX;
+  isLorsa(modelId) ? GRAPH_NODETHRESHOLD_MAX_LORSA : GRAPH_NODETHRESHOLD_MAX;
+const getNodeThresholdDefault = (modelId: string) =>
+  isLorsa(modelId) ? GRAPH_NODETHRESHOLD_DEFAULT_LORSA : GRAPH_NODETHRESHOLD_DEFAULT;
 
-const getEdgeThresholdDefault = (modelId: string) =>
-  LORSA_MODELS.includes(modelId)
-    ? round2(GRAPH_EDGETHRESHOLD_DEFAULT - LOWER_EDGE_THRESHOLD_OFFSET)
-    : GRAPH_EDGETHRESHOLD_DEFAULT;
-
+const getEdgeThresholdMin = (modelId: string) =>
+  isLorsa(modelId) ? GRAPH_EDGETHRESHOLD_MIN_LORSA : GRAPH_EDGETHRESHOLD_MIN;
 const getEdgeThresholdMax = (modelId: string) =>
-  LORSA_MODELS.includes(modelId)
-    ? round2(GRAPH_EDGETHRESHOLD_MAX - LOWER_EDGE_THRESHOLD_OFFSET)
-    : GRAPH_EDGETHRESHOLD_MAX;
+  isLorsa(modelId) ? GRAPH_EDGETHRESHOLD_MAX_LORSA : GRAPH_EDGETHRESHOLD_MAX;
+const getEdgeThresholdDefault = (modelId: string) =>
+  isLorsa(modelId) ? GRAPH_EDGETHRESHOLD_DEFAULT_LORSA : GRAPH_EDGETHRESHOLD_DEFAULT;
+
+const getMaxFeatureNodesMin = (modelId: string) =>
+  isLorsa(modelId) ? GRAPH_MAXFEATURENODES_MIN_LORSA : GRAPH_MAXFEATURENODES_MIN;
+const getMaxFeatureNodesMax = (modelId: string) =>
+  isLorsa(modelId) ? GRAPH_MAXFEATURENODES_MAX_LORSA : GRAPH_MAXFEATURENODES_MAX;
+const getMaxFeatureNodesDefault = (modelId: string) =>
+  isLorsa(modelId) ? GRAPH_MAXFEATURENODES_DEFAULT_LORSA : GRAPH_MAXFEATURENODES_DEFAULT;
 
 interface FormValues {
   prompt: string;
@@ -172,7 +179,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     desiredLogitProb: GRAPH_DESIREDLOGITPROB_DEFAULT,
     nodeThreshold: getNodeThresholdDefault(selectedModelId),
     edgeThreshold: getEdgeThresholdDefault(selectedModelId),
-    maxFeatureNodes: GRAPH_MAXFEATURENODES_DEFAULT,
+    maxFeatureNodes: getMaxFeatureNodesDefault(selectedModelId),
     slug: '',
   };
 
@@ -613,6 +620,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                 setFieldValue('modelId', value);
                                 setFieldValue('nodeThreshold', getNodeThresholdDefault(value));
                                 setFieldValue('edgeThreshold', getEdgeThresholdDefault(value));
+                                setFieldValue('maxFeatureNodes', getMaxFeatureNodesDefault(value));
                                 setTimeout(() => {
                                   setFieldValue('sourceSetName', getHasGraphsSourceSetsForModelId(value)[0].name);
                                 }, 100);
@@ -854,16 +862,16 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     onBlur={handleBlur}
                                     disabled={isGenerating}
                                     className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
-                                    min={GRAPH_MAXFEATURENODES_MIN}
-                                    max={GRAPH_MAXFEATURENODES_MAX}
+                                    min={getMaxFeatureNodesMin(values.modelId)}
+                                    max={getMaxFeatureNodesMax(values.modelId)}
                                     step={1}
                                   />
                                   <RadixSlider.Root
                                     name="maxFeatureNodes"
                                     value={[values.maxFeatureNodes]}
                                     onValueChange={(newVal: number[]) => setFieldValue('maxFeatureNodes', newVal[0])}
-                                    min={GRAPH_MAXFEATURENODES_MIN}
-                                    max={GRAPH_MAXFEATURENODES_MAX}
+                                    min={getMaxFeatureNodesMin(values.modelId)}
+                                    max={getMaxFeatureNodesMax(values.modelId)}
                                     disabled={isGenerating}
                                     step={500}
                                     className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
@@ -905,7 +913,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     onBlur={handleBlur}
                                     disabled={isGenerating}
                                     className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
-                                    min={GRAPH_NODETHRESHOLD_MIN}
+                                    min={getNodeThresholdMin(values.modelId)}
                                     max={getNodeThresholdMax(values.modelId)}
                                     step={0.01}
                                   />
@@ -913,7 +921,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     name="nodeThreshold"
                                     value={[values.nodeThreshold]}
                                     onValueChange={(newVal: number[]) => setFieldValue('nodeThreshold', newVal[0])}
-                                    min={GRAPH_NODETHRESHOLD_MIN}
+                                    min={getNodeThresholdMin(values.modelId)}
                                     max={getNodeThresholdMax(values.modelId)}
                                     disabled={isGenerating}
                                     step={0.01}
@@ -946,7 +954,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     onBlur={handleBlur}
                                     disabled={isGenerating}
                                     className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
-                                    min={GRAPH_EDGETHRESHOLD_MIN}
+                                    min={getEdgeThresholdMin(values.modelId)}
                                     max={getEdgeThresholdMax(values.modelId)}
                                     step={0.01}
                                   />
@@ -954,7 +962,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     name="edgeThreshold"
                                     value={[values.edgeThreshold]}
                                     onValueChange={(newVal: number[]) => setFieldValue('edgeThreshold', newVal[0])}
-                                    min={GRAPH_EDGETHRESHOLD_MIN}
+                                    min={getEdgeThresholdMin(values.modelId)}
                                     max={getEdgeThresholdMax(values.modelId)}
                                     disabled={isGenerating}
                                     step={0.01}
