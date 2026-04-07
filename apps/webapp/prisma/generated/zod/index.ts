@@ -116,7 +116,7 @@ export const ExplanationActivationV1ScalarFieldEnumSchema = z.enum(['id','explan
 
 export const VoteScalarFieldEnumSchema = z.enum(['id','voterId','reason','points','explanationId','createdAt','updatedAt']);
 
-export const ActivationScalarFieldEnumSchema = z.enum(['id','tokens','dataIndex','index','layer','modelId','dataSource','maxValue','maxValueTokenIndex','minValue','values','dfaValues','dfaTargetIndex','dfaMaxValue','creatorId','createdAt','lossValues','logitContributions','binMin','binMax','binContains','qualifyingTokenIndex']);
+export const ActivationScalarFieldEnumSchema = z.enum(['id','tokens','dataIndex','index','layer','modelId','dataSource','maxValue','maxValueTokenIndex','minValue','values','dfaValues','dfaTargetIndex','dfaMaxValue','zQIndices','zKIndices','zValues','creatorId','createdAt','lossValues','logitContributions','binMin','binMax','binContains','qualifyingTokenIndex']);
 
 export const CommentScalarFieldEnumSchema = z.enum(['id','modelId','layer','index','text','userId','createdAt']);
 
@@ -2605,6 +2605,9 @@ export const ActivationSchema = z.object({
   dfaValues: z.number().array(),
   dfaTargetIndex: z.number().int().nullable(),
   dfaMaxValue: z.number().nullable(),
+  zQIndices: z.number().int().array(),
+  zKIndices: z.number().int().array(),
+  zValues: z.number().array(),
   creatorId: z.string(),
   createdAt: z.coerce.date(),
   lossValues: z.number().array(),

@@ -1143,7 +1143,7 @@ export default function Subgraph() {
     // Apply classes based on interaction state
     nodeSel
       .classed('clicked', (d: ForceNode) => d.node.nodeId === currentClickedId)
-      .classed('hovered', (d: ForceNode) => d.node.featureId === currentHoveredId)
+      .classed('hovered', (d: ForceNode) => d.node.nodeId === currentHoveredId)
       .classed(
         'grouping-selected', // This class should now be applied correctly
         (d: ForceNode) => visState.subgraph?.activeGrouping.selectedNodeIds.has(d.node.nodeId || '') || false,
@@ -1205,7 +1205,7 @@ export default function Subgraph() {
     // Apply styles based on the potentially updated tmpClickedLink property
     memberNodeSel
       .classed('clicked', (d: CLTGraphNode) => d.nodeId === currentClickedId)
-      .classed('hovered', (d: CLTGraphNode) => d.featureId === currentHoveredId)
+      .classed('hovered', (d: CLTGraphNode) => d.nodeId === currentHoveredId)
       .style('background', (d: CLTGraphNode) =>
         d.feature_type === 'lorsa' ? 'transparent' : d?.tmpClickedLink?.pctInputColor || '#fff',
       )

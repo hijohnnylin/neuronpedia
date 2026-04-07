@@ -864,6 +864,10 @@ model Activation {
   dfaValues          Float[]                   @default([])
   dfaTargetIndex     Int?
   dfaMaxValue        Float?
+  zQIndices          Int[]                     @default([])
+  zKIndices          Int[]                     @default([])
+  zValues            Float[]                   @default([])
+
   neuron             Neuron                    @relation(fields: [modelId, layer, index], references: [modelId, layer, index], onDelete: Cascade)
   explanations       ExplanationActivationV1[]
   savedSearch        SavedSearchActivation[]

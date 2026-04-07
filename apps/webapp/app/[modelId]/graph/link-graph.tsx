@@ -220,7 +220,7 @@ export default function LinkGraph() {
         return;
       }
       // Get the hovered node
-      const node: CLTGraphNode | undefined = data.nodes.find((n) => n.featureId === hoveredId);
+      const node: CLTGraphNode | undefined = data.nodes.find((n) => n.nodeId === hoveredId);
 
       // If we couldn't find a node, clear all tmpHoveredLink values
       if (!node) {
@@ -389,7 +389,7 @@ export default function LinkGraph() {
 
       // Update hover circle visibility
       hoverSel.style('display', (d: any) => {
-        if (d.featureId === hoveredId) {
+        if (d.nodeId === hoveredId) {
           return '';
         }
         return 'none';

@@ -18,10 +18,35 @@ export default function ActivationItemTokenTooltip({
     v: number[] | undefined;
   }[];
 
+  const zQIndices = activation.zQIndices || [];
+  const zKIndices = activation.zKIndices || [];
+  const zValues = activation.zValues || [];
+  const hasZPattern = zQIndices.length > 0 && zKIndices.length > 0 && zValues.length > 0;
+
+  const zIncoming: { sourceIndex: number; value: number }[] = [];
+  const zOutgoing: { targetIndex: number; value: number }[] = [];
+  if (hasZPattern) {
+    const zLength = Math.min(zQIndices.length, zKIndices.length, zValues.length);
+    for (let i = 0; i < zLength; i += 1) {
+      const q = zQIndices[i];
+      const k = zKIndices[i];
+      const v = zValues[i];
+      // In Neuronpedia exports, zQ acts like source and zK acts like target.
+      if (k === tokenIndex) {
+        zIncoming.push({ sourceIndex: q, value: v });
+      }
+      if (q === tokenIndex) {
+        zOutgoing.push({ targetIndex: k, value: v });
+      }
+    }
+    zIncoming.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+    zOutgoing.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  }
+
   return (
     <Tooltip.Portal>
       <Tooltip.Content
-        className="z-50 flex w-full flex-col items-center gap-y-1.5 rounded border bg-white px-4 py-2 text-center text-xs font-semibold text-slate-700 shadow"
+        className="z-50 flex w-full flex-col items-center gap-y-1.5 rounded border bg-white/80 px-4 pb-0 pt-3 text-center text-xs font-semibold text-slate-700 shadow backdrop-blur-[1px]"
         sideOffset={3}
       >
         <div className="whitespace-pre-wrap rounded bg-slate-300 px-1 font-mono">{token.replaceAll('\n', '\\n')}</div>
@@ -41,6 +66,47 @@ export default function ActivationItemTokenTooltip({
               {activation.values[tokenIndex] >= 0 ? '+' : ''}
               {activation.values[tokenIndex].toFixed(ACTIVATION_PRECISION)}
             </div>
+          </div>
+        )}
+        {hasZPattern && zIncoming.length > 0 && (
+          <div className="font-base mt-1 flex w-full flex-col gap-y-1 border-t border-t-slate-200 pt-2 text-[11px] font-normal leading-tight">
+            <div className="font-semibold">Attention or Z Pattern</div>
+            {/* <div>
+              As target
+              (k={tokenIndex}): {zIncoming.length} source token
+              {zIncoming.length === 1 ? '' : 's'}
+            </div> */}
+            {zIncoming.slice(0, 4).map((item, i) => (
+              <div className="flex flex-row items-center justify-center gap-x-1" key={`zin-${i}`}>
+                <div className="rounded bg-slate-200 px-1 font-mono">
+                  {/* q={item.sourceIndex} ( */}
+                  {activation.tokens?.[item.sourceIndex]?.replaceAll('\n', '\\n') || 'N/A'}
+                  {/* ) */}
+                </div>
+                <div>
+                  {item.value >= 0 ? '+' : ''}
+                  {item.value.toFixed(ACTIVATION_PRECISION)}
+                </div>
+              </div>
+            ))}
+            {/* <div className="pt-1">
+              As source
+              (q={tokenIndex}): {zOutgoing.length} target token
+              {zOutgoing.length === 1 ? '' : 's'}
+            </div>
+            {zOutgoing.slice(0, 4).map((item, i) => (
+              <div className="flex flex-row items-center justify-center gap-x-1" key={`zout-${i}`}>
+                <div className="rounded bg-slate-200 px-1 font-mono">
+                  k={item.targetIndex} (
+                  {activation.tokens?.[item.targetIndex]?.replaceAll('\n', '\\n') || 'N/A'}
+                  )
+                </div>
+                <div>
+                  {item.value >= 0 ? '+' : ''}
+                  {item.value.toFixed(ACTIVATION_PRECISION)}
+                </div>
+              </div>
+            ))} */}
           </div>
         )}
         {activation.lossValues && activation.lossValues.length > 0 && (

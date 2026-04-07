@@ -7,6 +7,30 @@ import { Pool } from 'pg';
 
 const WORK_MEM = '2GB';
 
+type JsonObject = Record<string, unknown>;
+
+function isNumberArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'number');
+}
+
+function normalizeActivationJsonlLine(line: string): string {
+  const parsed = JSON.parse(line) as JsonObject;
+
+  // Activations in exports store attention metadata as zIndices:
+  // [zKIndices, zQIndices]. Schema expects separate zKIndices and zQIndices columns.
+  if (Array.isArray(parsed.zIndices)) {
+    const [zKIndicesCandidate, zQIndicesCandidate] = parsed.zIndices;
+    if (isNumberArray(zKIndicesCandidate)) {
+      parsed.zKIndices = zKIndicesCandidate;
+    }
+    if (isNumberArray(zQIndicesCandidate)) {
+      parsed.zQIndices = zQIndicesCandidate;
+    }
+  }
+
+  return JSON.stringify(parsed);
+}
+
 export async function importConfigFromS3() {
   const explanationModelTypeLines = await downloadFileJsonlParsedLines(
     `${CONFIG_BASE_PATH}explanation_model_type.jsonl`,
@@ -66,6 +90,15 @@ export async function importJsonlString(tableName: string, jsonlData: string) {
   // replace all \u0000 with ' ' because it's not supported by postgres
   // eslint-disable-next-line no-param-reassign
   jsonlData = jsonlData.replaceAll('\\u0000', ' ');
+  if (tableName === 'Activation') {
+    const activationLines = jsonlData
+      .trim()
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map(normalizeActivationJsonlLine);
+    // eslint-disable-next-line no-param-reassign
+    jsonlData = activationLines.join('\n');
+  }
   try {
     try {
       pool = new Pool({

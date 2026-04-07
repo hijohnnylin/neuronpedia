@@ -80,7 +80,7 @@ export function GraphStateProvider({ children }: { children: ReactNode }) {
 
   const updateHoverState = useCallback(
     (node: CLTGraphNode | null, onHoverChange?: (hoveredId: string | null) => void) => {
-      const newHoveredId = node?.featureId || null;
+      const newHoveredId = node?.nodeId || null;
       const newHoveredCtxIdx = node?.ctx_idx || null;
 
       // don't update if window width is less than 640px
