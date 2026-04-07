@@ -118,6 +118,7 @@ model User {
   graphMetadatas               GraphMetadata[]
   graphMetadataDataPutRequests GraphMetadataDataPutRequest[]
   graphMetadataSubgraphs       GraphMetadataSubgraph[]
+  activationRaws               ActivationRaw[]
 
   isProblemEditor      Boolean              @default(false)
   problemNodesCreated  ProblemNode[]        @relation(name: "problemNodeCreatedBy")
@@ -316,6 +317,7 @@ model Model {
   graphHostSources     GraphHostSource[]
   graphMetadata        GraphMetadata[]
   nlaSources           NlaSource[]
+  activationRaws       ActivationRaw[]
 
   @@unique([defaultSourceSetName, id])
   @@unique([defaultSourceId, id])
@@ -1164,4 +1166,33 @@ model NlaExplainCache {
   createdAt           DateTime @default(now())
 
   @@unique([text, numCompletionTokens, temperature, modelId, nlaSourceName], name: "nla_explain_cache_key")
+}
+
+model ActivationRaw {
+  id        String @id @default(cuid())
+  modelId   String
+  model     Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  prompt    String
+
+  hookPoint       String @default("residual_stream")
+  captureType     String @default("final_output_token")
+  dtype           String
+  device          String
+
+  tokenStrings String[]
+  tokenIds     Int[]
+
+  // Raw per-layer output payload for this prompt.
+  // Shape example: [{ layer, token_indices, values }]
+  activations Json
+
+  creatorId String?
+  creator   User? @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([modelId])
+  @@index([creatorId])
+  @@index([prompt])
 }

@@ -142,6 +142,8 @@ export const NlaSourceScalarFieldEnumSchema = z.enum(['id','name','description',
 
 export const NlaExplainCacheScalarFieldEnumSchema = z.enum(['id','text','numCompletionTokens','temperature','modelId','nlaSourceName','resultJson','createdAt']);
 
+export const ActivationRawScalarFieldEnumSchema = z.enum(['id','modelId','prompt','hookPoint','captureType','dtype','device','tokenStrings','tokenIds','activations','creatorId','metadata','createdAt']);
+
 export const SortOrderSchema = z.enum(['asc','desc']);
 
 export const JsonNullValueInputSchema = z.enum(['JsonNull',]);
@@ -417,6 +419,7 @@ export type UserRelations = {
   graphMetadatas: GraphMetadataWithRelations[];
   graphMetadataDataPutRequests: GraphMetadataDataPutRequestWithRelations[];
   graphMetadataSubgraphs: GraphMetadataSubgraphWithRelations[];
+  activationRaws: ActivationRawWithRelations[];
   problemNodesCreated: ProblemNodeWithRelations[];
   problemNodesApproved: ProblemNodeWithRelations[];
   problemEdgesCreated: ProblemEdgeWithRelations[];
@@ -454,6 +457,7 @@ export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.
   graphMetadatas: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
+  activationRaws: z.lazy(() => ActivationRawWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
@@ -492,6 +496,7 @@ export type UserPartialRelations = {
   graphMetadatas?: GraphMetadataPartialWithRelations[];
   graphMetadataDataPutRequests?: GraphMetadataDataPutRequestPartialWithRelations[];
   graphMetadataSubgraphs?: GraphMetadataSubgraphPartialWithRelations[];
+  activationRaws?: ActivationRawPartialWithRelations[];
   problemNodesCreated?: ProblemNodePartialWithRelations[];
   problemNodesApproved?: ProblemNodePartialWithRelations[];
   problemEdgesCreated?: ProblemEdgePartialWithRelations[];
@@ -529,6 +534,7 @@ export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -566,6 +572,7 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -1097,6 +1104,7 @@ export type ModelRelations = {
   graphHostSources: GraphHostSourceWithRelations[];
   graphMetadata: GraphMetadataWithRelations[];
   nlaSources: NlaSourceWithRelations[];
+  activationRaws: ActivationRawWithRelations[];
 };
 
 export type ModelWithRelations = z.infer<typeof ModelSchema> & ModelRelations
@@ -1116,6 +1124,7 @@ export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSche
   graphHostSources: z.lazy(() => GraphHostSourceWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourceWithRelationsSchema).array(),
+  activationRaws: z.lazy(() => ActivationRawWithRelationsSchema).array(),
 }))
 
 // MODEL PARTIAL RELATION SCHEMA
@@ -1136,6 +1145,7 @@ export type ModelPartialRelations = {
   graphHostSources?: GraphHostSourcePartialWithRelations[];
   graphMetadata?: GraphMetadataPartialWithRelations[];
   nlaSources?: NlaSourcePartialWithRelations[];
+  activationRaws?: ActivationRawPartialWithRelations[];
 };
 
 export type ModelPartialWithRelations = z.infer<typeof ModelPartialSchema> & ModelPartialRelations
@@ -1155,6 +1165,7 @@ export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelation
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
+  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
 })).partial()
 
 export type ModelWithPartialRelations = z.infer<typeof ModelSchema> & ModelPartialRelations
@@ -1174,6 +1185,7 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
+  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
 }).partial())
 
 /////////////////////////////////////////
@@ -3467,3 +3479,76 @@ export type NlaExplainCache = z.infer<typeof NlaExplainCacheSchema>
 export const NlaExplainCachePartialSchema = NlaExplainCacheSchema.partial()
 
 export type NlaExplainCachePartial = z.infer<typeof NlaExplainCachePartialSchema>
+
+/////////////////////////////////////////
+// ACTIVATION RAW SCHEMA
+/////////////////////////////////////////
+
+export const ActivationRawSchema = z.object({
+  id: z.string().cuid(),
+  modelId: z.string(),
+  prompt: z.string(),
+  hookPoint: z.string(),
+  captureType: z.string(),
+  dtype: z.string(),
+  device: z.string(),
+  tokenStrings: z.string().array(),
+  tokenIds: z.number().int().array(),
+  activations: InputJsonValue,
+  creatorId: z.string().nullable(),
+  metadata: NullableJsonValue.optional(),
+  createdAt: z.coerce.date(),
+})
+
+export type ActivationRaw = z.infer<typeof ActivationRawSchema>
+
+/////////////////////////////////////////
+// ACTIVATION RAW PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ActivationRawPartialSchema = ActivationRawSchema.partial()
+
+export type ActivationRawPartial = z.infer<typeof ActivationRawPartialSchema>
+
+// ACTIVATION RAW RELATION SCHEMA
+//------------------------------------------------------
+
+export type ActivationRawRelations = {
+  model: ModelWithRelations;
+  creator?: UserWithRelations | null;
+};
+
+export type ActivationRawWithRelations = Omit<z.infer<typeof ActivationRawSchema>, "metadata"> & {
+  metadata?: NullableJsonInput;
+} & ActivationRawRelations
+
+export const ActivationRawWithRelationsSchema: z.ZodType<ActivationRawWithRelations> = ActivationRawSchema.merge(z.object({
+  model: z.lazy(() => ModelWithRelationsSchema),
+  creator: z.lazy(() => UserWithRelationsSchema).nullable(),
+}))
+
+// ACTIVATION RAW PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ActivationRawPartialRelations = {
+  model?: ModelPartialWithRelations;
+  creator?: UserPartialWithRelations | null;
+};
+
+export type ActivationRawPartialWithRelations = Omit<z.infer<typeof ActivationRawPartialSchema>, "metadata"> & {
+  metadata?: NullableJsonInput;
+} & ActivationRawPartialRelations
+
+export const ActivationRawPartialWithRelationsSchema: z.ZodType<ActivationRawPartialWithRelations> = ActivationRawPartialSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+})).partial()
+
+export type ActivationRawWithPartialRelations = Omit<z.infer<typeof ActivationRawSchema>, "metadata"> & {
+  metadata?: NullableJsonInput;
+} & ActivationRawPartialRelations
+
+export const ActivationRawWithPartialRelationsSchema: z.ZodType<ActivationRawWithPartialRelations> = ActivationRawSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+}).partial())

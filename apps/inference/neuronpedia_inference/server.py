@@ -102,6 +102,8 @@ load_dotenv()
 
 global initialized
 initialized = False
+global initialization_error
+initialization_error: str | None = None
 
 app = FastAPI()
 
@@ -128,7 +130,15 @@ async def startup_event():
     # Wait briefly to ensure server is ready
     await asyncio.sleep(3)
     # Start initialization in background
-    asyncio.create_task(initialize(args.custom_hf_model_id))
+    init_task = asyncio.create_task(initialize(args.custom_hf_model_id))
+
+    def _log_init_task_result(task: asyncio.Task[None]) -> None:
+        try:
+            task.result()
+        except Exception:
+            logger.exception("Background initialization task failed")
+
+    init_task.add_done_callback(_log_init_task_result)
     logger.info("Initialization started")
 
 
@@ -164,6 +174,8 @@ async def initialize(
     custom_hf_model_id: str | None = None,
 ):
     logger.info("Initializing...")
+    global initialization_error
+    initialization_error = None
 
     # Move the heavy operations to a separate thread pool to prevent blocking
     def load_model_and_sae():
@@ -224,6 +236,12 @@ async def initialize(
         if args.nnsight:
             logger.info("Loading model with nnterp...")
 
+            if args.device == "mps":
+                raise RuntimeError(
+                    "nnsight+nnterp is not supported on MPS for this server setup. "
+                    "Use --device cpu, or disable --nnsight."
+                )
+
             model_to_load = (
                 config.override_model_id
                 if config.override_model_id
@@ -247,12 +265,19 @@ async def initialize(
                         i: f"{mem_values[i]}GiB" for i in range(num_gpus)
                     }
                 logger.info("nnsight max_memory: %s", nnsight_kwargs["max_memory"])
-            model = StandardizedTransformer(
-                replace_tlens_model_id_with_hf_model_id(model_to_load),
-                dtype=STR_TO_DTYPE[config.model_dtype],
-                trust_remote_code=True,
-                **nnsight_kwargs,
-            )
+            try:
+                model = StandardizedTransformer(
+                    replace_tlens_model_id_with_hf_model_id(model_to_load),
+                    dtype=STR_TO_DTYPE[config.model_dtype],
+                    trust_remote_code=True,
+                    **nnsight_kwargs,
+                )
+            except RecursionError as exc:
+                raise RuntimeError(
+                    "Failed to initialize nnterp StandardizedTransformer due to a recursion error. "
+                    "This is typically caused by an nnterp/nnsight/backend incompatibility for the "
+                    "current model/runtime. Try --device cpu, or disable --nnsight."
+                ) from exc
         elif args.chatspace:
             if not VLLM_AVAILABLE:
                 raise RuntimeError(
@@ -356,7 +381,12 @@ async def initialize(
         initialized = True
         logger.info("Initialized: %s", initialized)
 
-    await asyncio.get_event_loop().run_in_executor(None, load_model_and_sae)
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, load_model_and_sae)
+    except Exception as exc:
+        initialization_error = str(exc)
+        logger.exception("Initialization failed")
+        raise
 
     # After model is loaded, preload chatspace model if needed
     if args.chatspace and VLLM_AVAILABLE:
@@ -449,9 +479,14 @@ async def log_and_check_cuda_error(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     if not initialized:
+        error_details = (
+            f" Initialization error: {initialization_error}"
+            if initialization_error
+            else ""
+        )
         return JSONResponse(
             status_code=500,
-            content={"error": "Server not initialized"},
+            content={"error": f"Server not initialized.{error_details}"},
         )
     logger.info("=== Request Info ===")
     logger.info(f"URL: {request.url}")

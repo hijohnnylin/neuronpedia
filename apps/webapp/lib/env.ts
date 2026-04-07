@@ -122,6 +122,10 @@ export const USE_LOCALHOST_SPARSITY = process.env.USE_LOCALHOST_SPARSITY === 'tr
 export const SPARSITY_SERVER = process.env.SPARSITY_SERVER || 'http://localhost:5005';
 export const SPARSITY_SERVER_SECRET = process.env.SPARSITY_SERVER_SECRET || '';
 
+// Activations Server
+export const ACTIVATIONS_SERVER = process.env.ACTIVATIONS_SERVER || 'http://localhost:5010';
+export const ACTIVATIONS_SERVER_SECRET = process.env.ACTIVATIONS_SERVER_SECRET || '';
+
 // Runpod Graph
 // export const USE_RUNPOD_GRAPH = process.env.USE_RUNPOD_GRAPH === 'true';
 // if (USE_RUNPOD_GRAPH && USE_LOCALHOST_GRAPH) {

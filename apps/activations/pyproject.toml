@@ -1,0 +1,33 @@
+[project]
+name = "neuronpedia-activations"
+version = "0.1.0"
+description = "Minimal raw activation server for transformer residual streams."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi>=0.115.6,<0.116.0",
+  "uvicorn>=0.34.0,<0.35.0",
+  "transformers>=4.57.1,<5.0.0",
+  "torch>=1.10; platform_system == 'Linux'",
+  "torch>=1.10,!=2.0,!=2.1.0; platform_system != 'Linux'",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.7.4,<0.8.0",
+  "pyright>=1.1.351,<2.0.0",
+]
+
+[tool.ruff.lint]
+ignore = ["E501", "F821", "ARG002"]
+select = ["UP", "I", "F", "E", "ARG", "SIM", "RET", "LOG", "T20"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownParameterType = "none"
+
