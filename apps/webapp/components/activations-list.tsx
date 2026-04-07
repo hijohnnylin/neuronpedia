@@ -483,105 +483,123 @@ export default function ActivationsList({
         ) : (
           // Standard single-column layout
           <>
-            {items.map((activation, activationIndex) => (
-              <div
-                key={`activation-${activation.id}`}
-                id={activationIndex === 0 ? 'firstActivation' : undefined}
-                className={`relative border-slate-100 px-3 py-1 sm:px-5 [&:not(:last-child)]:border-b ${
-                  selectedRange > 0 && 'sm:py-2.5'
-                }`}
-              >
-                {(activation.binMin === -1 &&
-                  activationIndex > 0 &&
-                  items[activationIndex - 1].binMax !== activation.binMax) ||
-                activationIndex === 0 ? (
-                  <div className="absolute left-0 top-0 hidden h-6 w-full flex-row items-center justify-between bg-slate-100 px-3 font-mono text-[8px] font-bold uppercase text-slate-600 sm:flex">
-                    <div className="flex flex-row items-center gap-x-1 leading-normal">
-                      <div className="py-[1px]">Top</div>{' '}
-                      {activation?.dfaTargetIndex !== null && activation?.dfaTargetIndex !== -1 && (
-                        <>
-                          <div className="rounded-sm bg-orange-400 px-1 py-[1px]">DFA</div>
-                          <div className="py-[1px]">and</div>
-                        </>
-                      )}
-                      <div className="rounded-sm bg-emerald-400 px-1 py-[1px]">Activations</div>
-                    </div>
-                    {activation?.dfaTargetIndex !== null && activation?.dfaTargetIndex !== -1 && (
-                      <div className="flex flex-row gap-x-1.5">
-                        <Tooltip.Provider delayDuration={0} skipDelayDuration={0}>
-                          <Tooltip.Root>
-                            <Tooltip.Trigger asChild>
-                              <button type="button">
-                                <HelpCircle className="h-3 w-3" />
-                              </button>
-                            </Tooltip.Trigger>
-                            <Tooltip.Portal>
-                              <Tooltip.Content
-                                className="rounded bg-slate-500 px-3 py-2 text-xs text-white"
-                                sideOffset={5}
-                              >
-                                DFA is Direct Feature Attribution:
-                                <br />
-                                The top source position that the attention layer uses to compute this feature.
-                                <Tooltip.Arrow className="fill-slate-500" />
-                              </Tooltip.Content>
-                            </Tooltip.Portal>
-                          </Tooltip.Root>
-                        </Tooltip.Provider>
-                        <div className="border-[2px] border-emerald-400 px-1 py-[1px]">DFA Source</div>
-                        <div className="border-[2px] border-orange-400 px-1 py-[1px]">DFA Target</div>
-                      </div>
-                    )}
-                  </div>
-                ) : activation.binMax &&
-                  activationIndex > 0 &&
-                  items[activationIndex - 1].binMax !== activation.binMax ? (
-                  <div className="absolute left-0 top-0 hidden h-6 w-full flex-row items-center justify-start bg-slate-100 px-3 font-mono text-[8px] font-bold uppercase text-slate-600 sm:flex">
-                    Interval {activation.binMin?.toFixed(3)} - {activation.binMax?.toFixed(3)} (Contains{' '}
-                    {((activation.binContains || 0) * 100).toFixed(3)}%)
-                  </div>
-                ) : null}
+            {items.map((activation, activationIndex) => {
+              const zLength = Math.min(
+                activation.zQIndices?.length || 0,
+                activation.zKIndices?.length || 0,
+                activation.zValues?.length || 0,
+              );
+              const hasZPattern = zLength > 0;
+              return (
                 <div
-                  className={`flex w-full flex-row items-center justify-center ${
-                    (activation.binMin === -1 &&
-                      activationIndex > 0 &&
-                      items[activationIndex - 1].binMax !== activation.binMax) ||
-                    activationIndex === 0 ||
-                    (activation.binMax &&
-                      activationIndex > 0 &&
-                      items[activationIndex - 1].binMax !== activation.binMax)
-                      ? 'sm:mt-6'
-                      : ''
+                  key={`activation-${activation.id}`}
+                  id={activationIndex === 0 ? 'firstActivation' : undefined}
+                  className={`relative border-slate-100 px-3 py-1 sm:px-5 [&:not(:last-child)]:border-b ${
+                    selectedRange > 0 && 'sm:py-2.5'
                   }`}
                 >
-                  <div className="flex w-full flex-auto flex-col text-left text-sm">
-                    {activation.tokens && (
-                      <ActivationItem
-                        key={`${ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size}-${activationIndex}${showLineBreaks}`}
-                        activation={activation}
-                        tokensToDisplayAroundMaxActToken={ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size}
-                        showLineBreaks={showLineBreaks}
-                        setActivationTestText={setActivationTestText}
-                        showTopActivationToken={showTopActivationToken}
-                        dfa={getSourceSet(feature?.modelId || '', feature?.sourceSetName || '')?.showDfa}
-                        dfaSplit={dfaSplit}
-                        showCopy={showCopy}
-                        overallMaxActivationValueInList={overallMaxValue}
-                        overrideLeading={overrideLeading}
-                        overrideTextSize={overrideTextSize || 'text-[9.5px] sm:text-xs'}
-                        className={activationItemClassName}
-                        showRawTokens={showRawTokens}
-                      />
-                    )}
-                    {showDatasource && activation.dataSource && (
-                      <div className="flex w-full flex-row items-center justify-end pt-0.5 text-right text-[8px] font-medium leading-none text-slate-400 sm:pt-0">
-                        {activation.dataSource}
+                  {(activation.binMin === -1 &&
+                    activationIndex > 0 &&
+                    items[activationIndex - 1].binMax !== activation.binMax) ||
+                  activationIndex === 0 ? (
+                    <div className="absolute left-0 top-0 hidden h-6 w-full flex-row items-center justify-between bg-slate-100 px-3 font-mono text-[8px] font-bold uppercase text-slate-600 sm:flex">
+                      <div className="flex flex-row items-center gap-x-1 leading-normal">
+                        <div className="py-[1px]">Top</div>{' '}
+                        {activation?.dfaTargetIndex !== null && activation?.dfaTargetIndex !== -1 && (
+                          <>
+                            <div className="rounded-sm bg-orange-400 px-1 py-[1px]">DFA</div>
+                            <div className="py-[1px]">and</div>
+                          </>
+                        )}
+                        <div className="rounded-sm bg-emerald-400 px-1 py-[1px]">Activations</div>
+                        {hasZPattern && (
+                          <div className="ml-2 normal-case">
+                            HOVER{' '}
+                            <span className="rounded-sm bg-[linear-gradient(to_bottom,#fb923c_50%,#34d399_50%)] px-1 py-[1px] text-slate-700">
+                              ATTENTION
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                      {activation?.dfaTargetIndex !== null && activation?.dfaTargetIndex !== -1 && (
+                        <div className="flex flex-row gap-x-1.5">
+                          <Tooltip.Provider delayDuration={0} skipDelayDuration={0}>
+                            <Tooltip.Root>
+                              <Tooltip.Trigger asChild>
+                                <button type="button">
+                                  <HelpCircle className="h-3 w-3" />
+                                </button>
+                              </Tooltip.Trigger>
+                              <Tooltip.Portal>
+                                <Tooltip.Content
+                                  className="rounded bg-slate-500 px-3 py-2 text-xs text-white"
+                                  sideOffset={5}
+                                >
+                                  DFA is Direct Feature Attribution:
+                                  <br />
+                                  The top source position that the attention layer uses to compute this feature.
+                                  <Tooltip.Arrow className="fill-slate-500" />
+                                </Tooltip.Content>
+                              </Tooltip.Portal>
+                            </Tooltip.Root>
+                          </Tooltip.Provider>
+                          <div className="border-[2px] border-emerald-400 px-1 py-[1px]">DFA Source</div>
+                          <div className="border-[2px] border-orange-400 px-1 py-[1px]">DFA Target</div>
+                        </div>
+                      )}
+                    </div>
+                  ) : activation.binMax &&
+                    activationIndex > 0 &&
+                    items[activationIndex - 1].binMax !== activation.binMax ? (
+                    <div className="absolute left-0 top-0 hidden h-6 w-full flex-row items-center justify-start bg-slate-100 px-3 font-mono text-[8px] font-bold uppercase text-slate-600 sm:flex">
+                      Interval {activation.binMin?.toFixed(3)} - {activation.binMax?.toFixed(3)} (Contains{' '}
+                      {((activation.binContains || 0) * 100).toFixed(3)}%)
+                    </div>
+                  ) : null}
+                  <div
+                    className={`flex w-full flex-row items-center justify-center ${
+                      (activation.binMin === -1 &&
+                        activationIndex > 0 &&
+                        items[activationIndex - 1].binMax !== activation.binMax) ||
+                      activationIndex === 0 ||
+                      (activation.binMax &&
+                        activationIndex > 0 &&
+                        items[activationIndex - 1].binMax !== activation.binMax)
+                        ? 'sm:mt-6'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex w-full flex-auto flex-col text-left text-sm">
+                      {activation.tokens && (
+                        <ActivationItem
+                          key={`${ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size}-${activationIndex}${showLineBreaks}`}
+                          activation={activation}
+                          tokensToDisplayAroundMaxActToken={
+                            ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size
+                          }
+                          showLineBreaks={showLineBreaks}
+                          setActivationTestText={setActivationTestText}
+                          showTopActivationToken={showTopActivationToken}
+                          dfa={getSourceSet(feature?.modelId || '', feature?.sourceSetName || '')?.showDfa}
+                          dfaSplit={dfaSplit}
+                          showCopy={showCopy}
+                          overallMaxActivationValueInList={overallMaxValue}
+                          overrideLeading={overrideLeading}
+                          overrideTextSize={overrideTextSize || 'text-[9.5px] sm:text-xs'}
+                          className={activationItemClassName}
+                          showRawTokens={showRawTokens}
+                        />
+                      )}
+                      {showDatasource && activation.dataSource && (
+                        <div className="flex w-full flex-row items-center justify-end pt-0.5 text-right text-[8px] font-medium leading-none text-slate-400 sm:pt-0">
+                          {activation.dataSource}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {!showHidden && items.length < activations.length && (
               <div className="flex w-full flex-row items-center justify-center py-3">
                 <button
