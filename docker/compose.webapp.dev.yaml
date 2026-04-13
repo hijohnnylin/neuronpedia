@@ -1,10 +1,14 @@
 services:
   webapp:
+    build:
+      context: ..
+      dockerfile: apps/webapp/Dockerfile
+      # the builder stage includes the non production optimized build, e.g., node_modules
+      target: builder
     environment:
       - NODE_ENV=development
       - WATCHPACK_POLLING=true
     volumes:
       - ../apps/webapp:/app/apps/webapp
       - ../apps/webapp/node_modules:/app/apps/webapp/node_modules
-    command: >
-      sh -c "npx prisma migrate dev && npm run dev"
+    command: npm run dev # all prisma commands are handled in the db-init stage
