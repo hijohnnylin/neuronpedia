@@ -265,45 +265,49 @@ export default async function Page({
         console.error('Error parsing params clerps:', error);
       }
     }
-  } else if (
-    ANTHROPIC_MODELS.has(modelId) ||
-    (ADDITIONAL_MODELS_TO_LOAD.has(modelId) && modelIdToGraphMetadatasMap[modelId]?.length > 0)
-  ) {
-    // no default slug and it's a haiku or qwen3-4b model, just pick the first one
-    // pick the first graph in the map
-    [metadataGraph] = modelIdToGraphMetadatasMap[modelId];
-  } else if (modelIdToGraphMetadatasMap['gemma-2-2b']) {
-    if (initialSourceSet === 'transcoder-hp') {
+  } else {
+    // No slug specified - pick a default graph
+    if (modelId === 'gemma-2-2b' && modelIdToGraphMetadatasMap['gemma-2-2b']) {
       metadataGraph = modelIdToGraphMetadatasMap['gemma-2-2b'].find(
-        // no default slug, let's show gemma austin dallas
         (graph) => graph.slug === 'gemma-fact-dallas-austin',
       );
-      pinnedIds =
-        '27_22605_10,20_15589_10,E_26865_9,21_5943_10,23_12237_10,20_15589_9,16_25_9,14_2268_9,18_8959_10,4_13154_9,7_6861_9,19_1445_10,E_2329_7,E_6037_4,0_13727_7,6_4012_7,17_7178_10,15_4494_4,6_4662_4,4_7671_4,3_13984_4,1_1000_4,19_7477_9,18_6101_10,16_4298_10,7_691_10';
-      parsedSupernodes = [
-        ['capital', '15_4494_4', '6_4662_4', '4_7671_4', '3_13984_4', '1_1000_4'],
-        ['state', '6_4012_7', '0_13727_7'],
-        ['Texas', '20_15589_9', '19_7477_9', '16_25_9', '4_13154_9', '14_2268_9', '7_6861_9'],
-        ['preposition followed by place name', '19_1445_10', '18_6101_10'],
-        ['capital cities/say a capital city', '21_5943_10', '17_7178_10', '7_691_10', '16_4298_10'],
-      ];
-      parsedClerps = [
-        ['23_2312237_10', 'Cities and states names (say Austin)'],
-        ['18_1808959_10', 'state/regional government'],
-      ];
-      pruningThreshold = 0.6;
-      densityThreshold = 0.99;
-    } else {
-      // get the first graph that has the initial source set
-      metadataGraph = modelIdToGraphMetadatasMap['gemma-2-2b'].find(
-        (graph) => graph.sourceSetName === initialSourceSet,
-      );
-      if (!metadataGraph) {
-        console.error(`Graph with source set ${initialSourceSet} not found in database`);
+      if (metadataGraph) {
+        pinnedIds =
+          '27_22605_10,20_15589_10,E_26865_9,21_5943_10,23_12237_10,20_15589_9,16_25_9,14_2268_9,18_8959_10,4_13154_9,7_6861_9,19_1445_10,E_2329_7,E_6037_4,0_13727_7,6_4012_7,17_7178_10,15_4494_4,6_4662_4,4_7671_4,3_13984_4,1_1000_4,19_7477_9,18_6101_10,16_4298_10,7_691_10';
+        parsedSupernodes = [
+          ['capital', '15_4494_4', '6_4662_4', '4_7671_4', '3_13984_4', '1_1000_4'],
+          ['state', '6_4012_7', '0_13727_7'],
+          ['Texas', '20_15589_9', '19_7477_9', '16_25_9', '4_13154_9', '14_2268_9', '7_6861_9'],
+          ['preposition followed by place name', '19_1445_10', '18_6101_10'],
+          ['capital cities/say a capital city', '21_5943_10', '17_7178_10', '7_691_10', '16_4298_10'],
+        ];
+        parsedClerps = [
+          ['23_2312237_10', 'Cities and states names (say Austin)'],
+          ['18_1808959_10', 'state/regional government'],
+        ];
+        pruningThreshold = 0.6;
+        densityThreshold = 0.99;
       }
     }
-  } else {
-    console.error(`No default graph found for model ${modelId}`);
+
+    // If no graph selected yet, try the first featured graph for this model
+    if (!metadataGraph) {
+      const featuredForModel = featuredGraphs.find((g) => g.modelId === modelId);
+      if (featuredForModel) {
+        metadataGraph = modelIdToGraphMetadatasMap[modelId]?.find(
+          (graph) => graph.slug === featuredForModel.slug,
+        );
+      }
+    }
+
+    // Fall back to the first graph in the map
+    if (!metadataGraph && modelIdToGraphMetadatasMap[modelId]?.length > 0) {
+      [metadataGraph] = modelIdToGraphMetadatasMap[modelId];
+    }
+
+    if (!metadataGraph) {
+      console.error(`No default graph found for model ${modelId}`);
+    }
   }
 
   const generateParam = searchParams.generate as string | undefined;
