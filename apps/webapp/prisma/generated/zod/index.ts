@@ -142,7 +142,17 @@ export const NlaSourceScalarFieldEnumSchema = z.enum(['id','name','description',
 
 export const NlaExplainCacheScalarFieldEnumSchema = z.enum(['id','text','numCompletionTokens','temperature','modelId','nlaSourceName','resultJson','createdAt']);
 
-export const ActivationRawScalarFieldEnumSchema = z.enum(['id','modelId','prompt','hookPoint','captureType','dtype','device','tokenStrings','tokenIds','activations','creatorId','metadata','createdAt']);
+export const SampleDatasetScalarFieldEnumSchema = z.enum(['id','name','description','url','createdByUserId','createdAt']);
+
+export const SampleScalarFieldEnumSchema = z.enum(['id','type','modelId','datasetId','sampleIndex','groundTruth','conversation','conversationTokenized','conversationTokenizedStr','finalResponseStartIndex','userId','elo','vettedAt','vettedBy','createdAt']);
+
+export const ProbeScalarFieldEnumSchema = z.enum(['id','customLabel','modelId','type','userId','architecture','tokenSelection','reductionMethod','layers','weights','bias','weightsBlob','elo','createdAt','creatorNote']);
+
+export const ProbeMatchScalarFieldEnumSchema = z.enum(['id','probeId','sampleId','probeCorrect','probeScore','tokenScores','createdAt']);
+
+export const ProbeLogScalarFieldEnumSchema = z.enum(['id','action','modelId','userId','probeId','sampleId','details','createdAt']);
+
+export const ProcessLockScalarFieldEnumSchema = z.enum(['name','startedAt','expiresAt','details']);
 
 export const SortOrderSchema = z.enum(['asc','desc']);
 
@@ -183,6 +193,26 @@ export type ProblemNodeApprovalStateType = `${z.infer<typeof ProblemNodeApproval
 export const ProblemEdgeTypeSchema = z.enum(['raises','addresses','extends','replicates','related_to']);
 
 export type ProblemEdgeTypeType = `${z.infer<typeof ProblemEdgeTypeSchema>}`
+
+export const ProbeSampleTypeSchema = z.enum(['DECEPTION']);
+
+export type ProbeSampleTypeType = `${z.infer<typeof ProbeSampleTypeSchema>}`
+
+export const ProbeArchitectureSchema = z.enum(['LINEAR','MLP']);
+
+export type ProbeArchitectureType = `${z.infer<typeof ProbeArchitectureSchema>}`
+
+export const TokenSelectionSchema = z.enum(['LAST_ASSISTANT','ALL_TOKENS','EOT_TOKEN','REASONING_ONLY']);
+
+export type TokenSelectionType = `${z.infer<typeof TokenSelectionSchema>}`
+
+export const ReductionMethodSchema = z.enum(['MEAN_POOL','LAST_TOKEN','MAX_POOL']);
+
+export type ReductionMethodType = `${z.infer<typeof ReductionMethodSchema>}`
+
+export const ProbeLogActionSchema = z.enum(['NEW_PROBE','NEW_SAMPLE','SAMPLE_ACCEPTED','SAMPLE_REJECTED','RANK_CHANGE']);
+
+export type ProbeLogActionType = `${z.infer<typeof ProbeLogActionSchema>}`
 
 /////////////////////////////////////////
 // MODELS
@@ -419,7 +449,8 @@ export type UserRelations = {
   graphMetadatas: GraphMetadataWithRelations[];
   graphMetadataDataPutRequests: GraphMetadataDataPutRequestWithRelations[];
   graphMetadataSubgraphs: GraphMetadataSubgraphWithRelations[];
-  activationRaws: ActivationRawWithRelations[];
+  samples: SampleWithRelations[];
+  probes: ProbeWithRelations[];
   problemNodesCreated: ProblemNodeWithRelations[];
   problemNodesApproved: ProblemNodeWithRelations[];
   problemEdgesCreated: ProblemEdgeWithRelations[];
@@ -457,7 +488,8 @@ export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.
   graphMetadatas: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
-  activationRaws: z.lazy(() => ActivationRawWithRelationsSchema).array(),
+  samples: z.lazy(() => SampleWithRelationsSchema).array(),
+  probes: z.lazy(() => ProbeWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
@@ -496,7 +528,8 @@ export type UserPartialRelations = {
   graphMetadatas?: GraphMetadataPartialWithRelations[];
   graphMetadataDataPutRequests?: GraphMetadataDataPutRequestPartialWithRelations[];
   graphMetadataSubgraphs?: GraphMetadataSubgraphPartialWithRelations[];
-  activationRaws?: ActivationRawPartialWithRelations[];
+  samples?: SamplePartialWithRelations[];
+  probes?: ProbePartialWithRelations[];
   problemNodesCreated?: ProblemNodePartialWithRelations[];
   problemNodesApproved?: ProblemNodePartialWithRelations[];
   problemEdgesCreated?: ProblemEdgePartialWithRelations[];
@@ -534,7 +567,8 @@ export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
-  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
+  samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
+  probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -572,7 +606,8 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
-  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
+  samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
+  probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -1104,7 +1139,8 @@ export type ModelRelations = {
   graphHostSources: GraphHostSourceWithRelations[];
   graphMetadata: GraphMetadataWithRelations[];
   nlaSources: NlaSourceWithRelations[];
-  activationRaws: ActivationRawWithRelations[];
+  samples: SampleWithRelations[];
+  probes: ProbeWithRelations[];
 };
 
 export type ModelWithRelations = z.infer<typeof ModelSchema> & ModelRelations
@@ -1124,7 +1160,8 @@ export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSche
   graphHostSources: z.lazy(() => GraphHostSourceWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourceWithRelationsSchema).array(),
-  activationRaws: z.lazy(() => ActivationRawWithRelationsSchema).array(),
+  samples: z.lazy(() => SampleWithRelationsSchema).array(),
+  probes: z.lazy(() => ProbeWithRelationsSchema).array(),
 }))
 
 // MODEL PARTIAL RELATION SCHEMA
@@ -1145,7 +1182,8 @@ export type ModelPartialRelations = {
   graphHostSources?: GraphHostSourcePartialWithRelations[];
   graphMetadata?: GraphMetadataPartialWithRelations[];
   nlaSources?: NlaSourcePartialWithRelations[];
-  activationRaws?: ActivationRawPartialWithRelations[];
+  samples?: SamplePartialWithRelations[];
+  probes?: ProbePartialWithRelations[];
 };
 
 export type ModelPartialWithRelations = z.infer<typeof ModelPartialSchema> & ModelPartialRelations
@@ -1165,7 +1203,8 @@ export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelation
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
-  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
+  samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
+  probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
 })).partial()
 
 export type ModelWithPartialRelations = z.infer<typeof ModelSchema> & ModelPartialRelations
@@ -1185,7 +1224,8 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
-  activationRaws: z.lazy(() => ActivationRawPartialWithRelationsSchema).array(),
+  samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
+  probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
 }).partial())
 
 /////////////////////////////////////////
@@ -3481,74 +3521,316 @@ export const NlaExplainCachePartialSchema = NlaExplainCacheSchema.partial()
 export type NlaExplainCachePartial = z.infer<typeof NlaExplainCachePartialSchema>
 
 /////////////////////////////////////////
-// ACTIVATION RAW SCHEMA
+// SAMPLE DATASET SCHEMA
 /////////////////////////////////////////
 
-export const ActivationRawSchema = z.object({
+export const SampleDatasetSchema = z.object({
   id: z.string().cuid(),
-  modelId: z.string(),
-  prompt: z.string(),
-  hookPoint: z.string(),
-  captureType: z.string(),
-  dtype: z.string(),
-  device: z.string(),
-  tokenStrings: z.string().array(),
-  tokenIds: z.number().int().array(),
-  activations: InputJsonValue,
-  creatorId: z.string().nullable(),
-  metadata: NullableJsonValue.optional(),
+  name: z.string(),
+  description: z.string().nullable(),
+  url: z.string().nullable(),
+  createdByUserId: z.string(),
   createdAt: z.coerce.date(),
 })
 
-export type ActivationRaw = z.infer<typeof ActivationRawSchema>
+export type SampleDataset = z.infer<typeof SampleDatasetSchema>
 
 /////////////////////////////////////////
-// ACTIVATION RAW PARTIAL SCHEMA
+// SAMPLE DATASET PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const ActivationRawPartialSchema = ActivationRawSchema.partial()
+export const SampleDatasetPartialSchema = SampleDatasetSchema.partial()
 
-export type ActivationRawPartial = z.infer<typeof ActivationRawPartialSchema>
+export type SampleDatasetPartial = z.infer<typeof SampleDatasetPartialSchema>
 
-// ACTIVATION RAW RELATION SCHEMA
+// SAMPLE DATASET RELATION SCHEMA
 //------------------------------------------------------
 
-export type ActivationRawRelations = {
-  model: ModelWithRelations;
-  creator?: UserWithRelations | null;
+export type SampleDatasetRelations = {
+  samples: SampleWithRelations[];
 };
 
-export type ActivationRawWithRelations = Omit<z.infer<typeof ActivationRawSchema>, "metadata"> & {
-  metadata?: NullableJsonInput;
-} & ActivationRawRelations
+export type SampleDatasetWithRelations = z.infer<typeof SampleDatasetSchema> & SampleDatasetRelations
 
-export const ActivationRawWithRelationsSchema: z.ZodType<ActivationRawWithRelations> = ActivationRawSchema.merge(z.object({
-  model: z.lazy(() => ModelWithRelationsSchema),
-  creator: z.lazy(() => UserWithRelationsSchema).nullable(),
+export const SampleDatasetWithRelationsSchema: z.ZodType<SampleDatasetWithRelations> = SampleDatasetSchema.merge(z.object({
+  samples: z.lazy(() => SampleWithRelationsSchema).array(),
 }))
 
-// ACTIVATION RAW PARTIAL RELATION SCHEMA
+// SAMPLE DATASET PARTIAL RELATION SCHEMA
 //------------------------------------------------------
 
-export type ActivationRawPartialRelations = {
-  model?: ModelPartialWithRelations;
-  creator?: UserPartialWithRelations | null;
+export type SampleDatasetPartialRelations = {
+  samples?: SamplePartialWithRelations[];
 };
 
-export type ActivationRawPartialWithRelations = Omit<z.infer<typeof ActivationRawPartialSchema>, "metadata"> & {
-  metadata?: NullableJsonInput;
-} & ActivationRawPartialRelations
+export type SampleDatasetPartialWithRelations = z.infer<typeof SampleDatasetPartialSchema> & SampleDatasetPartialRelations
 
-export const ActivationRawPartialWithRelationsSchema: z.ZodType<ActivationRawPartialWithRelations> = ActivationRawPartialSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+export const SampleDatasetPartialWithRelationsSchema: z.ZodType<SampleDatasetPartialWithRelations> = SampleDatasetPartialSchema.merge(z.object({
+  samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
 })).partial()
 
-export type ActivationRawWithPartialRelations = Omit<z.infer<typeof ActivationRawSchema>, "metadata"> & {
-  metadata?: NullableJsonInput;
-} & ActivationRawPartialRelations
+export type SampleDatasetWithPartialRelations = z.infer<typeof SampleDatasetSchema> & SampleDatasetPartialRelations
 
-export const ActivationRawWithPartialRelationsSchema: z.ZodType<ActivationRawWithPartialRelations> = ActivationRawSchema.merge(z.object({
-  model: z.lazy(() => ModelPartialWithRelationsSchema),
-  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+export const SampleDatasetWithPartialRelationsSchema: z.ZodType<SampleDatasetWithPartialRelations> = SampleDatasetSchema.merge(z.object({
+  samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
 }).partial())
+
+/////////////////////////////////////////
+// SAMPLE SCHEMA
+/////////////////////////////////////////
+
+export const SampleSchema = z.object({
+  type: ProbeSampleTypeSchema,
+  id: z.string().cuid(),
+  modelId: z.string(),
+  datasetId: z.string(),
+  sampleIndex: z.number().int(),
+  groundTruth: z.boolean(),
+  conversation: InputJsonValue,
+  conversationTokenized: z.number().int().array(),
+  conversationTokenizedStr: z.string().array(),
+  finalResponseStartIndex: z.number().int(),
+  userId: z.string(),
+  elo: z.number(),
+  vettedAt: z.coerce.date().nullable(),
+  vettedBy: z.string().nullable(),
+  createdAt: z.coerce.date(),
+})
+
+export type Sample = z.infer<typeof SampleSchema>
+
+/////////////////////////////////////////
+// SAMPLE PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const SamplePartialSchema = SampleSchema.partial()
+
+export type SamplePartial = z.infer<typeof SamplePartialSchema>
+
+// SAMPLE RELATION SCHEMA
+//------------------------------------------------------
+
+export type SampleRelations = {
+  model: ModelWithRelations;
+  dataset: SampleDatasetWithRelations;
+  user: UserWithRelations;
+  probeMatches: ProbeMatchWithRelations[];
+};
+
+export type SampleWithRelations = z.infer<typeof SampleSchema> & SampleRelations
+
+export const SampleWithRelationsSchema: z.ZodType<SampleWithRelations> = SampleSchema.merge(z.object({
+  model: z.lazy(() => ModelWithRelationsSchema),
+  dataset: z.lazy(() => SampleDatasetWithRelationsSchema),
+  user: z.lazy(() => UserWithRelationsSchema),
+  probeMatches: z.lazy(() => ProbeMatchWithRelationsSchema).array(),
+}))
+
+// SAMPLE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type SamplePartialRelations = {
+  model?: ModelPartialWithRelations;
+  dataset?: SampleDatasetPartialWithRelations;
+  user?: UserPartialWithRelations;
+  probeMatches?: ProbeMatchPartialWithRelations[];
+};
+
+export type SamplePartialWithRelations = z.infer<typeof SamplePartialSchema> & SamplePartialRelations
+
+export const SamplePartialWithRelationsSchema: z.ZodType<SamplePartialWithRelations> = SamplePartialSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  dataset: z.lazy(() => SampleDatasetPartialWithRelationsSchema),
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+  probeMatches: z.lazy(() => ProbeMatchPartialWithRelationsSchema).array(),
+})).partial()
+
+export type SampleWithPartialRelations = z.infer<typeof SampleSchema> & SamplePartialRelations
+
+export const SampleWithPartialRelationsSchema: z.ZodType<SampleWithPartialRelations> = SampleSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  dataset: z.lazy(() => SampleDatasetPartialWithRelationsSchema),
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+  probeMatches: z.lazy(() => ProbeMatchPartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// PROBE SCHEMA
+/////////////////////////////////////////
+
+export const ProbeSchema = z.object({
+  type: ProbeSampleTypeSchema,
+  architecture: ProbeArchitectureSchema,
+  tokenSelection: TokenSelectionSchema,
+  reductionMethod: ReductionMethodSchema,
+  id: z.string().cuid(),
+  customLabel: z.string(),
+  modelId: z.string(),
+  userId: z.string(),
+  layers: z.number().int().array(),
+  weights: z.number().array(),
+  bias: z.number(),
+  weightsBlob: z.instanceof(Buffer).nullable(),
+  elo: z.number(),
+  createdAt: z.coerce.date(),
+  creatorNote: z.string().nullable(),
+})
+
+export type Probe = z.infer<typeof ProbeSchema>
+
+/////////////////////////////////////////
+// PROBE PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProbePartialSchema = ProbeSchema.partial()
+
+export type ProbePartial = z.infer<typeof ProbePartialSchema>
+
+// PROBE RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProbeRelations = {
+  model: ModelWithRelations;
+  user: UserWithRelations;
+  probeMatches: ProbeMatchWithRelations[];
+};
+
+export type ProbeWithRelations = z.infer<typeof ProbeSchema> & ProbeRelations
+
+export const ProbeWithRelationsSchema: z.ZodType<ProbeWithRelations> = ProbeSchema.merge(z.object({
+  model: z.lazy(() => ModelWithRelationsSchema),
+  user: z.lazy(() => UserWithRelationsSchema),
+  probeMatches: z.lazy(() => ProbeMatchWithRelationsSchema).array(),
+}))
+
+// PROBE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProbePartialRelations = {
+  model?: ModelPartialWithRelations;
+  user?: UserPartialWithRelations;
+  probeMatches?: ProbeMatchPartialWithRelations[];
+};
+
+export type ProbePartialWithRelations = z.infer<typeof ProbePartialSchema> & ProbePartialRelations
+
+export const ProbePartialWithRelationsSchema: z.ZodType<ProbePartialWithRelations> = ProbePartialSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+  probeMatches: z.lazy(() => ProbeMatchPartialWithRelationsSchema).array(),
+})).partial()
+
+export type ProbeWithPartialRelations = z.infer<typeof ProbeSchema> & ProbePartialRelations
+
+export const ProbeWithPartialRelationsSchema: z.ZodType<ProbeWithPartialRelations> = ProbeSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  user: z.lazy(() => UserPartialWithRelationsSchema),
+  probeMatches: z.lazy(() => ProbeMatchPartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// PROBE MATCH SCHEMA
+/////////////////////////////////////////
+
+export const ProbeMatchSchema = z.object({
+  id: z.string().cuid(),
+  probeId: z.string(),
+  sampleId: z.string(),
+  probeCorrect: z.boolean(),
+  probeScore: z.number(),
+  tokenScores: z.number().array(),
+  createdAt: z.coerce.date(),
+})
+
+export type ProbeMatch = z.infer<typeof ProbeMatchSchema>
+
+/////////////////////////////////////////
+// PROBE MATCH PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProbeMatchPartialSchema = ProbeMatchSchema.partial()
+
+export type ProbeMatchPartial = z.infer<typeof ProbeMatchPartialSchema>
+
+// PROBE MATCH RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProbeMatchRelations = {
+  probe: ProbeWithRelations;
+  sample: SampleWithRelations;
+};
+
+export type ProbeMatchWithRelations = z.infer<typeof ProbeMatchSchema> & ProbeMatchRelations
+
+export const ProbeMatchWithRelationsSchema: z.ZodType<ProbeMatchWithRelations> = ProbeMatchSchema.merge(z.object({
+  probe: z.lazy(() => ProbeWithRelationsSchema),
+  sample: z.lazy(() => SampleWithRelationsSchema),
+}))
+
+// PROBE MATCH PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ProbeMatchPartialRelations = {
+  probe?: ProbePartialWithRelations;
+  sample?: SamplePartialWithRelations;
+};
+
+export type ProbeMatchPartialWithRelations = z.infer<typeof ProbeMatchPartialSchema> & ProbeMatchPartialRelations
+
+export const ProbeMatchPartialWithRelationsSchema: z.ZodType<ProbeMatchPartialWithRelations> = ProbeMatchPartialSchema.merge(z.object({
+  probe: z.lazy(() => ProbePartialWithRelationsSchema),
+  sample: z.lazy(() => SamplePartialWithRelationsSchema),
+})).partial()
+
+export type ProbeMatchWithPartialRelations = z.infer<typeof ProbeMatchSchema> & ProbeMatchPartialRelations
+
+export const ProbeMatchWithPartialRelationsSchema: z.ZodType<ProbeMatchWithPartialRelations> = ProbeMatchSchema.merge(z.object({
+  probe: z.lazy(() => ProbePartialWithRelationsSchema),
+  sample: z.lazy(() => SamplePartialWithRelationsSchema),
+}).partial())
+
+/////////////////////////////////////////
+// PROBE LOG SCHEMA
+/////////////////////////////////////////
+
+export const ProbeLogSchema = z.object({
+  action: ProbeLogActionSchema,
+  id: z.string().cuid(),
+  modelId: z.string(),
+  userId: z.string().nullable(),
+  probeId: z.string().nullable(),
+  sampleId: z.string().nullable(),
+  details: NullableJsonValue.optional(),
+  createdAt: z.coerce.date(),
+})
+
+export type ProbeLog = z.infer<typeof ProbeLogSchema>
+
+/////////////////////////////////////////
+// PROBE LOG PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProbeLogPartialSchema = ProbeLogSchema.partial()
+
+export type ProbeLogPartial = z.infer<typeof ProbeLogPartialSchema>
+
+/////////////////////////////////////////
+// PROCESS LOCK SCHEMA
+/////////////////////////////////////////
+
+export const ProcessLockSchema = z.object({
+  name: z.string(),
+  startedAt: z.coerce.date(),
+  expiresAt: z.coerce.date(),
+  details: NullableJsonValue.optional(),
+})
+
+export type ProcessLock = z.infer<typeof ProcessLockSchema>
+
+/////////////////////////////////////////
+// PROCESS LOCK PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ProcessLockPartialSchema = ProcessLockSchema.partial()
+
+export type ProcessLockPartial = z.infer<typeof ProcessLockPartialSchema>
