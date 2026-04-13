@@ -1,8 +1,5 @@
 // TODO: clean this up
 
-/* eslint-disable no-param-reassign */
-/* eslint-disable no-restricted-syntax */
-
 import { prisma } from '@/lib/db';
 import { getModelById } from '@/lib/db/model';
 import { neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
@@ -172,10 +169,9 @@ async function saveSteerChatOutput(
         },
       });
 
-      // eslint-disable-next-line no-param-reassign
       toReturnResult.id = dbResult.id;
       console.log(`steer saved: ${dbResult.id}`);
-      // eslint-disable-next-line no-param-reassign
+
       toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${dbResult.id}`;
     }
 
@@ -199,7 +195,6 @@ function createStream(generator: AsyncGenerator<SteerResultChat>) {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
-      // eslint-disable-next-line
       for await (const chunk of generator) {
         const dataString = `data: ${JSON.stringify(chunk)}\n\n`;
         // console.log(JSON.stringify(chunk, null, 2));
@@ -705,7 +700,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
     // each feature access
     const featuresWithVectors: SteerFeature[] = [];
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const feature of body.features) {
       // eslint-disable-next-line no-await-in-loop
       const accessResult = await neuronExistsAndUserHasAccess(

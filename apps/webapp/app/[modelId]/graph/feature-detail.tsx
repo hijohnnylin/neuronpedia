@@ -159,7 +159,6 @@ export default function GraphFeatureDetail() {
                   onChange={(e) => {
                     setTempLabel(e.target.value);
                   }}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.code === 'Enter' || e.key === 'Enter') {
@@ -299,13 +298,11 @@ export default function GraphFeatureDetail() {
                   ref={groupRef}
                   className="min-h-[310px] w-full"
                   groupCounts={groupCounts}
-                  // eslint-disable-next-line react/no-unstable-nested-components
                   groupContent={(index) => (
                     <div className="h-8 border-b bg-slate-50 pb-1 pt-2 text-sm font-bold text-slate-600">
                       {node?.featureDetail?.examples_quantiles[index].quantile_name}
                     </div>
                   )}
-                  // eslint-disable-next-line react/no-unstable-nested-components
                   itemContent={(index, groupIndex) => {
                     const example =
                       node?.featureDetail?.examples_quantiles[groupIndex]?.examples[getIndexInGroup(index, groupIndex)];

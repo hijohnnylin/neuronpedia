@@ -58,13 +58,11 @@ function addGraphMetadataToMap(map: ModelToGraphMetadatasMap, modelId: string, g
   // https://github.com/safety-research/circuit-tracer/pull/34
   // replace ↵ with \n, → with \t, and \r with ↵ in the prompt tokens
   if (graphMetadata.promptTokens) {
-    // eslint-disable-next-line no-param-reassign
     graphMetadata.promptTokens = graphMetadata.promptTokens.map((token: string) =>
       token.replace(/⏎/g, '\n').replace(/→/g, '\t').replace(/↵/g, '\r'),
     );
   }
   if (!map[modelId]) {
-    // eslint-disable-next-line
     map[modelId] = [];
   }
   // Ensure no existing graph with the same slug to avoid overriding featured graphs
@@ -76,10 +74,8 @@ function addGraphMetadataToMap(map: ModelToGraphMetadatasMap, modelId: string, g
 // Helper function to merge graph metadata arrays into the map
 function mergeGraphMetadataArrays(map: ModelToGraphMetadatasMap, modelId: string, graphMetadataArray: any[]) {
   if (!map[modelId]) {
-    // eslint-disable-next-line
     map[modelId] = graphMetadataArray;
   } else {
-    // eslint-disable-next-line
     map[modelId] = [...map[modelId], ...graphMetadataArray];
   }
 }
@@ -157,7 +153,7 @@ export default async function Page({
   // if this is an ant model, then fetch the graph metadatas from their bucket
   if (ANTHROPIC_MODELS.has(modelId)) {
     const modelIdToGraphMetadata = await getGraphMetadatasFromBucket(ANT_BUCKET_URL);
-    // eslint-disable-next-line
+
     Object.keys(modelIdToGraphMetadata)
       .filter((m) => ANTHROPIC_MODELS.has(m))
       .forEach((m) => {

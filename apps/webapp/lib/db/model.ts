@@ -89,7 +89,6 @@ export const getModelByIdWithSourceSets = async (modelId: string, user?: Authent
   });
 
 export const createModel = async (model: Model, user: AuthenticatedUser) => {
-  // eslint-disable-next-line no-param-reassign
   model.creatorId = user.id;
 
   const existingModel = await prisma.model.findUnique({

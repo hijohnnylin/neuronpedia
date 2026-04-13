@@ -202,8 +202,7 @@ export default function TabAnalyze({
                   aria-label="none"
                 >
                   <div className="flex w-full flex-row items-center justify-center gap-x-1.5 leading-none">
-                    ❌ none of these{' '}
-                    {quizValue === 'none' && <div className="ml-1.5 text-[16px] leading-none">⭐️</div>}
+                    ❌ none of these {quizValue === 'none' && <div className="ml-1.5 text-[16px] leading-none">⭐️</div>}
                   </div>
                 </RadioGroup.Item>
               </RadioGroup.Root>

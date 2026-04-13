@@ -74,7 +74,6 @@ export default function TabMicroscope({
 
       // filter out boring indexes and ones with act desnsity > 1%
       resultData.results = resultData.results.map((resultDataResult) => {
-        // eslint-disable-next-line
         resultDataResult.topFeatures = resultDataResult.topFeatures.filter(
           (feature) => feature.feature?.frac_nonzero !== undefined,
         );
@@ -131,7 +130,6 @@ export default function TabMicroscope({
 
       // set the frequency, which is the number of times that index appears
       toSet = toSet.map((f) => {
-        // eslint-disable-next-line
         f.frequency = toSet.filter((f2) => f2.index === f.index).length;
         return f;
       });
@@ -407,7 +405,6 @@ export default function TabMicroscope({
                   </div>
                 )}
                 {topkResult && !isSearching && (
-                  // eslint-disable-next-line
                   <>
                     {lockedTokenPosition === -1 && hoveredTokenPosition === -1 ? (
                       <div className="flex flex-1 flex-col">

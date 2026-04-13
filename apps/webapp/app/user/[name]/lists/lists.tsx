@@ -1,8 +1,8 @@
 'use client';
 
+import { useRouter } from '@bprogress/next';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Field, Form, Formik } from 'formik';
-import { useRouter } from 'next-nprogress-bar';
 import { ListWithPartialRelations } from 'prisma/generated/zod';
 import { useEffect, useState } from 'react';
 

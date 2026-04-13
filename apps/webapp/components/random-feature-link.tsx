@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from '@bprogress/next';
 import { Button } from './shadcn/button';
 
 interface RandomFeatureLinkProps {

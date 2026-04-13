@@ -79,7 +79,6 @@ export default function SearchTopkByTokenSimple({
 
       // filter out boring indexes and ones with act desnsity > 1%
       resultData.results = resultData.results.map((resultDataItem) => {
-        // eslint-disable-next-line
         resultDataItem.topFeatures = resultDataItem.topFeatures.filter(
           (feature) => feature.feature?.frac_nonzero !== undefined && feature.feature?.frac_nonzero <= 0.01,
         );
@@ -119,7 +118,6 @@ export default function SearchTopkByTokenSimple({
 
       // set the frequency, which is the number of times that index appears
       toSet = toSet.map((f) => {
-        // eslint-disable-next-line
         f.frequency = toSet.filter((f2) => f2.index === f.index).length;
         return f;
       });
@@ -365,7 +363,6 @@ export default function SearchTopkByTokenSimple({
                 </div>
               )}
               {topkResult && !isSearching && (
-                // eslint-disable-next-line
                 <>
                   {lockedTokenPosition === -1 && hoveredTokenPosition === -1 ? (
                     <div className="flex h-full flex-1 flex-col items-center justify-center">

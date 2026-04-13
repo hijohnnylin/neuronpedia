@@ -2,8 +2,8 @@
 
 import { Button } from '@/components/shadcn/button';
 import { Card, CardContent } from '@/components/shadcn/card';
+import { useRouter } from '@bprogress/next';
 import { ArrowRight } from 'lucide-react';
-import { useRouter } from 'next-nprogress-bar';
 import { useEffect } from 'react';
 
 const DEFAULT_GRAPH_MODEL_ID = 'gemma-2-2b';

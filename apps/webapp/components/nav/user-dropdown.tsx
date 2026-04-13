@@ -2,10 +2,10 @@
 
 import { useGlobalContext } from '@/components/provider/global-provider';
 import Popover from '@/components/sign-in-modal/popover';
+import { useRouter } from '@bprogress/next';
 import { Bookmark, ExternalLink, LayoutList, LogOut, Menu, MoveUpLeft, Settings, User } from 'lucide-react';
 import { Session } from 'next-auth';
 import { signOut } from 'next-auth/react';
-import { useRouter } from 'next-nprogress-bar';
 import Link from 'next/link';
 import NavBarButtons from './navbar-buttons';
 
@@ -54,7 +54,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   prefetch={false}
                   href={`/user/${user?.name || name}/lists`}
                   className="relative flex w-full items-center justify-center space-x-2 rounded-md p-2 text-left text-sm outline-none ring-0 transition-all duration-75 hover:bg-slate-100 sm:justify-start"
-                  >
+                >
                   <LayoutList className="h-4 w-4" />
                   <p className="text-base sm:text-sm">My Lists</p>
                 </Link>
@@ -62,7 +62,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   prefetch={false}
                   href={`/user/${user?.name || name}/vectors`}
                   className="relative flex w-full items-center justify-center space-x-2 rounded-md p-2 text-left text-sm outline-none ring-0 transition-all duration-75 hover:bg-slate-100 sm:justify-start"
-                  >
+                >
                   <MoveUpLeft className="h-4 w-4" />
                   <p className="text-base sm:text-sm">My Vectors</p>
                 </Link>
@@ -92,7 +92,6 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                 </button>
               </>
             )}
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
             <div
               className={`mx-auto flex w-full flex-col items-center justify-center gap-3 border-slate-200 pb-4 ${
                 user && 'mt-4 border-t pt-4'

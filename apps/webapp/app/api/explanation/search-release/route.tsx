@@ -75,7 +75,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     // add the neurons to the result
     result.forEach((r) => {
-      // eslint-disable-next-line no-param-reassign
       r.neuron = neurons.find((n) => n.modelId === r.modelId && n.layer === r.layer && n.index === r.index);
     });
 

@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable @typescript-eslint/no-shadow */
-
 import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '@/lib/env';
 import { formatToGlobalModels } from '@/lib/utils/general';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
@@ -126,16 +124,16 @@ export default function GlobalProvider({
   const [globalModels, setGlobalModels] = useState<{
     [key: string]: ModelWithPartialRelations;
   }>(initialModels);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const [releases, setReleases] = useState<SourceReleaseWithPartialRelations[]>(initialReleases);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const [explanationTypes, setExplanationTypes] = useState<ExplanationType[]>(initialExplanationTypes);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const [explanationModels, setExplanationModels] = useState<ExplanationModelType[]>(initialExplanationModels);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const [explanationScoreTypes, setExplanationScoreTypes] =
     useState<ExplanationScoreType[]>(initialExplanationScoreTypes);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const [explanationScoreModelTypes, setExplanationScoreModelTypes] = useState<ExplanationScoreModel[]>(
     initialExplanationScoreModelTypes,
   );
@@ -247,7 +245,6 @@ export default function GlobalProvider({
     Object.keys(globalModels).filter((modelId) => getInferenceEnabledForModel(modelId));
 
   const getFirstInferenceEnabledModel = () => {
-    // eslint-disable-next-line no-restricted-syntax
     for (const modelId in globalModels) {
       if (getInferenceEnabledForModel(modelId)) {
         return modelId;

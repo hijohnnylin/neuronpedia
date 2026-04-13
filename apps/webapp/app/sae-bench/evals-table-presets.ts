@@ -1,4 +1,3 @@
-/* eslint-disable import/no-cycle */
 import { EvalsTableParams } from './evals-table';
 
 export const EVALS_TABLE_PRESETS: { name: string; params: EvalsTableParams }[] = [

@@ -218,7 +218,7 @@ export const sendWelcomeEmail = async (emailAddress: string, unsubscribeCode: st
     );
   }
   const mjml = await fs.readFile(`${templatesDirectory}/${EmailTemplates.welcome.mjmlFile}`, 'utf8');
-  // eslint-disable-next-line
+
   const templatedHtml = await mjml2html(mjml);
   const compiled = _.template(templatedHtml.html);
   const html = compiled({

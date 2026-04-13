@@ -91,7 +91,17 @@ export function NodeSidebar({
     } finally {
       setSaving(false);
     }
-  }, [selectedNode.id, editTitle, editDescription, editMainUrl, editAuthor, editNodeTypes, editAdditionalUrls, editParentId, onUpdated]);
+  }, [
+    selectedNode.id,
+    editTitle,
+    editDescription,
+    editMainUrl,
+    editAuthor,
+    editNodeTypes,
+    editAdditionalUrls,
+    editParentId,
+    onUpdated,
+  ]);
 
   const handleAddComment = useCallback(async () => {
     if (!session?.user) {
@@ -145,7 +155,6 @@ export function NodeSidebar({
         /* ── Edit mode ── */
         <div className="mt-3 flex flex-col gap-3">
           <div>
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label className="text-xs font-medium text-slate-600">Types</label>
             <div className="mt-1 flex flex-wrap gap-1">
               {typeOptions.map((t) => (
@@ -169,7 +178,6 @@ export function NodeSidebar({
             </div>
           </div>
           <div>
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label className="text-xs font-medium text-slate-600">Title</label>
             <input
               type="text"
@@ -179,7 +187,6 @@ export function NodeSidebar({
             />
           </div>
           <div>
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label className="text-xs font-medium text-slate-600">Description</label>
             <textarea
               value={editDescription}
@@ -189,7 +196,6 @@ export function NodeSidebar({
             />
           </div>
           <div>
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label className="text-xs font-medium text-slate-600">Main URL</label>
             <input
               type="text"
@@ -199,7 +205,6 @@ export function NodeSidebar({
             />
           </div>
           <div>
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label className="text-xs font-medium text-slate-600">Additional URLs</label>
             <div className="mt-1 flex flex-col gap-1">
               {editAdditionalUrls.map((url, i) => (
@@ -246,7 +251,6 @@ export function NodeSidebar({
             </div>
           </div>
           <div>
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label className="text-xs font-medium text-slate-600">Author</label>
             <input
               type="text"
@@ -256,7 +260,6 @@ export function NodeSidebar({
             />
           </div>
           <div>
-            {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
             <label className="text-xs font-medium text-slate-600">Parent node</label>
             <select
               value={editParentId ? String(editParentId) : ''}
@@ -494,7 +497,6 @@ export function NodeSidebar({
               </div>
             </div>
           )}
-
         </>
       )}
     </div>

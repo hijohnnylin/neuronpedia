@@ -704,7 +704,6 @@ export function GraphProvider({
       // put the details in the nodes
       const featureDetails = batchesOfDetails.flat(1);
       formattedData.nodes.forEach((d) => {
-        // eslint-disable-next-line no-param-reassign
         const feature = featureDetails.find((f) => {
           const nodeSourceSet = d.feature_type === 'lorsa' && lorsaSourceSet ? lorsaSourceSet : sourceSet;
           return (
@@ -716,7 +715,6 @@ export function GraphProvider({
           );
         });
         if (feature) {
-          // eslint-disable-next-line no-param-reassign
           d.featureDetailNP = feature as NeuronWithPartialRelations;
         }
       });
@@ -768,7 +766,6 @@ export function GraphProvider({
       formattedData.nodes
         .filter((d) => nodeTypeHasFeatureDetail(d)) // sometimes there are duplicate feature numbers from embed / logits / mlp recon error, we should always filter them out
         .forEach((d) => {
-          // eslint-disable-next-line no-param-reassign
           const feature = featureDetails.find(
             (f) =>
               f &&
@@ -778,7 +775,6 @@ export function GraphProvider({
               f.layer === `${getLayerFromOldSchema0Feature(selectedModelId, d)}-${sourceSet}`,
           );
           if (feature) {
-            // eslint-disable-next-line no-param-reassign
             d.featureDetailNP = feature as NeuronWithPartialRelations;
           }
         });
@@ -801,7 +797,6 @@ export function GraphProvider({
       );
 
       formattedData.nodes.forEach((d, i) => {
-        // eslint-disable-next-line no-param-reassign
         d.featureDetail = featureDetails[i] as AnthropicFeatureDetail;
       });
     } else if (ANTHROPIC_MODELS.has(selectedModelId)) {
@@ -824,7 +819,6 @@ export function GraphProvider({
       );
 
       formattedData.nodes.forEach((d, i) => {
-        // eslint-disable-next-line no-param-reassign
         d.featureDetail = featureDetails[i] as AnthropicFeatureDetail;
       });
     }
@@ -851,7 +845,6 @@ export function GraphProvider({
       );
 
       formattedData.nodes.forEach((d, i) => {
-        // eslint-disable-next-line no-param-reassign
         d.featureDetail = featureDetails[i] as AnthropicFeatureDetail;
       });
     }
@@ -878,7 +871,6 @@ export function GraphProvider({
       );
 
       formattedData.nodes.forEach((d, i) => {
-        // eslint-disable-next-line no-param-reassign
         d.featureDetail = featureDetails[i] as AnthropicFeatureDetail;
       });
     }

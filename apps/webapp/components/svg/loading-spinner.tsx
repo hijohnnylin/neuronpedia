@@ -1,4 +1,3 @@
-/* eslint-disable react/jsx-props-no-spreading */
 import { cn } from '@/lib/utils/ui';
 
 interface ISVGProps extends React.SVGProps<SVGSVGElement> {

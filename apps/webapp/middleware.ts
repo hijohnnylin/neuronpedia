@@ -50,7 +50,7 @@ const HIGHER_RATE_LIMITS = [
 ];
 
 const normalRateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
-// eslint-disable-next-line no-restricted-syntax
+
 for (const { endpoint, limit } of NORMAL_RATE_LIMITS) {
   normalRateLimiters.push({
     endpoint,
@@ -63,7 +63,7 @@ for (const { endpoint, limit } of NORMAL_RATE_LIMITS) {
 }
 
 const higherRateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
-// eslint-disable-next-line no-restricted-syntax
+
 for (const { endpoint, limit } of HIGHER_RATE_LIMITS) {
   higherRateLimiters.push({
     endpoint,
@@ -106,7 +106,6 @@ export default async function middleware(request: NextRequest) {
   const rateLimitersToUse =
     apiKey && HIGHER_LIMIT_API_TOKENS.includes(apiKey) ? higherRateLimiters : normalRateLimiters;
 
-  // eslint-disable-next-line no-restricted-syntax
   for (const { endpoint, limiter } of rateLimitersToUse) {
     if (pathname.startsWith(endpoint) && !NO_LIMIT_ENDPOINTS.some((ep) => pathname.startsWith(ep))) {
       // eslint-disable-next-line

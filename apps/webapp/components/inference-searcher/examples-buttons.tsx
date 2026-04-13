@@ -2,8 +2,8 @@
 
 import { Button } from '@/components/shadcn/button';
 import { INFERENCE_EXAMPLE_TEXTS, INFERENCE_EXAMPLE_TEXTS_CATEGORIZED } from '@/lib/utils/inference-example-texts';
+import { useRouter } from '@bprogress/next';
 import { Dices } from 'lucide-react';
-import { useRouter } from 'next-nprogress-bar';
 
 export default function ExamplesButtons({ makeUrl }: { makeUrl: (query: string) => string }) {
   const router = useRouter();

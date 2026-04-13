@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 export const markdownData = `
 # SAEBench: A Comprehensive Benchmark for Sparse Autoencoders
 

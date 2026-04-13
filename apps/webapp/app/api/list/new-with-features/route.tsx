@@ -114,7 +114,6 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     const featuresToCreate = [];
     if (features) {
       try {
-        // eslint-disable-next-line no-restricted-syntax
         for await (const feat of features) {
           const feature = await neuronExistsAndUserHasAccess(
             feat.modelId,

@@ -167,7 +167,6 @@ export default function SearchTopkByToken({
 
       // set the frequency, which is the number of times that index appears
       toSet = toSet.map((f) => {
-        // eslint-disable-next-line
         f.frequency = toSet.filter((f2) => f2.index === f.index).length;
         return f;
       });

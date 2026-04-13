@@ -1,5 +1,3 @@
-/* eslint-disable import/no-cycle */
-
 'use client';
 
 import { MODEL_HAS_CONNECTED_NEURONS } from '@/app/[modelId]/[layer]/[index]/feature-dashboard';
@@ -187,7 +185,7 @@ export default function ActivationsList({
               }
             }
           });
-          // eslint-disable-next-line no-param-reassign
+
           activations = Array.from(uniqueActsMap.values());
         }
         sortedActs = activations;

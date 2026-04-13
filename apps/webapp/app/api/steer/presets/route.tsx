@@ -838,7 +838,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     // if user is logged in, add their vectors to the feature presets
     if (request.user) {
       const vectors = await getVectorsForModelAndUser(modelId, request.user.id);
-      // eslint-disable-next-line no-restricted-syntax
+
       for (const vector of vectors) {
         const feature = {
           modelId: vector.modelId,

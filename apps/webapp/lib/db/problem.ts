@@ -1,6 +1,6 @@
-import { ProblemEdgeType, ProblemNodeApprovalState, ProblemNodeType } from '@prisma/client';
-import { prisma } from '@/lib/db';
 import { MAX_TITLE_LENGTH } from '@/app/problems/problems-shared';
+import { prisma } from '@/lib/db';
+import { ProblemEdgeType, ProblemNodeApprovalState, ProblemNodeType } from '@prisma/client';
 import { AuthenticatedUser } from '../with-user';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function validateNodeData(data: {
     if (data.additionalUrls.length > MAX_ADDITIONAL_URLS) {
       throw new Error(`Maximum ${MAX_ADDITIONAL_URLS} additional URLs allowed`);
     }
-    // eslint-disable-next-line no-restricted-syntax
+
     data.additionalUrls.forEach((url) => {
       if (url.length > MAX_URL_LENGTH) {
         throw new Error(`Each URL must be ${MAX_URL_LENGTH} characters or fewer`);
@@ -69,7 +69,7 @@ function validateNodeData(data: {
     if (data.applicationTags.length > MAX_APPLICATION_TAGS) {
       throw new Error(`Maximum ${MAX_APPLICATION_TAGS} application tags allowed`);
     }
-    // eslint-disable-next-line no-restricted-syntax
+
     data.applicationTags.forEach((tag) => {
       if (tag.length > MAX_TAG_LENGTH) {
         throw new Error(`Each tag must be ${MAX_TAG_LENGTH} characters or fewer`);
@@ -89,7 +89,9 @@ function validateNodeTypes(nodeTypes: unknown): asserts nodeTypes is ProblemNode
 
 function validateEdgeType(type: unknown): asserts type is ProblemEdgeType {
   if (typeof type !== 'string' || !VALID_EDGE_TYPES.has(type)) {
-    throw new Error(`Invalid edge type: ${String(type).slice(0, 50)}. Valid types: ${[...VALID_EDGE_TYPES].join(', ')}`);
+    throw new Error(
+      `Invalid edge type: ${String(type).slice(0, 50)}. Valid types: ${[...VALID_EDGE_TYPES].join(', ')}`,
+    );
   }
 }
 
@@ -106,7 +108,10 @@ const problemNodeInclude = {
 };
 
 async function assertUserCanEditNode(nodeId: number, user: AuthenticatedUser) {
-  const dbUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { admin: true, isProblemEditor: true } });
+  const dbUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { admin: true, isProblemEditor: true },
+  });
   if (dbUser.admin || dbUser.isProblemEditor) return;
 
   const node = await prisma.problemNode.findUniqueOrThrow({ where: { id: nodeId } });
@@ -176,7 +181,10 @@ export async function createProblemNode(
   validateNodeData(data);
   if (data.nodeTypes) validateNodeTypes(data.nodeTypes);
 
-  const dbUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { admin: true, isProblemEditor: true } });
+  const dbUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { admin: true, isProblemEditor: true },
+  });
   const autoApprove = dbUser.admin || dbUser.isProblemEditor;
 
   const node = await prisma.problemNode.create({
@@ -265,7 +273,10 @@ export async function deleteProblemNode(id: number, user: AuthenticatedUser) {
 // ─── Approval ───────────────────────────────────────────────────────────────
 
 export async function approveProblemNode(id: number, approved: boolean, user: AuthenticatedUser) {
-  const dbUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { admin: true, isProblemEditor: true } });
+  const dbUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { admin: true, isProblemEditor: true },
+  });
   if (!dbUser.admin && !dbUser.isProblemEditor) {
     throw new Error('You do not have permission to approve/reject nodes');
   }
@@ -303,7 +314,10 @@ export async function createProblemEdge(
 ) {
   validateEdgeType(data.type);
 
-  const dbUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { admin: true, isProblemEditor: true } });
+  const dbUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { admin: true, isProblemEditor: true },
+  });
   const autoApprove = dbUser.admin || dbUser.isProblemEditor;
 
   return prisma.problemEdge.create({
@@ -322,7 +336,10 @@ export async function createProblemEdge(
 
 export async function deleteProblemEdge(id: string, user: AuthenticatedUser) {
   const edge = await prisma.problemEdge.findUniqueOrThrow({ where: { id } });
-  const dbUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { admin: true, isProblemEditor: true } });
+  const dbUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { admin: true, isProblemEditor: true },
+  });
   if (!dbUser.admin && !dbUser.isProblemEditor && edge.createdById !== user.id) {
     throw new Error('You do not have permission to delete this edge');
   }
@@ -365,7 +382,10 @@ export async function createProblemComment(
 
 export async function deleteProblemComment(id: string, user: AuthenticatedUser) {
   const comment = await prisma.problemNodeComment.findUniqueOrThrow({ where: { id } });
-  const dbUser = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { admin: true, isProblemEditor: true } });
+  const dbUser = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { admin: true, isProblemEditor: true },
+  });
   if (!dbUser.admin && !dbUser.isProblemEditor && comment.userId !== user.id) {
     throw new Error('You do not have permission to delete this comment');
   }

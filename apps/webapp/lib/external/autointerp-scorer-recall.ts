@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-
 import { prisma } from '@/lib/db';
 import { ActivationPartial } from '@/prisma/generated/zod';
 import { Activation, Explanation } from '@prisma/client';

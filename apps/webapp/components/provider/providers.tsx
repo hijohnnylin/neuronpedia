@@ -1,8 +1,8 @@
 'use client';
 
+import { AppProgressProvider } from '@bprogress/next';
 import { Provider as TooltipProvider } from '@radix-ui/react-tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AppProgressBar as ProgressBar } from 'next-nprogress-bar';
 import { PrimeReactProvider } from 'primereact/api';
 import {
   ExplanationModelType,
@@ -43,7 +43,7 @@ export function Providers({
   initialExplanationScoreModelTypes: ExplanationScoreModel[];
 }) {
   return (
-    <>
+    <AppProgressProvider height="4px" color="#0369a1" options={{ showSpinner: false }} shallowRouting>
       <QueryClientProvider client={queryClient}>
         <PrimeReactProvider>
           <GlobalProvider
@@ -70,7 +70,6 @@ export function Providers({
           </GlobalProvider>
         </PrimeReactProvider>
       </QueryClientProvider>
-      <ProgressBar height="4px" color="#0369a1" options={{ showSpinner: false }} shallowRouting />
-    </>
+    </AppProgressProvider>
   );
 }

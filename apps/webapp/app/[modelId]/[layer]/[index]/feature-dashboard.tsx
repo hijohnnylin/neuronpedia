@@ -1,5 +1,3 @@
-/* eslint-disable import/no-cycle */
-
 'use client';
 
 import ActivationsList from '@/components/activations-list';
@@ -277,7 +275,6 @@ export default function FeatureDashboard({
 
           {/* === LISTS */}
           {/* TODO: fix this */}
-          {/* eslint-disable-next-line react/jsx-no-bind */}
           <ListsPane currentNeuron={currentNeuron} reloadNeuron={reloadNeuron} />
 
           {/* === COMMENTS */}

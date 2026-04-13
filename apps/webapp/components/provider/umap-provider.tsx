@@ -12,6 +12,7 @@ import React, { Dispatch, RefObject, SetStateAction, useMemo, useRef, useState }
 import dynamic from 'next/dynamic';
 import createContextWrapper from './provider-util';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a type for refs (RefObject<Plot>)
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 // const Plot = createPlotlyComponent(Plotly);

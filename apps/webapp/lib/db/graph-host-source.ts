@@ -1,10 +1,5 @@
 import { prisma } from '../db';
-import {
-  GRAPH_RUNPOD_SECRET,
-  GRAPH_SERVER_SECRET,
-  IS_DOCKER_COMPOSE,
-  USE_LOCALHOST_GRAPH,
-} from '../env';
+import { GRAPH_RUNPOD_SECRET, GRAPH_SERVER_SECRET, IS_DOCKER_COMPOSE, USE_LOCALHOST_GRAPH } from '../env';
 import { AuthenticatedUser } from '../with-user';
 import { userCanAccessModelAndSourceSet } from './userCanAccess';
 
@@ -79,7 +74,12 @@ export const wrapRequestBodyForRunpodIfNeeded = (body: any, isRunpodServerlessHo
   return body;
 };
 
-export const getGraphServerRequestUrlForSourceSet = async (modelId: string, sourceSetName: string, action: string, isRunpodServerlessHost: boolean) => {
+export const getGraphServerRequestUrlForSourceSet = async (
+  modelId: string,
+  sourceSetName: string,
+  action: string,
+  isRunpodServerlessHost: boolean,
+) => {
   if (USE_LOCALHOST_GRAPH) {
     return `${LOCALHOST_GRAPH_HOST}/${action}`;
   }

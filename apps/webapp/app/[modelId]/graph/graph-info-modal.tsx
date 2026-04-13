@@ -26,7 +26,6 @@ export default function GraphInfoModal({ cltGraph, selectedMetadataGraph }: Grap
           // find the node in the original selectedGraph
           const originalNode = selectedGraph.nodes.find((n) => n.node_id === node.node_id);
           if (originalNode) {
-            // eslint-disable-next-line no-param-reassign
             node.clerp = getOverrideClerpForNode(originalNode) || '';
           }
         });

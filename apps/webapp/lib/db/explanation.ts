@@ -1,5 +1,3 @@
-/* eslint-disable no-restricted-syntax */
-
 import { prisma } from '@/lib/db';
 import { getGlobalModels } from '@/lib/db/model';
 import { Explanation, Prisma } from '@prisma/client';
@@ -357,7 +355,7 @@ export const getUmapExplanations = async (modelId: string, layers: string[], use
     );
   }
   const resultsArray = await Promise.all(promises);
-  // eslint-disable-next-line
+
   for (let i = 0; i < layers.length; i++) {
     results[layers[i]] = resultsArray[i];
   }

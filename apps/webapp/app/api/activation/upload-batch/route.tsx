@@ -27,7 +27,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
   }
 
   // ensure activations tokens length matches values length
-  // eslint-disable-next-line no-restricted-syntax
+
   for (const activation of parsedBody.activations) {
     if (activation.tokens.length !== activation.values.length) {
       throw new Error('Activations tokens length does not match values length.');

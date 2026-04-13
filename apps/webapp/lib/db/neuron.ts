@@ -532,7 +532,7 @@ export const dangerousGetNeuronRangeInternalUseOnly = async (
 ) => {
   // make a string array of indexes from beginIndex to endIndex
   const indexes = [];
-  // eslint-disable-next-line no-plusplus
+
   for (let i = beginIndex; i <= endIndex; i++) {
     indexes.push(i.toString());
   }

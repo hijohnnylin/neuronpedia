@@ -64,7 +64,6 @@ export default function NewSourceSetForm() {
         weights or run the model.
       </div>
       <form onSubmit={handleSubmit}>
-        {/* eslint-disable-next-line */}
         <label htmlFor="id" className="mt-5 block">
           <ModelSelector
             modelId={modelId}

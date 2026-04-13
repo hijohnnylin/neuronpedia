@@ -1,5 +1,3 @@
-/* eslint-disable no-continue */
-
 import { prisma } from '@/lib/db';
 import { getActivationForFeature } from '@/lib/utils/inference';
 import { ListWithPartialRelations } from '@/prisma/generated/zod';
@@ -61,7 +59,7 @@ export const addNeuronsToList = async (
   if (list.defaultTestText && listNeuronsToAdd.length < 20) {
     // iterate through each listNeurontoAdd
     const activationsToAdd = [];
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const neuronToAdd of createdListsOnNeurons) {
       // eslint-disable-next-line no-await-in-loop
       const neuron = await prisma.neuron.findUniqueOrThrow({
@@ -332,7 +330,7 @@ export const updateListMetadata = async (
         });
         // run activations, saving each of them
         const activations = [];
-        // eslint-disable-next-line no-restricted-syntax
+
         for (const feature of features) {
           console.log('Running activation for feature index: ', feature.index);
           if (!feature.sourceSetName) {

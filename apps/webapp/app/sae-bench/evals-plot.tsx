@@ -11,7 +11,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import createPlotlyComponent from 'react-plotly.js/factory';
 import CustomTooltip from '../../components/custom-tooltip';
 import { PCA_BASELINES } from './pca-baselines-data';
-// eslint-disable-next-line import/no-cycle
+
 import { convertEvalTypeToHash, convertNumToAbbr, MetricColumn } from './evals-table';
 
 // const Plot = dynamic(

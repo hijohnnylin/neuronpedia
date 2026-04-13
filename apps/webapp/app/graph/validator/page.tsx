@@ -167,17 +167,14 @@ export default function GraphValidator() {
 
           // Skip qParams section
           if (currentPath === 'qParams' || currentPath.startsWith('qParams.')) {
-            // eslint-disable-next-line no-continue
             continue;
           }
 
           // Skip mutually exclusive feature_details options
           if (currentPath === 'metadata.feature_details.feature_json_base_url' && hasNeuronpediaSourceSet) {
-            // eslint-disable-next-line no-continue
             continue;
           }
           if (currentPath === 'metadata.feature_details.neuronpedia_source_set' && hasFeatureJsonBaseUrl) {
-            // eslint-disable-next-line no-continue
             continue;
           }
 
@@ -187,7 +184,6 @@ export default function GraphValidator() {
             currentPath === 'nodes[].activation' ||
             currentPath === 'metadata.node_threshold'
           ) {
-            // eslint-disable-next-line no-continue
             continue;
           }
 

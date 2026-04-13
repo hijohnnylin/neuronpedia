@@ -41,7 +41,7 @@ import UmapSelectedItem from './umap-selected-item';
 
 const ZOOM_IN_OUT_FACTOR = 0.32; // 32% zoom each click
 
-const usePrevious = <T extends unknown>(value: T): T | undefined => {
+const usePrevious = <T,>(value: T): T | undefined => {
   const ref = useRef<T>();
   useEffect(() => {
     ref.current = value;
@@ -375,7 +375,7 @@ export default function Umap({ modelId, sourceSet, layers }: { modelId: string; 
   function findAndScrollToFeature(feature: NeuronIdentifier) {
     let targetIndex = 0;
     const listToUse = searchText.length > 0 ? highlightedUmapExplanations : visibleUmapExplanations;
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const [indexInList, e] of listToUse.entries()) {
       if (feature.equals(getExplanationNeuronIdentifier(e))) {
         targetIndex = indexInList;
@@ -782,7 +782,6 @@ export default function Umap({ modelId, sourceSet, layers }: { modelId: string; 
               style={{ height: `${UMAP_HEIGHT}px` }}
               className="forceShowScrollBar overscroll-contain"
               data={searchText.length > 0 ? highlightedUmapExplanations : visibleUmapExplanations}
-              // eslint-disable-next-line react/no-unstable-nested-components
               itemContent={(i, exp) => (
                 <div
                   key={exp.id}

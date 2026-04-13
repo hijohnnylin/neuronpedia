@@ -162,7 +162,6 @@ export default function AssistantAxisChat({
     const resizeObserver = new ResizeObserver(updateDimensions);
     resizeObserver.observe(container);
 
-    // eslint-disable-next-line consistent-return
     return () => resizeObserver.disconnect();
   }, []);
 
@@ -330,7 +329,7 @@ export default function AssistantAxisChat({
           showToastServerError();
         }
       }
-      // eslint-disable-next-line @typescript-eslint/no-shadow
+
       const limitRemaining = response.headers.get('x-limit-remaining');
       if (limitRemaining) {
         setLimitRemaining(Number(limitRemaining));
@@ -394,7 +393,7 @@ export default function AssistantAxisChat({
         setTypedInText('');
         setIsSteering(false);
         // Pass the assistant_axis data to the parent for non-streaming response
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         const assistantAxisArray = data.assistant_axis as PersonaCheckResult[] | undefined;
         console.log('[DEBUG] Received assistant_axis (non-streaming):', JSON.stringify(assistantAxisArray, null, 2));
         if (onAssistantAxisData && assistantAxisArray && Array.isArray(assistantAxisArray)) {

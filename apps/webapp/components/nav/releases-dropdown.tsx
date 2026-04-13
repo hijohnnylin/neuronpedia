@@ -3,10 +3,10 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { IS_LOCALHOST } from '@/lib/env';
 import { UNNAMED_AUTHOR_NAME } from '@/lib/utils/general';
+import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { StarFilledIcon } from '@radix-ui/react-icons';
 import { ChevronDown, Plus } from 'lucide-react';
-import { useRouter } from 'next-nprogress-bar';
 import Link from 'next/link';
 
 export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: boolean }) {

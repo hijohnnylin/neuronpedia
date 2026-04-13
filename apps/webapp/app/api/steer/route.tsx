@@ -31,7 +31,6 @@ function createStream(generator: AsyncGenerator<SteerResult>) {
   const encoder = new TextEncoder();
   return new ReadableStream({
     async start(controller) {
-      // eslint-disable-next-line
       for await (const chunk of generator) {
         const dataString = `data: ${JSON.stringify(chunk)}\n\n`;
         controller.enqueue(encoder.encode(dataString));
@@ -90,7 +89,7 @@ async function* generateResponse(
   hasVector: boolean,
 ): AsyncGenerator<SteerResult> {
   // NOW: always return the SteerResult modified to what we have so far
-  // eslint-disable-next-line
+
   for (const steerType of steerTypesToRun) {
     // eslint-disable-next-line
     const steerCompletionResult = (await steerCompletion(
@@ -113,20 +112,18 @@ async function* generateResponse(
       .pipeThrough(new TextDecoderStream())
       .pipeThrough(new EventSourceParserStream())
       .getReader();
-    // eslint-disable-next-line no-await-in-loop, no-restricted-syntax
+    // eslint-disable-next-line no-await-in-loop
     for await (const completionChunk of transformStream(streamReader)) {
       // find the output for the steerType
       const output = completionChunk.outputs.find((out) => out.type === steerType);
       if (!output) {
         throw new Error(`No output found for steerType: ${steerType}`);
       }
-      // eslint-disable-next-line no-param-reassign
+
       toReturnResult[steerType] = output.output;
       if (steerType === SteerOutputType.STEERED) {
-        // eslint-disable-next-line no-param-reassign
         toReturnResult.steeredLogProbs = output.logprobs ? output.logprobs : null;
       } else {
-        // eslint-disable-next-line no-param-reassign
         toReturnResult.defaultLogProbs = output.logprobs ? output.logprobs : null;
       }
       yield toReturnResult;
@@ -135,7 +132,6 @@ async function* generateResponse(
   if (DEMO_MODE) {
     console.log('skipping saveSteerOutput in demo mode');
   } else {
-    // eslint-disable-next-line
     toReturnResult = await saveSteerOutput(body, steerTypesToRun, toReturnResult, user?.id);
   }
   yield toReturnResult;
@@ -236,12 +232,11 @@ async function saveSteerOutput(
   );
 
   const saveResults = await Promise.all(saveActions);
-  // eslint-disable-next-line no-restricted-syntax
+
   for (const saveResult of saveResults) {
     if (saveResult.type === SteerOutputType.STEERED) {
-      // eslint-disable-next-line
       toReturnResult.id = saveResult.id;
-      // eslint-disable-next-line
+
       toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${saveResult.id}`;
     }
   }
@@ -389,7 +384,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
     // each feature access
     const featuresWithVectors: SteerFeature[] = [];
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const feature of body.features) {
       // eslint-disable-next-line no-await-in-loop
       const accessResult = await neuronExistsAndUserHasAccess(

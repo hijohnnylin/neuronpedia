@@ -121,7 +121,7 @@ export default function ManualDashboard() {
       };
 
       const activationsToAdd = [];
-      // eslint-disable-next-line no-restricted-syntax
+
       for (const activation of feature.activations) {
         activationsToAdd.push({
           id: cuid(),

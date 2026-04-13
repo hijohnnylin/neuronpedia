@@ -19,7 +19,6 @@ export function fromMarkdown(markdown: string): [Result, Map<string, string>] {
   const keyMap = new Map<string, string>();
 
   function addKey<T extends RootContent>(node: T, prefix = '') {
-    // eslint-disable-next-line
     node.key = prefix;
     if (node.type === 'link') {
       keyMap.set(node.url, node.key);

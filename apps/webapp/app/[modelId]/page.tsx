@@ -1,5 +1,3 @@
-/* eslint-disable no-nested-ternary */
-
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import ModelsDropdown from '@/components/nav/models-dropdown';
 import SearchInferenceModelPane from '@/components/panes/search-inference-model-pane';

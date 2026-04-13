@@ -1,7 +1,7 @@
 'use client';
 
 import { SourceReleaseWithPartialRelations } from '@/prisma/generated/zod';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from '@bprogress/next';
 import { Button } from './shadcn/button';
 
 const MAX_RANDOM_FEATURE = 10000;

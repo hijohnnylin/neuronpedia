@@ -18,7 +18,7 @@ const additionalInstructions = `
 - API is under /app/api
 - API requests should generally be POST endpoints. Avoid GET when possible.
 - Environment variables like IS_LOCALHOST should be imported from @/lib/env
-- My useRouter for client side components should be: import { useRouter } from 'next-nprogress-bar';
+- My useRouter for client side components should be: import { useRouter } from '@bprogress/next';
 - Providers are under @/components/provider, with the top level provider file being providers.tsx
 - Do not significantly alter the providers.tsx file - only adding a nested provider file when necessary
 - Database schema is at /prisma/schema.prisma

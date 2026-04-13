@@ -148,7 +148,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     // remove all that are below the density threshold
     if (densityThreshold !== -1) {
       toReturn.results = toReturn.results.map((r) => {
-        // eslint-disable-next-line no-param-reassign
         r.topFeatures = r.topFeatures.filter(
           (f) => f.feature?.frac_nonzero && f.feature?.frac_nonzero <= densityThreshold,
         );

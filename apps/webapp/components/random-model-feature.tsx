@@ -1,7 +1,7 @@
 'use client';
 
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from '@bprogress/next';
 import { Button } from './shadcn/button';
 
 const MAX_RANDOM_FEATURE = 10000;

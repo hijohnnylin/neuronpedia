@@ -91,7 +91,6 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
                   .filter((url) => url.length > 0)
                   .map((url, i) => (
                     <a
-                      // eslint-disable-next-line react/no-array-index-key
                       key={i}
                       href={url}
                       target="_blank"

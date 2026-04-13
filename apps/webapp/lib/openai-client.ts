@@ -73,7 +73,7 @@ export class OpenAIClientFactory {
     return new AzureOpenAI({
       apiKey,
       endpoint,
-      apiVersion: '2024-10-21' // <-- this is required, inference wont work without it
+      apiVersion: '2024-10-21', // <-- this is required, inference wont work without it
     });
   }
 
@@ -102,7 +102,7 @@ export class OpenAIClientFactory {
 }
 
 // Singleton instance
-// eslint-disable-next-line @typescript-eslint/naming-convention, no-underscore-dangle
+
 let _instance: OpenAI | AzureOpenAI | null = null;
 
 /**

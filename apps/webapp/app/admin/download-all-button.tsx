@@ -76,7 +76,7 @@ export default function DownloadAllButton({ modelId, sourceSetName, onDownloadSt
         e.preventDefault();
         e.stopPropagation();
         if (
-          // eslint-disable-next-line no-alert, no-restricted-globals
+          // eslint-disable-next-line no-alert
           confirm(
             'Are you sure you want to download all sources? This may take a long time and if aborted, you will need to manually re-sync the interrupted download.',
           )

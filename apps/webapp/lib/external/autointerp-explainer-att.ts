@@ -1,5 +1,3 @@
-/* eslint-disable no-useless-escape */
-
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, UserSecretType } from '@prisma/client';
@@ -157,7 +155,6 @@ export const generateExplanationOaiAttentionHead = async (
 Attention head 5
 Activations:`;
 
-  // eslint-disable-next-line
   for (let i = 0; i < activations.length; i++) {
     newMessage += makeOAIattentionActivation(activations[i]);
     if (i < activations.length - 1) {

@@ -38,7 +38,6 @@ export default function UserVectors({ initialVectors }: { initialVectors: Neuron
         <TableVirtuoso
           id="vectors-table"
           style={{ height: 400, width: '100%' }}
-          // eslint-disable-next-line react/no-unstable-nested-components
           fixedHeaderContent={() => (
             <tr className="h-8 w-full rounded-md bg-slate-200 text-center text-[11px] uppercase text-slate-400">
               <th className="">Label</th>
@@ -53,7 +52,6 @@ export default function UserVectors({ initialVectors }: { initialVectors: Neuron
           )}
           className="rounded text-xs text-slate-600 odd:bg-slate-100"
           data={initialVectors}
-          // eslint-disable-next-line react/no-unstable-nested-components
           itemContent={(index, vector) => (
             <>
               <td className="px-3 py-2 text-[13px]">

@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-
 import CustomTooltip from '@/components/custom-tooltip';
 import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
 import { useGraphContext } from '@/components/provider/graph-provider';
@@ -292,7 +290,6 @@ export default function Subgraph() {
   function ungroupSupernodeWithNodeIds(memberNodeIds: string[]) {
     if (visState.subgraph) {
       const newSupernodes = visState.subgraph.supernodes.filter(
-        // eslint-disable-next-line
         ([_, ...nodeIds]) => !nodeIds.every((id) => memberNodeIds?.includes(id)),
       );
 
@@ -355,7 +352,7 @@ export default function Subgraph() {
         prevSupernodeLabel = node.ppClerp || '';
 
         // find the supernode to remove
-        // eslint-disable-next-line
+
         const supernodeToRemove = visState.subgraph?.supernodes.find(([_, ...nodeIds]) =>
           nodeIds.every((d) => node.memberNodeIds?.includes(d)),
         );
@@ -374,7 +371,6 @@ export default function Subgraph() {
 
       // remove the supernodes to remove
       let newSupernodes = visState.subgraph?.supernodes.filter(
-        // eslint-disable-next-line
         ([_, ...nodeIds]) => !supernodesToRemove.some((d) => nodeIds.every((e) => d.includes(e))),
       );
 
@@ -662,7 +658,6 @@ export default function Subgraph() {
       if (!nodeSelRef.current) return;
       nodeSelRef.current.translate((d) => [d.x, d.y]);
 
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       renderEdges(); // Calls renderEdges which uses refs
 
       // Only update edge labels if they exist and nodes aren't dagre-positioned
@@ -688,7 +683,7 @@ export default function Subgraph() {
       const currentSgLinks = sgLinksRef.current; // Use links from ref
 
       // Adjust link source positions based on source node member count
-      // eslint-disable-next-line @typescript-eslint/no-shadow
+
       d3.nestBy(currentSgLinks, (d) => d.source).forEach((links) => {
         const sourceNode = typeof links[0].source === 'object' ? links[0].source : null;
         if (!sourceNode || !sourceNode.node) return;
@@ -706,7 +701,7 @@ export default function Subgraph() {
       });
 
       // Adjust link target positions based on target node member count
-      // eslint-disable-next-line @typescript-eslint/no-shadow
+
       d3.nestBy(currentSgLinks, (d) => d.target).forEach((links) => {
         const targetNode = typeof links[0].target === 'object' ? links[0].target : null;
         if (!targetNode || !targetNode.node) return;
@@ -846,16 +841,13 @@ export default function Subgraph() {
       .data((d: ForceNode) => d.node.memberNodes || [])
       .join('div.member-circle')
       .classed('not-clt-feature', (d) => d.feature_type !== 'cross layer transcoder' && d.feature_type !== 'lorsa')
-      .classed(
-        'is-error',
-        (d) => d.feature_type === 'mlp reconstruction error' || d.feature_type === 'lorsa error',
-      )
+      .classed('is-error', (d) => d.feature_type === 'mlp reconstruction error' || d.feature_type === 'lorsa error')
       .classed('is-lorsa', (d) => d.feature_type === 'lorsa')
       .text((d) => (d.feature_type === 'lorsa' ? '▲' : ''))
       .st({
         marginLeft(d: CLTGraphNode, i: number) {
           // @ts-ignore
-          // eslint-disable-next-line
+
           const n = this.parentNode.childNodes.length;
           return n <= 4 ? 0 : i === 0 ? 0 : -((n - 4) * 8) / (n - 1);
         },
@@ -936,11 +928,10 @@ export default function Subgraph() {
           .select(spanSel.node().parentNode)
           .append('input')
           .at({ class: 'temp-edit', value: spanSel.text() })
-          // eslint-disable-next-line
+
           .on('blur', saveSupergroupLabel)
           .on('keydown', (saveEvent) => {
             if (saveEvent.key === 'Enter') {
-              // eslint-disable-next-line
               saveSupergroupLabel();
               input.node()?.blur();
             }
@@ -950,7 +941,6 @@ export default function Subgraph() {
         input.node()?.focus();
 
         function saveSupergroupLabel() {
-          // eslint-disable-next-line
           const idx = visState.subgraph?.supernodes.findIndex(([_, ...nodeIds]) =>
             nodeIds.every((id) => d.node.memberNodeIds?.includes(id)),
           );
@@ -961,7 +951,6 @@ export default function Subgraph() {
             // We need to create a new one because otherwise useEffect won't trigger
             const newSupernodes = visState.subgraph.supernodes.map((supernodeEntry, i) => {
               if (i === idx) {
-                // eslint-disable-next-line
                 const [_, ...restIds] = supernodeEntry;
                 return [newValue, ...restIds];
               }
@@ -987,7 +976,7 @@ export default function Subgraph() {
     // Get actual text height for each node
     nodeTextSel.each(function (d: ForceNode) {
       // @ts-ignore
-      // eslint-disable-next-line
+
       d.node.textHeight = this.getBoundingClientRect().height || -8;
     });
 
@@ -1074,7 +1063,7 @@ export default function Subgraph() {
     simulationRef.current?.on('tick', renderForce);
 
     // Cleanup function
-    // eslint-disable-next-line
+
     return () => {
       simulationRef.current?.stop();
     };
@@ -1270,7 +1259,6 @@ export default function Subgraph() {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
 
-    // eslint-disable-next-line
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);

@@ -59,7 +59,7 @@ export const createInferenceActivationsAndReturn = async (
   user: AuthenticatedUser | null = null,
 ) => {
   // ensure that the creatorId is either the authenticated user or the bot
-  // eslint-disable-next-line no-restricted-syntax
+
   for (const activation of activations) {
     if (!activation.creatorId) {
       throw new Error('Missing creatorId');

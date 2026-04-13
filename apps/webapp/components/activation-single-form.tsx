@@ -1,7 +1,5 @@
 'use client';
 
-// TODO: fix eslint
-// eslint-disable-next-line
 import ActivationItem from '@/components/activation-item';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { BOS_TOKENS } from '@/lib/utils/activations';

@@ -227,7 +227,6 @@ export const generateExplanationOaiTokenActivationPair = async (
 Neuron 4
 Activations:`;
 
-  // eslint-disable-next-line no-restricted-syntax
   for (const activation of activations) {
     newMessage += makeOAIactivation(activation);
   }

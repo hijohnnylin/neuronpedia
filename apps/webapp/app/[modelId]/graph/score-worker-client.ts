@@ -25,9 +25,9 @@ export async function computeGraphScoresInWorker(
     // Add timeout to prevent hanging if worker never responds with valid data
     const timeout = setTimeout(() => {
       // @ts-ignore
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+
       worker.removeEventListener('message', handleMessage as EventListener);
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+
       worker.removeEventListener('error', handleError as EventListener);
       worker.terminate();
       reject(new Error('Worker timeout: No valid response received within 30 seconds'));
@@ -52,7 +52,7 @@ export async function computeGraphScoresInWorker(
 
       // @ts-ignore
       worker.removeEventListener('message', handleMessage as EventListener);
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+
       worker.removeEventListener('error', handleError as EventListener);
       worker.terminate();
 
@@ -82,7 +82,7 @@ export async function computeGraphScoresInWorker(
     worker.addEventListener('error', handleError as EventListener);
 
     // Send the graph data directly
-    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+
     sendGraphData();
 
     function sendGraphData() {

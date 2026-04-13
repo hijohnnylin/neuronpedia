@@ -280,7 +280,6 @@ export default function PersonaChart({
     if (!loading && !isSteering) {
       // Skip animation if requested (e.g., when loading saved data)
       if (skipAnimationRef?.current) {
-        // eslint-disable-next-line no-param-reassign
         skipAnimationRef.current = false;
         prevDataRef.current = data;
         return;
@@ -358,7 +357,6 @@ export default function PersonaChart({
       prevDataRef.current = data;
     }
 
-    // eslint-disable-next-line consistent-return
     return () => {
       if (animationStateRef.current.frameId) {
         cancelAnimationFrame(animationStateRef.current.frameId);

@@ -20,7 +20,7 @@ export const POST = withAuthedAdminUser(async (request: RequestAuthedAdminUser) 
   const createDate = new Date();
 
   const featuresToCreate = [];
-  // eslint-disable-next-line no-restricted-syntax
+
   for (const index of skippedIndexes) {
     featuresToCreate.push({
       modelId,

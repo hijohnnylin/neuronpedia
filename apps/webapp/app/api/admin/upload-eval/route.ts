@@ -24,7 +24,7 @@ export const POST = withAuthedAdminUser(async (request: RequestAuthedAdminUser) 
   const checkedSourceSets = new Set<string>();
 
   console.log('Checking for existing evals and creating sources');
-  // eslint-disable-next-line no-restricted-syntax
+
   for (const evalUpload of body) {
     // ensure data is a valid json object
     JSON.parse(evalUpload.data);

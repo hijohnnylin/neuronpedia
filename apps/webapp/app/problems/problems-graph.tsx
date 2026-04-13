@@ -592,7 +592,6 @@ function ProblemsGraphInner({
         setTimeout(() => fitViewCustom(), 50);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     typeFilter,
     selectedNodeId,

@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { useGraphStateContext } from '@/components/provider/graph-state-provider';
 import { useScreenSize } from '@/lib/hooks/use-screen-size';
@@ -184,10 +182,9 @@ export default function LinkGraph() {
     if (!closestPoint.pos) return null;
     let closestDistance = distance(mouseX, mouseY, closestPoint.pos[0], closestPoint.pos[1]);
 
-    // eslint-disable-next-line
     for (let i = 1; i < points.length; i++) {
       const point = points[i];
-      // eslint-disable-next-line
+
       if (!point.pos) continue;
       const dist = distance(mouseX, mouseY, point.pos[0], point.pos[1]);
       if (dist < closestDistance) {
@@ -742,7 +739,7 @@ export default function LinkGraph() {
     const svgBot = bottomContainer.append('g').attr('class', 'svg-bot');
 
     // Create canvas elements for different link layers
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     canvasRefs.current.forEach((ref, i) => {
       const canvasId = `canvas-layer-${i}`;
 
@@ -820,7 +817,7 @@ export default function LinkGraph() {
 
     // Generate context counts
     const maxCtxIdx = d3.max(nonUndefinedNodes, (d) => d.ctx_idx as number) || 0;
-    // eslint-disable-next-line
+
     for (let ctxIdx = 0; ctxIdx <= maxCtxIdx; ctxIdx++) {
       let maxCount = 1;
       if (ctxIdx >= earliestCtxWithNodes) {
@@ -909,7 +906,7 @@ export default function LinkGraph() {
     ctxCounts.forEach((d, i) => {
       if (i < ctxCounts.length) {
         const colWidth = c.x(d.ctx_idx + 1) - c.x(ctxCounts[i].ctx_idx);
-        // eslint-disable-next-line
+
         d.width = colWidth;
       }
     });
@@ -920,7 +917,7 @@ export default function LinkGraph() {
     // Find the tightest spacing between nodes and use for all ctx (but don't go below 20)
     ctxCounts.forEach((d) => {
       const availableWidth = (d.width || 0) - padR;
-      // eslint-disable-next-line
+
       d.minS = availableWidth / d.maxCount;
     });
 
@@ -943,7 +940,7 @@ export default function LinkGraph() {
         } else {
           d.xOffset = ctxWidth - (padR / 2 + i * s);
         }
-        // eslint-disable-next-line
+
         d.yOffset = 0;
       });
     });
@@ -962,7 +959,6 @@ export default function LinkGraph() {
       const yBand = c.y(effectiveStreamIdx);
       if (yBand === undefined) return;
 
-      // eslint-disable-next-line
       d.pos = [xPos, yBand + c.y.bandwidth() / 2 + (d.yOffset || 0)];
     });
 
@@ -1113,7 +1109,7 @@ export default function LinkGraph() {
           clearClickedState(onClickedChange);
         } else {
           // Handle clicking on a node
-          // eslint-disable-next-line
+
           if (event.metaKey || event.ctrlKey) {
             // Toggle pinned state with meta/ctrl key
             const newPinnedIds = togglePin(closestNode.nodeId || '');

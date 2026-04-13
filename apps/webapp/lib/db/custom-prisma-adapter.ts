@@ -2,7 +2,7 @@ import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { PrismaClient } from '@prisma/client';
 import { AdapterUser } from 'next-auth/adapters';
 import { generateFromEmail } from 'unique-username-generator';
-// eslint-disable-next-line
+
 import { checkUserExistsByEmail, checkUserExistsByName, createUser } from './user';
 
 // https://github.com/nextauthjs/next-auth/discussions/562

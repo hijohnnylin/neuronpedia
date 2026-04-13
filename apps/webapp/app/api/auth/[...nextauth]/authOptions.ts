@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db';
-// eslint-disable-next-line import/no-cycle
+
 import CustomPrismaAdapterForNextAuth from '@/lib/db/custom-prisma-adapter';
 import { sendLoginEmail, sendWelcomeEmail } from '@/lib/email/email';
 import {
@@ -85,7 +85,6 @@ export const authOptions: NextAuthOptions = {
               return Buffer.from(random).toString('hex').slice(0, 6);
             },
             async sendVerificationRequest(params) {
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const { identifier } = params;
 
               const url = new URL(params.url);
@@ -106,7 +105,7 @@ export const authOptions: NextAuthOptions = {
         .toString('base64')
         .replace(/\+/g, '0')
         .replace(/\//g, '0')
-        // eslint-disable-next-line no-useless-escape
+
         .replace(/\=/g, '0')}`;
       await prisma.userSecret.create({
         data: {
@@ -130,9 +129,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     session: async ({ session, user }) => {
       if (session?.user) {
-        // eslint-disable-next-line no-param-reassign
         session.user.id = user.id;
-        // eslint-disable-next-line no-param-reassign
+
         session.user.name = user.name || '';
       }
       return session;

@@ -19,7 +19,7 @@ export default function Popover({
   setOpenPopover: Dispatch<SetStateAction<boolean>>;
 }) {
   const { isMobile, isDesktop } = useWindowSize();
-  // eslint-disable-next-line
+
   if (!isMobile && !isDesktop) return <>{children}</>;
   return (
     <>

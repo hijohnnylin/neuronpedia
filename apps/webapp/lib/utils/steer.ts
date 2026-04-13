@@ -94,10 +94,9 @@ export function convertOldSteerOutputToChatMessages(raw: string): ChatMessage[] 
   // split by message
   const split = newRaw.split('<end_of_turn>');
   const toReturn: ChatMessage[] = split.map((s) => {
-    // eslint-disable-next-line no-param-reassign
     s = s.trimStart();
     // remove the <start_of_turn>
-    // eslint-disable-next-line no-param-reassign
+
     s = s.replaceAll('<start_of_turn>', '');
     const splitByLineBreak = s.split('\n');
     if (splitByLineBreak.length === 0) {

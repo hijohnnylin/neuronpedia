@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax */
 /* eslint-disable no-await-in-loop */
 
 import { prisma } from '@/lib/db';
@@ -88,7 +87,7 @@ export async function importJsonlString(tableName: string, jsonlData: string) {
   let pool;
   let client;
   // replace all \u0000 with ' ' because it's not supported by postgres
-  // eslint-disable-next-line no-param-reassign
+
   jsonlData = jsonlData.replaceAll('\\u0000', ' ');
   if (tableName === 'Activation') {
     const activationLines = jsonlData
@@ -96,7 +95,7 @@ export async function importJsonlString(tableName: string, jsonlData: string) {
       .split('\n')
       .filter((line) => line.trim().length > 0)
       .map(normalizeActivationJsonlLine);
-    // eslint-disable-next-line no-param-reassign
+
     jsonlData = activationLines.join('\n');
   }
   try {

@@ -330,7 +330,6 @@ export default function GemmaScopeHome({ release }: { release: SourceReleaseWith
             ref={mainRef}
             className="flex h-full w-full flex-row items-start justify-center overflow-y-scroll border-slate-400 bg-white px-0 py-5 pb-1"
           >
-            {/* eslint-disable-next-line */}
             <TabMain tabUpdater={setTabValue} completedTabsAdd={addCompletedTab} />
           </div>
         </Tabs.Content>
@@ -357,7 +356,6 @@ export default function GemmaScopeHome({ release }: { release: SourceReleaseWith
               modelId={defaultModelIdNonSteer}
               layer={defaultSource?.id || ''}
               tabUpdater={setTabValue}
-              // eslint-disable-next-line
               completedTabsAdd={addCompletedTab}
             />
           </div>
@@ -365,7 +363,6 @@ export default function GemmaScopeHome({ release }: { release: SourceReleaseWith
 
         <Tabs.Content ref={analyzeRef} className="h-full w-full flex-col bg-white" value="analyze">
           <div className="flex h-full w-full flex-col items-center overflow-y-scroll bg-white px-0 pb-1">
-            {/* eslint-disable-next-line */}
             <TabAnalyze tabUpdater={setTabValue} completedTabsAdd={addCompletedTab} />
           </div>
         </Tabs.Content>
@@ -377,14 +374,12 @@ export default function GemmaScopeHome({ release }: { release: SourceReleaseWith
 
         <Tabs.Content ref={learnRef} className="h-full w-full flex-col bg-white" value="learn">
           <div className="flex h-full w-full flex-col items-center overflow-y-scroll bg-white px-0 pb-1">
-            {/* eslint-disable-next-line */}
             <TabLearn tabUpdater={setTabValue} />
           </div>
         </Tabs.Content>
 
         <Tabs.Content ref={openproblemsRef} className="h-full w-full flex-col bg-white" value="openproblems">
           <div className="flex h-full w-full flex-col items-center overflow-y-scroll bg-white px-0 pb-1">
-            {/* eslint-disable-next-line */}
             <TabProblems tabUpdater={setTabValue} />
           </div>
         </Tabs.Content>

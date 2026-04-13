@@ -224,7 +224,6 @@ export default function AssistantAxisSteerer({
     <div className="relative flex h-[calc(100dvh)] w-full flex-col items-start justify-center overflow-hidden sm:h-full sm:flex-row">
       <AssistantAxisChat
         currentSavedId={currentSavedId}
-        // eslint-disable-next-line react/jsx-no-bind
         loadSavedSteerOutput={loadSavedSteerOutput}
         chartData={chartData}
         loadingChartData={loadingChartData}
@@ -240,9 +239,7 @@ export default function AssistantAxisSteerer({
         selectedFeatures={selectedFeatures}
         typedInText={typedInText}
         setTypedInText={setTypedInText}
-        // eslint-disable-next-line react/jsx-no-bind
         reset={reset}
-        // eslint-disable-next-line react/jsx-no-bind
         setUrl={setUrl}
         temperature={temperature}
         steerTokens={steerTokens}

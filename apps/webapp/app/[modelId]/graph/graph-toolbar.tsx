@@ -10,6 +10,7 @@ import { useGlobalContext } from '@/components/provider/global-provider';
 import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { Button } from '@/components/shadcn/button';
+import { useRouter } from '@bprogress/next';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import {
@@ -24,7 +25,6 @@ import {
   UploadCloud,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next-nprogress-bar';
 import { useSearchParams } from 'next/navigation';
 import { Fragment, useState } from 'react';
 import GraphInfoModal from './graph-info-modal';

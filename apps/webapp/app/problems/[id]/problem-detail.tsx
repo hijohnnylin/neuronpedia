@@ -53,7 +53,7 @@ function CommentItem({ comment }: { comment: Comment }) {
       </div>
       <p className="mt-1 text-sm text-slate-700">{comment.text}</p>
       {comment.replies && comment.replies.length > 0 && (
-        <div className="mt-2 ml-4 flex flex-col gap-2 border-l-2 border-slate-100 pl-3">
+        <div className="ml-4 mt-2 flex flex-col gap-2 border-l-2 border-slate-100 pl-3">
           {comment.replies.map((reply) => (
             <CommentItem key={reply.id} comment={reply} />
           ))}
@@ -125,12 +125,17 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
       <div className="flex items-start gap-3">
         <div className="mt-1 flex gap-1">
           {node.nodeTypes.map((t) => (
-            <span key={t} className={`inline-block rounded px-2 py-0.5 text-xs font-semibold uppercase ${TYPE_COLORS[t] || 'bg-slate-100 text-slate-800'}`}>{t}</span>
+            <span
+              key={t}
+              className={`inline-block rounded px-2 py-0.5 text-xs font-semibold uppercase ${TYPE_COLORS[t] || 'bg-slate-100 text-slate-800'}`}
+            >
+              {t}
+            </span>
           ))}
         </div>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{node.title || '(untitled)'}</h1>
-          {node.description && <p className="mt-2 text-sm text-slate-600 leading-relaxed">{node.description}</p>}
+          {node.description && <p className="mt-2 text-sm leading-relaxed text-slate-600">{node.description}</p>}
         </div>
       </div>
 
@@ -138,12 +143,23 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
       {(node.mainUrl || node.additionalUrls.length > 0) && (
         <div className="mt-4 flex flex-col gap-1">
           {node.mainUrl && (
-            <a href={node.mainUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-600 hover:underline">
+            <a
+              href={node.mainUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-sky-600 hover:underline"
+            >
               {node.mainUrl}
             </a>
           )}
           {node.additionalUrls.map((url, i) => (
-            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-600 hover:underline">
+            <a
+              key={i}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-sky-600 hover:underline"
+            >
               {url}
             </a>
           ))}
@@ -196,7 +212,10 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
                 className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50"
               >
                 {child.nodeTypes.map((t) => (
-                  <span key={t} className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${TYPE_COLORS[t] || ''}`}>
+                  <span
+                    key={t}
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${TYPE_COLORS[t] || ''}`}
+                  >
                     {t}
                   </span>
                 ))}
@@ -258,7 +277,7 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
             type="button"
             onClick={() => handleAddComment()}
             disabled={submitting || !commentText.trim()}
-            className="rounded-lg bg-sky-700 px-4 py-2 text-xs font-medium text-white hover:bg-sky-800 disabled:opacity-50 transition-colors"
+            className="rounded-lg bg-sky-700 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-sky-800 disabled:opacity-50"
           >
             {submitting ? '...' : 'Post'}
           </button>

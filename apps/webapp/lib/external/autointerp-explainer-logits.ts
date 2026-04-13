@@ -310,7 +310,7 @@ const postProcessExplanation = (explanation: string | null) => {
   }
 
   // Filter out responses that contain "method [number]" in the explanation
-  // eslint-disable-next-line no-plusplus
+
   for (let i = 1; i <= 5; i++) {
     if (cleanedExplanation.toLowerCase().includes(`method ${i}`)) {
       console.error("Skipping output that contains 'method' in response text");

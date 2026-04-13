@@ -1,5 +1,3 @@
-/* eslint-disable import/no-cycle */
-
 import FeatureDashboard from '@/app/[modelId]/[layer]/[index]/feature-dashboard';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/shadcn/hover-card';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';

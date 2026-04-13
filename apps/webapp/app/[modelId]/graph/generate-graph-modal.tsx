@@ -119,7 +119,6 @@ const FormikValuesObserver: React.FC<{
     maxNLogits: number,
     desiredLogitProb: number,
   ) => void;
-  // eslint-disable-next-line
 }> = ({ prompt, modelId, sourceSetName, maxNLogits, desiredLogitProb, debouncedTokenize }) => {
   useEffect(() => {
     debouncedTokenize(modelId, prompt, sourceSetName, maxNLogits, desiredLogitProb);
@@ -130,7 +129,6 @@ const FormikValuesObserver: React.FC<{
 
 // Helper function to format seconds into "X min, Y sec"
 const formatCountdown = (totalSeconds: number): string => {
-  // eslint-disable-next-line
   if (totalSeconds < 0) totalSeconds = 0;
   const m = Math.floor(totalSeconds / 60);
   const s = Math.round(totalSeconds % 60);
@@ -201,7 +199,6 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
       // Find the role and content
       const lines = part.split('\n');
       if (lines.length < 2) {
-        // eslint-disable-next-line no-continue
         continue;
       }
 
@@ -246,7 +243,6 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
       // Find the role and content
       const lines = part.split('\n');
       if (lines.length < 2) {
-        // eslint-disable-next-line no-continue
         continue;
       }
 
@@ -1103,7 +1099,6 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     className="h-5 w-5 min-w-5 self-start px-0 text-xs"
                                     disabled={index !== chatPrompts.length - 1 || isGenerating}
                                     onClick={() => {
-                                      // eslint-disable-next-line
                                       setChatPrompts(chatPrompts.filter((_, i) => i !== index));
                                     }}
                                   >
@@ -1220,7 +1215,6 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                                     className="h-5 w-5 min-w-5 self-start px-0 text-xs"
                                     disabled={index !== chatPrompts.length - 1 || isGenerating}
                                     onClick={() => {
-                                      // eslint-disable-next-line
                                       setChatPrompts(chatPrompts.filter((_, i) => i !== index));
                                     }}
                                   >

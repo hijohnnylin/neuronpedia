@@ -259,7 +259,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const userId = request.user?.id;
     const userName = request.user?.name;
 
-    const key = `${GRAPH_S3_USER_GRAPHS_DIR}/${userId || GRAPH_ANONYMOUS_USER_ID}/${validatedData.slug}.json`;
+    const key = `${GRAPH_S3_USER_GRAPHS_DIR}/${userId || GRAPH_ANONYMOUS_USER_ID}/${validatedData.slug}-${Date.now()}.json`;
 
     // Initialize S3 client
     const s3Client = new S3Client({

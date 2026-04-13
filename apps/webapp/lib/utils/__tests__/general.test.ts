@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest';
 import { formatToGlobalModels, UNNAMED_AUTHOR_NAME } from '@/lib/utils/general';
+import { describe, expect, test } from 'vitest';
 
 describe('formatToGlobalModels', () => {
   test('converts array to object keyed by id', () => {
@@ -36,4 +36,3 @@ describe('UNNAMED_AUTHOR_NAME', () => {
     expect(UNNAMED_AUTHOR_NAME).toBe('Unnamed');
   });
 });
-

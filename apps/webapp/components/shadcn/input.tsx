@@ -1,5 +1,3 @@
-/* eslint-disable react/jsx-props-no-spreading */
-
 import { cn } from '@/lib/utils/ui';
 import * as React from 'react';
 

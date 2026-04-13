@@ -257,7 +257,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     // eslint-disable-next-line
     var searchResults: InferenceActivationAllResult[] = [];
     activations.forEach((activation) => {
-      // eslint-disable-next-line
       searchResults.push({
         modelId,
         layer: activation.layer,
@@ -309,7 +308,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       if (!neuron) {
         console.log(`couldnt find neuron for activation: ${activation.index}`);
         hasMissingNeuron = true;
-        // eslint-disable-next-line
+
         searchResults.push({
           modelId,
           layer: activation.source,
@@ -333,7 +332,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         (sortIndexes.length === 0 && activation.maxValue > 0) ||
         (sortIndexes.length > 0 && activation.sumValues !== undefined && activation.sumValues > 0)
       ) {
-        // eslint-disable-next-line
         searchResults.push({
           modelId,
           layer: neuron.layer,
@@ -351,9 +349,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   }
 
   const toReturn: InferenceActivationAllResponse = {
-    // eslint-disable-next-line
     tokens,
-    // eslint-disable-next-line
+
     result: searchResults,
     counts,
     sortIndexes,
@@ -386,14 +383,12 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       dfaMaxValue: number | undefined;
       creatorId: string;
     }[] = [];
-    // eslint-disable-next-line
+
     console.log(`creating: ${searchResults.length}`);
 
-    // eslint-disable-next-line
     searchResults.forEach((searchResult) => {
       if (searchResult.neuron) {
         toCreateMany.push({
-          // eslint-disable-next-line
           tokens,
           index: searchResult.index,
           layer: searchResult.layer,
@@ -405,7 +400,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           dfaValues: searchResult.dfaValues,
           dfaTargetIndex: searchResult.dfaTargetIndex,
           dfaMaxValue: searchResult.dfaMaxValue,
-          // eslint-disable-next-line
+
           creatorId: userIdForSearch,
         });
       }
@@ -433,16 +428,15 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     if (DEMO_MODE) {
       console.log('skipping saved search creation in demo mode');
     } else {
-      // eslint-disable-next-line
       const savedSearch = await prisma.savedSearch.create({
         data: {
           modelId,
           query: body.text,
           selectedLayers,
           sortByIndexes: sortIndexes,
-          // eslint-disable-next-line
+
           tokens,
-          // eslint-disable-next-line
+
           userId: userIdForSearch,
           sourceSet: sourceSetName,
           ignoreBos: body.ignoreBos,

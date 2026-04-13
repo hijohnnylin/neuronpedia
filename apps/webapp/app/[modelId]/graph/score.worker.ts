@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-globals */
 // Lightweight worker to compute subgraph scores off the main thread.
 // Duplicates the core scoring logic to avoid bringing in DOM/d3 dependencies.
 
@@ -107,9 +106,7 @@ function computeGraphScoresFromGraphData(
   graphData: WorkerGraph,
   pinnedIds: string[] = [],
 ): { replacementScore: number; completenessScore: number } {
-  const hasLorsa = graphData.nodes.some(
-    (n) => n.feature_type === 'lorsa' || n.feature_type === 'lorsa error',
-  );
+  const hasLorsa = graphData.nodes.some((n) => n.feature_type === 'lorsa' || n.feature_type === 'lorsa error');
   if (hasLorsa) {
     console.warn(
       'Score computation skipped: graph contains lorsa nodes which are not yet supported by the scoring algorithm.',
@@ -178,9 +175,7 @@ function computeGraphScoresFromGraphData(
 
   // Align logit weights with sortedNodes order so that the last indices match the correct logits
   const logitWeights = new Array(adjacencyMatrix.length).fill(0);
-  const sortedLogitProbs = sortedNodes
-    .filter((n) => n.feature_type === 'logit')
-    .map((n) => n.token_prob);
+  const sortedLogitProbs = sortedNodes.filter((n) => n.feature_type === 'logit').map((n) => n.token_prob);
   for (let i = 0; i < nLogits; i += 1) {
     logitWeights[adjacencyMatrix.length - nLogits + i] = sortedLogitProbs[i];
   }
@@ -221,7 +216,7 @@ self.onmessage = (ev: MessageEvent) => {
     const { data } = ev;
 
     // Validate that we have the expected message structure
-    // eslint-disable-next-line no-prototype-builtins
+
     if (typeof data !== 'object' || !data.hasOwnProperty('graph') || !data.hasOwnProperty('requestId')) {
       console.error('Worker: Invalid message format', data);
       // @ts-ignore

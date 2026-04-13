@@ -115,7 +115,6 @@ export const getSource = async (modelId: string, sourceId: string, user: Authent
 };
 
 export const createSource = async (input: Source, user: AuthenticatedUser) => {
-  // eslint-disable-next-line no-param-reassign
   input.creatorId = user.id;
   // First check if source exists
   const existingSource = await prisma.source.findUnique({
@@ -192,7 +191,6 @@ export const upsertSourceForVector = async (
 };
 
 export const createSourceSetWithSources = async (input: SourceSet, layers: number, user: AuthenticatedUser) => {
-  // eslint-disable-next-line no-param-reassign
   input.creatorId = user.id;
 
   const existingSourceSet = await prisma.sourceSet.findUnique({
@@ -235,7 +233,6 @@ export const createSourceSetWithSources = async (input: SourceSet, layers: numbe
 };
 
 export const createSourceRelease = async (input: SourceRelease, user: AuthenticatedUser) => {
-  // eslint-disable-next-line no-param-reassign
   input.creatorId = user.id;
   // First check if source release exists
   const existingSourceRelease = await prisma.sourceRelease.findUnique({

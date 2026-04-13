@@ -26,7 +26,6 @@ export default function SteerChatMessage({
               key={i}
               ref={(el) => {
                 if (messageRefs?.current) {
-                  // eslint-disable-next-line no-param-reassign
                   messageRefs.current[i] = el;
                 }
               }}
@@ -46,7 +45,6 @@ export default function SteerChatMessage({
               key={i}
               ref={(el) => {
                 if (messageRefs?.current) {
-                  // eslint-disable-next-line no-param-reassign
                   messageRefs.current[i] = el;
                 }
               }}

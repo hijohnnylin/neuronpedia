@@ -2,7 +2,7 @@
 
 import ModelSelector from '@/components/feature-selector/model-selector';
 import SourceSelector from '@/components/feature-selector/source-selector';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from '@bprogress/next';
 import React from 'react';
 
 export default function JumpToSAE({

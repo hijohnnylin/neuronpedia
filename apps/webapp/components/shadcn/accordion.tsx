@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable react/jsx-props-no-spreading */
-
 import { cn } from '@/lib/utils/ui';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { ChevronDownIcon } from '@radix-ui/react-icons';

@@ -1,5 +1,3 @@
-/* eslint-disable react/jsx-props-no-spreading */
-// eslint-disable-next-line import/no-extraneous-dependencies
 import colors from 'tailwindcss/colors';
 
 interface ISVGProps extends React.SVGProps<SVGSVGElement> {

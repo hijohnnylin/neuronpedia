@@ -287,7 +287,6 @@ export default function SteerModal() {
     for (let i = 0; i < selectedGraph.metadata.prompt_tokens.length; i += 1) {
       // don't check BOS
       if (BOS_TOKENS.includes(selectedGraph.metadata.prompt_tokens[i])) {
-        // eslint-disable-next-line no-continue
         continue;
       }
       const feature = findSteeredPositionByPosition(nodeSteerIdentifier, i);
@@ -323,7 +322,6 @@ export default function SteerModal() {
       for (let i = 0; i < selectedGraph.metadata.prompt_tokens.length; i += 1) {
         // don't steer BOS
         if (BOS_TOKENS.includes(selectedGraph.metadata.prompt_tokens[i])) {
-          // eslint-disable-next-line no-continue
           continue;
         }
         newSteeredPositionFeatures.push({
@@ -871,7 +869,6 @@ export default function SteerModal() {
 
                             // remove all activations except the top 3
                             if (n.activations) {
-                              // eslint-disable-next-line
                               n.activations = n.activations.slice(0, 3);
                             }
                             setQueuedAddFeature({

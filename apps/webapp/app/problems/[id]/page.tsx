@@ -1,6 +1,6 @@
 import { authOptions } from '@/app/api/auth/[...nextauth]/authOptions';
-import { getProblemNodes } from '@/lib/db/problem';
 import { prisma } from '@/lib/db';
+import { getProblemNodes } from '@/lib/db/problem';
 import { Metadata } from 'next';
 import { getServerSession } from 'next-auth';
 import ProblemsGraph from '../problems-graph';
@@ -25,5 +25,11 @@ export default async function ProblemNodePage({ params }: { params: { id: string
     canEdit = dbUser?.admin === true || dbUser?.isProblemEditor === true;
   }
 
-  return <ProblemsGraph initialNodes={JSON.parse(JSON.stringify(initialNodes))} canEdit={canEdit} initialSelectedId={Number(params.id)} />;
+  return (
+    <ProblemsGraph
+      initialNodes={JSON.parse(JSON.stringify(initialNodes))}
+      canEdit={canEdit}
+      initialSelectedId={Number(params.id)}
+    />
+  );
 }

@@ -1,4 +1,3 @@
-/* eslint-disable no-console -- disabling this to match existing pattern */
 // this is a radically simplified version of the steerer component
 // it's for the gemma-scope demo and the explorables demo
 // it has a lot of duplicate code with the steer component
@@ -47,7 +46,6 @@ export default function SteererSimple({
 }) {
   const [isInitialPageLoad, setInitialPageLoad] = useState(true); // track this
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [modelId, setModelId] = useState(initialModelId);
   const [featurePresets, setFeaturePresets] = useState<FeaturePreset[]>([]);
 

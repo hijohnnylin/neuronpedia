@@ -1,8 +1,8 @@
 'use client';
 
 import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
+import { useRouter } from '@bprogress/next';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useRouter } from 'next-nprogress-bar';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useGlobalContext } from '../provider/global-provider';

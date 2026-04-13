@@ -157,7 +157,6 @@ export default function SteerCompletion({
           .pipeThrough(new EventSourceParserStream())
           .getReader();
 
-        // eslint-disable-next-line
         while (true) {
           // eslint-disable-next-line
           const { done, value } = await reader.read();

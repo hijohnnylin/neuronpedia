@@ -112,16 +112,14 @@ export function Link(props: LinkProps) {
   const { activeKey, scrollAlign, ...rest } = props;
   const currentKey = useContext(context);
   return (
-    // eslint-disable-next-line
     <a
       data-active={currentKey === activeKey}
-      // eslint-disable-next-line
       {...rest}
       onClick={(e) => {
         e.preventDefault();
-        // eslint-disable-next-line
+
         window.history.pushState(null, '', props.href);
-        // eslint-disable-next-line
+
         const id = props.href!.slice(1);
         const target = document.getElementById(id);
         target?.scrollIntoView({ behavior: 'smooth', block: scrollAlign });
@@ -153,7 +151,7 @@ export function TOC(props: TOCProps) {
 
   function render(item: ItemType) {
     let renderFn: RenderProps | null = null;
-    // eslint-disable-next-line
+
     switch (item.type) {
       case 'list':
         renderFn = renderList;
@@ -170,7 +168,6 @@ export function TOC(props: TOCProps) {
     }
     if (renderFn) {
       return (
-        // eslint-disable-next-line
         <TOCImplRender key={item.key} activeKey={item.key} render={renderFn}>
           {item.children.map((child) => render(child as ItemType))}
         </TOCImplRender>

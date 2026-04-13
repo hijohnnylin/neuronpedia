@@ -104,7 +104,8 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     }
     console.log('putRequests count | user ID', putRequests.length, userId);
 
-    const key = `${GRAPH_S3_USER_GRAPHS_DIR}/${userId}/${body.filename}`;
+    const filenameWithoutExt = body.filename.replace(/\.json$/, '');
+    const key = `${GRAPH_S3_USER_GRAPHS_DIR}/${userId}/${filenameWithoutExt}-${Date.now()}.json`;
 
     // Initialize S3 client
     const s3Client = new S3Client({

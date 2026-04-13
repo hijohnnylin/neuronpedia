@@ -242,7 +242,7 @@ function addVirtualDiff(data: CLTGraph, logitDiff: string | null) {
   const nodes = data.nodes.filter((d) => !d.isJsVirtual);
   const links = data.links.filter((d) => !d.isJsVirtual);
   // @ts-ignore
-  // eslint-disable-next-line
+
   // Extract logitToken from clerp - handles both formats:
   // - Double quotes: Output " floor" (p=0.111) -> " floor"
   // - Single quotes: output: 'Austin' (p=1.000) -> Austin
@@ -251,14 +251,12 @@ function addVirtualDiff(data: CLTGraph, logitDiff: string | null) {
     // Try double quote format first
     const doubleQuoteMatch = d.clerp.split(`"`)[1]?.split(`" k(p=`)[0];
     if (doubleQuoteMatch) {
-      // eslint-disable-next-line no-param-reassign
       d.logitToken = doubleQuoteMatch;
       return;
     }
     // Try single quote format: output: 'token' (p=...)
     const singleQuoteMatch = d.clerp.match(/['']([^'']+)['']/);
     if (singleQuoteMatch) {
-      // eslint-disable-next-line
       d.logitToken = singleQuoteMatch[1];
     }
   });
@@ -282,7 +280,7 @@ function addVirtualDiff(data: CLTGraph, logitDiff: string | null) {
   nodes.push(diffNode);
 
   const targetLinks = links.filter((d) => d.target === logitANode.node_id || d.target === logitBNode.node_id);
-  // eslint-disable-next-line
+
   d3.nestBy(targetLinks, (d) => d.source).map((sourceLinks) => {
     const linkA = sourceLinks.find((d) => d.target === logitANode.node_id);
     const linkB = sourceLinks.find((d) => d.target === logitBNode.node_id);
@@ -308,7 +306,6 @@ function layerLocationLabel(layer: string, location: number) {
   return `L${layer}`;
 }
 
-/* eslint-disable no-param-reassign */
 export function formatCLTGraphData(data: CLTGraph, logitDiff: string | null): CLTGraph {
   const { metadata } = data;
   let { nodes, links } = addVirtualDiff(data, logitDiff);
@@ -396,7 +393,7 @@ export function formatCLTGraphData(data: CLTGraph, logitDiff: string | null): CL
   nodes.forEach((d) => {
     d.inputAbsSum = d3.sum(d.sourceLinks || [], (e) => Math.abs(e.weight));
     // @ts-ignore
-    // eslint-disable-next-line
+
     d.sourceLinks?.forEach((e) => (e.pctInput = e.weight / d.inputAbsSum));
     d.inputError = d3.sum(
       // @ts-ignore
@@ -417,7 +414,7 @@ export function formatCLTGraphData(data: CLTGraph, logitDiff: string | null): CL
       d.layerLocationLabel = layerLocationLabel(d.layer, d.probe_location_idx);
 
       // @ts-ignore
-      // eslint-disable-next-line
+
       if (!isHideLayer(metadata.scan)) d.streamIdx = isFinite(d.layer) ? +d.layer : 0;
     });
   });

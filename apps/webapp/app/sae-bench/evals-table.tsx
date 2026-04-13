@@ -3,10 +3,6 @@
 // Obviously, need to be cleaned up.
 // Mostly one-off code for SAE Bench / SAE Evals
 
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable guard-for-in */
-/* eslint-disable react/no-unstable-nested-components */
-
 import CustomTooltip from '@/components/custom-tooltip';
 import { Button } from '@/components/shadcn/button';
 import { getLayerNumFromSource } from '@/lib/utils/source';
@@ -23,7 +19,7 @@ import { DataTable, DataTableFilterMeta, DataTableValueArray } from 'primereact/
 import { MultiSelect, MultiSelectChangeEvent } from 'primereact/multiselect';
 import 'primereact/resources/themes/nano/theme.css';
 import { useEffect, useRef, useState } from 'react';
-// eslint-disable-next-line import/no-cycle
+
 import { Absorption } from '@/types/eval_output_schema_absorption_first_letter';
 import { AutoInterp } from '@/types/eval_output_schema_autointerp';
 import { Core } from '@/types/eval_output_schema_core';
@@ -32,9 +28,9 @@ import { SCR } from '@/types/eval_output_schema_scr';
 import { SparseProbing } from '@/types/eval_output_schema_sparse_probing';
 import { TPP } from '@/types/eval_output_schema_tpp';
 import { Unlearning } from '@/types/eval_output_schema_unlearning';
-// eslint-disable-next-line import/no-cycle
+
 import EvalsPlot, { EvalsPlotMethods, getSaeBenchDisplayString, specialMetricColumnToDictKey } from './evals-plot';
-// eslint-disable-next-line import/no-cycle
+
 import { EVALS_TABLE_PRESETS } from './evals-table-presets';
 
 const DEFAULT_SORT_ORDER = -1;
@@ -243,9 +239,7 @@ export default function EvalsTable({
         return 0;
       }
       if (
-        // eslint-disable-next-line no-prototype-builtins
         a.hasOwnProperty(sortByMetricColName) &&
-        // eslint-disable-next-line no-prototype-builtins
         b.hasOwnProperty(sortByMetricColName) &&
         typeof a[sortByMetricColName] === 'number' &&
         typeof b[sortByMetricColName] === 'number'
@@ -558,7 +552,6 @@ export default function EvalsTable({
   const formatCell = (data: any, field: string) => {
     let metric = data[field];
 
-    // eslint-disable-next-line no-restricted-globals
     if (typeof metric === 'number' || (typeof metric === 'string' && !isNaN(parseFloat(metric)))) {
       const numericValue = typeof metric === 'number' ? metric : parseFloat(metric);
       if (Number.isInteger(numericValue)) {
@@ -1065,7 +1058,6 @@ export default function EvalsTable({
             metricColumns={metricColumns}
             setDefaultMetricColumnNamesToDisplay={setMetricColumnNamesToDisplay}
             setGroupByParent={setGroupBy}
-            // eslint-disable-next-line react/jsx-no-bind
             rerenderFilteredRows={rerenderFilteredRows}
             anonymized={anonymized}
           />

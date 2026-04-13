@@ -2,9 +2,9 @@
 
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { IS_LOCALHOST } from '@/lib/env';
+import { useRouter } from '@bprogress/next';
 import * as Select from '@radix-ui/react-select';
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
-import { useRouter } from 'next-nprogress-bar';
 import Link from 'next/link';
 
 export default function ModelsDropdown({ isInBreadcrumb = false }: { isInBreadcrumb?: boolean }) {

@@ -1,5 +1,5 @@
 import { type Edge, type Node } from '@xyflow/react';
-// eslint-disable-next-line import/no-extraneous-dependencies
+
 import ELK, { type ElkNode } from 'elkjs/lib/elk.bundled';
 import { DRAFT_NODE_HEIGHT_POPULATED, DRAFT_NODE_HEIGHT_URL } from './draft-node';
 import { DEFAULT_NODE_WIDTH, ROOT_NODE_WIDTH } from './problem-node';

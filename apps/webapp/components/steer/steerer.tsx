@@ -185,7 +185,7 @@ export default function Steerer({
 
   function findExplanationFromPresets(explanationModelId: string, layer: string, index: number) {
     // this exists because we prefer the explanations from the presets, rather than the actual top explanation from the feature
-    // eslint-disable-next-line no-restricted-syntax
+
     for (const preset of featurePresets) {
       const feature = preset.features.find(
         (f) => f.modelId === explanationModelId && f.layer === layer && f.index === index,
@@ -244,7 +244,7 @@ export default function Steerer({
           setTypedInText(resp.inputText || '');
         } else {
           // if chat template is null, we need to convert it (it's an older form of steering)
-          // eslint-disable-next-line no-lonely-if
+
           if (resp.DEFAULT?.chatTemplate) {
             setDefaultChatMessages(resp.DEFAULT?.chatTemplate || []);
             setSteeredChatMessages(resp.STEERED?.chatTemplate || []);
@@ -384,7 +384,6 @@ export default function Steerer({
   }
 
   function currentlySelectedPreset(): FeaturePreset | null {
-    // eslint-disable-next-line no-restricted-syntax
     for (const preset of featurePresets) {
       if (presetIsSelected(preset)) {
         return preset;
@@ -618,15 +617,12 @@ export default function Steerer({
             <SteerPresetSelector
               loadingPresets={loadingPresets}
               featurePresets={featurePresets}
-              // eslint-disable-next-line react/jsx-no-bind
               presetIsSelected={presetIsSelected}
               selectedFeatures={selectedFeatures}
               setSelectedFeatures={setSelectedFeatures}
               setSteerMethod={setSteerMethod}
               setShowSettingsOnMobile={setShowSettingsOnMobile}
-              // eslint-disable-next-line react/jsx-no-bind
               deleteUserVector={deleteUserVector}
-              // eslint-disable-next-line react/jsx-no-bind
               loadSavedSteerOutput={loadSavedSteerOutput}
             />
 
@@ -674,12 +670,9 @@ export default function Steerer({
                 <SteerSelectedFeature
                   key={feature.modelId + feature.layer + feature.index}
                   feature={feature}
-                  // eslint-disable-next-line react/jsx-no-bind
                   setFeatureStrength={setFeatureStrength}
                   selectedFeatures={selectedFeatures}
-                  // eslint-disable-next-line react/jsx-no-bind
                   setSelectedFeatures={setSelectedFeatures}
-                  // eslint-disable-next-line react/jsx-no-bind
                   findExplanationFromPresets={findExplanationFromPresets}
                 />
               ))}
@@ -742,11 +735,9 @@ export default function Steerer({
           selectedFeatures={selectedFeatures}
           typedInText={typedInText}
           setTypedInText={setTypedInText}
-          // eslint-disable-next-line react/jsx-no-bind
           reset={reset}
           copying={copying}
           setCopying={setCopying}
-          // eslint-disable-next-line react/jsx-no-bind
           setUrl={setUrl}
           temperature={temperature}
           steerTokens={steerTokens}
@@ -772,11 +763,9 @@ export default function Steerer({
           selectedFeatures={selectedFeatures}
           typedInText={typedInText}
           setTypedInText={setTypedInText}
-          // eslint-disable-next-line react/jsx-no-bind
           reset={reset}
           copying={copying}
           setCopying={setCopying}
-          // eslint-disable-next-line react/jsx-no-bind
           setUrl={setUrl}
           temperature={temperature}
           steerTokens={steerTokens}

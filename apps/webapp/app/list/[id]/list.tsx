@@ -10,12 +10,12 @@ import { NEXT_PUBLIC_URL } from '@/lib/env';
 import { useScreenSize } from '@/lib/hooks/use-screen-size';
 import { MAX_LIST_FEATURES_FOR_TEST_TEXT, MAX_LIST_TEST_TEXT_LENGTH_CHARS } from '@/lib/utils/list';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
+import { useRouter } from '@bprogress/next';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import copy from 'copy-to-clipboard';
 import { Field, Form, Formik } from 'formik';
 import { Copy, LayoutDashboard, List as ListIcon, Pencil, WrapText, X } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next-nprogress-bar';
 import { useSearchParams } from 'next/navigation';
 import { ListWithPartialRelations, NeuronWithPartialRelations } from 'prisma/generated/zod';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -82,7 +82,6 @@ export default function List({ listId }: { listId: string }) {
   }, [selectedFeatures]);
 
   function findSelectedFeatureDescription(feature: NeuronIdentifier) {
-    // eslint-disable-next-line no-restricted-syntax
     for (const [key, value] of selectedFeatures) {
       if (key.equals(feature)) {
         if (value.description) {
@@ -186,7 +185,6 @@ export default function List({ listId }: { listId: string }) {
                   return;
                 }
                 if (values.defaultTestText.trim().length === 0) {
-                  // eslint-disable-next-line no-param-reassign
                   values.defaultTestText = null;
                 }
               }

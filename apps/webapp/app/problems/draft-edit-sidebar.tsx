@@ -54,7 +54,6 @@ export function DraftEditSidebar({
       <div className="mt-4 flex flex-col gap-3">
         {/* Type */}
         <div>
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label className="mb-1 block text-xs font-medium text-slate-600">Types *</label>
           <div className="flex flex-wrap gap-1">
             {NODE_TYPES_LIST.map((t) => (
@@ -80,7 +79,6 @@ export function DraftEditSidebar({
 
         {/* Title */}
         <div>
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label className="mb-1 block text-xs font-medium text-slate-600">Title *</label>
           <input
             type="text"
@@ -93,7 +91,6 @@ export function DraftEditSidebar({
 
         {/* Description */}
         <div>
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label className="mb-1 block text-xs font-medium text-slate-600">Description</label>
           <textarea
             value={draftNode.description || ''}
@@ -106,7 +103,6 @@ export function DraftEditSidebar({
 
         {/* URL */}
         <div>
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label className="mb-1 block text-xs font-medium text-slate-600">URL</label>
           <input
             type="url"
@@ -119,7 +115,6 @@ export function DraftEditSidebar({
 
         {/* Additional URLs */}
         <div>
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label className="mb-1 block text-xs font-medium text-slate-600">Additional URLs</label>
           <div className="flex flex-col gap-1">
             {(draftNode.additionalUrls || []).map((url, i) => (
@@ -129,9 +124,7 @@ export function DraftEditSidebar({
                 </span>
                 <button
                   type="button"
-                  onClick={() =>
-                    updateDraft({ additionalUrls: draftNode.additionalUrls.filter((_, j) => j !== i) })
-                  }
+                  onClick={() => updateDraft({ additionalUrls: draftNode.additionalUrls.filter((_, j) => j !== i) })}
                   className="shrink-0 text-xs text-slate-400 hover:text-red-500"
                 >
                   ✕
@@ -174,7 +167,6 @@ export function DraftEditSidebar({
 
         {/* Author */}
         <div>
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label className="mb-1 block text-xs font-medium text-slate-600">Author</label>
           <input
             type="text"
@@ -187,7 +179,6 @@ export function DraftEditSidebar({
 
         {/* Parent */}
         <div>
-          {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
           <label className="mb-1 block text-xs font-medium text-slate-600">Parent node</label>
           <select
             value={draftNode.parentId ? String(draftNode.parentId) : ''}
@@ -227,9 +218,7 @@ export function DraftEditSidebar({
             onClick={handleSubmit}
             disabled={submitting}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              submitting
-                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                : 'bg-sky-700 text-white hover:bg-sky-800'
+              submitting ? 'cursor-not-allowed bg-slate-300 text-slate-500' : 'bg-sky-700 text-white hover:bg-sky-800'
             }`}
           >
             {submitting ? 'Saving...' : 'Create Node'}

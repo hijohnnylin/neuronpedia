@@ -17,13 +17,13 @@ import {
   getLayerNumAsStringFromSource,
 } from '@/lib/utils/source';
 import { SourceSetWithPartialRelations } from '@/prisma/generated/zod';
+import { useRouter } from '@bprogress/next';
 import { Visibility } from '@prisma/client';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { Form, Formik, FormikProps } from 'formik';
 import { Check, ChevronDownIcon, HelpCircle, Search } from 'lucide-react';
-import { useRouter } from 'next-nprogress-bar';
 import { useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 import ExamplesButtons from './examples-buttons';
@@ -328,12 +328,7 @@ export default function InferenceSearcher({
 
       {exploreState === InferenceActivationAllState.DEFAULT && (
         <div className="mt-4 flex w-full max-w-screen-lg flex-col px-0 sm:mt-4">
-          {showExamples && (
-            <ExamplesButtons
-              // eslint-disable-next-line
-              makeUrl={makeUrl}
-            />
-          )}
+          {showExamples && <ExamplesButtons makeUrl={makeUrl} />}
         </div>
       )}
       {exploreState === InferenceActivationAllState.RUNNING && (

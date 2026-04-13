@@ -85,7 +85,6 @@ export default function NewVectorForm({ defaultModel, callback }: { defaultModel
       }}
       onSubmit={async (values, { setSubmitting }) => {
         try {
-          // eslint-disable-next-line
           values.modelId = model?.id || '';
           const vectorArray = JSON.parse(values.vector as string);
 

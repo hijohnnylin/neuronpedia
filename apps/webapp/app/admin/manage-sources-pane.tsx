@@ -6,7 +6,7 @@ import { Button } from '@/components/shadcn/button';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { getS3ModelsToSources } from '@/lib/utils/s3';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
-import { useRouter } from 'next-nprogress-bar';
+import { useRouter } from '@bprogress/next';
 import { Fragment, useEffect, useState } from 'react';
 import DownloadAllButton from './download-all-button';
 import DownloadButton from './download-button';

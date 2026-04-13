@@ -39,7 +39,6 @@ export default function JumpToPane({
         showModel={showModel}
         modelId={defaultModelId}
         layer={
-          // eslint-disable-next-line no-nested-ternary
           release
             ? release.defaultSourceId || getFirstSourceForRelease(release, Visibility.PUBLIC, false, false)?.id
             : defaultSourceId || defaultModelId in globalModels

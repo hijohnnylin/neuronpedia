@@ -1,9 +1,4 @@
 /* eslint-disable no-var */
-/* eslint-disable vars-on-top */
-/* eslint-disable no-param-reassign */
-/* eslint-disable block-scoped-var */
-/* eslint-disable @typescript-eslint/no-shadow */
-/* eslint-disable @typescript-eslint/no-redeclare */
 
 import { getTransformerLensModelIdIfExists } from '@/lib/db/model';
 import { getNeuronOnly } from '@/lib/db/neuron';
@@ -204,7 +199,6 @@ function createRunpodLoadBalancingStreamingResponse(
     async start(controller) {
       let lastError: Error | null = null;
 
-      // eslint-disable-next-line no-plusplus
       for (let attempt = 0; attempt < RUNPOD_LB_MAX_RETRIES; attempt += 1) {
         try {
           // eslint-disable-next-line no-await-in-loop
@@ -221,14 +215,14 @@ function createRunpodLoadBalancingStreamingResponse(
           if (response.status === 400) {
             // eslint-disable-next-line no-await-in-loop
             const errorText = await response.text();
-            // eslint-disable-next-line no-console
+
             console.warn(
               `RunPod LB attempt ${attempt + 1}/${RUNPOD_LB_MAX_RETRIES}: No workers available, retrying...`,
               errorText,
             );
             lastError = new Error(`No workers available: ${errorText}`);
             if (attempt < RUNPOD_LB_MAX_RETRIES - 1) {
-              // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+              // eslint-disable-next-line no-await-in-loop
               await new Promise<void>((resolve) => {
                 setTimeout(resolve, RUNPOD_LB_RETRY_DELAY_MS * (attempt + 1));
               });
@@ -245,7 +239,6 @@ function createRunpodLoadBalancingStreamingResponse(
             const decoder = new TextDecoder();
             let buffer = ''; // Buffer for incomplete messages
 
-            // eslint-disable-next-line no-constant-condition
             while (true) {
               // eslint-disable-next-line no-await-in-loop
               const { done, value } = await reader.read();
@@ -287,12 +280,11 @@ function createRunpodLoadBalancingStreamingResponse(
             return; // Success, exit retry loop
           }
         } catch (error) {
-          // eslint-disable-next-line no-console
           console.error(`RunPod LB attempt ${attempt + 1}/${RUNPOD_LB_MAX_RETRIES} failed:`, error);
           lastError = error instanceof Error ? error : new Error(String(error));
 
           if (attempt < RUNPOD_LB_MAX_RETRIES - 1) {
-            // eslint-disable-next-line no-await-in-loop, no-promise-executor-return
+            // eslint-disable-next-line no-await-in-loop
             await new Promise<void>((resolve) => {
               setTimeout(resolve, RUNPOD_LB_RETRY_DELAY_MS * (attempt + 1));
             });
@@ -301,7 +293,7 @@ function createRunpodLoadBalancingStreamingResponse(
       }
 
       // All retries exhausted
-      // eslint-disable-next-line no-console
+
       console.error('RunPod LB streaming failed after all retries:', lastError);
       controller.error(lastError);
     },
@@ -319,7 +311,7 @@ export const getCosSimForFeature = async (
 
   if (result?.hasVector) {
     // if it's a vector, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-    // eslint-disable-next-line
+
     var [serverHost, _] = await getTwoRandomServerHostsForModel(targetModelId);
   } else {
     // if it's not a vector, then we need to use the source set's host
@@ -362,7 +354,7 @@ export const getActivationForFeature = async (
 
   if (result?.hasVector) {
     // if it's a vector, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-    // eslint-disable-next-line
+
     var [serverHost, _] = await getTwoRandomServerHostsForModel(feature.modelId);
   } else {
     // if it's not a vector, then we need to use the source set's host

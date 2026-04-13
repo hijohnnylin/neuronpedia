@@ -1,11 +1,6 @@
 // file needs a lot of cleanup
 
 /* eslint-disable no-var */
-/* eslint-disable vars-on-top */
-/* eslint-disable no-param-reassign */
-/* eslint-disable block-scoped-var */
-/* eslint-disable @typescript-eslint/no-shadow */
-/* eslint-disable @typescript-eslint/no-redeclare */
 
 export const BOS_TOKENS = ['<bos>', '<|endoftext|>', '<|begin_of_text|>'];
 

@@ -1,6 +1,3 @@
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable no-await-in-loop */
-
 import { importJsonlString } from '@/lib/db/import';
 import { IS_LOCALHOST } from '@/lib/env';
 import { downloadAndDecompressFile } from '@/lib/utils/s3';

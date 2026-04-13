@@ -105,7 +105,6 @@ export default function Page() {
   const shuffled = [...tooltips].sort(() => Math.random() - 0.5);
   const withCommas = shuffled.map((tooltip, index) => (
     <Fragment key={tooltip.key}>
-      {/* eslint-disable-next-line no-irregular-whitespace */}
       {index > 0 && <span className="text-slate-500">, </span>}
       {tooltip}
     </Fragment>
@@ -135,7 +134,7 @@ export default function Page() {
           <span className="text-[10px] italic text-slate-400">*Core Contributor</span>
         </div>
       </CustomTooltip>
-      {/* eslint-disable-next-line no-irregular-whitespace */}
+      {}
       <span className="text-slate-500">, </span>
     </Fragment>,
   );

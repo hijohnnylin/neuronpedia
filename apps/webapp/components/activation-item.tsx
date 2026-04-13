@@ -119,7 +119,6 @@ export default function ActivationItem({
       const k = activation.zKIndices?.[i];
       const v = activation.zValues?.[i];
       if (q === undefined || k === undefined || v === undefined) {
-        // eslint-disable-next-line no-continue
         continue;
       }
       // In Neuronpedia exports, zQ acts like source and zK acts like target.
@@ -264,7 +263,6 @@ export default function ActivationItem({
           </div>
         </div>
       )}
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div
         // if it's the smallest range and we're split in dfa mode, then force it to be stacked
         className={`flex-1 ${

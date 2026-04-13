@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  replaceSteerModelIdIfNeeded,
-  convertOldSteerOutputToChatMessages,
-} from '../steer';
+import { convertOldSteerOutputToChatMessages, replaceSteerModelIdIfNeeded } from '../steer';
 
 describe('replaceSteerModelIdIfNeeded', () => {
   test('returns modelId unchanged when not in allow list', () => {

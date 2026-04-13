@@ -65,7 +65,6 @@ export default function UmapSelectedItem({
       className={`group mb-3 flex w-[300px] min-w-[300px] max-w-[300px] flex-col items-start rounded border border-slate-200 bg-slate-100 px-0 pb-2 hover:border-sky-600 ${
         isHovered && 'border-sky-600'
       } `}
-      // eslint-disable-next-line
       onMouseOver={() => {
         if (neuron && neuron.explanations && neuron.explanations.length > 0) {
           // TODO: hack

@@ -61,36 +61,6 @@ export default function UploadGraphModal() {
 
       const { url, putRequestId } = await response.json();
 
-      // Extract the clean S3 URL without query parameters for GET check
-      const cleanedURL = url.split('?')[0];
-
-      // Check if file already exists in S3
-      try {
-        const checkResponse = await fetch(cleanedURL, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        // If file exists (200 OK), ask for confirmation before overwriting
-        if (checkResponse.ok) {
-          const shouldOverwrite = window.confirm(
-            'WARNING: You already have a graph with this same filename.\n\nDo you want to overwrite it?',
-          );
-
-          // If user cancels overwrite, abort the upload
-          if (!shouldOverwrite) {
-            setIsUploading(false);
-            return;
-          }
-        }
-      } catch (error) {
-        // If error occurs during check, it likely means file doesn't exist
-        // Continue with upload in this case
-        console.log("File doesn't exist so we can continue with upload:", error);
-      }
-
       // Upload file to S3 with progress tracking
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', url, true);
@@ -131,7 +101,7 @@ export default function UploadGraphModal() {
       setUploadedFilename(fileToUpload.name);
 
       // Download and parse the file immediately
-      // eslint-disable-next-line
+
       await downloadParseAndPersistGraph(url, putRequestId);
     } catch (error: unknown) {
       console.error('Upload error:', error);

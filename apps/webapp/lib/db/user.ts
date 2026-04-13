@@ -1,7 +1,6 @@
-// eslint-disable-next-line import/no-cycle
 import { authOptions } from '@/app/api/auth/[...nextauth]/authOptions';
 import { prisma } from '@/lib/db';
-// eslint-disable-next-line import/no-cycle
+
 import { RequestOptionalUser } from '@/lib/with-user';
 import { UserSecretType } from '@prisma/client';
 import { getServerSession, Session } from 'next-auth';
@@ -49,7 +48,6 @@ export const makeAuthedUserFromSessionOrReturnNull = async (session: Session | n
     return null;
   }
 
-  // eslint-disable-next-line no-param-reassign
   session = session || (await getServerSession(authOptions));
   if (session) {
     return { id: session.user.id, name: session.user.name };
