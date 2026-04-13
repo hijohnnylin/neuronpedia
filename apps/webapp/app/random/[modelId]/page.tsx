@@ -1,8 +1,10 @@
-'use client';
+'use client';;
+import { use } from "react";
 
 import { useRouter } from '@bprogress/next';
 
-export default function Random({ params }: { params: { modelId: string } }) {
+export default function Random(props: { params: Promise<{ modelId: string }> }) {
+  const params = use(props.params);
   const router = useRouter();
 
   const randomLayer = Math.floor(Math.random() * 48);

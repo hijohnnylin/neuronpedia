@@ -2,7 +2,8 @@ import { getExplanationScoreType } from '@/lib/db/explanation-type';
 import { notFound } from 'next/navigation';
 import RecentScores from './recent-scores';
 
-export default async function Page({ params }: { params: { name: string } }) {
+export default async function Page(props: { params: Promise<{ name: string }> }) {
+  const params = await props.params;
   const explanationScoreType = await getExplanationScoreType(params.name);
 
   if (!explanationScoreType) {

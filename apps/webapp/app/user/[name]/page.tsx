@@ -7,7 +7,8 @@ import { getUserByNameForPublicProfile, makeAuthedUserFromSessionOrReturnNull } 
 import { Bot } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
-export default async function Page({ params }: { params: { name: string } }) {
+export default async function Page(props: { params: Promise<{ name: string }> }) {
+  const params = await props.params;
   const authedUser = await makeAuthedUserFromSessionOrReturnNull();
 
   let bookmarks: any[] = [];

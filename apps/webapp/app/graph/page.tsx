@@ -3,13 +3,14 @@ import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ANTHROPIC_MODEL_TO_DISPLAY_NAME, DEFAULT_GRAPH_MODEL_ID } from '../[modelId]/graph/utils';
 
-export async function generateMetadata({
-  params,
-  searchParams,
-}: {
-  params: { modelId: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ modelId: string }>;
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  }
+): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const { modelId } = params;
   const slug = searchParams.slug as string | undefined;
 

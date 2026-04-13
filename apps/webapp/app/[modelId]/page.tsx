@@ -14,21 +14,22 @@ import GemmaScopeHome from './gemmascope/home';
 import PageModel from './page-model';
 import PageRelease from './page-release';
 
-export async function generateMetadata({
-  params,
-  searchParams,
-}: {
-  params: { modelId: string };
-  searchParams: {
-    q?: string;
-    selectedLayers?: string;
-    filter?: string;
-    sortIndex?: string;
-    sortIndexes?: string;
-    sourceSet?: string;
-    ignoreBos?: string;
-  };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ modelId: string }>;
+    searchParams: Promise<{
+      q?: string;
+      selectedLayers?: string;
+      filter?: string;
+      sortIndex?: string;
+      sortIndexes?: string;
+      sourceSet?: string;
+      ignoreBos?: string;
+    }>;
+  }
+): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   if (params.modelId === 'gemma-scope') {
     const title = 'Gemma Scope';
     const description = 'Exploring the Inner Workings of Gemma 2 2B';
@@ -83,21 +84,22 @@ export async function generateMetadata({
   };
 }
 
-export default async function Page({
-  params,
-  searchParams,
-}: {
-  params: { modelId: string };
-  searchParams: {
-    q?: string;
-    selectedLayers?: string;
-    filter?: string;
-    sortIndex?: string;
-    sortIndexes?: string;
-    sourceSet?: string;
-    ignoreBos?: string;
-  };
-}) {
+export default async function Page(
+  props: {
+    params: Promise<{ modelId: string }>;
+    searchParams: Promise<{
+      q?: string;
+      selectedLayers?: string;
+      filter?: string;
+      sortIndex?: string;
+      sortIndexes?: string;
+      sourceSet?: string;
+      ignoreBos?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const { modelId } = params;
   const model = await getModelByIdWithSourceSets(modelId, await makeAuthedUserFromSessionOrReturnNull());
 

@@ -16,7 +16,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function Page({ searchParams }: { searchParams: { embed: string } }) {
+export default async function Page(props: { searchParams: Promise<{ embed: string }> }) {
+  const searchParams = await props.searchParams;
   // only get the fields that we need - this can get huge
   let evalTypes: {
     id: number;

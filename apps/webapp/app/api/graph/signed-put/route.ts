@@ -79,7 +79,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
 
     const userId = user.id;
 
-    const headersList = headers();
+    const headersList = await headers();
     const forwardedFor = headersList.get('x-forwarded-for');
     const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : null;
 

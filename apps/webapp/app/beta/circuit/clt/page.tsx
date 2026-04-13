@@ -4,22 +4,23 @@ import { Button } from '@/components/shadcn/button';
 import { Card, CardContent } from '@/components/shadcn/card';
 import { useRouter } from '@bprogress/next';
 import { ArrowRight } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, use } from 'react';
 
 const DEFAULT_GRAPH_MODEL_ID = 'gemma-2-2b';
 
-export default function CircuitCLTRedirectPage({
-  searchParams,
-}: {
-  searchParams: {
-    logitDiff?: string;
-    model?: string;
-    slug?: string;
-    pinnedIds?: string;
-    supernodes?: string;
-    clerps?: string;
-  };
-}) {
+export default function CircuitCLTRedirectPage(
+  props: {
+    searchParams: Promise<{
+      logitDiff?: string;
+      model?: string;
+      slug?: string;
+      pinnedIds?: string;
+      supernodes?: string;
+      clerps?: string;
+    }>;
+  }
+) {
+  const searchParams = use(props.searchParams);
   const router = useRouter();
   let { model } = searchParams;
 

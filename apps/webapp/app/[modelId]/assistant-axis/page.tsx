@@ -24,20 +24,21 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function Page({
-  params,
-  searchParams,
-}: {
-  params: { modelId: string };
-  searchParams: {
-    saved?: string;
-    source?: string;
-    index?: string;
-    strength?: string;
-    hideInitialSettingsOnMobile?: string;
-    preset?: string;
-  };
-}) {
+export default async function Page(
+  props: {
+    params: Promise<{ modelId: string }>;
+    searchParams: Promise<{
+      saved?: string;
+      source?: string;
+      index?: string;
+      strength?: string;
+      hideInitialSettingsOnMobile?: string;
+      preset?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   if (!SUPPORTED_MODELS.includes(params.modelId)) {
     notFound();
   }

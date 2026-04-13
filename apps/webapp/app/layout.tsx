@@ -82,7 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     ]);
 
   const initialModels = formatToGlobalModels(models);
-  const headersList = headers();
+  const headersList = await headers();
   const isEmbed = headersList.get('x-is-embed') === 'true';
 
   return (

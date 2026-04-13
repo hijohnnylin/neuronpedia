@@ -2,17 +2,18 @@ import SearchExplanationsPane from '@/components/panes/search-explanations-pane'
 import { SearchExplanationsType } from '@/lib/utils/general';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: {
-    q: string;
-    releaseName: string;
-    modelId: string;
-    sources: string;
-    embed: string;
-  };
-}) {
+export default async function Page(
+  props: {
+    searchParams: Promise<{
+      q: string;
+      releaseName: string;
+      modelId: string;
+      sources: string;
+      embed: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const isEmbed = searchParams.embed === 'true';
   let selectedTab: SearchExplanationsType | undefined;
   if (searchParams.releaseName) {

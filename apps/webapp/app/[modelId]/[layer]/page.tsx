@@ -8,7 +8,8 @@ import { notFound, redirect } from 'next/navigation';
 import PageSource from './page-source';
 import PageSourceSet from './page-sourceset';
 
-export async function generateMetadata({ params }: { params: { modelId: string; layer: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ modelId: string; layer: string }> }): Promise<Metadata> {
+  const params = await props.params;
   let title = `${params.modelId.toUpperCase()} · ${params.layer.toUpperCase()}`;
   let description = '';
 
@@ -41,13 +42,14 @@ export async function generateMetadata({ params }: { params: { modelId: string; 
   };
 }
 
-export default async function Page({
-  params,
-  searchParams,
-}: {
-  params: { modelId: string; layer: string };
-  searchParams: { simMatrix?: string; simMatrixDemo?: string };
-}) {
+export default async function Page(
+  props: {
+    params: Promise<{ modelId: string; layer: string }>;
+    searchParams: Promise<{ simMatrix?: string; simMatrixDemo?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
   if (params.modelId in REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT) {
     // redirect to the new model id

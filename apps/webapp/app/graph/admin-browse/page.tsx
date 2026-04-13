@@ -2,13 +2,14 @@ import { prisma } from '@/lib/db';
 import { GRAPH_ADMIN_BROWSE_KEY, NEXT_PUBLIC_URL } from '@/lib/env';
 import { notFound } from 'next/navigation';
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: {
-    key: string;
-  };
-}) {
+export default async function Page(
+  props: {
+    searchParams: Promise<{
+      key: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   // Check that the browse key is correct
   if (searchParams.key !== GRAPH_ADMIN_BROWSE_KEY) {
     notFound();

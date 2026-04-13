@@ -7,14 +7,15 @@ import { notFound } from 'next/navigation';
 import { makeAuthedUserFromSessionOrReturnNull } from '../../lib/db/user';
 import QuickList from './quick-list';
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams?: {
-    name?: string;
-    features?: string; // array of objects { model, layer, index }
-  };
-}) {
+export default async function Page(
+  props: {
+    searchParams?: Promise<{
+      name?: string;
+      features?: string; // array of objects { model, layer, index }
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   if (!searchParams || !searchParams.name || !searchParams.features) {
     notFound();
   }

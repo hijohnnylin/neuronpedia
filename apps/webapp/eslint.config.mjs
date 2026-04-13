@@ -1,16 +1,17 @@
+import nextTypescript from "eslint-config-next/typescript";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const compat = new FlatCompat({ baseDirectory: __dirname });
 
 export default [
+  ...nextTypescript,
   { ignores: ["prisma/generated/zod/*", ".next/*", "coverage/*", "types/eval_output_schema_*.d.ts"] },
-  ...compat.extends("next/core-web-vitals"),
+  ...nextCoreWebVitals,
   ...tseslint.configs.recommended,
   prettier,
   {
@@ -43,5 +44,5 @@ export default [
       "@typescript-eslint/ban-ts-comment": "warn",
       "@typescript-eslint/no-require-imports": "off",
     },
-  },
+  }
 ];

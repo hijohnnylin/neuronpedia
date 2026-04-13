@@ -1,7 +1,8 @@
 import { setUserEmailUnsubscribeNewsletter } from '@/lib/db/user';
 import { CONTACT_EMAIL_ADDRESS } from '@/lib/env';
 
-export default async function Page({ searchParams }: { searchParams?: { [key: string]: string | undefined } }) {
+export default async function Page(props: { searchParams?: Promise<{ [key: string]: string | undefined }> }) {
+  const searchParams = await props.searchParams;
   const unsubscribeCode = searchParams?.code;
   const unsubscribed = await setUserEmailUnsubscribeNewsletter(unsubscribeCode || '');
 

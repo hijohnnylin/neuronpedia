@@ -1,6 +1,7 @@
 import { Ratelimit } from '@upstash/ratelimit';
 import { kv } from '@vercel/kv';
 import { NextRequest, NextResponse } from 'next/server';
+import { ipAddress } from "@vercel/functions";
 import { API_KEY_HEADER_NAME, CONTACT_EMAIL_ADDRESS, ENABLE_RATE_LIMITER, HIGHER_LIMIT_API_TOKENS } from './lib/env';
 
 const RATE_LIMIT_WINDOW = '60 m';
@@ -77,7 +78,7 @@ for (const { endpoint, limit } of HIGHER_RATE_LIMITS) {
 
 export default async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
-  const ip = request.ip ?? '127.0.0.1';
+  const ip = ipAddress(request) ?? '127.0.0.1';
   const pathname = request.nextUrl.pathname.toLowerCase();
 
   const isEmbedSearchParam = request.nextUrl.searchParams.get('embed');

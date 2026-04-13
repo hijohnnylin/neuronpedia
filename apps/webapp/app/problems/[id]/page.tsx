@@ -11,7 +11,8 @@ export const metadata: Metadata = {
     'Explore the landscape of open problems, tools, papers, and datasets in mechanistic interpretability research.',
 };
 
-export default async function ProblemNodePage({ params }: { params: { id: string } }) {
+export default async function ProblemNodePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
 
   const initialNodes = await getProblemNodes(false);

@@ -3,20 +3,21 @@ import { REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT } from '@/lib/db/model';
 import { redirect } from 'next/navigation';
 
 // this page url is formatted as: /gemma-2-9b-it/steer?saved=cm1l96eeu000nooqkir7bq9lw
-export default async function Page({
-  params,
-  searchParams,
-}: {
-  params: { modelId: string };
-  searchParams: {
-    saved?: string;
-    source?: string;
-    index?: string;
-    strength?: string;
-    hideInitialSettingsOnMobile?: string;
-    preset?: string;
-  };
-}) {
+export default async function Page(
+  props: {
+    params: Promise<{ modelId: string }>;
+    searchParams: Promise<{
+      saved?: string;
+      source?: string;
+      index?: string;
+      strength?: string;
+      hideInitialSettingsOnMobile?: string;
+      preset?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
   if (params.modelId in REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT) {
     // redirect to the new model id

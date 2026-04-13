@@ -3,7 +3,8 @@ import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '@/lib/env';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 // this page url is formatted as: /steer/[steer-model] or /steer/[steer-output-id]
-export default async function Page({ params }: { params: { slug: string } }) {
+export default async function Page(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const isInferenceEnabledModel = await prisma.model.findFirst({
     where: {
       id: params.slug,

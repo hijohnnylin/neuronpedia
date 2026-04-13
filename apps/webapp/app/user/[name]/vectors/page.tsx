@@ -5,7 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../api/auth/[...nextauth]/authOptions';
 import UserVectors from './user-vectors';
 
-export default async function Page({ params }: { params: { name: string } }) {
+export default async function Page(props: { params: Promise<{ name: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
 
   const user = await getUserByName(params.name);

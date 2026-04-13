@@ -8,9 +8,9 @@ import Image from 'next/image';
 import BlogSidebar from '../blog-sidebar';
 
 type Props = {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 };
 
 const getPageData = async (slug: string): Promise<{ meta: PostMetaData; content: any }> => {
@@ -18,7 +18,8 @@ const getPageData = async (slug: string): Promise<{ meta: PostMetaData; content:
   return { meta, content };
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const { meta } = await getPageData(params.slug);
   return {
     title: { absolute: `${meta.title} | The Residual Stream` },
@@ -55,7 +56,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function Page({ params }: Props) {
+export default async function Page(props: Props) {
+  const params = await props.params;
   const { meta, content } = await getPageData(params.slug);
   return (
     <div className="flex w-full flex-col items-center justify-start">

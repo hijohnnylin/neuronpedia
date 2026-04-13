@@ -6,12 +6,11 @@ import { getTweet } from 'react-tweet/api';
 
 export const GET = async (
   request: NextRequest,
-  {
-    params,
-  }: {
-    params: { tweet: string };
-  },
+  props: {
+    params: Promise<{ tweet: string }>;
+  }
 ) => {
+  const params = await props.params;
   const tweetId = params.tweet;
 
   if (tweetId !== '1773403396130885844' && tweetId !== '1773403397489881423' && tweetId !== '1773403398928503024') {

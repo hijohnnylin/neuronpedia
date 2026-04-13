@@ -3,7 +3,8 @@ import { getExplanationType } from '@/lib/db/explanation-type';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 
-export default async function Page({ params }: { params: { name: string } }) {
+export default async function Page(props: { params: Promise<{ name: string }> }) {
+  const params = await props.params;
   const explanationType = await getExplanationType(params.name);
 
   if (!explanationType) {
