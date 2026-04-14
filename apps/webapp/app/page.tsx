@@ -237,7 +237,7 @@ export default function Page() {
             </div>
 
             <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:w-[400px] sm:min-w-[400px] sm:px-0">
-              <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-emerald-600/20 px-3 py-7 text-center text-emerald-700 sm:gap-y-0 sm:px-5 sm:py-7">
+              <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-emerald-600/20 px-3 py-7 text-center text-emerald-700 shadow-sm shadow-emerald-700/40 sm:gap-y-0 sm:px-5 sm:py-7">
                 <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-emerald-600/30 px-7 py-[6px] text-[11px] font-semibold text-emerald-700">
                   Multi-Org
                 </div>
@@ -298,7 +298,7 @@ export default function Page() {
             </div>
 
             <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:w-[340px] sm:min-w-[340px] sm:px-0">
-              <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gBlue/10 px-3 py-7 text-center text-slate-600 sm:gap-y-0 sm:px-5 sm:py-7">
+              <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gBlue/10 px-3 py-7 text-center text-slate-600 shadow-sm shadow-gBlue/40 sm:gap-y-0 sm:px-5 sm:py-7">
                 <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-gBlue/15 px-6 py-[6px] text-[11px] font-semibold text-gBlue">
                   Google Deepmind
                 </div>
