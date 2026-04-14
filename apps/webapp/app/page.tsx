@@ -194,7 +194,7 @@ export default function Page() {
                         type="button"
                         className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
                       >
-                        <div className="flex h-14 min-h-14 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                        <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
@@ -223,9 +223,9 @@ export default function Page() {
                     <Link href={CAP_PAPER_URL} className="">
                       <button
                         type="button"
-                        className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
+                        className="h-12 min-h-12 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
                       >
-                        <div className="flex h-14 min-h-14 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                        <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
                           <Scroll className="h-5 w-5" />
                           <div className="text-[12px] font-semibold leading-tight">Read Paper</div>
                         </div>
@@ -271,7 +271,7 @@ export default function Page() {
                   >
                     <button
                       type="button"
-                      className="flex h-14 min-h-14 w-28 min-w-28 flex-row items-center justify-center rounded-xl bg-emerald-600 px-0 py-0 font-bold leading-none transition-all hover:scale-105 hover:bg-emerald-700"
+                      className="flex h-12 min-h-12 w-28 min-w-28 flex-row items-center justify-center rounded-xl bg-emerald-600 px-0 py-0 font-bold leading-none transition-all hover:scale-105 hover:bg-emerald-700"
                     >
                       <Youtube className="mr-2.5 h-6 w-6" />
                       <div className="text-[12px] font-bold leading-tight text-white">
@@ -285,7 +285,7 @@ export default function Page() {
                   <Link href="/graph/info" className="flex-1 text-white">
                     <button
                       type="button"
-                      className="h-14 min-h-14 w-28 min-w-28 rounded-xl bg-emerald-600 transition-all hover:scale-105 hover:bg-emerald-700"
+                      className="h-12 min-h-12 w-28 min-w-28 rounded-xl bg-emerald-600 transition-all hover:scale-105 hover:bg-emerald-700"
                     >
                       <div className="flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
                         <Newspaper className="mr-2 h-5 min-h-5 w-5 min-w-5" />
