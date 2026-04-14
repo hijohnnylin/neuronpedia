@@ -771,6 +771,7 @@ export default forwardRef<EvalsPlotMethods, EvalsPlotProps>(
             {' vs '}
             {metricColumnY ? getMetricTooltip(metricColumnY) : ''}
           </div>
+          {/* @ts-ignore */}
           <Plot
             onClick={(event) => {
               if (anonymized) return;

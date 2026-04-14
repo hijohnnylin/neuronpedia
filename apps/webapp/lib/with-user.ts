@@ -8,6 +8,8 @@ export type AuthenticatedUser = {
   name: string;
 };
 
+type NextRouteHandler = (request: NextRequest, arg?: any) => Promise<NextResponse> | NextResponse;
+
 // ================ MARK: Optionally Authenticated User ================
 
 export interface RequestOptionalUser extends NextRequest {
@@ -16,8 +18,8 @@ export interface RequestOptionalUser extends NextRequest {
 
 type NextHandlerWithUser<T = any> = (request: RequestOptionalUser, arg?: T) => Promise<NextResponse> | NextResponse;
 
-export function withOptionalUser(handler: NextHandlerWithUser): NextHandlerWithUser {
-  return async (request: RequestOptionalUser, response: NextResponse) => {
+export function withOptionalUser(handler: NextHandlerWithUser): NextRouteHandler {
+  return async (request: NextRequest, arg?: any) => {
     let authenticatedUser;
     const apiKey = request.headers.get(API_KEY_HEADER_NAME);
     if (apiKey) {
@@ -26,8 +28,8 @@ export function withOptionalUser(handler: NextHandlerWithUser): NextHandlerWithU
       authenticatedUser = await makeAuthedUserFromSessionOrReturnNull();
     }
 
-    request.user = authenticatedUser;
-    return handler(request, response);
+    (request as RequestOptionalUser).user = authenticatedUser;
+    return handler(request as RequestOptionalUser, arg);
   };
 }
 
@@ -39,11 +41,11 @@ export interface RequestAuthedUser extends NextRequest {
 
 type NextHandlerWithAuthedUser<T = any> = (
   request: RequestAuthedUser,
-  arg?: T, // res: NextResponse,
+  arg?: T,
 ) => Promise<NextResponse> | NextResponse;
 
-export function withAuthedUser(handler: NextHandlerWithAuthedUser): NextHandlerWithAuthedUser {
-  return async (request: RequestAuthedUser, response: NextResponse) => {
+export function withAuthedUser(handler: NextHandlerWithAuthedUser): NextRouteHandler {
+  return async (request: NextRequest, arg?: any) => {
     let authenticatedUser;
     const apiKey = request.headers.get(API_KEY_HEADER_NAME);
     if (apiKey) {
@@ -62,8 +64,8 @@ export function withAuthedUser(handler: NextHandlerWithAuthedUser): NextHandlerW
       );
     }
 
-    request.user = authenticatedUser;
-    return handler(request, response);
+    (request as RequestAuthedUser).user = authenticatedUser;
+    return handler(request as RequestAuthedUser, arg);
   };
 }
 
@@ -75,10 +77,10 @@ export interface RequestAuthedAdminUser extends NextRequest {
 
 type NextHandlerWithAuthedAdminUser<T = any> = (
   request: RequestAuthedAdminUser,
-  arg?: T, // res: NextResponse,
+  arg?: T,
 ) => Promise<NextResponse> | NextResponse;
 
-export async function getAuthedAdminUser(request: RequestAuthedAdminUser): Promise<AuthenticatedUser | null> {
+export async function getAuthedAdminUser(request: NextRequest): Promise<AuthenticatedUser | null> {
   let authenticatedUser;
   const apiKey = request.headers.get(API_KEY_HEADER_NAME);
   if (apiKey) {
@@ -92,8 +94,8 @@ export async function getAuthedAdminUser(request: RequestAuthedAdminUser): Promi
   return authenticatedUser?.admin ? authenticatedUser : null;
 }
 
-export function withAuthedAdminUser(handler: NextHandlerWithAuthedAdminUser): NextHandlerWithAuthedAdminUser {
-  return async (request: RequestAuthedAdminUser, response: NextResponse) => {
+export function withAuthedAdminUser(handler: NextHandlerWithAuthedAdminUser): NextRouteHandler {
+  return async (request: NextRequest, arg?: any) => {
     const authenticatedAdminUser = await getAuthedAdminUser(request);
     if (!authenticatedAdminUser) {
       return NextResponse.json(
@@ -105,7 +107,7 @@ export function withAuthedAdminUser(handler: NextHandlerWithAuthedAdminUser): Ne
       );
     }
 
-    request.user = authenticatedAdminUser;
-    return handler(request, response);
+    (request as RequestAuthedAdminUser).user = authenticatedAdminUser;
+    return handler(request as RequestAuthedAdminUser, arg);
   };
 }

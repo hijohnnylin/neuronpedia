@@ -1,5 +1,5 @@
-import nextTypescript from "eslint-config-next/typescript";
-import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript.js";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals.js";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import tseslint from "typescript-eslint";
