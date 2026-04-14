@@ -42,7 +42,7 @@ import UmapSelectedItem from './umap-selected-item';
 const ZOOM_IN_OUT_FACTOR = 0.32; // 32% zoom each click
 
 const usePrevious = <T,>(value: T): T | undefined => {
-  const ref = useRef<T>();
+  const ref = useRef<T>(undefined);
   useEffect(() => {
     ref.current = value;
   });

@@ -1,17 +1,18 @@
-import nextTypescript from "eslint-config-next/typescript.js";
-import nextCoreWebVitals from "eslint-config-next/core-web-vitals.js";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
+import { FlatCompat } from "@eslint/eslintrc";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const compat = new FlatCompat({ baseDirectory: __dirname });
+
 export default [
-  ...nextTypescript,
-  { ignores: ["prisma/generated/zod/*", ".next/*", "coverage/*", "types/eval_output_schema_*.d.ts"] },
-  ...nextCoreWebVitals,
+  ...compat.extends("next/typescript"),
+  { ignores: ["prisma/generated/zod/*", ".next/*", "coverage/*", "types/eval_output_schema_*.d.ts", "next-env.d.ts"] },
+  ...compat.extends("next/core-web-vitals"),
   ...tseslint.configs.recommended,
   prettier,
   {

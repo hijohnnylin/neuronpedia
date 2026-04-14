@@ -31,7 +31,7 @@
     "start": "next start",
     "test:vitest": "vitest",
     "test:playwright": "playwright test",
-    "lint": "eslint .",
+    "lint": "eslint --quiet . && tsc --noEmit",
     "lint:fix": "eslint --fix .",
     "knip": "knip",
     "test:coverage": "vitest run --coverage"
