@@ -1,24 +1,18 @@
 'use client';
 
 import { Button } from '@/components/shadcn/button';
-import { NEXT_PUBLIC_ENABLE_SIGNIN } from '@/lib/env';
 import emailSpellChecker from '@zootools/email-spell-checker';
 import { MailIcon } from 'lucide-react';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { generateFromEmail } from 'unique-username-generator';
 import isEmail from 'validator/lib/isEmail';
 
 export default function HomeNewsletterSignup() {
-  const { data: session } = useSession();
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
-
-  if (!NEXT_PUBLIC_ENABLE_SIGNIN || session) {
-    return null;
-  }
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -52,27 +46,21 @@ export default function HomeNewsletterSignup() {
   }
 
   return (
-    <div className="mb-3 flex w-full max-w-screen-sm flex-col items-center gap-y-2 rounded-xl border border-slate-400 bg-white px-6 py-4 shadow-sm sm:flex-row sm:gap-x-4 sm:gap-y-0">
+    <div className="flex w-full flex-1 flex-col items-center gap-y-2 rounded-xl bg-white px-6 py-5 shadow-sm sm:flex-row sm:gap-x-4 sm:gap-y-0">
       <div className="flex flex-col items-center text-center sm:items-start sm:gap-y-0 sm:text-left">
-        <div className="mb-1 flex flex-row items-center justify-center text-sm font-semibold text-slate-700">
-          <MailIcon className="mr-1.5 h-4 w-4" /> Get Updates
+        <div className="mb-0.5 flex flex-row items-center justify-center text-sm font-semibold text-slate-700">
+          <MailIcon className="mr-1.5 h-4 w-4" /> Get Quarterly Updates
         </div>
         <div className="text-xs text-slate-500">
-          Quarterly newsletter from our{' '}
-          <a href="/blog" className="text-sky-600 hover:underline">
-            blog
-          </a>
-          .
-          <br />{' '}
           <a
             href="/privacy"
             target="_blank"
             rel="noreferrer noopener"
-            className="text-[11px] text-sky-600 hover:underline"
+            className="text-[11px] text-sky-700 hover:underline"
           >
             No spam
           </a>
-          , unsubscribe any time.
+          , unsubscribe anytime.
         </div>
       </div>
       {submitted ? (

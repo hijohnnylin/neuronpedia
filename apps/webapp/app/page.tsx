@@ -4,27 +4,21 @@ import InferenceActivationAllProvider from '@/components/provider/inference-acti
 import RandomFeatureLink from '@/components/random-feature-link';
 import { Button } from '@/components/shadcn/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
-import {
-  DEFAULT_MODELID,
-  DEFAULT_SOURCE,
-  DEMO_MODE,
-  IS_LOCALHOST,
-  NEXT_PUBLIC_URL,
-  SITE_NAME_VERCEL_DEPLOY,
-} from '@/lib/env';
+import { DEFAULT_MODELID, DEFAULT_SOURCE, DEMO_MODE, IS_LOCALHOST, NEXT_PUBLIC_URL } from '@/lib/env';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
   Blocks,
   BookOpenText,
   Computer,
+  Folder,
   Github,
-  Megaphone,
-  Microscope,
+  Lightbulb,
   Newspaper,
   Notebook,
   PictureInPicture,
   RocketIcon,
+  Route,
   School,
   Scroll,
   Search,
@@ -33,7 +27,6 @@ import {
   Speech,
   SquareActivity,
   Wand,
-  WandSparkles,
   Youtube,
 } from 'lucide-react';
 import { Metadata } from 'next';
@@ -96,356 +89,328 @@ export default function Page() {
         </div>
       )}
 
-      <HomeNewsletterSignup />
-
-      <div className="flex flex-col items-center justify-center gap-x-5 gap-y-2 sm:flex-row">
-        <svg style={{ display: 'none' }}>
-          <filter id="glass-distortion">
-            <feTurbulence type="turbulence" baseFrequency="0.008" numOctaves="2" result="noise" />
-            <feDisplacementMap in="SourceGraphic" in2="noise" scale="77" />
-          </filter>
-        </svg>
-
-        <div className="relative z-0 order-2 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:order-1 sm:mx-0 sm:mb-8 sm:h-[260px] sm:min-h-[260px] sm:w-[380px] sm:min-w-[380px] sm:px-0">
-          <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gradient-to-t from-white via-white to-gBlue/40 px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
-            <div className="content">
-              <div className="flex items-center justify-center text-xs font-bold text-sky-800">
-                <span className="flex flex-col items-center justify-center gap-y-[5px] text-xs font-semibold text-slate-600">
-                  <div className="flex flex-row items-center justify-center gap-x-1 rounded-full px-4 py-0.5 text-[10px] font-bold text-gBlue transition-all">
-                    Dec 2025
-                  </div>
+      <div className="mb-5 mt-2 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:flex-row">
+        <div className="flex basis-[55%] flex-col items-center justify-center text-center text-sm sm:text-base">
+          <div className="text-lg font-medium text-slate-800 sm:text-[19px]">
+            Neuronpedia is an{' '}
+            <a
+              href="https://github.com/hijohnnylin/neuronpedia#readme"
+              className="transition-all hover:text-slate-900/70 hover:underline"
+              target="_blank"
+              rel="noreferrer"
+            >
+              open source
+            </a>{' '}
+            <CustomTooltip
+              trigger={
+                <span className="font-bold text-sky-700 transition-all hover:cursor-default hover:text-sky-600">
+                  interpretability
                 </span>
-              </div>
-              <div className="mt-2 text-[24px] font-bold text-sky-700 sm:mt-3">
-                <span className="font-bold text-gBlue">Gemma Scope 2</span>
-              </div>
-              <div className="mt-1 text-xs font-medium text-slate-500 sm:mb-1 sm:mt-0">Google DeepMind</div>
-
-              <div className="mt-4 flex flex-col items-center justify-center gap-3 sm:mt-3 sm:grid sm:grid-cols-2 sm:gap-y-1.5">
-                <Link href="/gemma-scope-2" className="">
-                  <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
-                    <div className="flex flex-row items-center justify-center rounded-xl bg-gGreen px-5 py-2 text-white shadow sm:px-6">
-                      <WandSparkles className="mr-2.5 h-5 w-5" />
-                      <div className="text-[12px] font-semibold leading-snug">
-                        Browse
-                        <br />
-                        Release
-                      </div>
-                    </div>
-                  </button>
-                </Link>
-                <a
-                  href="https://colab.research.google.com/drive/1NhWjg7n0nhfW--CjtsOdw5A5J_-Bzn4r"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className=""
-                >
-                  <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
-                    <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="flex w-full flex-row items-center justify-center rounded-xl bg-gYellow px-5 py-2 text-white shadow sm:px-5">
-                        <Notebook className="mr-2.5 h-5 w-5" />
-                        <div className="text-[12px] font-semibold leading-snug">
-                          Tutorial
-                          <br />
-                          Notebook
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                </a>
-                <a
-                  href="https://huggingface.co/google/gemma-scope-2"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className=""
-                >
-                  <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
-                    <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="sm:px- flex w-full flex-row items-center justify-center rounded-xl bg-gRed px-5 py-2 text-white shadow">
-                        <SmileIcon className="mr-2.5 h-5 w-5" />
-                        <div className="text-[12px] font-semibold leading-snug">
-                          Hugging
-                          <br />
-                          Face
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                </a>
-                <a
-                  href="https://deepmind.google/blog/gemma-scope-2-helping-the-ai-safety-community-deepen-understanding-of-complex-language-model-behavior/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className=""
-                >
-                  <button type="button" className="h-12 min-h-12 w-36 transition-all hover:scale-105 sm:w-auto">
-                    <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="sm:px- flex w-full flex-row items-center justify-center rounded-xl bg-gBlue px-5 py-2 text-white shadow">
-                        <Megaphone className="mr-2.5 h-5 w-5" />
-                        <div className="text-[12px] font-semibold leading-snug">
-                          DeepMind
-                          <br />
-                          Blog
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                </a>
-              </div>
-            </div>
+              }
+            >
+              The inner workings of modern AIs are a mystery. This is because AIs are language models that are grown,
+              not designed. The science of understanding what happens inside AI is called interpretability.
+            </CustomTooltip>{' '}
+            platform.
+          </div>
+          <div className="mt-0 text-sm font-normal text-slate-600 sm:text-[14px]">
+            Explore, visualize, and steer the internals of AI models.
+          </div>
+          <div className="mt-3 flex flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2 sm:flex-row">
+            <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
+              <Button
+                variant="default"
+                size="sm"
+                className="flex w-[110px] max-w-[110px] flex-row gap-x-2 bg-slate-800 text-white transition-all hover:bg-slate-900"
+              >
+                <Github className="h-3.5 w-3.5" />
+                <div className="flex flex-col gap-y-0.5">
+                  <span className="text-xs leading-none">GitHub</span>
+                </div>
+              </Button>
+            </Link>
+            {/* <Link href="https://docs.neuronpedia.org" target="_blank" rel="noreferrer">
+              <Button variant="default" size="sm" className="w-[165px] gap-x-2 bg-sky-600 text-white hover:bg-sky-700">
+                <BookOpenText className="h-5 w-5" />
+                <span>Get Started</span>
+              </Button>
+            </Link> */}
+            <Link href="/gemma-scope">
+              <Button
+                variant="default"
+                size="sm"
+                className="flex w-[135px] max-w-[135px] flex-row gap-x-2 bg-sky-600 text-xs text-white transition-all hover:bg-sky-700"
+              >
+                <Lightbulb className="h-3.5 w-3.5" />
+                <span>New to Interp?</span>
+              </Button>
+            </Link>
           </div>
         </div>
+        <HomeNewsletterSignup />
+      </div>
 
-        <div className="relative z-0 order-1 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:order-2 sm:mx-0 sm:mb-8 sm:h-[280px] sm:min-h-[280px] sm:w-[400px] sm:min-w-[440px] sm:px-0">
-          <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#e5e4df] px-8 py-7 text-center text-slate-600 shadow-md sm:gap-y-0 sm:px-5 sm:py-7">
-            <div className="content">
-              <div className="flex items-center justify-center text-xs font-bold text-[#666663]">January 2026</div>
-              <div className="mt-2 text-[32px] font-bold text-sky-700 sm:mt-3">
-                <span className="font-bold text-[#bf4d43]">Assistant Axis</span>
-              </div>
-              <div className="mt-1 text-[13px] font-medium text-[#666663] sm:mt-0">Lu et al.</div>
-
-              <div className="mt-2 flex flex-col items-center justify-center gap-y-3 sm:mt-5 sm:flex-row sm:gap-x-2.5">
-                <Link href={CAP_BLOG_URL} className="">
-                  <button
-                    type="button"
-                    className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
-                  >
-                    <div className="flex h-14 min-h-14 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow sm:px-3">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        id="Anthropic-Icon--Streamline-Svg-Logos"
-                        height="24"
-                        width="24"
-                        className="flex-shrink-0"
-                      >
-                        <desc>Anthropic Icon Streamline Icon: https://streamlinehq.com</desc>
-                        <path
-                          fill="#181818"
-                          d="m13.788825 3.932 6.43325 16.136075h3.5279L17.316725 3.932H13.788825Z"
-                          strokeWidth="0.25"
-                        />
-                        <path
-                          fill="#181818"
-                          d="m6.325375 13.682775 2.20125 -5.67065 2.201275 5.67065H6.325375ZM6.68225 3.932 0.25 20.068075h3.596525l1.3155 -3.3886h6.729425l1.315275 3.3886h3.59655L10.371 3.932H6.68225Z"
-                          strokeWidth="0.25"
-                        />
-                      </svg>
-                      <div className="text-[12px] font-semibold leading-snug">Anthropic</div>
-                    </div>
-                  </button>
-                </Link>
-                <Link href="/llama3.3-70b-it/assistant-axis" className="">
-                  <button
-                    type="button"
-                    className="h-16 min-h-16 w-32 min-w-32 transition-all hover:scale-105 sm:w-auto"
-                  >
-                    <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#CC785C] px-5 py-2 text-[#000000] shadow sm:px-3">
-                      <SquareActivity className="h-5 w-5" />
-                      <div className="text-[14px] font-semibold leading-snug">
-                        Launch
-                        <br />
-                        Demo
-                      </div>
-                    </div>
-                  </button>
-                </Link>
-                <Link href={CAP_PAPER_URL} className="">
-                  <button
-                    type="button"
-                    className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
-                  >
-                    <div className="flex h-14 min-h-14 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow sm:px-3">
-                      <Scroll className="h-5 w-5" />
-                      <div className="text-[12px] font-semibold leading-snug">Paper</div>
-                    </div>
-                  </button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="relative z-0 order-3 mb-3 mt-3 flex min-h-[350px] w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-8 sm:h-[260px] sm:min-h-[260px] sm:w-[380px] sm:min-w-[380px] sm:px-0">
+      <div className="flex w-full flex-col items-center justify-center px-1.5 sm:px-0">
+        <div className="my-5 mb-10 overflow-hidden rounded-xl border border-emerald-600 bg-white px-0 pb-6 sm:max-w-screen-xl">
           <div
-            style={{ backgroundImage: `url('/usedby/landscapebg.jpg')` }}
-            className="bg-size-[100%] absolute inset-[1px] -z-10 mx-3 rounded-[20px] bg-cover bg-top opacity-100 brightness-75 -hue-rotate-[5deg] saturate-[2.0] sm:mx-0 sm:px-0"
-          />
+            className="flex w-full flex-row items-center justify-center bg-emerald-600 py-[5px] pl-3 text-[10px] font-medium uppercase text-white"
+            title="Fully vetted and stabilized projects and collaborations."
+          >
+            Featured Releases
+          </div>
 
-          <div className="glass-card relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-lg px-2 py-16 shadow-sm sm:gap-y-0 sm:px-5 sm:py-7">
-            <div className="glass-filter" />
-            <div className="glass-overlay" />
-            <div className="glass-specular" />
-            <div className="glass-content">
-              <div className="text-xs font-medium" style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}>
-                August 2025
-              </div>
-              <div
-                className="mt-1.5 text-base font-bold leading-snug sm:text-[18px]"
-                style={{ textShadow: '0 2px 3px rgba(0, 0, 0, 0.3)' }}
-              >
-                The Circuit Analysis
-                <br className="hidden sm:block" />
-                Research Landscape
-              </div>
-              <div
-                className="mt-1.5 text-sm font-medium sm:text-[12px]"
-                style={{ textShadow: '0 2px 3px rgba(0, 0, 0, 0.25)' }}
-              >
-                Anthropic, EleutherAI, Goodfire AI, Google DeepMind
-              </div>
+          <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-4 sm:flex-row sm:gap-y-2 sm:px-6">
+            <div className="relative z-0 mb-3 mt-1 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-3 sm:h-[250px] sm:min-h-[250px] sm:w-[440px] sm:min-w-[440px] sm:px-0">
+              <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
+                <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/40 px-7 py-[6px] text-[11px] font-semibold text-[#262625]">
+                  Lu et al. 2026
+                </div>
+                <div className="content">
+                  <div className="mt-2 text-[26px] font-bold text-sky-700 sm:mt-3 sm:text-[32px]">
+                    <span className="font-bold text-[#bf4d43]">Assistant Axis</span>
+                  </div>
+                  <div className="mt-1 text-[13.5px] font-medium leading-none text-[#666663] sm:mt-0">
+                    Monitor and Stabilize the Character of an LLM
+                  </div>
 
-              <div className="mt-5 flex flex-col gap-y-2 sm:flex-row sm:gap-x-3">
-                <Link href="/graph/info" className="text-white">
-                  <button type="button" className="glass-button h-12 min-h-12">
-                    <div className="glass-filter" />
-                    <div className="glass-overlay" />
-                    <div className="glass-specular" />
-                    <div className="glass-content flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="flex flex-row items-center justify-center px-1.5">
-                        <Newspaper className="mr-2 h-5 min-h-5 w-5 min-w-5" />
-                        <div
-                          className="text-[11px] font-bold leading-tight text-white"
-                          style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}
-                        >
-                          Read Post
+                  <div className="mt-4 flex flex-col items-center justify-center gap-y-3 sm:mt-6 sm:flex-row sm:gap-x-2.5">
+                    <Link href="/llama3.3-70b-it/assistant-axis" className="">
+                      <button
+                        type="button"
+                        className="h-16 min-h-16 w-32 min-w-32 transition-all hover:scale-105 sm:w-auto"
+                      >
+                        <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-[#CC785C] px-6 py-2 text-[#000000] shadow-sm shadow-[#666663]/60">
+                          <SquareActivity className="h-7 w-7" style={{ transform: 'rotate(90deg)' }} />
+                          <div className="text-[13.5px] font-semibold leading-tight">
+                            Launch
+                            <br />
+                            Chat
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </button>
-                </Link>
-                <a href="/gemma-2-2b/graph" className="text-white">
-                  <button type="button" className="glass-button h-12 min-h-12">
-                    <div className="glass-filter" />
-                    <div className="glass-overlay" />
-                    <div className="glass-specular" />
-                    <div className="glass-content flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="flex flex-row items-center justify-center">
-                        <RocketIcon className="mr-2 h-5 w-5" />
-                        <div
-                          className="text-[11px] font-bold leading-tight text-white"
-                          style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}
-                        >
-                          Circuit
+                      </button>
+                    </Link>
+                    <Link href={CAP_BLOG_URL} className="">
+                      <button
+                        type="button"
+                        className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
+                      >
+                        <div className="flex h-14 min-h-14 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            id="Anthropic-Icon--Streamline-Svg-Logos"
+                            height="24"
+                            width="24"
+                            className="flex-shrink-0"
+                          >
+                            <desc>Anthropic Icon Streamline Icon: https://streamlinehq.com</desc>
+                            <path
+                              fill="#181818"
+                              d="m13.788825 3.932 6.43325 16.136075h3.5279L17.316725 3.932H13.788825Z"
+                              strokeWidth="0.25"
+                            />
+                            <path
+                              fill="#181818"
+                              d="m6.325375 13.682775 2.20125 -5.67065 2.201275 5.67065H6.325375ZM6.68225 3.932 0.25 20.068075h3.596525l1.3155 -3.3886h6.729425l1.315275 3.3886h3.59655L10.371 3.932H6.68225Z"
+                              strokeWidth="0.25"
+                            />
+                          </svg>
+                          <div className="text-[12px] font-semibold leading-tight">Read Post</div>
+                        </div>
+                      </button>
+                    </Link>
+                    <Link href={CAP_PAPER_URL} className="">
+                      <button
+                        type="button"
+                        className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
+                      >
+                        <div className="flex h-14 min-h-14 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                          <Scroll className="h-5 w-5" />
+                          <div className="text-[12px] font-semibold leading-tight">Read Paper</div>
+                        </div>
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:w-[400px] sm:min-w-[400px] sm:px-0">
+              <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-emerald-600/20 px-3 py-7 text-center text-emerald-700 sm:gap-y-0 sm:px-5 sm:py-7">
+                <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-emerald-600/30 px-7 py-[6px] text-[11px] font-semibold text-emerald-700">
+                  Multi-Org
+                </div>
+                <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-2xl">Circuit Tracer</div>
+                <div className="mt-0 text-sm font-medium leading-tight sm:mt-0.5 sm:text-[13px]">
+                  Trace the Internal Reasoning Steps of a Model
+                </div>
+
+                <div className="mt-3 flex w-full flex-col items-center justify-center gap-y-2 sm:mt-5 sm:flex-row sm:gap-x-2">
+                  <a href="/gemma-2-2b/graph" className="flex-1 text-white">
+                    <button
+                      type="button"
+                      className="h-16 min-h-16 w-full rounded-xl bg-emerald-800 transition-all hover:scale-105 hover:bg-emerald-900"
+                    >
+                      <div className="flex flex-row items-center justify-center px-5 py-2 font-bold leading-none">
+                        <Route className="mr-2.5 h-6 w-6" />
+                        <div className="text-[13.5px] font-semibold leading-tight text-white">
+                          Launch
                           <br />
                           Tracer
                         </div>
                       </div>
-                    </div>
-                  </button>
-                </a>
-                <a
-                  href="https://www.youtube.com/playlist?list=PL05yUGfKO5wP6S5_12z7LG30LZigRYx1e"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-white"
-                >
-                  <button type="button" className="glass-button h-12 min-h-12">
-                    <div className="glass-filter" />
-                    <div className="glass-overlay" />
-                    <div className="glass-specular" />
-                    <div className="glass-content flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <div className="flex flex-row items-center justify-center">
-                        <Youtube className="mr-2 h-5 w-5" />
-                        <div
-                          className="text-[11px] font-bold leading-tight text-white"
-                          style={{ textShadow: '0 1px 2px rgba(0, 0, 0, 0.2)' }}
-                        >
-                          Watch
-                          <br />
-                          Demo
-                        </div>
+                    </button>
+                  </a>
+
+                  <a
+                    href="https://www.youtube.com/playlist?list=PL05yUGfKO5wP6S5_12z7LG30LZigRYx1e"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 text-white"
+                  >
+                    <button
+                      type="button"
+                      className="flex h-14 min-h-14 w-28 min-w-28 flex-row items-center justify-center rounded-xl bg-emerald-600 px-0 py-0 font-bold leading-none transition-all hover:scale-105 hover:bg-emerald-700"
+                    >
+                      <Youtube className="mr-2.5 h-6 w-6" />
+                      <div className="text-[12px] font-bold leading-tight text-white">
+                        Watch
+                        <br />
+                        Demo
                       </div>
-                    </div>
-                  </button>
-                </a>
+                    </button>
+                  </a>
+
+                  <Link href="/graph/info" className="flex-1 text-white">
+                    <button
+                      type="button"
+                      className="h-14 min-h-14 w-28 min-w-28 rounded-xl bg-emerald-600 transition-all hover:scale-105 hover:bg-emerald-700"
+                    >
+                      <div className="flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                        <Newspaper className="mr-2 h-5 min-h-5 w-5 min-w-5" />
+                        <div className="text-[12px] font-bold leading-tight text-white">Read Post</div>
+                      </div>
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:w-[340px] sm:min-w-[340px] sm:px-0">
+              <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gBlue/10 px-3 py-7 text-center text-slate-600 sm:gap-y-0 sm:px-5 sm:py-7">
+                <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-gBlue/15 px-6 py-[6px] text-[11px] font-semibold text-gBlue">
+                  Google Deepmind
+                </div>
+                <div className="content">
+                  <div className="mt-2 text-[24px] font-bold sm:mt-1.5">
+                    <span className="font-bold text-gBlue">Gemma Scope 2</span>
+                  </div>
+                  <div className="mt-1 text-[13px] font-medium leading-tight text-slate-500 sm:mb-1 sm:mt-0">
+                    SAEs and Transcoders for Gemma 3
+                  </div>
+
+                  <div className="mt-4 flex flex-row items-center justify-center gap-3 gap-x-2 sm:mt-5">
+                    <Link href="/gemma-scope-2" className="">
+                      <button
+                        type="button"
+                        className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105"
+                        title="Browse the Release on Neuronpedia"
+                      >
+                        <div className="flex h-14 min-h-14 flex-row items-center justify-center rounded-xl bg-gBlue px-3 py-2.5 text-white shadow">
+                          <Folder className="mr-2 h-6 w-6" />
+                          <div className="text-[12.5px] font-semibold leading-tight">
+                            Browse
+                            <br />
+                            Data
+                          </div>
+                        </div>
+                      </button>
+                    </Link>
+
+                    <a
+                      href="https://deepmind.google/blog/gemma-scope-2-helping-the-ai-safety-community-deepen-understanding-of-complex-language-model-behavior/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className=""
+                    >
+                      <button
+                        type="button"
+                        className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
+                        title="Read Google DeepMind Blog Post"
+                      >
+                        <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                          <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gYellow py-2.5 text-white shadow">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                              <path
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                                fill="#FFFFFF"
+                              />
+                              <path
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                fill="#FFFFFF"
+                              />
+                              <path
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                fill="#FFFFFF"
+                              />
+                              <path
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                fill="#FFFFFF"
+                              />
+                              <path d="M1 1h22v22H1z" fill="none" />
+                            </svg>
+                          </div>
+                        </div>
+                      </button>
+                    </a>
+                    <a
+                      href="https://huggingface.co/google/gemma-scope-2"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className=""
+                      title="View Hugging Face Release"
+                    >
+                      <button
+                        type="button"
+                        className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
+                      >
+                        <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                          <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gRed py-2.5 text-white shadow">
+                            <SmileIcon className="h-5 w-5" />
+                          </div>
+                        </div>
+                      </button>
+                    </a>
+
+                    <a
+                      href="https://colab.research.google.com/drive/1NhWjg7n0nhfW--CjtsOdw5A5J_-Bzn4r"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className=""
+                    >
+                      <button
+                        type="button"
+                        className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
+                        title="Open Colab Tutorial Notebook"
+                      >
+                        <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                          <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gGreen py-2.5 text-white shadow">
+                            <Notebook className="h-5 w-5" />
+                          </div>
+                        </div>
+                      </button>
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 bg-slate-100 px-0 py-8 sm:mb-10 sm:mt-0 sm:flex-col sm:gap-y-1.5 sm:px-3 sm:py-6 sm:pt-2">
-        <div className="mb-2 mt-0 flex flex-col items-center justify-center text-center text-sm sm:text-base">
-          <div className="text-lg font-medium text-slate-800 sm:text-xl">
-            {SITE_NAME_VERCEL_DEPLOY ? (
-              <div className="pb-1 text-4xl font-semibold text-[#7B3F00]">{SITE_NAME_VERCEL_DEPLOY}</div>
-            ) : (
-              <>
-                Neuronpedia is an{' '}
-                <a
-                  href="https://github.com/hijohnnylin/neuronpedia#readme"
-                  className="transition-all hover:text-slate-900/70 hover:underline"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  open source
-                </a>{' '}
-                <CustomTooltip
-                  trigger={
-                    <span className="font-bold text-sky-700 transition-all hover:cursor-pointer hover:text-sky-600">
-                      interpretability
-                    </span>
-                  }
-                >
-                  The inner workings of modern AIs are a mystery. This is because AIs are language models that are
-                  grown, not designed. The science of understanding what happens inside AI is called interpretability.
-                </CustomTooltip>{' '}
-                platform.
-              </>
-            )}
-          </div>
-          <div className="mt-1 text-sm font-normal text-slate-600 sm:text-base">
-            {SITE_NAME_VERCEL_DEPLOY ? (
-              <div className="leading-relaxed">
-                Welcome to your very own Neuronpedia instance.
-                <br />
-                Check out the{' '}
-                <a
-                  target="_blank"
-                  rel="noreferrer"
-                  href="https://github.com/hijohnnylin/neuronpedia#readme"
-                  className="font-semibold text-sky-700 underline"
-                >
-                  README
-                </a>{' '}
-                to start building and customizing Neuronpedia.
-              </div>
-            ) : (
-              'Explore, steer, and experiment on AI models.'
-            )}
-          </div>
-        </div>
-        <div className="flex flex-col gap-x-2.5 gap-y-2 sm:flex-row">
-          <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
-            <Button
-              variant="default"
-              size="lg"
-              className="flex w-[165px] max-w-[165px] flex-row gap-x-2 bg-slate-800 text-white transition-all hover:scale-105 hover:bg-slate-900"
-            >
-              <Github className="h-5 w-5" />
-              <div className="flex flex-col gap-y-0.5">
-                <span className="text-sm leading-none">GitHub</span>
-              </div>
-            </Button>
-          </Link>
-          <Link href="https://docs.neuronpedia.org" target="_blank" rel="noreferrer">
-            <Button variant="default" size="lg" className="w-[165px] gap-x-2 bg-sky-600 text-white hover:bg-sky-700">
-              <BookOpenText className="h-5 w-5" />
-              <span>Get Started</span>
-            </Button>
-          </Link>
-          <Link
-            href="/gemma-scope"
-            className="flex w-[165px] flex-row items-center justify-center gap-x-2 rounded-md bg-emerald-600 px-0 py-2.5 text-sm font-medium text-white shadow transition-all hover:scale-105"
-          >
-            <Microscope className="h-5 w-5" />
-            <span>Gemma Scope</span>
-          </Link>
-        </div>
-      </div>
+      {/* 
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 bg-slate-100 px-0 py-8 sm:mb-10 sm:mt-0 sm:flex-col sm:gap-y-1.5 sm:px-3 sm:py-6 sm:pt-2"></div> */}
 
       <div className="grid w-full grid-cols-2 items-center justify-center gap-x-12 gap-y-5 bg-white px-5 py-5 md:flex md:h-[95px] md:min-h-[95px] md:grid-cols-3 md:flex-row md:py-0">
         <a
@@ -546,7 +511,7 @@ export default function Page() {
           <div className="flex flex-col text-center">
             <div className="text-3xl font-black text-sky-800">Explore</div>
             <div className="mt-3 text-[15px] font-medium leading-relaxed text-sky-800">
-              Browse over four terabytes of activations, explanations, and metadata. <br className="hidden sm:block" />
+              Browse five+ terabytes of activations, explanations, and metadata. <br className="hidden sm:block" />
               Neuronpedia supports probes,{' '}
               <a href="https://docs.neuronpedia.org/features" className="text-sky-600 underline" target="_blank">
                 latents/features

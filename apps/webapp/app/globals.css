@@ -1151,7 +1151,6 @@ foreignObject canvas {
   height: 200px;
   border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
 }
 
 .glass-filter,
