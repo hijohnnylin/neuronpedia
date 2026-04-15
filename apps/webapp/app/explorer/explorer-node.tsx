@@ -134,10 +134,10 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
         <div className="mt-0.5 truncate font-sans text-[11px] font-normal leading-tight tracking-tight text-slate-800">
           {data.label || '(untitled)'}
         </div>
-        {data.author && <div className="mt-1 truncate text-[9px] leading-tight text-slate-400">{data.author}</div>}
+        {data.author && <div className="mt-0.5 truncate text-[8px] leading-tight text-slate-400">{data.author}</div>}
       </div>
       {data.hiddenChildCount > 0 && (
-        <div className="absolute bottom-1 right-1 rounded bg-slate-400 px-1 py-0.5 text-[7.5px] font-semibold uppercase text-white group-hover:hidden">
+        <div className="absolute bottom-1 left-1.5 rounded-sm bg-slate-400 px-1 py-[1px] text-[7px] font-semibold uppercase text-white">
           {data.hiddenChildCount} Subnode{data.hiddenChildCount !== 1 ? 's' : ''}
         </div>
       )}
@@ -153,10 +153,25 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           rel="noopener noreferrer"
           title="Open link in new tab"
           onClick={(e) => e.stopPropagation()}
-          className="absolute -top-1 right-14 z-10 flex h-5 w-16 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-slate-400 bg-white text-[9px] font-semibold text-slate-500 opacity-0 shadow transition-opacity hover:border-slate-600 hover:text-slate-600 group-hover:opacity-100"
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute bottom-1 right-1.5 z-10 flex items-center gap-x-0.5 rounded-full border-[1px] border-slate-400 bg-white px-2 py-[1px] text-[7.5px] font-medium text-slate-500 hover:border-slate-600 hover:bg-slate-600 hover:text-white group-hover:hidden"
         >
-          <ExternalLink size={10} />
           Open
+          <ExternalLink size={8} />
+        </a>
+      )}
+      {data.mainUrl && (
+        <a
+          href={data.mainUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open link in new tab"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          className="absolute -bottom-1 right-14 z-10 flex h-5 w-16 translate-x-full items-center justify-center gap-x-1 rounded-full border border-slate-400 bg-white text-[9px] font-semibold text-slate-500 opacity-0 shadow transition-opacity hover:border-slate-600 hover:bg-slate-600 hover:text-white group-hover:opacity-100"
+        >
+          Open
+          <ExternalLink size={10} className="-mt-[1px]" />
         </a>
       )}
       {hasCollapsedChildren && !data.isDraft && (
@@ -176,7 +191,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
             data.onAddChild();
           }}
           title="Add child node"
-          className="absolute -bottom-1 right-14 z-10 flex h-5 w-16 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-sky-600 bg-white text-[9px] font-semibold text-sky-600 opacity-0 shadow transition-opacity hover:border-sky-600 hover:bg-sky-600 hover:text-white group-hover:opacity-100"
+          className="absolute -top-1 right-14 z-10 flex h-5 w-16 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-sky-600 bg-white text-[9px] font-semibold text-sky-600 opacity-0 shadow transition-opacity hover:border-sky-600 hover:bg-sky-600 hover:text-white group-hover:opacity-100"
         >
           + Subnode
         </button>
