@@ -3,7 +3,6 @@
 import { Handle, Position } from '@xyflow/react';
 import { ExternalLink } from 'lucide-react';
 import { memo, useState } from 'react';
-import { TYPE_COLORS as SHARED_TYPE_COLORS } from './explorer-shared';
 import { NODE_HEIGHT } from './use-layout';
 
 export const ROOT_NODE_WIDTH = 180;
@@ -93,7 +92,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
   const hasCollapsedChildren = (data.hiddenChildCount ?? 0) > 0;
   const showPreview = isHovered && hasCollapsedChildren && !data.hoverDimmed;
 
-  const effectiveOpacity = data.hoverDimmed ? 0.35 : data.dimmed ? 0.2 : undefined;
+  const effectiveOpacity = data.hoverDimmed ? 0.35 : data.dimmed ? 0.4 : undefined;
 
   return (
     <div
@@ -124,7 +123,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
 
       <div className="absolute left-2 top-[1px] flex gap-1">
         {types.map((t) => (
-          <span key={t} className={`text-[6px] font-bold ${(TYPE_COLORS[t] || TYPE_COLORS.topic).label}`}>
+          <span key={t} className={`text-[7px] font-bold ${(TYPE_COLORS[t] || TYPE_COLORS.topic).label}`}>
             {t.toUpperCase()}
           </span>
         ))}
@@ -137,8 +136,22 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
         {data.author && <div className="mt-0.5 truncate text-[8px] leading-tight text-slate-400">{data.author}</div>}
       </div>
       {data.hiddenChildCount > 0 && (
-        <div className="absolute bottom-1 left-1.5 rounded-sm bg-slate-400 px-1 py-[1px] text-[7px] font-semibold uppercase text-white">
-          {data.hiddenChildCount} Subnode{data.hiddenChildCount !== 1 ? 's' : ''}
+        <div className="absolute bottom-1 left-1.5 flex gap-0.5">
+          {Object.entries(
+            (children as ChildPreview[]).reduce<Record<string, number>>((acc, c) => {
+              const t = c.nodeTypes?.[0] || 'topic';
+              acc[t] = (acc[t] || 0) + 1;
+              return acc;
+            }, {}),
+          ).map(([type, count]) => (
+            <span
+              key={type}
+              className={`rounded-[3px] px-1 py-[1px] text-[7px] font-semibold uppercase text-white ${(TYPE_COLORS[type] || TYPE_COLORS.topic).icon}`}
+            >
+              {count} {type}
+              {count !== 1 ? 's' : ''}
+            </span>
+          ))}
         </div>
       )}
       <Handle
@@ -209,11 +222,11 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
                 className="flex flex-col items-start gap-0.5 rounded border-b border-slate-200 px-1 py-2 first:pt-0 last:border-b-0 last:pb-0"
               >
                 {/* Tag(s) above item title */}
-                <div className="mb-0.5 flex shrink-0 gap-0.5">
+                <div className="mb-0 flex shrink-0 gap-1.5">
                   {child.nodeTypes.map((t) => (
                     <span
                       key={t}
-                      className={`rounded px-1 py-[1px] text-[6px] font-bold uppercase leading-tight ${SHARED_TYPE_COLORS[t] || 'bg-slate-500 text-white'}`}
+                      className={`text-[8px] font-bold uppercase leading-tight ${(TYPE_COLORS[t] || TYPE_COLORS.topic).label}`}
                     >
                       {t}
                     </span>

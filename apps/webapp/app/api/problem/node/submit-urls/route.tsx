@@ -1,5 +1,6 @@
 import { createProblemNode } from '@/lib/db/problem';
 import { detectTypeFromUrl, fetchUrlMetadata } from '@/lib/problem-utils';
+import { normalizeUrl } from '@/lib/problem-url-types';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
@@ -23,13 +24,13 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
 
   const results: { url: string; nodeId?: number; error?: string }[] = [];
 
-  // First URL becomes mainUrl; remaining become additionalUrls
-  const mainUrl = urls[0];
-  const additionalUrls = urls.slice(1);
+  const normalizedUrls = urls.map(normalizeUrl);
+  const mainUrl = normalizedUrls[0];
+  const additionalUrls = normalizedUrls.slice(1);
 
   // Detect types from all URLs, deduplicated
   const detectedTypes = new Set<string>();
-  for (const url of urls) {
+  for (const url of normalizedUrls) {
     detectedTypes.add(detectTypeFromUrl(url));
   }
   const nodeTypes = Array.from(detectedTypes);

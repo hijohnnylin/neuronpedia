@@ -1,6 +1,6 @@
 'use client';
 
-import { detectTypeFromUrl } from '@/lib/problem-url-types';
+import { detectTypeFromUrl, normalizeUrl } from '@/lib/problem-url-types';
 import { Handle, Position } from '@xyflow/react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_NODE_WIDTH, TYPE_COLORS } from './explorer-node';
@@ -47,40 +47,40 @@ function DraftNodeComponent({ data }: { data: any }) {
       if (!trimmed) return;
 
       if (!/^https?:\/\/.+/i.test(trimmed)) {
-        // Not a URL — treat as topic title
         handleTextSubmit(trimmed);
         return;
       }
 
+      const normalized = normalizeUrl(trimmed);
       const d = dataRef.current;
-      const detectedType = detectTypeFromUrl(trimmed);
+      const detectedType = detectTypeFromUrl(normalized);
       const isAdditional = !!d.draftTitle; // check latest data, not stale closure
 
       if (isAdditional) {
         // Additional URL: add to additionalUrls, merge detected type if new
         const currentAdditional: string[] = d.currentAdditionalUrls || [];
         const mainUrl: string = d.draftUrl || '';
-        if (trimmed === mainUrl || currentAdditional.includes(trimmed)) {
+        if (normalized === mainUrl || currentAdditional.includes(normalized)) {
           setUrlInput('');
           return;
         }
         const currentTypes: string[] = d.currentNodeTypes || ['topic'];
         const newTypes = currentTypes.includes(detectedType) ? currentTypes : [...currentTypes, detectedType];
         d.onUpdateDraft?.({
-          additionalUrls: [...currentAdditional, trimmed],
+          additionalUrls: [...currentAdditional, normalized],
           nodeTypes: newTypes,
         });
         setUrlInput('');
       } else {
         // First URL: set as mainUrl, detect type, fetch metadata
-        d.onUpdateDraft?.({ mainUrl: trimmed, nodeTypes: [detectedType] });
+        d.onUpdateDraft?.({ mainUrl: normalized, nodeTypes: [detectedType] });
 
         setFetching(true);
         try {
           const res = await fetch('/api/problem/url-metadata', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: trimmed }),
+            body: JSON.stringify({ url: normalized }),
           });
           if (res.ok) {
             const meta = await res.json();
@@ -92,7 +92,7 @@ function DraftNodeComponent({ data }: { data: any }) {
             } else {
               const title = meta.title ? meta.title.slice(0, MAX_TITLE_LENGTH) : null;
               dataRef.current.onUpdateDraft?.({
-                mainUrl: trimmed,
+                mainUrl: normalized,
                 title,
                 description: meta.description || null,
                 author: meta.author || null,

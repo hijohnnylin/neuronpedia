@@ -1,3 +1,4 @@
+import { normalizeUrl } from '@/lib/problem-url-types';
 import { fetchUrlMetadata } from '@/lib/problem-utils';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
@@ -15,7 +16,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
   }
 
   try {
-    const meta = await fetchUrlMetadata(url);
+    const meta = await fetchUrlMetadata(normalizeUrl(url));
     return NextResponse.json(meta);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

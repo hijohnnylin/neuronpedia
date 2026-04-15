@@ -37,6 +37,27 @@ const TYPE_RULES: TypeRule[] = [
   { match: (u) => u.hostname === 'kaggle.com' || u.hostname === 'www.kaggle.com', type: 'dataset' },
 ];
 
+/**
+ * Normalize known URL variants to their canonical form.
+ * e.g. arxiv.org/pdf/... and arxiv.org/html/... → arxiv.org/abs/...
+ */
+export function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'arxiv.org' || parsed.hostname === 'www.arxiv.org') {
+      const pdfOrHtml = parsed.pathname.match(/^\/(pdf|html)\/(.+)/);
+      if (pdfOrHtml) {
+        const id = pdfOrHtml[2].replace(/v\d+$/, '').replace(/\.pdf$/, '');
+        parsed.pathname = `/abs/${id}`;
+        return parsed.toString();
+      }
+    }
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 export function detectTypeFromUrl(url: string): string {
   try {
     const parsed = new URL(url);

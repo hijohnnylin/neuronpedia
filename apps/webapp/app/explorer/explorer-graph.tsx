@@ -31,7 +31,7 @@ import { NODE_HEIGHT, getLayoutedElements } from './use-layout';
 const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 
 // Padding for fitView — adjust these to control spacing around the graph
-const FIT_VIEW_PADDING_TOP = 0.04;
+const FIT_VIEW_PADDING_TOP = 0.06;
 const FIT_VIEW_PADDING_BOTTOM = 0.03;
 
 function getVisibleNodesWithCollapse(
@@ -771,7 +771,10 @@ function ProblemsGraphInner({
         if (draftNode) {
           const focusIds = [String(DRAFT_ID)];
           if (draftNode.parentId) focusIds.push(String(draftNode.parentId));
-          setTimeout(() => fitView({ padding: 0.3, nodes: layoutedNodes.filter((n) => focusIds.includes(n.id)) }), 50);
+          setTimeout(
+            () => fitView({ padding: 0.3, duration: 300, nodes: layoutedNodes.filter((n) => focusIds.includes(n.id)) }),
+            50,
+          );
         } else if (sid != null) {
           const target = layoutedNodes.find((n) => n.id === String(sid));
           if (target) {
