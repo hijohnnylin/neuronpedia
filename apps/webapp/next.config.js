@@ -70,6 +70,16 @@ const nextConfig = {
         destination: '/graph',
         permanent: true,
       },
+      {
+        source: '/problems',
+        destination: '/explorer',
+        permanent: true,
+      },
+      {
+        source: '/problems/:id',
+        destination: '/explorer/:id',
+        permanent: true,
+      },
     ];
   },
   // https://github.com/mjmlio/mjml/issues/2562

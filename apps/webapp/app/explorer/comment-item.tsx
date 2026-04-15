@@ -1,6 +1,6 @@
 'use client';
 
-import { type Comment } from './problems-shared';
+import { type Comment } from './explorer-shared';
 
 export function CommentItem({ comment }: { comment: Comment }) {
   return (

@@ -2,10 +2,9 @@ import { type Edge, type Node } from '@xyflow/react';
 
 import ELK, { type ElkNode } from 'elkjs/lib/elk.bundled';
 import { DRAFT_NODE_HEIGHT_POPULATED, DRAFT_NODE_HEIGHT_URL } from './draft-node';
-import { DEFAULT_NODE_WIDTH, ROOT_NODE_WIDTH } from './problem-node';
+import { DEFAULT_NODE_WIDTH, ROOT_NODE_WIDTH } from './explorer-node';
 
-const NODE_HEIGHT_TOPIC = 42;
-const NODE_HEIGHT_DEFAULT = 45;
+export const NODE_HEIGHT = 60;
 const SIBLING_GAP = 4;
 
 const elk = new ELK();
@@ -17,10 +16,7 @@ function getNodeDimensions(node: Node): { width: number; height: number } {
   }
   const isRoot = (node.data as any)?.isRoot;
   const width = isRoot ? ROOT_NODE_WIDTH : DEFAULT_NODE_WIDTH;
-  const nodeTypes: string[] = (node.data as any)?.nodeTypes || [];
-  const isTopicOnly = nodeTypes.length > 0 && nodeTypes.every((t: string) => t === 'topic');
-  const height = isTopicOnly ? NODE_HEIGHT_TOPIC : NODE_HEIGHT_DEFAULT;
-  return { width, height };
+  return { width, height: NODE_HEIGHT };
 }
 
 // Sort nodes so that children of the same parent are grouped and alphabetically ordered.

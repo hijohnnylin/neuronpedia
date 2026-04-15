@@ -3,8 +3,8 @@
 import { detectTypeFromUrl } from '@/lib/problem-url-types';
 import { Handle, Position } from '@xyflow/react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { DEFAULT_NODE_WIDTH, TYPE_COLORS } from './problem-node';
-import { MAX_TITLE_LENGTH } from './problems-shared';
+import { DEFAULT_NODE_WIDTH, TYPE_COLORS } from './explorer-node';
+import { MAX_TITLE_LENGTH } from './explorer-shared';
 
 export const DRAFT_NODE_HEIGHT_URL = 50;
 export const DRAFT_NODE_HEIGHT_POPULATED = 58;

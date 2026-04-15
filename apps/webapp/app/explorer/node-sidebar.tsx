@@ -3,7 +3,8 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { useCallback, useEffect, useState } from 'react';
 import { CommentItem } from './comment-item';
-import { type DetailNode, type ProblemNodeData, TYPE_COLORS } from './problems-shared';
+import { TYPE_COLORS as NODE_TYPE_COLORS } from './explorer-node';
+import { type DetailNode, type ProblemNodeData, TYPE_COLORS } from './explorer-shared';
 
 export function NodeSidebar({
   selectedNode,
@@ -59,13 +60,15 @@ export function NodeSidebar({
   }, [node]);
 
   useEffect(() => {
+    setEditing(false);
+  }, [selectedNode.id]);
+
+  useEffect(() => {
     if (editOnSelect) {
       startEditing();
       onEditOnSelectConsumed?.();
-    } else {
-      setEditing(false);
     }
-  }, [selectedNode.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editOnSelect]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveEdit = useCallback(async () => {
     setSaving(true);
@@ -130,14 +133,15 @@ export function NodeSidebar({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1">
-          {node.nodeTypes.map((t) => (
-            <span
-              key={t}
-              className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${TYPE_COLORS[t] || 'bg-slate-100 text-slate-800'}`}
-            >
-              {t}
-            </span>
-          ))}
+          {!editing &&
+            node.nodeTypes.map((t) => (
+              <span
+                key={t}
+                className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${TYPE_COLORS[t] || 'bg-slate-100 text-slate-800'}`}
+              >
+                {t}
+              </span>
+            ))}
         </div>
         <div className="flex items-center gap-2">
           {canEdit && !editing && (
@@ -157,24 +161,27 @@ export function NodeSidebar({
           <div>
             <label className="text-xs font-medium text-slate-600">Types</label>
             <div className="mt-1 flex flex-wrap gap-1">
-              {typeOptions.map((t) => (
-                <button
-                  type="button"
-                  key={t}
-                  onClick={() =>
-                    setEditNodeTypes((prev) =>
-                      prev.includes(t) ? (prev.length > 1 ? prev.filter((x) => x !== t) : prev) : [...prev, t],
-                    )
-                  }
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-medium capitalize transition-colors ${
-                    editNodeTypes.includes(t)
-                      ? 'border-slate-800 bg-slate-800 text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+              {typeOptions.map((t) => {
+                const colors = NODE_TYPE_COLORS[t];
+                return (
+                  <button
+                    type="button"
+                    key={t}
+                    onClick={() =>
+                      setEditNodeTypes((prev) =>
+                        prev.includes(t) ? (prev.length > 1 ? prev.filter((x) => x !== t) : prev) : [...prev, t],
+                      )
+                    }
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase transition-colors ${
+                      editNodeTypes.includes(t)
+                        ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
+                        : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
+                    }`}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div>
@@ -310,15 +317,15 @@ export function NodeSidebar({
             {node.title || '(untitled)'}
             <span className="ml-1.5 text-xs font-normal text-slate-300">&middot;</span>
             <a
-              href={`/problems/${selectedNode.id}`}
+              href={`/explorer/${selectedNode.id}`}
               onClick={(e) => {
                 e.preventDefault();
-                const url = `${window.location.origin}/problems/${selectedNode.id}`;
+                const url = `${window.location.origin}/explorer/${selectedNode.id}`;
                 navigator.clipboard.writeText(url);
                 showToastMessage('Link copied to clipboard.');
               }}
               onContextMenu={() => {
-                const url = `${window.location.origin}/problems/${selectedNode.id}`;
+                const url = `${window.location.origin}/explorer/${selectedNode.id}`;
                 navigator.clipboard.writeText(url);
               }}
               className="ml-1 text-xs font-normal text-slate-400 hover:text-slate-600"

@@ -1,4 +1,4 @@
-import { MAX_TITLE_LENGTH } from '@/app/problems/problems-shared';
+import { MAX_TITLE_LENGTH } from '@/app/explorer/explorer-shared';
 import { prisma } from '@/lib/db';
 import { ProblemEdgeType, ProblemNodeApprovalState, ProblemNodeType } from '@prisma/client';
 import { AuthenticatedUser } from '../with-user';

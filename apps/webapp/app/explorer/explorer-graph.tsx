@@ -1,6 +1,9 @@
 'use client';
 
+import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import { useGlobalContext } from '@/components/provider/global-provider';
+import { BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
+import { Button } from '@/components/shadcn/button';
 import {
   ConnectionLineType,
   Controls,
@@ -20,20 +23,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DraftEditSidebar } from './draft-edit-sidebar';
 import DraftNodeComponent from './draft-node';
 import { DraftPreviewSidebar } from './draft-preview-sidebar';
+import ProblemNodeComponent, { TYPE_COLORS as NODE_TYPE_COLORS } from './explorer-node';
+import { DRAFT_ID, TYPE_HEX_COLORS, type DetailNode, type ProblemNodeData } from './explorer-shared';
 import { NodeSidebar } from './node-sidebar';
-import ProblemNodeComponent, { TYPE_COLORS as NODE_TYPE_COLORS } from './problem-node';
-import { DRAFT_ID, type DetailNode, type ProblemNodeData } from './problems-shared';
-import { getLayoutedElements } from './use-layout';
+import { NODE_HEIGHT, getLayoutedElements } from './use-layout';
 
 const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 
 // Padding for fitView — adjust these to control spacing around the graph
-const FIT_VIEW_PADDING_TOP = 0.05;
+const FIT_VIEW_PADDING_TOP = 0.04;
 const FIT_VIEW_PADDING_BOTTOM = 0.03;
 
 function getVisibleNodesWithCollapse(
   allNodes: ProblemNodeData[],
   selectedId: number | null,
+  expandForIds?: Set<number>,
 ): { visibleNodes: ProblemNodeData[]; hiddenChildCounts: Map<number, number> } {
   const nodeById = new Map(allNodes.map((n) => [n.id, n]));
 
@@ -66,16 +70,22 @@ function getVisibleNodesWithCollapse(
     }
   }
 
-  // A node is expanded (shows its children) if it's a root, on the ancestor path, or a descendant of the selected node
+  // Also expand ancestors of filter-matched nodes so they're visible
+  if (expandForIds) {
+    for (const id of expandForIds) {
+      let cur: number | null | undefined = id;
+      while (cur != null) {
+        ancestorIds.add(cur);
+        cur = nodeById.get(cur)?.parentId;
+      }
+    }
+  }
+
+  // A node is expanded (shows its children) if it's a root, on the ancestor path, or the selected node itself
   const expandedIds = new Set<number>([...ancestorIds]);
   roots.forEach((r) => expandedIds.add(r.id));
   if (selectedId != null && selectedId !== DRAFT_ID) {
-    const descQueue = [selectedId];
-    while (descQueue.length > 0) {
-      const id = descQueue.shift()!;
-      expandedIds.add(id);
-      (childrenOf.get(id) || []).forEach((childId) => descQueue.push(childId));
-    }
+    expandedIds.add(selectedId);
   }
 
   const visibleIds = new Set<number>();
@@ -104,19 +114,25 @@ function getVisibleNodesWithCollapse(
   };
 }
 
-async function buildFlowGraph(
-  problemNodes: ProblemNodeData[],
-  onAddChild?: (parentId: number) => void,
-  onEditNode?: (nodeId: number) => void,
+type FlowBuildParams = {
+  problemNodes: ProblemNodeData[];
+  onAddChild?: (parentId: number) => void;
+  onEditNode?: (nodeId: number) => void;
   draftCallbacks?: {
     onUpdateDraft: (fields: Partial<ProblemNodeData>) => void;
     onSubmitDraft: () => void;
     onStartEdit: () => void;
     onCancel: () => void;
     saving: boolean;
-  },
-  hiddenChildCounts?: Map<number, number>,
-) {
+  };
+  hiddenChildCounts?: Map<number, number>;
+  dimmedIds?: Set<number>;
+  hoverCallbacks?: { onHoverNode: (id: number) => void; onHoverLeave: () => void };
+};
+
+function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges: Edge[] } {
+  const { problemNodes, onAddChild, onEditNode, draftCallbacks, hiddenChildCounts, dimmedIds, hoverCallbacks } = params;
+
   const nodes: Node[] = problemNodes.map((pn) => {
     if (pn.id === DRAFT_ID) {
       return {
@@ -150,13 +166,17 @@ async function buildFlowGraph(
         nodeTypes: pn.nodeTypes,
         description: pn.description,
         childCount: pn.children?.length ?? 0,
+        children: pn.children || [],
         approvalState: pn.approvalState,
         mainUrl: pn.mainUrl,
         isRoot: !pn.parentId || pn.parentId === 1,
         isDraft: false,
         hiddenChildCount: hiddenChildCounts?.get(pn.id) ?? 0,
+        dimmed: dimmedIds?.has(pn.id) ?? false,
         onAddChild: onAddChild ? () => onAddChild(pn.id) : undefined,
         onEditNode: onEditNode ? () => onEditNode(pn.id) : undefined,
+        onHoverNode: hoverCallbacks ? () => hoverCallbacks.onHoverNode(pn.id) : undefined,
+        onHoverLeave: hoverCallbacks?.onHoverLeave,
       },
     };
   });
@@ -174,6 +194,11 @@ async function buildFlowGraph(
       animated: false,
     }));
 
+  return { nodes, edges };
+}
+
+async function buildFlowGraph(params: FlowBuildParams) {
+  const { nodes, edges } = buildFlowNodesAndEdges(params);
   return getLayoutedElements(nodes, edges);
 }
 
@@ -233,8 +258,7 @@ function ProblemsGraphInner({
       if (!container) return;
       const zoom = opts?.zoom ?? 1.5;
       const rect = container.getBoundingClientRect();
-      // Position node at 20% from left, vertically centered
-      const x = -((nodeX + nodeW / 2) * zoom) + rect.width * 0.3;
+      const x = -((nodeX + nodeW / 2) * zoom) + rect.width * 0.45;
       const y = -((nodeY + nodeH / 2) * zoom) + rect.height / 2;
       setViewport({ x, y, zoom }, { duration: opts?.duration });
     },
@@ -251,11 +275,88 @@ function ProblemsGraphInner({
   const [draftNode, setDraftNode] = useState<ProblemNodeData | null>(null);
   const [editOnSelect, setEditOnSelect] = useState(false);
   const [showUnapproved, setShowUnapproved] = useState(false);
+  const [filteredNodeCount, setFilteredNodeCount] = useState(0);
+  const [totalNodeCount, setTotalNodeCount] = useState(0);
+  const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onHoverNode = useCallback(
+    (id: number) => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+      setHoveredNodeId(id);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          zIndex: n.id === String(id) ? 1000 : 0,
+          data: { ...n.data, hoverDimmed: n.id !== String(id) },
+        })),
+      );
+    },
+    [setNodes],
+  );
+
+  const onHoverLeave = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredNodeId(null);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          zIndex: 0,
+          data: { ...n.data, hoverDimmed: false },
+        })),
+      );
+    }, 75);
+  }, [setNodes]);
 
   const selectedNode = useMemo(() => {
     if (selectedNodeId === DRAFT_ID && draftNode) return draftNode;
     return problemNodes.find((n) => n.id === selectedNodeId) || null;
   }, [problemNodes, selectedNodeId, draftNode]);
+
+  const ancestryChain = useMemo(() => {
+    if (!selectedNodeId || selectedNodeId === DRAFT_ID) return [];
+    const nodeById = new Map(problemNodes.map((n) => [n.id, n]));
+    const chain: ProblemNodeData[] = [];
+    let cur = nodeById.get(selectedNodeId);
+    while (cur) {
+      chain.unshift(cur);
+      cur = cur.parentId ? nodeById.get(cur.parentId) : undefined;
+    }
+    return chain;
+  }, [problemNodes, selectedNodeId]);
+
+  const breadcrumbs = useMemo(() => {
+    const crumbs: React.ReactNode[] = [];
+    if (ancestryChain.length === 0) {
+      crumbs.push(<span key="explorer">Field Explorer</span>);
+    } else {
+      crumbs.push(
+        <BreadcrumbLink key="explorer" href="/explorer">
+          Field Explorer
+        </BreadcrumbLink>,
+      );
+      ancestryChain.forEach((node, i) => {
+        const isLast = i === ancestryChain.length - 1;
+        if (isLast) {
+          crumbs.push(
+            <span key={node.id} className="truncate">
+              {node.title || '(untitled)'}
+            </span>,
+          );
+        } else {
+          crumbs.push(
+            <BreadcrumbLink key={node.id} href={`/explorer/${node.id}`}>
+              {node.title || '(untitled)'}
+            </BreadcrumbLink>,
+          );
+        }
+      });
+    }
+    return crumbs;
+  }, [ancestryChain]);
 
   // Fetch full detail (comments, edges) only when a node is selected
   useEffect(() => {
@@ -263,6 +364,7 @@ function ProblemsGraphInner({
       setDetailNode(null);
       return;
     }
+    setDetailNode(null);
     fetch('/api/problem/node/get', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -365,7 +467,7 @@ function ProblemsGraphInner({
     setDraftEditing(false);
     if (selectedNodeIdRef.current === DRAFT_ID) {
       setSelectedNodeId(null);
-      window.history.replaceState(null, '', '/problems');
+      window.history.replaceState(null, '', '/explorer');
     }
   }, []);
 
@@ -411,11 +513,35 @@ function ProblemsGraphInner({
     [updateDraftFields, submitDraft, startDraftEdit, handleDraftCancelled, draftSaving],
   );
 
+  const typeFilterOptions = useMemo(() => {
+    const base = ['all', 'tool', 'replication', 'paper', 'dataset', 'eval', 'model'];
+    if (canEdit) base.push('unapproved');
+    return base;
+  }, [canEdit]);
+  const [typeFilter, setTypeFilter] = useState('all');
+
+  const positionCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const prevProblemNodesRef = useRef(problemNodes);
+  const prevTypeFilterRef = useRef(typeFilter);
+  const prevDraftNodeRef = useRef(draftNode);
+
+  const handleTypeFilter = useCallback(
+    (t: string) => {
+      setTypeFilter(t);
+      setShowUnapproved(t === 'unapproved');
+      setSelectedNodeId(null);
+      window.history.replaceState(null, '', '/explorer');
+    },
+    [setShowUnapproved],
+  );
+
   const selectNode = useCallback(
     (id: number) => {
       setSelectedNodeId(id);
+      setTypeFilter('all');
+      setShowUnapproved(false);
       setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === String(id) })));
-      window.history.replaceState(null, '', `/problems/${id}`);
+      window.history.replaceState(null, '', `/explorer/${id}`);
       setTimeout(() => {
         const currentNodes = getNodes();
         const target = currentNodes.find((n) => n.id === String(id));
@@ -431,10 +557,12 @@ function ProblemsGraphInner({
 
   const editNode = useCallback(
     (id: number) => {
-      selectNode(id);
+      if (id !== selectedNodeId) {
+        selectNode(id);
+      }
       setEditOnSelect(true);
     },
-    [selectNode],
+    [selectNode, selectedNodeId],
   );
 
   const onNodeClick = useCallback(
@@ -448,7 +576,7 @@ function ProblemsGraphInner({
       if (clickedId === selectedNodeId) {
         setSelectedNodeId(null);
         setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-        window.history.replaceState(null, '', '/problems');
+        window.history.replaceState(null, '', '/explorer');
       } else {
         selectNode(clickedId);
       }
@@ -458,19 +586,22 @@ function ProblemsGraphInner({
 
   const handleClose = useCallback(() => {
     setSelectedNodeId(null);
-    window.history.replaceState(null, '', '/problems');
+    window.history.replaceState(null, '', '/explorer');
   }, []);
 
   const onPaneClick = useCallback(() => {
+    if (hoveredNodeId != null) {
+      setHoveredNodeId(null);
+      setNodes((nds) => nds.map((n) => ({ ...n, zIndex: 0, data: { ...n.data, hoverDimmed: false } })));
+    }
     if (draftNode) return;
     if (selectedNodeId != null) {
       handleClose();
-      // Delay zoom reset until sidebar is gone and container has resized
       setTimeout(() => fitViewCustom(), 50);
     } else {
       fitViewCustom();
     }
-  }, [draftNode, selectedNodeId, handleClose, fitViewCustom]);
+  }, [draftNode, selectedNodeId, handleClose, fitViewCustom, hoveredNodeId, setNodes]);
 
   const handleAddNode = useCallback(() => {
     if (!session?.user) {
@@ -533,7 +664,7 @@ function ProblemsGraphInner({
       if (parentId) {
         selectedNodeIdRef.current = parentId;
         setSelectedNodeId(parentId);
-        window.history.replaceState(null, '', `/problems/${parentId}`);
+        window.history.replaceState(null, '', `/explorer/${parentId}`);
       } else {
         handleClose();
       }
@@ -541,15 +672,16 @@ function ProblemsGraphInner({
     }
   }, [selectedNodeId, selectedNode, handleClose, fetchNodes]);
 
-  const typeFilterOptions = useMemo(
-    () => ['all', 'topic', 'paper', 'tool', 'dataset', 'eval', 'replication', 'model'],
-    [],
-  );
-  const [typeFilter, setTypeFilter] = useState('all');
-
   useEffect(() => {
     if (problemNodes.length === 0 && !draftNode) return;
-    const filtered = typeFilter === 'all' ? problemNodes : problemNodes.filter((n) => n.nodeTypes.includes(typeFilter));
+    const filtered =
+      typeFilter === 'all'
+        ? problemNodes
+        : typeFilter === 'unapproved'
+          ? problemNodes.filter((n) => n.approvalState !== 'APPROVED')
+          : problemNodes.filter((n) => n.nodeTypes.includes(typeFilter));
+    setFilteredNodeCount(filtered.length);
+    setTotalNodeCount(problemNodes.length);
     const includeIds = new Set(filtered.map((n) => n.id));
     const nodeById = new Map(problemNodes.map((n) => [n.id, n]));
     filtered.forEach((n) => {
@@ -563,24 +695,144 @@ function ProblemsGraphInner({
       }
     });
     const withParents = problemNodes.filter((n) => includeIds.has(n.id));
-    const { visibleNodes, hiddenChildCounts } = getVisibleNodesWithCollapse(withParents, selectedNodeId);
+
+    // Dim nodes not related to the selected node (ancestors, selected, descendants stay bright)
+    let selectionDimmedIds: Set<number> | undefined;
+    if (selectedNodeId != null && selectedNodeId !== DRAFT_ID) {
+      const focusedIds = new Set<number>();
+      const nbm = new Map(withParents.map((n) => [n.id, n]));
+
+      // Walk up to collect ancestors
+      let cur: number | null | undefined = selectedNodeId;
+      while (cur != null) {
+        focusedIds.add(cur);
+        cur = nbm.get(cur)?.parentId;
+      }
+
+      // Walk down to collect all descendants
+      const descQueue = [selectedNodeId];
+      while (descQueue.length > 0) {
+        const id = descQueue.shift()!;
+        focusedIds.add(id);
+        withParents.forEach((n) => {
+          if (n.parentId === id && !focusedIds.has(n.id)) {
+            descQueue.push(n.id);
+          }
+        });
+      }
+
+      selectionDimmedIds = new Set(withParents.filter((n) => !focusedIds.has(n.id)).map((n) => n.id));
+    }
+
+    const filterMatchIds = typeFilter !== 'all' ? new Set(filtered.map((n) => n.id)) : undefined;
+    const { visibleNodes, hiddenChildCounts } = getVisibleNodesWithCollapse(
+      withParents,
+      selectedNodeId,
+      filterMatchIds,
+    );
+    const filterDimmedIds =
+      filterMatchIds && filterMatchIds.size > 0
+        ? new Set(visibleNodes.filter((n) => !filterMatchIds.has(n.id)).map((n) => n.id))
+        : undefined;
+    const dimmedIds =
+      selectionDimmedIds || filterDimmedIds
+        ? new Set([...(selectionDimmedIds || []), ...(filterDimmedIds || [])])
+        : undefined;
     const allNodes = draftNode ? [...visibleNodes, draftNode] : visibleNodes;
-    buildFlowGraph(
-      allNodes,
-      addChildToNode,
-      canEdit ? editNode : undefined,
-      draftNode ? draftCallbacks : undefined,
+    const buildParams: FlowBuildParams = {
+      problemNodes: allNodes,
+      onAddChild: addChildToNode,
+      onEditNode: canEdit ? editNode : undefined,
+      draftCallbacks: draftNode ? draftCallbacks : undefined,
       hiddenChildCounts,
-    ).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+      dimmedIds,
+      hoverCallbacks: selectedNodeId == null ? { onHoverNode, onHoverLeave } : undefined,
+    };
+
+    const needsRelayout =
+      positionCacheRef.current.size === 0 ||
+      problemNodes !== prevProblemNodesRef.current ||
+      typeFilter !== prevTypeFilterRef.current ||
+      draftNode !== prevDraftNodeRef.current;
+
+    prevProblemNodesRef.current = problemNodes;
+    prevTypeFilterRef.current = typeFilter;
+    prevDraftNodeRef.current = draftNode;
+
+    if (needsRelayout) {
+      buildFlowGraph(buildParams).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+        const cache = new Map<string, { x: number; y: number }>();
+        layoutedNodes.forEach((n) => cache.set(n.id, { ...n.position }));
+        positionCacheRef.current = cache;
+
+        const sid = selectedNodeIdRef.current;
+        setNodes(layoutedNodes.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
+        setEdges(layoutedEdges);
+        if (draftNode) {
+          const focusIds = [String(DRAFT_ID)];
+          if (draftNode.parentId) focusIds.push(String(draftNode.parentId));
+          setTimeout(() => fitView({ padding: 0.3, nodes: layoutedNodes.filter((n) => focusIds.includes(n.id)) }), 50);
+        } else if (sid != null) {
+          const target = layoutedNodes.find((n) => n.id === String(sid));
+          if (target) {
+            const w = target.measured?.width ?? 200;
+            const h = target.measured?.height ?? 40;
+            setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200 }), 50);
+          } else {
+            setTimeout(() => fitViewCustom(), 50);
+          }
+        } else {
+          setTimeout(() => fitViewCustom(), 50);
+        }
+      });
+    } else {
+      const { nodes: builtNodes, edges: builtEdges } = buildFlowNodesAndEdges(buildParams);
+
       const sid = selectedNodeIdRef.current;
-      setNodes(layoutedNodes.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
-      setEdges(layoutedEdges);
-      if (draftNode) {
-        const focusIds = [String(DRAFT_ID)];
-        if (draftNode.parentId) focusIds.push(String(draftNode.parentId));
-        setTimeout(() => fitView({ padding: 0.3, nodes: layoutedNodes.filter((n) => focusIds.includes(n.id)) }), 50);
-      } else if (sid != null) {
-        const target = layoutedNodes.find((n) => n.id === String(sid));
+      const focusedNodeIds = new Set<string>();
+      if (sid != null) {
+        focusedNodeIds.add(String(sid));
+        const nbm = new Map(buildParams.problemNodes.map((pn) => [pn.id, pn]));
+        let cur: number | null | undefined = sid;
+        while (cur != null) {
+          focusedNodeIds.add(String(cur));
+          cur = nbm.get(cur)?.parentId;
+        }
+        const dq = [sid];
+        while (dq.length > 0) {
+          const id = dq.shift()!;
+          focusedNodeIds.add(String(id));
+          buildParams.problemNodes.forEach((pn) => {
+            if (pn.parentId === id && !focusedNodeIds.has(String(pn.id))) dq.push(pn.id);
+          });
+        }
+      }
+
+      const newChildOffsets = new Map<string, number>();
+      const positioned = builtNodes.map((n) => {
+        const isFocused = focusedNodeIds.has(n.id);
+        const cached = positionCacheRef.current.get(n.id);
+        if (cached) return { ...n, position: { ...cached }, zIndex: isFocused ? 100 : 0 };
+
+        const parentEdge = builtEdges.find((e) => e.target === n.id);
+        if (parentEdge) {
+          const parentPos = positionCacheRef.current.get(parentEdge.source);
+          if (parentPos) {
+            const offset = newChildOffsets.get(parentEdge.source) || 0;
+            newChildOffsets.set(parentEdge.source, offset + 1);
+            const pos = { x: parentPos.x + 300, y: parentPos.y + offset * (NODE_HEIGHT + 4) };
+            positionCacheRef.current.set(n.id, pos);
+            return { ...n, position: pos, zIndex: 100 };
+          }
+        }
+        return n;
+      });
+
+      setNodes(positioned.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
+      setEdges(builtEdges);
+
+      if (sid != null) {
+        const target = positioned.find((n) => n.id === String(sid));
         if (target) {
           const w = target.measured?.width ?? 200;
           const h = target.measured?.height ?? 40;
@@ -591,7 +843,7 @@ function ProblemsGraphInner({
       } else {
         setTimeout(() => fitViewCustom(), 50);
       }
-    });
+    }
   }, [
     typeFilter,
     selectedNodeId,
@@ -606,20 +858,23 @@ function ProblemsGraphInner({
     fitView,
     fitViewCustom,
     panToNode,
+    onHoverNode,
+    onHoverLeave,
   ]);
 
   return (
     <>
+      <BreadcrumbsComponent crumbsArray={breadcrumbs} />
       <div className="flex h-[calc(100vh-48px)] items-center justify-center sm:hidden">
         <p className="px-8 text-center text-sm text-slate-500">
           This interface is not yet optimized for mobile. Go to{' '}
-          <a href="/problems" className="text-sky-600 underline">
-            {typeof window !== 'undefined' ? window.location.host : ''}/problems
+          <a href="/explorer" className="text-sky-600 underline">
+            neuronpedia.org/explorer
           </a>{' '}
           on a larger screen.
         </p>
       </div>
-      <div className="hidden h-[calc(100vh-48px)] w-full sm:flex">
+      <div className="hidden h-[calc(100vh-84px)] w-full sm:flex">
         <div ref={flowContainerRef} className="flex-1">
           <ReactFlow
             nodes={nodes}
@@ -655,38 +910,32 @@ function ProblemsGraphInner({
                 position="top-right"
                 className="!static !m-0"
                 nodeColor={(node) => {
-                  const colorMap: Record<string, string> = {
-                    topic: '#3b82f6',
-                    paper: '#10b981',
-                    tool: '#4f46e5',
-                    dataset: '#f59e0b',
-                    eval: '#f43f5e',
-                    replication: '#c026d3',
-                    model: '#78716c',
-                  };
-                  return colorMap[(node.data as any)?.nodeTypes?.[0]] || '#94a3b8';
+                  const types = (node.data as Record<string, string[]>)?.nodeTypes;
+                  return TYPE_HEX_COLORS[types?.[0]] || '#94a3b8';
                 }}
                 maskColor="rgba(100, 116, 139, 0.35)"
                 style={{ height: 100, width: 160, border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}
               />
             </Panel>
 
-            <div className="pointer-events-none absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg bg-white/50 px-4 py-2 text-center backdrop-blur-[3px]">
-              <h1 className="text-sm font-semibold text-slate-800">Mech Interp Problems & Explorer</h1>
-              <p className="mt-0.5 text-[11px] text-slate-400">Seeded from Sharkey et al. 2025</p>
-            </div>
-            <Panel position="bottom-left">
+            <Panel position="top-left">
               <div className="flex flex-col gap-2">
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-xl">
-                  <div className="grid grid-cols-4 gap-1 pt-0">
+                <div className="rounded-lg border border-slate-200 bg-white px-4 pb-3.5 pt-2.5 shadow">
+                  <h1 className="mb-1 w-full text-center text-[15px] font-semibold text-slate-700">
+                    Interpretability Field Explorer
+                  </h1>
+                  <div className="mb-1 w-full text-center text-[8px] font-medium uppercase text-slate-400">
+                    Filter by type
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-1 pt-0">
                     {typeFilterOptions.map((t) => {
                       const colors = NODE_TYPE_COLORS[t];
                       return (
                         <button
                           type="button"
                           key={t}
-                          onClick={() => setTypeFilter(t)}
-                          className={`rounded-full border px-1.5 py-1 text-center text-[8px] font-bold uppercase transition-colors ${
+                          onClick={() => handleTypeFilter(t)}
+                          className={`rounded-full border px-3 py-1 text-center text-[9px] font-bold uppercase transition-colors ${
                             typeFilter === t
                               ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
                               : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
@@ -697,25 +946,32 @@ function ProblemsGraphInner({
                       );
                     })}
                   </div>
-                  <div className="mt-2 flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-label="Show unapproved"
-                      aria-checked={showUnapproved}
-                      onClick={() => setShowUnapproved((v) => !v)}
-                      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors ${
-                        showUnapproved ? 'bg-sky-700' : 'bg-slate-300'
-                      }`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-3 w-3 translate-y-0.5 rounded-full bg-white shadow transition-transform ${
-                          showUnapproved ? 'translate-x-3.5' : 'translate-x-0.5'
-                        }`}
-                      />
-                    </button>
-                    <span className="text-[11px] text-slate-500">Show unapproved</span>
-                  </div>
+                  {typeFilter !== 'all' && (
+                    <div className="mt-2.5 flex items-center justify-center gap-3 rounded bg-slate-100 py-2.5">
+                      <span className="text-[12px] text-slate-600">
+                        Filtering to {filteredNodeCount} of {totalNodeCount} nodes
+                      </span>
+                      <Button
+                        size="xs"
+                        onClick={() => handleTypeFilter('all')}
+                        className="rounded px-3 py-1.5 text-[10px] font-semibold uppercase"
+                      >
+                        Clear Filter
+                      </Button>
+                    </div>
+                  )}
+                  {selectedNodeId != null && selectedNodeId !== DRAFT_ID && (
+                    <div className="mt-2.5 flex items-center justify-center gap-3 rounded bg-slate-100 py-2.5">
+                      <span className="text-[12px] text-slate-600">Selected Single Node</span>
+                      <Button
+                        size="xs"
+                        onClick={handleClose}
+                        className="rounded px-3 py-1.5 text-[10px] font-semibold uppercase"
+                      >
+                        Show All Nodes
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             </Panel>
@@ -770,6 +1026,20 @@ function ProblemsGraphInner({
                 className="mt-2 rounded-lg bg-sky-700 px-4 py-2 text-xs font-medium text-white hover:bg-sky-800"
               >
                 Create the first one
+              </button>
+            </div>
+          </div>
+        )}
+        {problemNodes.length > 0 && nodes.length === 0 && !draftNode && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+            <div className="pointer-events-auto text-center">
+              <p className="text-sm text-slate-500">No nodes matched the current filter.</p>
+              <button
+                type="button"
+                onClick={() => handleTypeFilter('all')}
+                className="mt-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Reset filter
               </button>
             </div>
           </div>

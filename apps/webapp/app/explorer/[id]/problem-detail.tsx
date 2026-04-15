@@ -106,13 +106,17 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
       {/* Breadcrumb */}
       <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
-        <Link href="/problems" className="hover:text-sky-600 hover:underline">
-          Problems
+        <Link href="/" className="hover:text-sky-600 hover:underline">
+          Home
+        </Link>
+        <span>/</span>
+        <Link href="/explorer" className="hover:text-sky-600 hover:underline">
+          Explorer
         </Link>
         {node.parent && (
           <>
             <span>/</span>
-            <Link href={`/problems/${node.parent.id}`} className="hover:text-sky-600 hover:underline">
+            <Link href={`/explorer/${node.parent.id}`} className="hover:text-sky-600 hover:underline">
               {node.parent.title || '(untitled)'}
             </Link>
           </>
@@ -208,7 +212,7 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
             {node.children.map((child) => (
               <Link
                 key={child.id}
-                href={`/problems/${child.id}`}
+                href={`/explorer/${child.id}`}
                 className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50"
               >
                 {child.nodeTypes.map((t) => (
@@ -234,7 +238,7 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
             {node.edgesAsSource.map((edge) => (
               <Link
                 key={edge.id}
-                href={`/problems/${edge.targetNode.id}`}
+                href={`/explorer/${edge.targetNode.id}`}
                 className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50"
               >
                 <span className="text-xs text-slate-400">{edge.type}</span>
@@ -244,7 +248,7 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
             {node.edgesAsTarget.map((edge) => (
               <Link
                 key={edge.id}
-                href={`/problems/${edge.sourceNode.id}`}
+                href={`/explorer/${edge.sourceNode.id}`}
                 className="flex items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-sm hover:bg-slate-50"
               >
                 <span className="text-xs text-slate-400">{edge.type}</span>

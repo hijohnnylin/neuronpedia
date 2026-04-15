@@ -1,4 +1,4 @@
-import { MAX_TITLE_LENGTH } from '@/app/problems/problems-shared';
+import { MAX_TITLE_LENGTH } from '@/app/explorer/explorer-shared';
 
 export { detectTypeFromUrl } from './problem-url-types';
 

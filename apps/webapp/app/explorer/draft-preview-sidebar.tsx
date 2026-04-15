@@ -1,6 +1,6 @@
 'use client';
 
-import { type ProblemNodeData, TYPE_COLORS } from './problems-shared';
+import { type ProblemNodeData, TYPE_COLORS } from './explorer-shared';
 
 export function DraftPreviewSidebar({ draftNode, onCancel }: { draftNode: ProblemNodeData; onCancel: () => void }) {
   return (

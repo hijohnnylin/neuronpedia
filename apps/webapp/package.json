@@ -3,38 +3,33 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "prisma generate && next dev",
-    "dev:localhost": "env-cmd -f .env.localhost --use-shell \"prisma generate && next dev\"",
-    "dev:remote": "env-cmd -f .env.remote --use-shell \"prisma generate && next dev\"",
-    "dev:demo": "env-cmd -f .env.demo --use-shell \"prisma generate && next dev\"",
-    "dev:demo:admin": "env-cmd -f .env.demo.admin --use-shell \"prisma generate && next dev\"",
-    "dev:prod": "env-cmd -f .env.prod --use-shell \"prisma generate && next dev\"",
+    "dev": "prisma generate && next dev --turbopack",
+    "dev:localhost": "env-cmd -f .env.localhost --use-shell \"prisma generate && next dev --turbopack\"",
+    "dev:remote": "env-cmd -f .env.remote --use-shell \"prisma generate && next dev --turbopack\"",
+    "dev:prod": "env-cmd -f .env.prod --use-shell \"prisma generate && next dev --turbopack\"",
+    "build": "prisma generate && prisma db push && next build",
+    "build:localhost": "env-cmd -f .env.localhost next build",
+    "build:remote": "env-cmd -f .env.remote next build",
+    "build:prod": "env-cmd -f .env.prod next build",
+    "build:simple": "prisma generate && next build",
+    "db:seed": "prisma db seed",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
     "migrate:localhost": "env-cmd -f .env.localhost prisma migrate dev",
     "migrate:localhost:create-only": "env-cmd -f .env.localhost prisma migrate dev --create-only",
     "migrate:remote": "env-cmd -f .env.remote prisma migrate dev",
-    "migrate:demo": "env-cmd -f .env.demo.admin prisma migrate dev",
-    "build": "prisma generate && prisma db push && next build",
-    "db:push": "prisma db push",
-    "build:localhost": "env-cmd -f .env.localhost next build",
-    "build:remote": "env-cmd -f .env.remote next build",
-    "build:demo": "env-cmd -f .env.demo next build",
-    "build:prod": "env-cmd -f .env.prod next build",
-    "build:simple": "prisma generate && next build",
-    "format:write": "prettier --write \"**/*.{css,js,json,jsx,ts,tsx}\"",
-    "format": "prettier \"**/*.{css,js,json,jsx,ts,tsx}\"",
-    "db:migrate:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed",
     "start:localhost": "env-cmd -f .env.localhost next start",
     "start:remote": "env-cmd -f .env.remote next start",
-    "start:demo": "env-cmd -f .env.demo next start",
     "start:prod": "env-cmd -f .env.prod next start",
     "start": "next start",
     "test:vitest": "vitest",
     "test:playwright": "playwright test",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint --quiet . && tsc --noEmit",
     "lint:fix": "eslint --fix .",
-    "knip": "knip",
-    "test:coverage": "vitest run --coverage"
+    "format:write": "prettier --write \"**/*.{css,js,json,jsx,ts,tsx}\"",
+    "format": "prettier \"**/*.{css,js,json,jsx,ts,tsx}\"",
+    "knip": "knip"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
@@ -220,5 +215,7 @@
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "^4.40.1"
   },
-  "overrides": {}
+  "overrides": {
+    "import-in-the-middle": "3.0.1"
+  }
 }

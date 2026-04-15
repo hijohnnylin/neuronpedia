@@ -45,3 +45,13 @@ export const TYPE_COLORS: Record<string, string> = {
   replication: 'bg-fuchsia-600 text-white',
   model: 'bg-stone-600 text-white',
 };
+
+export const TYPE_HEX_COLORS: Record<string, string> = {
+  topic: '#3b82f6',
+  paper: '#10b981',
+  tool: '#4f46e5',
+  dataset: '#f59e0b',
+  eval: '#f43f5e',
+  replication: '#c026d3',
+  model: '#78716c',
+};

@@ -3,20 +3,21 @@ import { prisma } from '@/lib/db';
 import { getProblemNodes } from '@/lib/db/problem';
 import { Metadata } from 'next';
 import { getServerSession } from 'next-auth';
-import ProblemsGraph from '../problems-graph';
+import ProblemsGraph from './explorer-graph';
 
 export const metadata: Metadata = {
-  title: 'Open Problems in Mechanistic Interpretability',
+  title: 'Interpretability Field Explorer',
   description:
     'Explore the landscape of open problems, tools, papers, and datasets in mechanistic interpretability research.',
 };
 
-export default async function ProblemNodePage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
+export default async function ProblemsPage() {
   const session = await getServerSession(authOptions);
 
-  const initialNodes = await getProblemNodes(false);
+  // Fetch all approved nodes server-side (plus user's own nodes if logged in)
+  const initialNodes = await getProblemNodes(false, session?.user?.id);
 
+  // Check if user is editor/admin
   let canEdit = false;
   if (session?.user?.id) {
     const dbUser = await prisma.user.findUnique({
@@ -26,11 +27,5 @@ export default async function ProblemNodePage(props: { params: Promise<{ id: str
     canEdit = dbUser?.admin === true || dbUser?.isProblemEditor === true;
   }
 
-  return (
-    <ProblemsGraph
-      initialNodes={JSON.parse(JSON.stringify(initialNodes))}
-      canEdit={canEdit}
-      initialSelectedId={Number(params.id)}
-    />
-  );
+  return <ProblemsGraph initialNodes={JSON.parse(JSON.stringify(initialNodes))} canEdit={canEdit} />;
 }

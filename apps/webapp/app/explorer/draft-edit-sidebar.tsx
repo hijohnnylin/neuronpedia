@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { NODE_TYPES_LIST, type ProblemNodeData } from './problems-shared';
+import { TYPE_COLORS as NODE_TYPE_COLORS } from './explorer-node';
+import { NODE_TYPES_LIST, type ProblemNodeData } from './explorer-shared';
 
 export function DraftEditSidebar({
   draftNode,
@@ -56,24 +57,27 @@ export function DraftEditSidebar({
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">Types *</label>
           <div className="flex flex-wrap gap-1">
-            {NODE_TYPES_LIST.map((t) => (
-              <button
-                type="button"
-                key={t}
-                onClick={() => {
-                  const cur = draftNode.nodeTypes;
-                  const next = cur.includes(t) ? (cur.length > 1 ? cur.filter((x) => x !== t) : cur) : [...cur, t];
-                  updateDraft({ nodeTypes: next });
-                }}
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
-                  draftNode.nodeTypes.includes(t)
-                    ? 'border-slate-800 bg-slate-800 text-white'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+            {NODE_TYPES_LIST.map((t) => {
+              const colors = NODE_TYPE_COLORS[t];
+              return (
+                <button
+                  type="button"
+                  key={t}
+                  onClick={() => {
+                    const cur = draftNode.nodeTypes;
+                    const next = cur.includes(t) ? (cur.length > 1 ? cur.filter((x) => x !== t) : cur) : [...cur, t];
+                    updateDraft({ nodeTypes: next });
+                  }}
+                  className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase transition-colors ${
+                    draftNode.nodeTypes.includes(t)
+                      ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
+                      : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
+                  }`}
+                >
+                  {t}
+                </button>
+              );
+            })}
           </div>
         </div>
 
