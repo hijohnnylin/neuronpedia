@@ -309,15 +309,21 @@ function ProblemsGraphInner({
   const guideItems: MediaItem[] = [
     {
       type: 'video',
-      src: `${ASSET_BASE_URL}/graph/subgraph-demo.mp4`,
-      title: 'Navigating the Explorer',
-      subtitle: 'Overview',
+      src: `${ASSET_BASE_URL}/demos/explorer-browse.mp4`,
+      title: 'Browse & Navigate',
+      subtitle: 'Zoom, Pan, Hover, Select',
     },
     {
-      type: 'image',
-      src: `${ASSET_BASE_URL}/graph/explainer-new.jpg`,
-      title: 'Node Types',
-      subtitle: 'Reference',
+      type: 'video',
+      src: `${ASSET_BASE_URL}/demos/explorer-add.mp4`,
+      title: 'Add & Contribute',
+      subtitle: 'Add Tools/Models/etc',
+    },
+    {
+      type: 'video',
+      src: `${ASSET_BASE_URL}/demos/explorer-approve.mp4`,
+      title: 'Approve',
+      subtitle: 'Editor Role Only',
     },
   ];
 
@@ -1114,7 +1120,7 @@ function ProblemsGraphInner({
 
             {editors.length > 0 && (
               <Panel position="bottom-left">
-                <div className="hidden min-w-[200px] max-w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 shadow-md">
+                <div className="min-w-[200px] max-w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 shadow-md">
                   {canEdit && (
                     <>
                       <div className="mb-2 border-b px-3.5 pb-2 pt-1 text-left text-[10px] font-medium leading-snug text-sky-700">
@@ -1122,7 +1128,7 @@ function ProblemsGraphInner({
                       </div>
                       <div className="border-b border-slate-200 px-3.5 pb-1.5">
                         <div className="mb-1 text-[9px] font-medium uppercase tracking-wide text-slate-400">
-                          Items Pending Approval
+                          Pending Approval
                         </div>
                         {unapprovedItems.length === 0 ? (
                           <div className="py-1 text-[11px] text-slate-400">No pending items</div>
@@ -1275,7 +1281,7 @@ function ProblemsGraphInner({
         open={guideOpen}
         onOpenChange={setGuideOpen}
         title="Interpretability Explorer Guide"
-        description="Learn how to navigate and use the Interpretability Field Explorer."
+        description=""
         items={guideItems}
       />
     </>

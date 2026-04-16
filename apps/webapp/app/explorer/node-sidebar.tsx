@@ -132,18 +132,30 @@ export function NodeSidebar({
     <div className="w-[420px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           {!editing &&
             node.nodeTypes.map((t) => (
               <span
                 key={t}
-                className={`rounded px-2 py-0.5 text-xs font-semibold uppercase ${TYPE_COLORS[t] || 'bg-slate-100 text-slate-800'}`}
+                className={`text-[10px] font-semibold uppercase ${(NODE_TYPE_COLORS[t] || NODE_TYPE_COLORS.topic).label}`}
               >
                 {t}
               </span>
             ))}
         </div>
         <div className="flex items-center gap-2">
+          {!editing && (
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Copied share link to clipboard.');
+              }}
+              className="text-xs text-sky-600 hover:text-sky-700"
+            >
+              Share
+            </button>
+          )}
           {canEdit && !editing && (
             <button type="button" onClick={startEditing} className="text-xs text-sky-600 hover:text-sky-700">
               Edit

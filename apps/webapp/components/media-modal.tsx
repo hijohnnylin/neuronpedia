@@ -3,6 +3,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from './shadcn/button';
 
 export type MediaItem = {
   type: 'image' | 'video';
@@ -51,7 +52,7 @@ export function MediaModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-2xl flex-col gap-0 overflow-hidden border-0 bg-white p-0 text-slate-700">
+      <DialogContent className="flex max-h-[90vh] w-[95vw] max-w-screen-xl flex-col gap-0 overflow-hidden rounded-lg border-0 bg-white p-0 text-slate-700">
         <DialogHeader className="shrink-0 space-y-1 px-5 pb-3 pt-5 sm:px-6 sm:pt-6">
           <DialogTitle className="text-lg font-bold leading-snug tracking-tight text-slate-800">{title}</DialogTitle>
           {description && <DialogDescription className="text-[13px] text-slate-500">{description}</DialogDescription>}
@@ -66,7 +67,7 @@ export function MediaModal({
                   type="button"
                   key={i}
                   onClick={() => goTo(i)}
-                  className={`flex flex-1 flex-col items-center justify-center gap-y-0.5 px-3 py-2.5 text-xs font-medium transition-colors focus:outline-none ${
+                  className={`flex flex-1 flex-col items-center justify-center gap-y-1 px-3 py-2.5 text-xs font-medium transition-colors focus:outline-none ${
                     i === currentIndex
                       ? 'bg-slate-300 text-slate-700'
                       : 'bg-slate-200 text-slate-500 hover:bg-slate-300/80'
@@ -91,7 +92,7 @@ export function MediaModal({
 
             {/* Mobile: title + subtitle above media */}
             {(item.title || item.subtitle) && (
-              <div className="flex flex-col items-center gap-0.5 px-5 pb-1 pt-2 sm:hidden">
+              <div className="flex flex-col items-center gap-0.5 px-5 pb-1 pt-0 sm:hidden">
                 {item.title && <span className="text-sm font-semibold text-slate-700">{item.title}</span>}
                 {item.subtitle && <span className="text-[11px] uppercase text-slate-400">{item.subtitle}</span>}
               </div>
@@ -99,25 +100,26 @@ export function MediaModal({
           </>
         )}
 
-        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-4 sm:px-6">
+        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center px-5 py-2 pb-3 sm:px-6 sm:py-4 sm:pb-0">
           {item.type === 'image' ? (
             <img
               src={item.src}
               alt={item.alt || item.title || ''}
-              className="max-h-[55vh] w-full rounded-lg object-contain"
+              className="max-h-[65vh] w-full rounded-lg object-contain"
             />
           ) : (
             <video
               ref={videoRef}
               src={item.src}
-              controls
+              // controls
+              autoPlay
               muted
               loop
-              className="max-h-[55vh] w-full rounded-lg object-contain"
+              className="max-h-[65vh] w-full rounded-lg object-contain"
             />
           )}
 
-          {hasMultiple && (
+          {/* {hasMultiple && (
             <>
               <button
                 type="button"
@@ -136,49 +138,83 @@ export function MediaModal({
                 <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </>
-          )}
+          )} */}
         </div>
 
         {/* Mobile dots */}
         {hasMultiple && (
-          <div className="flex shrink-0 items-center justify-center gap-1.5 pb-4 sm:hidden">
-            {items.map((_, i) => (
-              <button
-                type="button"
-                key={i}
-                onClick={() => goTo(i)}
-                className={`h-2 w-2 rounded-full transition-colors ${
-                  i === currentIndex ? 'bg-slate-700' : 'bg-slate-300'
-                }`}
-              />
-            ))}
+          <div className="flex shrink-0 items-center justify-between gap-1.5 px-3 pb-4 sm:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-20"
+              onClick={() => goTo(currentIndex - 1)}
+              disabled={currentIndex === 0}
+            >
+              <ChevronLeft className="h-4 w-4" /> Prev
+            </Button>
+            <div className="flex items-center gap-1.5">
+              {items.map((_, i) => (
+                <button
+                  type="button"
+                  key={i}
+                  onClick={() => goTo(i)}
+                  aria-label={`Go to item ${i + 1}`}
+                  className={`h-2 w-2 rounded-full border-2 transition-colors focus:outline-none ${i === currentIndex ? 'border-slate-700 bg-slate-700' : 'border-slate-300 bg-slate-300'}`}
+                  tabIndex={0}
+                />
+              ))}
+            </div>
+            {currentIndex === items.length - 1 ? (
+              <Button variant="default" size="sm" className="w-20" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                className="w-20"
+                onClick={() => goTo(currentIndex + 1)}
+                disabled={currentIndex === items.length - 1}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
 
         {/* Desktop prev/next footer */}
-        {/* {hasMultiple && (
-          <div className="hidden shrink-0 items-center justify-between border-t border-slate-200 px-6 py-3 sm:flex">
-            <button
-              type="button"
+        {hasMultiple && (
+          <div className="mt-4 hidden shrink-0 items-center justify-between gap-x-3 border-t border-slate-300 bg-slate-100 px-6 py-4 sm:flex">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-32"
               onClick={() => goTo(currentIndex - 1)}
               disabled={currentIndex === 0}
-              className="flex items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-800 disabled:opacity-30"
             >
               <ChevronLeft className="h-4 w-4" /> Prev
-            </button>
-            <span className="text-xs text-slate-400">
+            </Button>
+            {/* <span className="text-xs text-slate-400">
               {currentIndex + 1} / {items.length}
-            </span>
-            <button
-              type="button"
-              onClick={() => goTo(currentIndex + 1)}
-              disabled={currentIndex === items.length - 1}
-              className="flex items-center gap-1 text-sm font-medium text-slate-600 transition-colors hover:text-slate-800 disabled:opacity-30"
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </button>
+            </span> */}
+            {currentIndex === items.length - 1 ? (
+              <Button variant="default" size="lg" onClick={() => onOpenChange(false)} className="flex-1">
+                Close
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                size="lg"
+                onClick={() => goTo(currentIndex + 1)}
+                className="flex-1"
+                disabled={currentIndex === items.length - 1}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-        )} */}
+        )}
       </DialogContent>
     </Dialog>
   );
