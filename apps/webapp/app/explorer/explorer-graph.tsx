@@ -1,9 +1,13 @@
 'use client';
 
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
+import CustomTooltip from '@/components/custom-tooltip';
+import { MediaModal, type MediaItem } from '@/components/media-modal';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
 import { Button } from '@/components/shadcn/button';
+import { ASSET_BASE_URL } from '@/lib/env';
+import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
   ConnectionLineType,
   Controls,
@@ -18,6 +22,7 @@ import {
   type Node,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { BookOpen, Check, X } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DraftEditSidebar } from './draft-edit-sidebar';
@@ -30,9 +35,9 @@ import { NODE_HEIGHT, getLayoutedElements } from './use-layout';
 
 const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 
-// Padding for fitView — adjust these to control spacing around the graph
-const FIT_VIEW_PADDING_TOP = 0.06;
-const FIT_VIEW_PADDING_BOTTOM = 0.03;
+// Fixed top padding (px) to clear the header/minimap overlay; proportional bottom padding
+const FIT_VIEW_TOP_PX = 130;
+const FIT_VIEW_PADDING_BOTTOM = 0.02;
 
 function getVisibleNodesWithCollapse(
   allNodes: ProblemNodeData[],
@@ -202,14 +207,18 @@ async function buildFlowGraph(params: FlowBuildParams) {
   return getLayoutedElements(nodes, edges);
 }
 
+type Editor = { id: string; name: string };
+
 function ProblemsGraphInner({
   initialNodes,
   canEdit,
   initialSelectedId,
+  editors,
 }: {
   initialNodes: ProblemNodeData[];
   canEdit: boolean;
   initialSelectedId?: number;
+  editors: Editor[];
 }) {
   const { data: session } = useSession();
   const { setSignInModalOpen, showToastMessage } = useGlobalContext();
@@ -220,7 +229,7 @@ function ProblemsGraphInner({
     const container = flowContainerRef.current;
     const allNodes = getNodes();
     if (!container || allNodes.length === 0) {
-      fitView({ padding: FIT_VIEW_PADDING_TOP, duration: 300 });
+      fitView({ padding: 0.08, duration: 300 });
       return;
     }
     // Calculate bounds of all nodes
@@ -239,16 +248,16 @@ function ProblemsGraphInner({
     const graphW = maxX - minX;
     const graphH = maxY - minY;
     const rect = container.getBoundingClientRect();
-    // Calculate zoom with asymmetric padding
-    const zoomX = rect.width / (graphW * (1 + FIT_VIEW_PADDING_TOP * 2));
-    const zoomY = rect.height / (graphH * (1 + FIT_VIEW_PADDING_TOP + FIT_VIEW_PADDING_BOTTOM));
+    const bottomPadPx = rect.height * FIT_VIEW_PADDING_BOTTOM;
+    const availW = rect.width;
+    const availH = rect.height - FIT_VIEW_TOP_PX - bottomPadPx;
+    const zoomX = availW / graphW;
+    const zoomY = availH / graphH;
     const zoom = Math.min(zoomX, zoomY, 1.5);
-    // Center horizontally, apply asymmetric vertical padding
     const scaledW = graphW * zoom;
     const scaledH = graphH * zoom;
-    const x = (rect.width - scaledW) / 2 - minX * zoom;
-    const topPad = (rect.height - scaledH) * (FIT_VIEW_PADDING_TOP / (FIT_VIEW_PADDING_TOP + FIT_VIEW_PADDING_BOTTOM));
-    const y = topPad - minY * zoom;
+    const x = (availW - scaledW) / 2 - minX * zoom;
+    const y = FIT_VIEW_TOP_PX + (availH - scaledH) / 2 - minY * zoom;
     setViewport({ x, y, zoom }, { duration: 200 });
   }, [fitView, getNodes, setViewport]);
 
@@ -274,11 +283,58 @@ function ProblemsGraphInner({
   const [detailNode, setDetailNode] = useState<DetailNode | null>(null);
   const [draftNode, setDraftNode] = useState<ProblemNodeData | null>(null);
   const [editOnSelect, setEditOnSelect] = useState(false);
-  const [showUnapproved, setShowUnapproved] = useState(false);
+  const [unapprovedItems, setUnapprovedItems] = useState<ProblemNodeData[]>([]);
   const [filteredNodeCount, setFilteredNodeCount] = useState(0);
   const [totalNodeCount, setTotalNodeCount] = useState(0);
+  const layoutReadyRef = useRef(false);
   const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guideSeen, setGuideSeen] = useState(true);
+
+  useEffect(() => {
+    try {
+      setGuideSeen(localStorage.getItem('explorer-guide-seen') === 'true');
+    } catch {}
+  }, []);
+
+  const openGuide = useCallback(() => {
+    setGuideOpen(true);
+    setGuideSeen(true);
+    try {
+      localStorage.setItem('explorer-guide-seen', 'true');
+    } catch {}
+  }, []);
+
+  const guideItems: MediaItem[] = [
+    {
+      type: 'video',
+      src: `${ASSET_BASE_URL}/graph/subgraph-demo.mp4`,
+      title: 'Navigating the Explorer',
+      subtitle: 'Overview',
+    },
+    {
+      type: 'image',
+      src: `${ASSET_BASE_URL}/graph/explainer-new.jpg`,
+      title: 'Node Types',
+      subtitle: 'Reference',
+    },
+  ];
+
+  type RecentLog = {
+    id: string;
+    timestamp: string;
+    action: string;
+    user: { name: string };
+    problemNode: { id: number; title: string | null; nodeTypes: string[] };
+  };
+  const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
+  useEffect(() => {
+    fetch('/api/explorer/log/recent', { method: 'POST' })
+      .then((res) => res.json())
+      .then((data) => setRecentLogs(data))
+      .catch(() => {});
+  }, []);
 
   const onHoverNode = useCallback(
     (id: number) => {
@@ -331,11 +387,11 @@ function ProblemsGraphInner({
   const breadcrumbs = useMemo(() => {
     const crumbs: React.ReactNode[] = [];
     if (ancestryChain.length === 0) {
-      crumbs.push(<span key="explorer">Field Explorer</span>);
+      crumbs.push(<span key="explorer">Interpretability Explorer</span>);
     } else {
       crumbs.push(
         <BreadcrumbLink key="explorer" href="/explorer">
-          Field Explorer
+          Interpretability Explorer
         </BreadcrumbLink>,
       );
       ancestryChain.forEach((node, i) => {
@@ -365,7 +421,7 @@ function ProblemsGraphInner({
       return;
     }
     setDetailNode(null);
-    fetch('/api/problem/node/get', {
+    fetch('/api/explorer/node/get', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: selectedNodeId }),
@@ -377,28 +433,45 @@ function ProblemsGraphInner({
 
   const fetchNodes = useCallback(async () => {
     try {
-      const res = await fetch('/api/problem/node/list', {
+      const res = await fetch('/api/explorer/node/list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ includeUnapproved: showUnapproved }),
+        body: JSON.stringify({ includeUnapproved: canEdit }),
       });
       const data = await res.json();
       setProblemNodes(data);
+      if (canEdit) {
+        setUnapprovedItems(data.filter((n: ProblemNodeData) => n.approvalState === 'PENDING'));
+      }
     } catch {
       // fetch failed
     }
-  }, [showUnapproved]);
+  }, [canEdit]);
 
-  // Re-fetch when showUnapproved changes (but not on mount — we have initialNodes)
-  const [didMount, setDidMount] = useState(false);
   useEffect(() => {
-    if (!didMount) {
-      setDidMount(true);
-      return;
-    }
-    fetchNodes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showUnapproved]);
+    if (canEdit) fetchNodes();
+  }, [canEdit, fetchNodes]);
+
+  const handleApproval = useCallback(
+    async (nodeId: number, approved: boolean) => {
+      const approvalMessage = approved
+        ? 'Are you sure you want to approve this item?'
+        : 'Are you sure you want to reject this item?';
+      if (!window.confirm(approvalMessage)) return;
+      try {
+        await fetch('/api/explorer/node/approve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: nodeId, approved }),
+        });
+        setUnapprovedItems((prev) => prev.filter((n) => n.id !== nodeId));
+        fetchNodes();
+      } catch {
+        // approval failed
+      }
+    },
+    [fetchNodes],
+  );
 
   const [draftEditing, setDraftEditing] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
@@ -415,7 +488,7 @@ function ProblemsGraphInner({
     if (!draftNode?.title?.trim()) return;
     setDraftSaving(true);
     try {
-      const res = await fetch('/api/problem/node/new', {
+      const res = await fetch('/api/explorer/node/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -513,11 +586,7 @@ function ProblemsGraphInner({
     [updateDraftFields, submitDraft, startDraftEdit, handleDraftCancelled, draftSaving],
   );
 
-  const typeFilterOptions = useMemo(() => {
-    const base = ['all', 'tool', 'replication', 'paper', 'dataset', 'eval', 'model'];
-    if (canEdit) base.push('unapproved');
-    return base;
-  }, [canEdit]);
+  const typeFilterOptions = useMemo(() => ['all', 'tool', 'replication', 'paper', 'dataset', 'eval', 'model'], []);
   const [typeFilter, setTypeFilter] = useState('all');
 
   const positionCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -525,21 +594,16 @@ function ProblemsGraphInner({
   const prevTypeFilterRef = useRef(typeFilter);
   const prevDraftNodeRef = useRef(draftNode);
 
-  const handleTypeFilter = useCallback(
-    (t: string) => {
-      setTypeFilter(t);
-      setShowUnapproved(t === 'unapproved');
-      setSelectedNodeId(null);
-      window.history.replaceState(null, '', '/explorer');
-    },
-    [setShowUnapproved],
-  );
+  const handleTypeFilter = useCallback((t: string) => {
+    setTypeFilter(t);
+    setSelectedNodeId(null);
+    window.history.replaceState(null, '', '/explorer');
+  }, []);
 
   const selectNode = useCallback(
     (id: number) => {
       setSelectedNodeId(id);
       setTypeFilter('all');
-      setShowUnapproved(false);
       setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === String(id) })));
       window.history.replaceState(null, '', `/explorer/${id}`);
       setTimeout(() => {
@@ -640,7 +704,7 @@ function ProblemsGraphInner({
   const handleUpdated = useCallback(() => {
     fetchNodes();
     if (selectedNodeId) {
-      fetch('/api/problem/node/get', {
+      fetch('/api/explorer/node/get', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: selectedNodeId }),
@@ -655,7 +719,7 @@ function ProblemsGraphInner({
     // eslint-disable-next-line no-alert
     if (!selectedNodeId || !window.confirm('Delete this node?')) return;
     const parentId = selectedNode?.parentId ?? null;
-    const res = await fetch('/api/problem/node/delete', {
+    const res = await fetch('/api/explorer/node/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: selectedNodeId }),
@@ -674,12 +738,8 @@ function ProblemsGraphInner({
 
   useEffect(() => {
     if (problemNodes.length === 0 && !draftNode) return;
-    const filtered =
-      typeFilter === 'all'
-        ? problemNodes
-        : typeFilter === 'unapproved'
-          ? problemNodes.filter((n) => n.approvalState !== 'APPROVED')
-          : problemNodes.filter((n) => n.nodeTypes.includes(typeFilter));
+    let cancelled = false;
+    const filtered = typeFilter === 'all' ? problemNodes : problemNodes.filter((n) => n.nodeTypes.includes(typeFilter));
     setFilteredNodeCount(filtered.length);
     setTotalNodeCount(problemNodes.length);
     const includeIds = new Set(filtered.map((n) => n.id));
@@ -760,12 +820,15 @@ function ProblemsGraphInner({
     prevDraftNodeRef.current = draftNode;
 
     if (needsRelayout) {
+      layoutReadyRef.current = false;
       buildFlowGraph(buildParams).then(({ nodes: layoutedNodes, edges: layoutedEdges }) => {
+        if (cancelled) return;
         const cache = new Map<string, { x: number; y: number }>();
         layoutedNodes.forEach((n) => cache.set(n.id, { ...n.position }));
         positionCacheRef.current = cache;
 
         const sid = selectedNodeIdRef.current;
+        layoutReadyRef.current = true;
         setNodes(layoutedNodes.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
         setEdges(layoutedEdges);
         if (draftNode) {
@@ -831,6 +894,7 @@ function ProblemsGraphInner({
         return n;
       });
 
+      layoutReadyRef.current = true;
       setNodes(positioned.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
       setEdges(builtEdges);
 
@@ -847,6 +911,9 @@ function ProblemsGraphInner({
         setTimeout(() => fitViewCustom(), 50);
       }
     }
+    return () => {
+      cancelled = true;
+    };
   }, [
     typeFilter,
     selectedNodeId,
@@ -923,34 +990,48 @@ function ProblemsGraphInner({
 
             <Panel position="top-left">
               <div className="flex flex-col gap-2">
-                <div className="rounded-lg border border-slate-200 bg-white px-4 pb-3.5 pt-2.5 shadow">
-                  <h1 className="mb-1 w-full text-center text-[15px] font-semibold text-slate-700">
-                    Interpretability Field Explorer
-                  </h1>
-                  <div className="mb-1 w-full text-center text-[8px] font-medium uppercase text-slate-400">
-                    Filter by type
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-1 pt-0">
-                    {typeFilterOptions.map((t) => {
-                      const colors = NODE_TYPE_COLORS[t];
-                      return (
-                        <button
-                          type="button"
-                          key={t}
-                          onClick={() => handleTypeFilter(t)}
-                          className={`rounded-full border px-3 py-1 text-center text-[9px] font-bold uppercase transition-colors ${
-                            typeFilter === t
-                              ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
-                              : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      );
-                    })}
+                <div className="flex flex-row items-start gap-2">
+                  <div className="rounded-lg border border-slate-200 bg-white px-4 pb-3 pt-2.5 shadow-md">
+                    <div className="mb-1 flex w-full flex-row items-center justify-between">
+                      <h1 className="text-[15px] font-semibold text-slate-700">Interpretability Explorer</h1>
+                      <button
+                        type="button"
+                        onClick={openGuide}
+                        className="relative flex items-center gap-1 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-1 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
+                      >
+                        {!guideSeen && (
+                          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+                        )}
+                        <BookOpen className="h-3 w-3" />
+                        How-To Guide
+                      </button>
+                    </div>
+
+                    <div className="mb-0.5 mt-2.5 w-full text-center text-[8px] font-medium uppercase text-slate-400">
+                      Filter by type
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-1 pt-0">
+                      {typeFilterOptions.map((t) => {
+                        const colors = NODE_TYPE_COLORS[t];
+                        return (
+                          <button
+                            type="button"
+                            key={t}
+                            onClick={() => handleTypeFilter(t)}
+                            className={`rounded-full border px-3 py-1 text-center text-[9px] font-semibold uppercase transition-colors ${
+                              typeFilter === t
+                                ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
+                                : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
+                            }`}
+                          >
+                            {t}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   {typeFilter !== 'all' && (
-                    <div className="mt-2.5 flex items-center justify-center gap-3 rounded bg-slate-100 py-2.5">
+                    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-md">
                       <span className="text-[12px] text-slate-600">
                         Filtering to {filteredNodeCount} of {totalNodeCount} nodes
                       </span>
@@ -964,7 +1045,7 @@ function ProblemsGraphInner({
                     </div>
                   )}
                   {selectedNodeId != null && selectedNodeId !== DRAFT_ID && (
-                    <div className="mt-2.5 flex items-center justify-center gap-3 rounded bg-slate-100 py-2.5">
+                    <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-md">
                       <span className="text-[12px] text-slate-600">Selected Single Node</span>
                       <Button
                         size="xs"
@@ -976,6 +1057,48 @@ function ProblemsGraphInner({
                     </div>
                   )}
                 </div>
+                {recentLogs.length > 0 && (
+                  <div className="hidden max-w-[240px] flex-col rounded-lg border border-slate-200 bg-white pb-0 shadow-md">
+                    <div
+                      className="sticky top-0 z-10 mb-0.5 border-slate-200 bg-slate-50 pb-1 pt-1 text-center text-[8px] font-medium uppercase text-slate-500"
+                      style={{ borderTopLeftRadius: 6, borderTopRightRadius: 6 }} // tailwind can't do only top
+                    >
+                      Recently Added
+                    </div>
+                    <div className="flex max-h-[230px] flex-col gap-0.5 overflow-y-auto px-1.5">
+                      {recentLogs.map((log) => (
+                        <button
+                          type="button"
+                          key={log.id}
+                          onClick={() => selectNode(log.problemNode.id)}
+                          className="flex items-start gap-0 rounded px-1.5 py-1 text-left transition-colors hover:bg-slate-200"
+                        >
+                          <div className="flex min-w-0 flex-1 flex-col">
+                            <div className="flex items-center gap-1">
+                              {log.problemNode.nodeTypes.map((t) => (
+                                <span
+                                  key={t}
+                                  className={`rounded-sm px-1 py-[0.5px] text-[7.5px] font-bold uppercase text-white ${(NODE_TYPE_COLORS[t] || NODE_TYPE_COLORS.topic).icon}`}
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                            <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-snug text-slate-700">
+                              {log.problemNode.title || '(untitled)'}
+                            </span>
+
+                            <span className="text-[8px] text-slate-400">
+                              {log.user.name}
+                              {/* &middot;{' '} */}
+                              {/* {formatDistanceToNowStrict(new Date(log.timestamp), { addSuffix: true })} */}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </Panel>
 
@@ -988,6 +1111,105 @@ function ProblemsGraphInner({
                 + Add Node
               </button>
             </Panel>
+
+            {editors.length > 0 && (
+              <Panel position="bottom-left">
+                <div className="hidden min-w-[200px] max-w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 shadow-md">
+                  {canEdit && (
+                    <>
+                      <div className="mb-2 border-b px-3.5 pb-2 pt-1 text-left text-[10px] font-medium leading-snug text-sky-700">
+                        Editor Mode: You can approve pending items and add/edit items without approval.
+                      </div>
+                      <div className="border-b border-slate-200 px-3.5 pb-1.5">
+                        <div className="mb-1 text-[9px] font-medium uppercase tracking-wide text-slate-400">
+                          Items Pending Approval
+                        </div>
+                        {unapprovedItems.length === 0 ? (
+                          <div className="py-1 text-[11px] text-slate-400">No pending items</div>
+                        ) : (
+                          <div className="flex max-h-[200px] flex-col gap-0 overflow-y-auto">
+                            {unapprovedItems.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex items-center gap-2 border-b border-slate-100 py-1.5 last:border-b-0"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => selectNode(item.id)}
+                                  className="flex min-w-0 flex-1 flex-col text-left transition-colors hover:opacity-70"
+                                >
+                                  <div className="flex items-center gap-1">
+                                    {item.nodeTypes.map((t) => (
+                                      <span
+                                        key={t}
+                                        className={`rounded-sm px-1 py-[0.5px] text-[7.5px] font-bold uppercase text-white ${(NODE_TYPE_COLORS[t] || NODE_TYPE_COLORS.topic).icon}`}
+                                      >
+                                        {t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <span className="mt-0.5 block truncate text-[11px] leading-snug text-slate-700">
+                                    {item.title || '(untitled)'}
+                                  </span>
+                                  {item.createdBy && (
+                                    <span className="text-[8px] text-slate-400">by {item.createdBy.name}</span>
+                                  )}
+                                </button>
+                                <div className="flex shrink-0 gap-1">
+                                  <button
+                                    type="button"
+                                    title="Approve"
+                                    onClick={() => handleApproval(item.id, true)}
+                                    className="flex h-6 w-6 items-center justify-center rounded border border-emerald-200 bg-emerald-50 text-emerald-600 transition-colors hover:bg-emerald-600 hover:text-white"
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Reject"
+                                    onClick={() => handleApproval(item.id, false)}
+                                    className="flex h-6 w-6 items-center justify-center rounded border border-rose-200 bg-rose-50 text-rose-600 transition-colors hover:bg-rose-600 hover:text-white"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  <div className="px-3.5 py-2 pt-1">
+                    <CustomTooltip
+                      trigger={
+                        <div className="mb-1.5 flex cursor-default flex-row items-center gap-x-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                          Editors <QuestionMarkCircledIcon className="h-3 w-3" />
+                        </div>
+                      }
+                    >
+                      Anyone can add items, but new additions are &apos;pending&apos; until an editor approves them.
+                    </CustomTooltip>
+                    <div className="flex flex-col gap-1">
+                      {editors.map((editor) => (
+                        <div key={editor.id} className="flex items-center gap-1.5">
+                          <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 text-[7px] font-bold text-white">
+                            {editor.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-[11px] text-slate-600">{editor.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <a
+                      href="mailto:johnny@neuronpedia.org?subject=Request%20Editor%20Role&body=I'd%20like%20to%20be%20an%20editor%20of%20Neuronpedia's%20Interp%20Explorer."
+                      className="mt-3 block rounded border border-slate-200 bg-slate-50 px-2 py-1 text-center text-[10px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      Request to be an Editor
+                    </a>
+                  </div>
+                </div>
+              </Panel>
+            )}
           </ReactFlow>
         </div>
 
@@ -1033,7 +1255,7 @@ function ProblemsGraphInner({
             </div>
           </div>
         )}
-        {problemNodes.length > 0 && nodes.length === 0 && !draftNode && (
+        {layoutReadyRef.current && problemNodes.length > 0 && nodes.length === 0 && !draftNode && (
           <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
             <div className="pointer-events-auto text-center">
               <p className="text-sm text-slate-500">No nodes matched the current filter.</p>
@@ -1048,6 +1270,14 @@ function ProblemsGraphInner({
           </div>
         )}
       </div>
+
+      <MediaModal
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+        title="Interpretability Explorer Guide"
+        description="Learn how to navigate and use the Interpretability Field Explorer."
+        items={guideItems}
+      />
     </>
   );
 }
@@ -1056,14 +1286,21 @@ export default function ProblemsGraph({
   initialNodes,
   canEdit,
   initialSelectedId,
+  editors,
 }: {
   initialNodes: ProblemNodeData[];
   canEdit: boolean;
   initialSelectedId?: number;
+  editors: Editor[];
 }) {
   return (
     <ReactFlowProvider>
-      <ProblemsGraphInner initialNodes={initialNodes} canEdit={canEdit} initialSelectedId={initialSelectedId} />
+      <ProblemsGraphInner
+        initialNodes={initialNodes}
+        canEdit={canEdit}
+        initialSelectedId={initialSelectedId}
+        editors={editors}
+      />
     </ReactFlowProvider>
   );
 }

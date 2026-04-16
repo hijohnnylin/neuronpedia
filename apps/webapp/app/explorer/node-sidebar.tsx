@@ -73,7 +73,7 @@ export function NodeSidebar({
   const saveEdit = useCallback(async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/problem/node/update', {
+      const res = await fetch('/api/explorer/node/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -114,7 +114,7 @@ export function NodeSidebar({
     if (!commentText.trim()) return;
     setSubmitting(true);
     try {
-      await fetch('/api/problem/comment/new', {
+      await fetch('/api/explorer/comment/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ problemNodeId: selectedNode.id, text: commentText }),

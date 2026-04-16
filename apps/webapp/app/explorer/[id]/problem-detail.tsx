@@ -79,13 +79,13 @@ export default function ProblemDetail({ initialNode }: { initialNode: ProblemNod
       if (!commentText.trim()) return;
       setSubmitting(true);
       try {
-        await fetch('/api/problem/comment/new', {
+        await fetch('/api/explorer/comment/new', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ problemNodeId: node.id, text: commentText, parentCommentId }),
         });
         // Refresh node data
-        const res = await fetch('/api/problem/node/get', {
+        const res = await fetch('/api/explorer/node/get', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: node.id }),

@@ -14,10 +14,8 @@ export const metadata: Metadata = {
 export default async function ProblemsPage() {
   const session = await getServerSession(authOptions);
 
-  // Fetch all approved nodes server-side (plus user's own nodes if logged in)
   const initialNodes = await getProblemNodes(false, session?.user?.id);
 
-  // Check if user is editor/admin
   let canEdit = false;
   if (session?.user?.id) {
     const dbUser = await prisma.user.findUnique({
@@ -27,5 +25,17 @@ export default async function ProblemsPage() {
     canEdit = dbUser?.admin === true || dbUser?.isProblemEditor === true;
   }
 
-  return <ProblemsGraph initialNodes={JSON.parse(JSON.stringify(initialNodes))} canEdit={canEdit} />;
+  const editors = await prisma.user.findMany({
+    where: { isProblemEditor: true },
+    select: { id: true, name: true, image: true },
+    orderBy: { name: 'asc' },
+  });
+
+  return (
+    <ProblemsGraph
+      initialNodes={JSON.parse(JSON.stringify(initialNodes))}
+      canEdit={canEdit}
+      editors={editors}
+    />
+  );
 }

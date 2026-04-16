@@ -77,7 +77,7 @@ function DraftNodeComponent({ data }: { data: any }) {
 
         setFetching(true);
         try {
-          const res = await fetch('/api/problem/url-metadata', {
+          const res = await fetch('/api/explorer/url-metadata', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: normalized }),

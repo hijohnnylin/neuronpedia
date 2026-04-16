@@ -31,10 +31,10 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   <div className="py-1.5 text-base leading-none text-slate-700 sm:py-0 sm:text-[13px]">
                     {user?.name || name}
                   </div>
-                  <p className="mt-1.5 flex flex-row items-center gap-x-1 text-xs font-bold uppercase leading-none text-sky-700 sm:text-[11px]">
+                  <div className="mt-1.5 flex flex-row items-center gap-x-1 text-xs font-bold uppercase leading-none text-sky-700 sm:text-[11px]">
                     <div className="-mb-[2px] leading-none">My Profile</div>
                     <ExternalLink className="h-3.5 w-3.5" />
-                  </p>
+                  </div>
                 </Link>
 
                 <button

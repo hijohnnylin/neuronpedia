@@ -26,11 +26,18 @@ export default async function ProblemNodePage(props: { params: Promise<{ id: str
     canEdit = dbUser?.admin === true || dbUser?.isProblemEditor === true;
   }
 
+  const editors = await prisma.user.findMany({
+    where: { isProblemEditor: true },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
   return (
     <ProblemsGraph
       initialNodes={JSON.parse(JSON.stringify(initialNodes))}
       canEdit={canEdit}
       initialSelectedId={Number(params.id)}
+      editors={editors}
     />
   );
 }

@@ -6,7 +6,7 @@ import { memo, useState } from 'react';
 import { NODE_HEIGHT } from './use-layout';
 
 export const ROOT_NODE_WIDTH = 180;
-export const DEFAULT_NODE_WIDTH = 270;
+export const DEFAULT_NODE_WIDTH = 250;
 
 const MAX_PREVIEW_CHILDREN = 8;
 
@@ -79,7 +79,13 @@ export const TYPE_COLORS: Record<
   },
 };
 
-type ChildPreview = { id: number; title: string | null; nodeTypes: string[]; approvalState: string };
+type ChildPreview = {
+  id: number;
+  title: string | null;
+  nodeTypes: string[];
+  approvalState: string;
+  author: string | null;
+};
 
 function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean }) {
   const [isHovered, setIsHovered] = useState(false);
@@ -92,7 +98,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
   const hasCollapsedChildren = (data.hiddenChildCount ?? 0) > 0;
   const showPreview = isHovered && hasCollapsedChildren && !data.hoverDimmed;
 
-  const effectiveOpacity = data.hoverDimmed ? 0.35 : data.dimmed ? 0.4 : undefined;
+  const effectiveOpacity = data.hoverDimmed || data.dimmed ? 0.2 : undefined;
 
   return (
     <div
@@ -138,11 +144,13 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
       {data.hiddenChildCount > 0 && (
         <div className="absolute bottom-1 left-1.5 flex gap-0.5">
           {Object.entries(
-            (children as ChildPreview[]).reduce<Record<string, number>>((acc, c) => {
-              const t = c.nodeTypes?.[0] || 'topic';
-              acc[t] = (acc[t] || 0) + 1;
-              return acc;
-            }, {}),
+            (children as ChildPreview[])
+              .filter((c) => c.approvalState !== 'PENDING')
+              .reduce<Record<string, number>>((acc, c) => {
+                const t = c.nodeTypes?.[0] || 'topic';
+                acc[t] = (acc[t] || 0) + 1;
+                return acc;
+              }, {}),
           ).map(([type, count]) => (
             <span
               key={type}
@@ -159,6 +167,11 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
         position={Position.Right}
         style={{ width: 0, height: 0, minWidth: 0, minHeight: 0, border: 'none', background: 'transparent', right: 0 }}
       />
+      {data.approvalState === 'PENDING' && (
+        <div className="absolute -bottom-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full border border-slate-300 bg-slate-100 px-2 py-[1px] text-[7px] font-semibold uppercase text-slate-500 shadow-sm">
+          Pending Approval
+        </div>
+      )}
       {data.mainUrl && (
         <a
           href={data.mainUrl}
@@ -169,7 +182,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           onMouseDown={(e) => e.stopPropagation()}
           className="absolute bottom-1 right-1.5 z-10 flex items-center gap-x-0.5 rounded-full border-[1px] border-slate-400 bg-white px-2 py-[1px] text-[7.5px] font-medium text-slate-500 hover:border-slate-600 hover:bg-slate-600 hover:text-white group-hover:hidden"
         >
-          Open
+          Source
           <ExternalLink size={8} />
         </a>
       )}
@@ -183,7 +196,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           onMouseDown={(e) => e.stopPropagation()}
           className="absolute -bottom-1 right-14 z-10 flex h-5 w-16 translate-x-full items-center justify-center gap-x-1 rounded-full border border-slate-400 bg-white text-[9px] font-semibold text-slate-500 opacity-0 shadow transition-opacity hover:border-slate-600 hover:bg-slate-600 hover:text-white group-hover:opacity-100"
         >
-          Open
+          Source
           <ExternalLink size={10} className="-mt-[1px]" />
         </a>
       )}
@@ -206,15 +219,12 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           title="Add child node"
           className="absolute -top-1 right-14 z-10 flex h-5 w-16 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-sky-600 bg-white text-[9px] font-semibold text-sky-600 opacity-0 shadow transition-opacity hover:border-sky-600 hover:bg-sky-600 hover:text-white group-hover:opacity-100"
         >
-          + Subnode
+          + Sub-Item
         </button>
       )}
 
       {showPreview && (
         <div className="absolute left-full top-1/2 ml-3 w-56 -translate-y-1/2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur-sm">
-          {/* <div className="mb-1.5 text-[8px] font-semibold uppercase tracking-wide text-slate-400">
-            {children.length} Subnode{children.length !== 1 ? 's' : ''}
-          </div> */}
           <div className="flex flex-col gap-0.5">
             {children.slice(0, MAX_PREVIEW_CHILDREN).map((child) => (
               <div
@@ -243,6 +253,12 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
                 >
                   {child.title || '(untitled)'}
                 </span>
+                <span className="text-[8px] text-slate-400">{child.author}</span>
+                {child.approvalState === 'PENDING' && (
+                  <span className="mt-0.5 self-start rounded-full border border-slate-300 bg-slate-100 px-1.5 py-[0.5px] text-[7px] font-semibold uppercase text-slate-500">
+                    Pending Approval
+                  </span>
+                )}
               </div>
             ))}
             {children.length > MAX_PREVIEW_CHILDREN && (

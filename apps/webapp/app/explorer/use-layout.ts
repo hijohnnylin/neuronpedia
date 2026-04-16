@@ -79,7 +79,7 @@ export async function getLayoutedElements(nodes: Node[], edges: Edge[]) {
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.separateConnectedComponents': 'true',
       'elk.aspectRatio': '2',
-      'elk.spacing.componentComponent': '30',
+      'elk.spacing.componentComponent': '16',
       'elk.margins': '[top=60,left=30,bottom=30,right=30]',
     },
     children: sortChildrenByParent(nodes, edges).map((node) => {

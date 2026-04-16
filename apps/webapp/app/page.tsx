@@ -420,12 +420,74 @@ export default function Page() {
               Beta Releases{' '}
             </div>
 
-            <div className="ml-0 text-[9px] font-medium uppercase leading-none text-amber-600">
-              May be incomplete, inaccurate, or unstable
+            <div className="ml-0 text-[9px] font-medium uppercase leading-tight text-amber-600">
+              Subject to change
+              <br />
+              may be unstable
             </div>
           </div>
-          <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-2 sm:flex-row sm:gap-y-2 sm:px-6 sm:pt-0">
-            <div className="relative z-0 mb-3 mt-1 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-3 sm:h-[180px] sm:min-h-[180px] sm:w-[400px] sm:min-w-[400px] sm:px-0">
+          <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-2 sm:flex-row sm:gap-y-2 sm:px-4 sm:pt-0">
+            <div className="relative z-0 mb-3 mt-1 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-3 sm:h-[180px] sm:min-h-[180px] sm:flex-1 sm:px-0">
+              <div className="shadow-slate/50 relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-slate-100 px-3 py-7 text-center text-slate-600 shadow-sm shadow-slate-400/50 sm:gap-y-0 sm:px-2 sm:py-3">
+                <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-slate-500/20 px-5 py-[6px] text-[11px] font-semibold text-slate-700/80">
+                  Crowdsourced
+                </div>
+                <div className="content">
+                  <div className="mt-2.5 text-[21px] font-bold">
+                    <span className="font-bold text-slate-700">Field Explorer</span>
+                  </div>
+                  <div className="mt-0.5 text-[13px] font-medium leading-snug text-slate-500">
+                    The latest tools, papers, replications, problems and more.
+                  </div>
+
+                  <div className="mt-4 flex flex-col items-center justify-center gap-y-3 sm:flex-row sm:gap-x-2.5">
+                    <Link href="/explorer" className="">
+                      <button
+                        type="button"
+                        className="h-12 min-h-12 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
+                      >
+                        <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-slate-600 px-5 text-white shadow-sm shadow-slate-700/60">
+                          <Map className="h-5 w-5" />
+                          <div className="text-[13px] font-semibold leading-none">Open Map</div>
+                        </div>
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative z-0 mb-3 mt-1 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-3 sm:h-[180px] sm:min-h-[180px] sm:flex-1 sm:px-0">
+              <div className="shadow-slate/50 relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-slate-100 px-3 py-7 text-center text-slate-600 shadow-sm shadow-slate-400/50 sm:gap-y-0 sm:px-2 sm:py-3">
+                <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-slate-500/20 px-5 py-[6px] text-[11px] font-semibold text-slate-700/80">
+                  Crowdsourced
+                </div>
+                <div className="content">
+                  <div className="mt-2.5 text-[21px] font-bold">
+                    <span className="font-bold text-slate-700">Field Explorer</span>
+                  </div>
+                  <div className="mt-0.5 text-[13px] font-medium leading-snug text-slate-500">
+                    The latest tools, papers, replications, problems and more.
+                  </div>
+
+                  <div className="mt-4 flex flex-col items-center justify-center gap-y-3 sm:flex-row sm:gap-x-2.5">
+                    <Link href="/explorer" className="">
+                      <button
+                        type="button"
+                        className="h-12 min-h-12 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
+                      >
+                        <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-slate-600 px-5 text-white shadow-sm shadow-slate-700/60">
+                          <Map className="h-5 w-5" />
+                          <div className="text-[13px] font-semibold leading-none">Open Map</div>
+                        </div>
+                      </button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative z-0 mb-3 mt-1 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-3 sm:h-[180px] sm:min-h-[180px] sm:flex-1 sm:px-0">
               <div className="shadow-slate/50 relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-slate-100 px-3 py-7 text-center text-slate-600 shadow-sm shadow-slate-400/50 sm:gap-y-0 sm:px-2 sm:py-3">
                 <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-slate-500/20 px-5 py-[6px] text-[11px] font-semibold text-slate-700/80">
                   Crowdsourced

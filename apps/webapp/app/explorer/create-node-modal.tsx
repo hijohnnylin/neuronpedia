@@ -37,7 +37,7 @@ export default function CreateNodeModal({
     setSubmitting(true);
     setError('');
     try {
-      const res = await fetch('/api/problem/node/new', {
+      const res = await fetch('/api/explorer/node/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

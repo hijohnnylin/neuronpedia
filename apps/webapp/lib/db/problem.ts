@@ -99,7 +99,8 @@ const problemNodeInclude = {
   createdBy: { select: { id: true, name: true, image: true } },
   approver: { select: { id: true, name: true, image: true } },
   children: {
-    select: { id: true, title: true, nodeTypes: true, approvalState: true },
+    select: { id: true, title: true, nodeTypes: true, approvalState: true, author: true },
+    where: { approvalState: { not: ProblemNodeApprovalState.REJECTED } },
     orderBy: { title: 'asc' as const },
   },
   parent: {
@@ -124,9 +125,14 @@ async function assertUserCanEditNode(nodeId: number, user: AuthenticatedUser) {
 
 export async function getProblemNodes(includeUnapproved = false, currentUserId?: string) {
   const where = includeUnapproved
-    ? {}
+    ? { approvalState: { not: ProblemNodeApprovalState.REJECTED } }
     : currentUserId
-      ? { OR: [{ approvalState: ProblemNodeApprovalState.APPROVED }, { createdById: currentUserId }] }
+      ? {
+          OR: [
+            { approvalState: ProblemNodeApprovalState.APPROVED },
+            { createdById: currentUserId, approvalState: { not: ProblemNodeApprovalState.REJECTED } },
+          ],
+        }
       : { approvalState: ProblemNodeApprovalState.APPROVED };
 
   return prisma.problemNode.findMany({
@@ -398,6 +404,21 @@ export async function getProblemLogs(limit = 50) {
   return prisma.problemNodeLog.findMany({
     include: {
       user: { select: { id: true, name: true, image: true } },
+      problemNode: { select: { id: true, title: true, nodeTypes: true } },
+    },
+    orderBy: { timestamp: 'desc' },
+    take: limit,
+  });
+}
+
+export async function getRecentProblemCreations(limit = 10) {
+  return prisma.problemNodeLog.findMany({
+    where: {
+      action: 'CREATED_NODE',
+      problemNode: { approvalState: ProblemNodeApprovalState.APPROVED },
+    },
+    include: {
+      user: { select: { id: true, name: true } },
       problemNode: { select: { id: true, title: true, nodeTypes: true } },
     },
     orderBy: { timestamp: 'desc' },

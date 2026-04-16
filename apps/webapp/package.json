@@ -93,7 +93,7 @@
     "dotenv": "^16.4.5",
     "elkjs": "^0.11.1",
     "eventsource-parser": "^3.0.0",
-    "focus-trap-react": "^10.1.4",
+    "focus-trap-react": "^12.0.0",
     "formik": "^2.4.5",
     "html-to-text": "^9.0.5",
     "json-schema-to-typescript": "^15.0.2",

@@ -14,7 +14,7 @@ export type ProblemNodeData = {
   additionalUrls: string[];
   applicationTags: string[];
   approvalState: string;
-  children: { id: number; title: string | null; nodeTypes: string[]; approvalState: string }[];
+  children: { id: number; title: string | null; nodeTypes: string[]; approvalState: string; author: string | null }[];
   parent: { id: number; title: string | null; nodeTypes: string[] } | null;
   createdBy: { id: string; name: string };
   approver: { id: string; name: string } | null;
