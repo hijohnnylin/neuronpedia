@@ -1246,14 +1246,14 @@ function ProblemsGraphInner({
                   <div className="px-3.5 py-2 pt-1">
                     <CustomTooltip
                       trigger={
-                        <div className="mb-1.5 flex cursor-default flex-row items-center gap-x-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                        <div className="mb-1.5 hidden cursor-default flex-row items-center gap-x-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
                           Editors <QuestionMarkCircledIcon className="h-3 w-3" />
                         </div>
                       }
                     >
                       Anyone can add items, but new additions are &apos;pending&apos; until an editor approves them.
                     </CustomTooltip>
-                    <div className="flex flex-col gap-1">
+                    <div className="hidden flex-col gap-1">
                       {editors.map((editor) => (
                         <div key={editor.id} className="flex items-center gap-1.5">
                           <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 text-[7px] font-bold text-white">

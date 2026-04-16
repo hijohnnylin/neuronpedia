@@ -6,9 +6,8 @@ import { getServerSession } from 'next-auth';
 import ProblemsGraph from './explorer-graph';
 
 export const metadata: Metadata = {
-  title: 'Interpretability Field Explorer',
-  description:
-    'Explore the landscape of open problems, tools, papers, and datasets in mechanistic interpretability research.',
+  title: 'Interpretability Explorer',
+  description: 'Explore the landscape of tools, papers, datasets, and problems in interpretability research.',
 };
 
 export default async function ProblemsPage() {
@@ -31,11 +30,5 @@ export default async function ProblemsPage() {
     orderBy: { name: 'asc' },
   });
 
-  return (
-    <ProblemsGraph
-      initialNodes={JSON.parse(JSON.stringify(initialNodes))}
-      canEdit={canEdit}
-      editors={editors}
-    />
-  );
+  return <ProblemsGraph initialNodes={JSON.parse(JSON.stringify(initialNodes))} canEdit={canEdit} editors={editors} />;
 }
