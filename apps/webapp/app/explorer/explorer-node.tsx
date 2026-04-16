@@ -5,7 +5,7 @@ import { ExternalLink } from 'lucide-react';
 import { memo, useState } from 'react';
 import { NODE_HEIGHT } from './use-layout';
 
-export const ROOT_NODE_WIDTH = 180;
+export const ROOT_NODE_WIDTH = 240;
 export const DEFAULT_NODE_WIDTH = 250;
 
 const MAX_PREVIEW_CHILDREN = 8;
@@ -22,12 +22,12 @@ export const TYPE_COLORS: Record<
   }
 > = {
   topic: {
-    border: 'border-slate-300 hover:border-sky-600',
-    selectedBorder: 'border-sky-600 outline outline-sky-600 !outline-2',
-    label: 'text-sky-600',
-    icon: 'bg-sky-600',
-    handleColor: '!bg-sky-500',
-    selectedHandleColor: '!bg-sky-600',
+    border: 'border-slate-300 hover:border-slate-600',
+    selectedBorder: 'border-slate-600 outline outline-slate-600 !outline-2',
+    label: 'text-slate-400',
+    icon: 'bg-slate-600',
+    handleColor: '!bg-slate-500',
+    selectedHandleColor: '!bg-slate-600',
   },
   paper: {
     border: 'border-slate-300 hover:border-emerald-600',
@@ -98,15 +98,16 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
   const hasCollapsedChildren = (data.hiddenChildCount ?? 0) > 0;
   const showPreview = isHovered && hasCollapsedChildren && !data.hoverDimmed;
 
-  const effectiveOpacity = data.hoverDimmed || data.dimmed ? 0.2 : undefined;
+  const isDimmed = data.hoverDimmed || data.dimmed;
 
   return (
     <div
-      className={`group relative rounded-md border ${border} duration-250 flex items-start bg-white px-2 py-[5px] shadow-sm transition-[shadow,opacity] hover:shadow-md`}
+      className={`group relative rounded-md border ${border} duration-250 flex items-start bg-white px-2 py-[5px] shadow-sm transition-[shadow,opacity,filter] hover:shadow-md`}
       style={{
         height: NODE_HEIGHT,
         ...(data.isRoot ? { width: ROOT_NODE_WIDTH } : { minWidth: DEFAULT_NODE_WIDTH, maxWidth: DEFAULT_NODE_WIDTH }),
-        opacity: effectiveOpacity ?? 1,
+        ...(isDimmed ? { opacity: 0.3 } : {}),
+        ...(data.dimmed ? { filter: 'blur(1.4px) grayscale(0.5)' } : {}),
       }}
       onMouseEnter={() => {
         if (hasCollapsedChildren && data.onHoverNode) {
@@ -127,9 +128,9 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
         style={{ width: 0, height: 0, minWidth: 0, minHeight: 0, border: 'none', background: 'transparent', left: 0 }}
       />
 
-      <div className="absolute left-2 top-[1px] flex gap-1">
+      <div className="absolute left-2 top-[3px] flex gap-1">
         {types.map((t) => (
-          <span key={t} className={`text-[7px] font-bold ${(TYPE_COLORS[t] || TYPE_COLORS.topic).label}`}>
+          <span key={t} className={`text-[6.5px] font-medium uppercase ${(TYPE_COLORS[t] || TYPE_COLORS.topic).label}`}>
             {t.toUpperCase()}
           </span>
         ))}
@@ -139,29 +140,30 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
         <div className="mt-0.5 truncate font-sans text-[11px] font-normal leading-tight tracking-tight text-slate-800">
           {data.label || '(untitled)'}
         </div>
-        {data.author && <div className="mt-0.5 truncate text-[8px] leading-tight text-slate-400">{data.author}</div>}
+        {primaryType === 'topic'
+          ? data.description && (
+              <div className="mt-[3px] truncate text-[8px] leading-tight text-slate-400">{data.description}</div>
+            )
+          : data.author && (
+              <div className="mt-[3px] truncate text-[8px] leading-tight text-slate-400">{data.author}</div>
+            )}
       </div>
       {data.hiddenChildCount > 0 && (
-        <div className="absolute bottom-1 left-1.5 flex gap-0.5">
-          {Object.entries(
-            (children as ChildPreview[])
-              .filter((c) => c.approvalState !== 'PENDING')
-              .reduce<Record<string, number>>((acc, c) => {
-                const t = c.nodeTypes?.[0] || 'topic';
-                acc[t] = (acc[t] || 0) + 1;
-                return acc;
-              }, {}),
-          ).map(([type, count]) => (
-            <span
-              key={type}
-              className={`rounded-[3px] px-1 py-[1px] text-[7px] font-semibold uppercase text-white ${(TYPE_COLORS[type] || TYPE_COLORS.topic).icon}`}
-            >
-              {count} {type}
-              {count !== 1 ? 's' : ''}
-            </span>
-          ))}
+        <div className="absolute bottom-1 right-1.5 flex gap-0.5">
+          {Object.entries((data.descendantTypeCounts || {}) as Record<string, number>)
+            .sort(([typeA], [typeB]) => typeA.localeCompare(typeB))
+            .map(([type, count]) => (
+              <span
+                key={type}
+                className={`rounded-[2px] px-1 py-[2px] text-[6px] font-medium uppercase leading-none text-white ${(TYPE_COLORS[type] || TYPE_COLORS.topic).icon}`}
+              >
+                {count} {type}
+                {count !== 1 ? 's' : ''}
+              </span>
+            ))}
         </div>
       )}
+
       <Handle
         type="source"
         position={Position.Right}
@@ -180,13 +182,13 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           title="Open link in new tab"
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute bottom-1 right-1.5 z-10 flex items-center gap-x-0.5 rounded-full border-[1px] border-slate-400 bg-white px-2 py-[1px] text-[7.5px] font-medium text-slate-500 hover:border-slate-600 hover:bg-slate-600 hover:text-white group-hover:hidden"
+          className="absolute bottom-1.5 left-2 z-10 flex items-center gap-x-0.5 text-[7.5px] font-semibold uppercase leading-none text-sky-600 hover:underline"
         >
-          Source
-          <ExternalLink size={8} />
+          Link
+          <ExternalLink size={8} className="-mt-[1px]" />
         </a>
       )}
-      {data.mainUrl && (
+      {/* {data.mainUrl && (
         <a
           href={data.mainUrl}
           target="_blank"
@@ -199,12 +201,12 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           Source
           <ExternalLink size={10} className="-mt-[1px]" />
         </a>
-      )}
+      )} */}
       {hasCollapsedChildren && !data.isDraft && (
         <button
           type="button"
           title="Expand children"
-          className="absolute right-14 top-1/2 z-10 flex h-5 w-16 -translate-y-1/2 translate-x-full items-center justify-center rounded-full border border-slate-400 bg-white text-[9px] font-semibold text-slate-500 opacity-0 shadow transition-opacity hover:border-slate-600 hover:bg-slate-600 hover:text-white group-hover:opacity-100"
+          className="absolute right-7 top-1/2 z-10 flex h-5 w-14 -translate-y-1/2 translate-x-full items-center justify-center rounded-full border border-slate-400 bg-white text-[7.5px] font-medium text-slate-500 opacity-0 shadow transition-opacity hover:border-slate-600 hover:bg-slate-600 hover:text-white group-hover:opacity-100"
         >
           Expand &#8594;
         </button>
@@ -217,14 +219,14 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
             data.onAddChild();
           }}
           title="Add child node"
-          className="absolute -top-1 right-14 z-10 flex h-5 w-16 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-sky-600 bg-white text-[9px] font-semibold text-sky-600 opacity-0 shadow transition-opacity hover:border-sky-600 hover:bg-sky-600 hover:text-white group-hover:opacity-100"
+          className="absolute -top-2.5 right-7 z-10 flex h-5 w-14 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-sky-600 bg-white text-[7.5px] font-medium text-sky-600 opacity-0 shadow transition-opacity hover:border-sky-600 hover:bg-sky-600 hover:text-white group-hover:opacity-100"
         >
           + Sub-Item
         </button>
       )}
 
       {showPreview && (
-        <div className="absolute left-full top-1/2 ml-3 w-56 -translate-y-1/2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur-sm">
+        <div className="absolute left-full top-1/2 ml-8 w-56 -translate-y-1/2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur-sm">
           <div className="flex flex-col gap-0.5">
             {children.slice(0, MAX_PREVIEW_CHILDREN).map((child) => (
               <div
@@ -253,7 +255,24 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
                 >
                   {child.title || '(untitled)'}
                 </span>
-                <span className="text-[8px] text-slate-400">{child.author}</span>
+                {child.author && <span className="text-[8px] text-slate-400">{child.author}</span>}
+                {(() => {
+                  const types = (data.childDescendantTypes || {})[child.id] as Record<string, number> | undefined;
+                  if (!types || Object.keys(types).length === 0) return null;
+                  return (
+                    <div className="mt-0.5 flex gap-0.5">
+                      {Object.entries(types).map(([type, count]) => (
+                        <span
+                          key={type}
+                          className={`rounded-[3px] px-1 py-[1px] text-[7px] font-semibold uppercase text-white ${(TYPE_COLORS[type] || TYPE_COLORS.topic).icon}`}
+                        >
+                          {count} {type}
+                          {count !== 1 ? 's' : ''}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
                 {child.approvalState === 'PENDING' && (
                   <span className="mt-0.5 self-start rounded-full border border-slate-300 bg-slate-100 px-1.5 py-[0.5px] text-[7px] font-semibold uppercase text-slate-500">
                     Pending Approval

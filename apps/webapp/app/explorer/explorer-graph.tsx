@@ -36,14 +36,19 @@ import { NODE_HEIGHT, getLayoutedElements } from './use-layout';
 const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 
 // Fixed top padding (px) to clear the header/minimap overlay; proportional bottom padding
-const FIT_VIEW_TOP_PX = 130;
+const FIT_VIEW_TOP_PX = 30;
 const FIT_VIEW_PADDING_BOTTOM = 0.02;
 
 function getVisibleNodesWithCollapse(
   allNodes: ProblemNodeData[],
   selectedId: number | null,
   expandForIds?: Set<number>,
-): { visibleNodes: ProblemNodeData[]; hiddenChildCounts: Map<number, number> } {
+): {
+  visibleNodes: ProblemNodeData[];
+  hiddenChildCounts: Map<number, number>;
+  hiddenDescendantTypes: Map<number, Record<string, number>>;
+  descendantTypesCache: Map<number, Record<string, number>>;
+} {
   const nodeById = new Map(allNodes.map((n) => [n.id, n]));
 
   const childrenOf = new Map<number, number[]>();
@@ -86,9 +91,8 @@ function getVisibleNodesWithCollapse(
     }
   }
 
-  // A node is expanded (shows its children) if it's a root, on the ancestor path, or the selected node itself
+  // A node is expanded (shows its children) if it's on the ancestor path or the selected node itself
   const expandedIds = new Set<number>([...ancestorIds]);
-  roots.forEach((r) => expandedIds.add(r.id));
   if (selectedId != null && selectedId !== DRAFT_ID) {
     expandedIds.add(selectedId);
   }
@@ -96,26 +100,59 @@ function getVisibleNodesWithCollapse(
   const visibleIds = new Set<number>();
   allNodes.forEach((n) => {
     const depth = depths.get(n.id) ?? 0;
-    if (depth <= 1) {
+    if (depth === 0) {
       visibleIds.add(n.id);
     } else if (n.parentId != null && expandedIds.has(n.parentId)) {
       visibleIds.add(n.id);
     }
   });
 
+  // Count all hidden descendants (not just direct children) and build type breakdowns
+  const descendantCountCache = new Map<number, number>();
+  const descendantTypesCache = new Map<number, Record<string, number>>();
+  function getHiddenDescendants(id: number): { count: number; types: Record<string, number> } {
+    if (descendantCountCache.has(id)) {
+      return { count: descendantCountCache.get(id)!, types: descendantTypesCache.get(id)! };
+    }
+    const children = childrenOf.get(id) || [];
+    let count = 0;
+    const types: Record<string, number> = {};
+    for (const cId of children) {
+      if (!visibleIds.has(cId)) {
+        const child = nodeById.get(cId);
+        if (child && child.approvalState !== 'PENDING') {
+          count++;
+          const t = child.nodeTypes?.[0] || 'topic';
+          types[t] = (types[t] || 0) + 1;
+        }
+        const sub = getHiddenDescendants(cId);
+        count += sub.count;
+        for (const [t, c] of Object.entries(sub.types)) {
+          types[t] = (types[t] || 0) + c;
+        }
+      }
+    }
+    descendantCountCache.set(id, count);
+    descendantTypesCache.set(id, types);
+    return { count, types };
+  }
+
   const hiddenChildCounts = new Map<number, number>();
+  const hiddenDescendantTypes = new Map<number, Record<string, number>>();
   allNodes.forEach((n) => {
     if (!visibleIds.has(n.id)) return;
-    const children = childrenOf.get(n.id) || [];
-    const hiddenCount = children.filter((cId) => !visibleIds.has(cId)).length;
-    if (hiddenCount > 0) {
-      hiddenChildCounts.set(n.id, hiddenCount);
+    const { count, types } = getHiddenDescendants(n.id);
+    if (count > 0) {
+      hiddenChildCounts.set(n.id, count);
+      hiddenDescendantTypes.set(n.id, types);
     }
   });
 
   return {
     visibleNodes: allNodes.filter((n) => visibleIds.has(n.id)),
     hiddenChildCounts,
+    hiddenDescendantTypes,
+    descendantTypesCache,
   };
 }
 
@@ -131,12 +168,24 @@ type FlowBuildParams = {
     saving: boolean;
   };
   hiddenChildCounts?: Map<number, number>;
+  hiddenDescendantTypes?: Map<number, Record<string, number>>;
+  descendantTypesCache?: Map<number, Record<string, number>>;
   dimmedIds?: Set<number>;
   hoverCallbacks?: { onHoverNode: (id: number) => void; onHoverLeave: () => void };
 };
 
 function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges: Edge[] } {
-  const { problemNodes, onAddChild, onEditNode, draftCallbacks, hiddenChildCounts, dimmedIds, hoverCallbacks } = params;
+  const {
+    problemNodes,
+    onAddChild,
+    onEditNode,
+    draftCallbacks,
+    hiddenChildCounts,
+    hiddenDescendantTypes,
+    descendantTypesCache,
+    dimmedIds,
+    hoverCallbacks,
+  } = params;
 
   const nodes: Node[] = problemNodes.map((pn) => {
     if (pn.id === DRAFT_ID) {
@@ -177,6 +226,10 @@ function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges
         isRoot: !pn.parentId || pn.parentId === 1,
         isDraft: false,
         hiddenChildCount: hiddenChildCounts?.get(pn.id) ?? 0,
+        descendantTypeCounts: hiddenDescendantTypes?.get(pn.id) ?? {},
+        childDescendantTypes: descendantTypesCache
+          ? Object.fromEntries((pn.children || []).map((c) => [c.id, descendantTypesCache.get(c.id) ?? {}]))
+          : {},
         dimmed: dimmedIds?.has(pn.id) ?? false,
         onAddChild: onAddChild ? () => onAddChild(pn.id) : undefined,
         onEditNode: onEditNode ? () => onEditNode(pn.id) : undefined,
@@ -190,14 +243,17 @@ function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges
   const edges: Edge[] = [...problemNodes]
     .filter((pn) => pn.parentId && nodeIdSet.has(String(pn.id)) && nodeIdSet.has(String(pn.parentId)))
     .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
-    .map((pn) => ({
-      id: `e-${pn.parentId}-${pn.id}`,
-      source: String(pn.parentId!),
-      target: String(pn.id),
-      type: 'bezier',
-      style: { stroke: '#cbd5e1', strokeWidth: 1 },
-      animated: false,
-    }));
+    .map((pn) => {
+      const edgeDimmed = dimmedIds?.has(pn.id) || dimmedIds?.has(pn.parentId!);
+      return {
+        id: `e-${pn.parentId}-${pn.id}`,
+        source: String(pn.parentId!),
+        target: String(pn.id),
+        type: 'bezier',
+        style: { stroke: '#cbd5e1', strokeWidth: 1, opacity: edgeDimmed ? 0.1 : 1 },
+        animated: false,
+      };
+    });
 
   return { nodes, edges };
 }
@@ -265,10 +321,10 @@ function ProblemsGraphInner({
     (nodeX: number, nodeY: number, nodeW: number, nodeH: number, opts?: { zoom?: number; duration?: number }) => {
       const container = flowContainerRef.current;
       if (!container) return;
-      const zoom = opts?.zoom ?? 1.5;
+      const zoom = opts?.zoom ?? 1.35;
       const rect = container.getBoundingClientRect();
       const x = -((nodeX + nodeW / 2) * zoom) + rect.width * 0.45;
-      const y = -((nodeY + nodeH / 2) * zoom) + rect.height / 2;
+      const y = -((nodeY + nodeH / 2) * zoom) + rect.height * 0.35;
       setViewport({ x, y, zoom }, { duration: opts?.duration });
     },
     [setViewport],
@@ -277,9 +333,10 @@ function ProblemsGraphInner({
   const [problemNodes, setProblemNodes] = useState<ProblemNodeData[]>(initialNodes);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(initialSelectedId ?? null);
+  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
   const selectedNodeIdRef = useRef<number | null>(null);
   selectedNodeIdRef.current = selectedNodeId;
+  const initialSelectionPendingRef = useRef(initialSelectedId != null);
   const [detailNode, setDetailNode] = useState<DetailNode | null>(null);
   const [draftNode, setDraftNode] = useState<ProblemNodeData | null>(null);
   const [editOnSelect, setEditOnSelect] = useState(false);
@@ -762,40 +819,41 @@ function ProblemsGraphInner({
     });
     const withParents = problemNodes.filter((n) => includeIds.has(n.id));
 
-    // Dim nodes not related to the selected node (ancestors, selected, descendants stay bright)
+    // Dim nodes not sharing the same root tree as the selected node
     let selectionDimmedIds: Set<number> | undefined;
     if (selectedNodeId != null && selectedNodeId !== DRAFT_ID) {
-      const focusedIds = new Set<number>();
       const nbm = new Map(withParents.map((n) => [n.id, n]));
 
-      // Walk up to collect ancestors
+      // Walk up to find the root of the selected node
+      let rootId = selectedNodeId;
       let cur: number | null | undefined = selectedNodeId;
       while (cur != null) {
-        focusedIds.add(cur);
-        cur = nbm.get(cur)?.parentId;
+        rootId = cur;
+        const pid: number | null | undefined = nbm.get(cur)?.parentId;
+        if (pid == null || !nbm.has(pid)) break;
+        cur = pid;
       }
 
-      // Walk down to collect all descendants
-      const descQueue = [selectedNodeId];
-      while (descQueue.length > 0) {
-        const id = descQueue.shift()!;
-        focusedIds.add(id);
+      // BFS from root to collect all nodes in the same tree
+      const sameTreeIds = new Set<number>();
+      const treeQueue = [rootId];
+      while (treeQueue.length > 0) {
+        const id = treeQueue.shift()!;
+        if (sameTreeIds.has(id)) continue;
+        sameTreeIds.add(id);
         withParents.forEach((n) => {
-          if (n.parentId === id && !focusedIds.has(n.id)) {
-            descQueue.push(n.id);
+          if (n.parentId === id && !sameTreeIds.has(n.id)) {
+            treeQueue.push(n.id);
           }
         });
       }
 
-      selectionDimmedIds = new Set(withParents.filter((n) => !focusedIds.has(n.id)).map((n) => n.id));
+      selectionDimmedIds = new Set(withParents.filter((n) => !sameTreeIds.has(n.id)).map((n) => n.id));
     }
 
     const filterMatchIds = typeFilter !== 'all' ? new Set(filtered.map((n) => n.id)) : undefined;
-    const { visibleNodes, hiddenChildCounts } = getVisibleNodesWithCollapse(
-      withParents,
-      selectedNodeId,
-      filterMatchIds,
-    );
+    const { visibleNodes, hiddenChildCounts, hiddenDescendantTypes, descendantTypesCache } =
+      getVisibleNodesWithCollapse(withParents, selectedNodeId, filterMatchIds);
     const filterDimmedIds =
       filterMatchIds && filterMatchIds.size > 0
         ? new Set(visibleNodes.filter((n) => !filterMatchIds.has(n.id)).map((n) => n.id))
@@ -811,6 +869,8 @@ function ProblemsGraphInner({
       onEditNode: canEdit ? editNode : undefined,
       draftCallbacks: draftNode ? draftCallbacks : undefined,
       hiddenChildCounts,
+      hiddenDescendantTypes,
+      descendantTypesCache,
       dimmedIds,
       hoverCallbacks: selectedNodeId == null ? { onHoverNode, onHoverLeave } : undefined,
     };
@@ -833,8 +893,18 @@ function ProblemsGraphInner({
         layoutedNodes.forEach((n) => cache.set(n.id, { ...n.position }));
         positionCacheRef.current = cache;
 
-        const sid = selectedNodeIdRef.current;
         layoutReadyRef.current = true;
+
+        if (initialSelectionPendingRef.current && initialSelectedId != null) {
+          initialSelectionPendingRef.current = false;
+          selectedNodeIdRef.current = initialSelectedId;
+          setNodes(layoutedNodes.map((n) => ({ ...n, selected: n.id === String(initialSelectedId) })));
+          setEdges(layoutedEdges);
+          setSelectedNodeId(initialSelectedId);
+          return;
+        }
+
+        const sid = selectedNodeIdRef.current;
         setNodes(layoutedNodes.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
         setEdges(layoutedEdges);
         if (draftNode) {
@@ -861,30 +931,12 @@ function ProblemsGraphInner({
       const { nodes: builtNodes, edges: builtEdges } = buildFlowNodesAndEdges(buildParams);
 
       const sid = selectedNodeIdRef.current;
-      const focusedNodeIds = new Set<string>();
-      if (sid != null) {
-        focusedNodeIds.add(String(sid));
-        const nbm = new Map(buildParams.problemNodes.map((pn) => [pn.id, pn]));
-        let cur: number | null | undefined = sid;
-        while (cur != null) {
-          focusedNodeIds.add(String(cur));
-          cur = nbm.get(cur)?.parentId;
-        }
-        const dq = [sid];
-        while (dq.length > 0) {
-          const id = dq.shift()!;
-          focusedNodeIds.add(String(id));
-          buildParams.problemNodes.forEach((pn) => {
-            if (pn.parentId === id && !focusedNodeIds.has(String(pn.id))) dq.push(pn.id);
-          });
-        }
-      }
 
       const newChildOffsets = new Map<string, number>();
       const positioned = builtNodes.map((n) => {
-        const isFocused = focusedNodeIds.has(n.id);
+        const nodeIsDimmed = dimmedIds?.has(Number(n.id));
         const cached = positionCacheRef.current.get(n.id);
-        if (cached) return { ...n, position: { ...cached }, zIndex: isFocused ? 100 : 0 };
+        if (cached) return { ...n, position: { ...cached }, zIndex: nodeIsDimmed ? -1 : 0 };
 
         const parentEdge = builtEdges.find((e) => e.target === n.id);
         if (parentEdge) {
@@ -894,7 +946,7 @@ function ProblemsGraphInner({
             newChildOffsets.set(parentEdge.source, offset + 1);
             const pos = { x: parentPos.x + 300, y: parentPos.y + offset * (NODE_HEIGHT + 4) };
             positionCacheRef.current.set(n.id, pos);
-            return { ...n, position: pos, zIndex: 100 };
+            return { ...n, position: pos, zIndex: nodeIsDimmed ? -1 : 0 };
           }
         }
         return n;
@@ -936,6 +988,7 @@ function ProblemsGraphInner({
     panToNode,
     onHoverNode,
     onHoverLeave,
+    initialSelectedId,
   ]);
 
   return (
@@ -1019,15 +1072,19 @@ function ProblemsGraphInner({
                     <div className="flex flex-wrap justify-center gap-1 pt-0">
                       {typeFilterOptions.map((t) => {
                         const colors = NODE_TYPE_COLORS[t];
+                        const filterDisabled = selectedNodeId != null && selectedNodeId !== DRAFT_ID;
                         return (
                           <button
                             type="button"
                             key={t}
+                            disabled={filterDisabled}
                             onClick={() => handleTypeFilter(t)}
                             className={`rounded-full border px-3 py-1 text-center text-[9px] font-semibold uppercase transition-colors ${
-                              typeFilter === t
-                                ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
-                                : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
+                              filterDisabled
+                                ? 'cursor-not-allowed border-slate-100 text-slate-300'
+                                : typeFilter === t
+                                  ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
+                                  : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
                             }`}
                           >
                             {t}
