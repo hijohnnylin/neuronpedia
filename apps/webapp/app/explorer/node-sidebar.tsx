@@ -4,7 +4,7 @@ import { useGlobalContext } from '@/components/provider/global-provider';
 import { useCallback, useEffect, useState } from 'react';
 import { CommentItem } from './comment-item';
 import { TYPE_COLORS as NODE_TYPE_COLORS } from './explorer-node';
-import { type DetailNode, type ProblemNodeData, TYPE_COLORS } from './explorer-shared';
+import { MAX_TITLE_LENGTH, type DetailNode, type ProblemNodeData, TYPE_COLORS } from './explorer-shared';
 
 export function NodeSidebar({
   selectedNode,
@@ -202,6 +202,7 @@ export function NodeSidebar({
               type="text"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
+              maxLength={MAX_TITLE_LENGTH}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
             />
           </div>

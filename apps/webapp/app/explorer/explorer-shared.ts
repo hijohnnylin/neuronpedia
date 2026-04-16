@@ -1,5 +1,5 @@
 export const DRAFT_ID = -1;
-export const MAX_TITLE_LENGTH = 54;
+export const MAX_TITLE_LENGTH = 128;
 
 export const NODE_TYPES_LIST = ['topic', 'paper', 'tool', 'dataset', 'eval', 'replication', 'model'] as const;
 

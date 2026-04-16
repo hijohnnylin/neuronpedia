@@ -28,10 +28,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DraftEditSidebar } from './draft-edit-sidebar';
 import DraftNodeComponent from './draft-node';
 import { DraftPreviewSidebar } from './draft-preview-sidebar';
-import ProblemNodeComponent, { TYPE_COLORS as NODE_TYPE_COLORS } from './explorer-node';
+import ProblemNodeComponent, {
+  DEFAULT_NODE_WIDTH,
+  TYPE_COLORS as NODE_TYPE_COLORS,
+  ROOT_NODE_WIDTH,
+} from './explorer-node';
 import { DRAFT_ID, TYPE_HEX_COLORS, type DetailNode, type ProblemNodeData } from './explorer-shared';
 import { NodeSidebar } from './node-sidebar';
-import { NODE_HEIGHT, getLayoutedElements } from './use-layout';
+import { LAYER_GAP, NODE_HEIGHT, getLayoutedElements } from './use-layout';
 
 const nodeTypes = { problem: ProblemNodeComponent, draft: DraftNodeComponent };
 
@@ -48,6 +52,7 @@ function getVisibleNodesWithCollapse(
   hiddenChildCounts: Map<number, number>;
   hiddenDescendantTypes: Map<number, Record<string, number>>;
   descendantTypesCache: Map<number, Record<string, number>>;
+  totalDescendantTypes: Map<number, Record<string, number>>;
 } {
   const nodeById = new Map(allNodes.map((n) => [n.id, n]));
 
@@ -148,11 +153,37 @@ function getVisibleNodesWithCollapse(
     }
   });
 
+  // Count all descendants regardless of visibility, for the always-on type-count badges
+  const totalDescendantTypes = new Map<number, Record<string, number>>();
+  function getTotalDescendants(id: number): Record<string, number> {
+    const cached = totalDescendantTypes.get(id);
+    if (cached) return cached;
+    const types: Record<string, number> = {};
+    const children = childrenOf.get(id) || [];
+    for (const cId of children) {
+      const child = nodeById.get(cId);
+      if (child && child.approvalState !== 'PENDING') {
+        const t = child.nodeTypes?.[0] || 'topic';
+        types[t] = (types[t] || 0) + 1;
+      }
+      const sub = getTotalDescendants(cId);
+      for (const [t, c] of Object.entries(sub)) {
+        types[t] = (types[t] || 0) + c;
+      }
+    }
+    totalDescendantTypes.set(id, types);
+    return types;
+  }
+  allNodes.forEach((n) => {
+    getTotalDescendants(n.id);
+  });
+
   return {
     visibleNodes: allNodes.filter((n) => visibleIds.has(n.id)),
     hiddenChildCounts,
     hiddenDescendantTypes,
     descendantTypesCache,
+    totalDescendantTypes,
   };
 }
 
@@ -170,6 +201,7 @@ type FlowBuildParams = {
   hiddenChildCounts?: Map<number, number>;
   hiddenDescendantTypes?: Map<number, Record<string, number>>;
   descendantTypesCache?: Map<number, Record<string, number>>;
+  totalDescendantTypes?: Map<number, Record<string, number>>;
   dimmedIds?: Set<number>;
   hoverCallbacks?: { onHoverNode: (id: number) => void; onHoverLeave: () => void };
 };
@@ -183,6 +215,7 @@ function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges
     hiddenChildCounts,
     hiddenDescendantTypes,
     descendantTypesCache,
+    totalDescendantTypes,
     dimmedIds,
     hoverCallbacks,
   } = params;
@@ -226,7 +259,7 @@ function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges
         isRoot: !pn.parentId || pn.parentId === 1,
         isDraft: false,
         hiddenChildCount: hiddenChildCounts?.get(pn.id) ?? 0,
-        descendantTypeCounts: hiddenDescendantTypes?.get(pn.id) ?? {},
+        descendantTypeCounts: totalDescendantTypes?.get(pn.id) ?? hiddenDescendantTypes?.get(pn.id) ?? {},
         childDescendantTypes: descendantTypesCache
           ? Object.fromEntries((pn.children || []).map((c) => [c.id, descendantTypesCache.get(c.id) ?? {}]))
           : {},
@@ -318,17 +351,32 @@ function ProblemsGraphInner({
   }, [fitView, getNodes, setViewport]);
 
   const panToNode = useCallback(
-    (nodeX: number, nodeY: number, nodeW: number, nodeH: number, opts?: { zoom?: number; duration?: number }) => {
+    (
+      nodeX: number,
+      nodeY: number,
+      nodeW: number,
+      nodeH: number,
+      opts?: { zoom?: number; duration?: number; xRatio?: number },
+    ) => {
       const container = flowContainerRef.current;
       if (!container) return;
       const zoom = opts?.zoom ?? 1.35;
+      const xRatio = opts?.xRatio ?? 0.25;
       const rect = container.getBoundingClientRect();
-      const x = -((nodeX + nodeW / 2) * zoom) + rect.width * 0.45;
-      const y = -((nodeY + nodeH / 2) * zoom) + rect.height * 0.35;
+      const x = -((nodeX + nodeW / 2) * zoom) + rect.width * xRatio;
+      const y = -((nodeY + nodeH / 2) * zoom) + rect.height * 0.4;
       setViewport({ x, y, zoom }, { duration: opts?.duration });
     },
     [setViewport],
   );
+
+  const panXRatioForNode = useCallback((n: Node | undefined): number => {
+    if (!n) return 0.25;
+    const d = (n.data || {}) as { isRoot?: boolean; childCount?: number; hiddenChildCount?: number };
+    if (d.isRoot) return 0.2;
+    const hasDescendants = (d.childCount ?? 0) > 0 || (d.hiddenChildCount ?? 0) > 0;
+    return hasDescendants ? 0.35 : 0.5;
+  }, []);
 
   const [problemNodes, setProblemNodes] = useState<ProblemNodeData[]>(initialNodes);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -344,8 +392,9 @@ function ProblemsGraphInner({
   const [filteredNodeCount, setFilteredNodeCount] = useState(0);
   const [totalNodeCount, setTotalNodeCount] = useState(0);
   const layoutReadyRef = useRef(false);
-  const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewSelectedId, setPreviewSelectedId] = useState<number | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAppliedRealSelectionRef = useRef<number | null | undefined>(undefined);
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideSeen, setGuideSeen] = useState(true);
 
@@ -399,36 +448,68 @@ function ProblemsGraphInner({
       .catch(() => {});
   }, []);
 
+  const clearPreviewTimer = useCallback(() => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+  }, []);
+
+  const getRootIdOf = useCallback(
+    (id: number | null | undefined): number | null => {
+      if (id == null) return null;
+      const byId = new Map(problemNodes.map((n) => [n.id, n]));
+      let cur: number | null | undefined = id;
+      let root: number | null = null;
+      while (cur != null) {
+        const node = byId.get(cur);
+        if (!node) break;
+        root = cur;
+        const pid = node.parentId;
+        if (pid == null || pid === 1 || !byId.has(pid)) break;
+        cur = pid;
+      }
+      return root;
+    },
+    [problemNodes],
+  );
+
   const onHoverNode = useCallback(
     (id: number) => {
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-        hoverTimerRef.current = null;
+      clearPreviewTimer();
+      // Ignore hovers until the initial layout has settled, otherwise hover-induced
+      // relayouts can race with and clobber the first pass.
+      if (!layoutReadyRef.current) return;
+      if (draftNode) return;
+      if (id === selectedNodeId) {
+        if (previewSelectedId != null) setPreviewSelectedId(null);
+        return;
       }
-      setHoveredNodeId(id);
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          zIndex: n.id === String(id) ? 1000 : 0,
-          data: { ...n.data, hoverDimmed: n.id !== String(id) },
-        })),
-      );
+      if (previewSelectedId === id) return;
+      // If switching to a different root/tree than the one we're already previewing,
+      // debounce briefly so that briefly grazing a dimmed node behind the previewed
+      // subtree (e.g. when moving between children) doesn't hijack the preview.
+      const currentRoot = getRootIdOf(previewSelectedId ?? selectedNodeId);
+      const newRoot = getRootIdOf(id);
+      const switchingTrees = currentRoot != null && newRoot != null && currentRoot !== newRoot;
+      if (switchingTrees) {
+        previewTimerRef.current = setTimeout(() => {
+          previewTimerRef.current = null;
+          setPreviewSelectedId(id);
+        }, 120);
+      } else {
+        setPreviewSelectedId(id);
+      }
     },
-    [setNodes],
+    [clearPreviewTimer, draftNode, selectedNodeId, previewSelectedId, getRootIdOf],
   );
 
   const onHoverLeave = useCallback(() => {
-    hoverTimerRef.current = setTimeout(() => {
-      setHoveredNodeId(null);
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          zIndex: 0,
-          data: { ...n.data, hoverDimmed: false },
-        })),
-      );
-    }, 75);
-  }, [setNodes]);
+    clearPreviewTimer();
+    previewTimerRef.current = setTimeout(() => {
+      setPreviewSelectedId(null);
+    }, 500);
+  }, [clearPreviewTimer]);
 
   const selectedNode = useMemo(() => {
     if (selectedNodeId === DRAFT_ID && draftNode) return draftNode;
@@ -665,6 +746,8 @@ function ProblemsGraphInner({
 
   const selectNode = useCallback(
     (id: number) => {
+      clearPreviewTimer();
+      setPreviewSelectedId(null);
       setSelectedNodeId(id);
       setTypeFilter('all');
       setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === String(id) })));
@@ -675,11 +758,14 @@ function ProblemsGraphInner({
         if (target) {
           const width = target.measured?.width ?? 200;
           const height = target.measured?.height ?? 40;
-          panToNode(target.position.x, target.position.y, width, height, { duration: 200 });
+          panToNode(target.position.x, target.position.y, width, height, {
+            duration: 200,
+            xRatio: panXRatioForNode(target),
+          });
         }
       }, 100);
     },
-    [setNodes, getNodes, panToNode],
+    [setNodes, getNodes, panToNode, panXRatioForNode, clearPreviewTimer],
   );
 
   const editNode = useCallback(
@@ -701,26 +787,35 @@ function ProblemsGraphInner({
         handleDraftCancelled();
       }
       if (clickedId === selectedNodeId) {
-        setSelectedNodeId(null);
-        setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
-        window.history.replaceState(null, '', '/explorer');
+        const clicked = problemNodes.find((n) => n.id === clickedId);
+        const parentId = clicked?.parentId;
+        const parentIsRealNode = parentId != null && parentId !== 1 && problemNodes.some((n) => n.id === parentId);
+        if (parentIsRealNode) {
+          selectNode(parentId);
+        } else {
+          clearPreviewTimer();
+          setPreviewSelectedId(null);
+          setSelectedNodeId(null);
+          setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+          window.history.replaceState(null, '', '/explorer');
+        }
       } else {
         selectNode(clickedId);
       }
     },
-    [selectNode, draftNode, handleDraftCancelled, selectedNodeId, setNodes],
+    [selectNode, draftNode, handleDraftCancelled, selectedNodeId, setNodes, problemNodes, clearPreviewTimer],
   );
 
   const handleClose = useCallback(() => {
+    clearPreviewTimer();
+    setPreviewSelectedId(null);
     setSelectedNodeId(null);
     window.history.replaceState(null, '', '/explorer');
-  }, []);
+  }, [clearPreviewTimer]);
 
   const onPaneClick = useCallback(() => {
-    if (hoveredNodeId != null) {
-      setHoveredNodeId(null);
-      setNodes((nds) => nds.map((n) => ({ ...n, zIndex: 0, data: { ...n.data, hoverDimmed: false } })));
-    }
+    clearPreviewTimer();
+    if (previewSelectedId != null) setPreviewSelectedId(null);
     if (draftNode) return;
     if (selectedNodeId != null) {
       handleClose();
@@ -728,7 +823,7 @@ function ProblemsGraphInner({
     } else {
       fitViewCustom();
     }
-  }, [draftNode, selectedNodeId, handleClose, fitViewCustom, hoveredNodeId, setNodes]);
+  }, [draftNode, selectedNodeId, handleClose, fitViewCustom, previewSelectedId, clearPreviewTimer]);
 
   const handleAddNode = useCallback(() => {
     if (!session?.user) {
@@ -788,20 +883,23 @@ function ProblemsGraphInner({
       body: JSON.stringify({ id: selectedNodeId }),
     });
     if (res.ok) {
-      if (parentId) {
-        selectedNodeIdRef.current = parentId;
-        setSelectedNodeId(parentId);
-        window.history.replaceState(null, '', `/explorer/${parentId}`);
+      // Mirror the click-to-deselect logic: select the parent if it's a real node, otherwise close.
+      const parentIsRealNode =
+        parentId != null && parentId !== 1 && problemNodes.some((n) => n.id === parentId);
+      if (parentIsRealNode) {
+        selectNode(parentId);
       } else {
         handleClose();
       }
       fetchNodes();
     }
-  }, [selectedNodeId, selectedNode, handleClose, fetchNodes]);
+  }, [selectedNodeId, selectedNode, handleClose, fetchNodes, problemNodes, selectNode]);
 
   useEffect(() => {
     if (problemNodes.length === 0 && !draftNode) return;
     let cancelled = false;
+    const effectiveSelectedId = previewSelectedId ?? selectedNodeId;
+    const isPreviewActive = previewSelectedId != null && previewSelectedId !== selectedNodeId;
     const filtered = typeFilter === 'all' ? problemNodes : problemNodes.filter((n) => n.nodeTypes.includes(typeFilter));
     setFilteredNodeCount(filtered.length);
     setTotalNodeCount(problemNodes.length);
@@ -819,14 +917,19 @@ function ProblemsGraphInner({
     });
     const withParents = problemNodes.filter((n) => includeIds.has(n.id));
 
-    // Dim nodes not sharing the same root tree as the selected node
+    // While drafting, anchor visibility/dimming on the draft's parent so its tree stays expanded
+    // and the rest of the graph is de-emphasized (instead of collapsing back to just roots because
+    // selectedNodeId is the sentinel DRAFT_ID).
+    const visibilityAnchorId = draftNode && draftNode.parentId != null ? draftNode.parentId : effectiveSelectedId;
+
+    // Dim nodes not sharing the same root tree as the visibility anchor
     let selectionDimmedIds: Set<number> | undefined;
-    if (selectedNodeId != null && selectedNodeId !== DRAFT_ID) {
+    if (visibilityAnchorId != null && visibilityAnchorId !== DRAFT_ID) {
       const nbm = new Map(withParents.map((n) => [n.id, n]));
 
-      // Walk up to find the root of the selected node
-      let rootId = selectedNodeId;
-      let cur: number | null | undefined = selectedNodeId;
+      // Walk up to find the root of the anchor node
+      let rootId = visibilityAnchorId;
+      let cur: number | null | undefined = visibilityAnchorId;
       while (cur != null) {
         rootId = cur;
         const pid: number | null | undefined = nbm.get(cur)?.parentId;
@@ -852,8 +955,8 @@ function ProblemsGraphInner({
     }
 
     const filterMatchIds = typeFilter !== 'all' ? new Set(filtered.map((n) => n.id)) : undefined;
-    const { visibleNodes, hiddenChildCounts, hiddenDescendantTypes, descendantTypesCache } =
-      getVisibleNodesWithCollapse(withParents, selectedNodeId, filterMatchIds);
+    const { visibleNodes, hiddenChildCounts, hiddenDescendantTypes, descendantTypesCache, totalDescendantTypes } =
+      getVisibleNodesWithCollapse(withParents, visibilityAnchorId, filterMatchIds);
     const filterDimmedIds =
       filterMatchIds && filterMatchIds.size > 0
         ? new Set(visibleNodes.filter((n) => !filterMatchIds.has(n.id)).map((n) => n.id))
@@ -871,15 +974,25 @@ function ProblemsGraphInner({
       hiddenChildCounts,
       hiddenDescendantTypes,
       descendantTypesCache,
+      totalDescendantTypes,
       dimmedIds,
-      hoverCallbacks: selectedNodeId == null ? { onHoverNode, onHoverLeave } : undefined,
+      hoverCallbacks: { onHoverNode, onHoverLeave },
     };
 
+    // Only trigger a full elk re-layout when we truly need one (no cached positions yet, or the
+    // type filter just changed). Mere changes to `problemNodes` (e.g. the post-mount fetch for
+    // canEdit users that reloads with unapproved entries, or a draft being submitted) are handled
+    // cheaply by the non-relayout branch using cached positions + parent-relative fallback — this
+    // avoids a disruptive re-layout right as the user starts interacting.
     const needsRelayout =
-      positionCacheRef.current.size === 0 ||
-      problemNodes !== prevProblemNodesRef.current ||
-      typeFilter !== prevTypeFilterRef.current ||
-      draftNode !== prevDraftNodeRef.current;
+      positionCacheRef.current.size === 0 || typeFilter !== prevTypeFilterRef.current;
+    const draftJustAppeared = !prevDraftNodeRef.current && draftNode != null;
+    const draftJustChanged = prevDraftNodeRef.current !== draftNode;
+    if (draftJustChanged) {
+      // Any time the draft transitions (appear, disappear, different parent), drop any stale cached
+      // draft position so it's recomputed via the parent-relative fallback.
+      positionCacheRef.current.delete(String(DRAFT_ID));
+    }
 
     prevProblemNodesRef.current = problemNodes;
     prevTypeFilterRef.current = typeFilter;
@@ -895,36 +1008,56 @@ function ProblemsGraphInner({
 
         layoutReadyRef.current = true;
 
+        const applyZIndex = (n: Node) => (dimmedIds?.has(Number(n.id)) ? -1 : 0);
+
         if (initialSelectionPendingRef.current && initialSelectedId != null) {
           initialSelectionPendingRef.current = false;
           selectedNodeIdRef.current = initialSelectedId;
-          setNodes(layoutedNodes.map((n) => ({ ...n, selected: n.id === String(initialSelectedId) })));
+          setNodes(
+            layoutedNodes.map((n) => ({
+              ...n,
+              selected: n.id === String(initialSelectedId),
+              zIndex: applyZIndex(n),
+            })),
+          );
           setEdges(layoutedEdges);
           setSelectedNodeId(initialSelectedId);
           return;
         }
 
         const sid = selectedNodeIdRef.current;
-        setNodes(layoutedNodes.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
+        setNodes(
+          layoutedNodes.map((n) => ({
+            ...n,
+            selected: sid != null && n.id === String(sid),
+            zIndex: applyZIndex(n),
+          })),
+        );
         setEdges(layoutedEdges);
-        if (draftNode) {
+        const realSelectionChanged = sid !== lastAppliedRealSelectionRef.current;
+        const shouldAdjustView = !isPreviewActive && realSelectionChanged;
+        if (shouldAdjustView) lastAppliedRealSelectionRef.current = sid;
+        if (draftJustAppeared && draftNode) {
           const focusIds = [String(DRAFT_ID)];
           if (draftNode.parentId) focusIds.push(String(draftNode.parentId));
           setTimeout(
             () => fitView({ padding: 0.3, duration: 300, nodes: layoutedNodes.filter((n) => focusIds.includes(n.id)) }),
             50,
           );
-        } else if (sid != null) {
-          const target = layoutedNodes.find((n) => n.id === String(sid));
-          if (target) {
-            const w = target.measured?.width ?? 200;
-            const h = target.measured?.height ?? 40;
-            setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200 }), 50);
+        } else if (shouldAdjustView) {
+          if (sid != null) {
+            const target = layoutedNodes.find((n) => n.id === String(sid));
+            if (target) {
+              const w = target.measured?.width ?? 200;
+              const h = target.measured?.height ?? 40;
+              const xRatio = panXRatioForNode(target);
+              setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200, xRatio }), 50);
+            } else {
+              setTimeout(() => fitViewCustom(), 50);
+            }
           } else {
             setTimeout(() => fitViewCustom(), 50);
           }
-        } else {
-          setTimeout(() => fitViewCustom(), 50);
         }
       });
     } else {
@@ -932,7 +1065,6 @@ function ProblemsGraphInner({
 
       const sid = selectedNodeIdRef.current;
 
-      const newChildOffsets = new Map<string, number>();
       const positioned = builtNodes.map((n) => {
         const nodeIsDimmed = dimmedIds?.has(Number(n.id));
         const cached = positionCacheRef.current.get(n.id);
@@ -942,9 +1074,20 @@ function ProblemsGraphInner({
         if (parentEdge) {
           const parentPos = positionCacheRef.current.get(parentEdge.source);
           if (parentPos) {
-            const offset = newChildOffsets.get(parentEdge.source) || 0;
-            newChildOffsets.set(parentEdge.source, offset + 1);
-            const pos = { x: parentPos.x + 300, y: parentPos.y + offset * (NODE_HEIGHT + 4) };
+            const parentNode = builtNodes.find((b) => b.id === parentEdge.source);
+            const parentIsRoot = (parentNode?.data as { isRoot?: boolean } | undefined)?.isRoot;
+            const parentWidth = parentIsRoot ? ROOT_NODE_WIDTH : DEFAULT_NODE_WIDTH;
+            // Place this node below the lowest cached sibling (if any), otherwise aligned with parent's y.
+            const cachedSiblings = builtEdges
+              .filter((e) => e.source === parentEdge.source && e.target !== n.id)
+              .map((e) => positionCacheRef.current.get(e.target))
+              .filter((p): p is { x: number; y: number } => !!p);
+            const y =
+              cachedSiblings.length === 0 ? parentPos.y : Math.max(...cachedSiblings.map((s) => s.y)) + NODE_HEIGHT + 4;
+            const pos = {
+              x: parentPos.x + parentWidth + LAYER_GAP,
+              y,
+            };
             positionCacheRef.current.set(n.id, pos);
             return { ...n, position: pos, zIndex: nodeIsDimmed ? -1 : 0 };
           }
@@ -956,17 +1099,31 @@ function ProblemsGraphInner({
       setNodes(positioned.map((n) => ({ ...n, selected: sid != null && n.id === String(sid) })));
       setEdges(builtEdges);
 
-      if (sid != null) {
-        const target = positioned.find((n) => n.id === String(sid));
-        if (target) {
-          const w = target.measured?.width ?? 200;
-          const h = target.measured?.height ?? 40;
-          setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200 }), 50);
+      const realSelectionChanged = sid !== lastAppliedRealSelectionRef.current;
+      const shouldAdjustView = !isPreviewActive && realSelectionChanged;
+      if (shouldAdjustView) lastAppliedRealSelectionRef.current = sid;
+
+      if (draftJustAppeared && draftNode) {
+        const focusIds = [String(DRAFT_ID)];
+        if (draftNode.parentId) focusIds.push(String(draftNode.parentId));
+        setTimeout(
+          () => fitView({ padding: 0.3, duration: 300, nodes: positioned.filter((n) => focusIds.includes(n.id)) }),
+          50,
+        );
+      } else if (shouldAdjustView) {
+        if (sid != null) {
+          const target = positioned.find((n) => n.id === String(sid));
+          if (target) {
+            const w = target.measured?.width ?? 200;
+            const h = target.measured?.height ?? 40;
+            const xRatio = panXRatioForNode(target);
+            setTimeout(() => panToNode(target.position.x, target.position.y, w, h, { duration: 200, xRatio }), 50);
+          } else {
+            setTimeout(() => fitViewCustom(), 50);
+          }
         } else {
           setTimeout(() => fitViewCustom(), 50);
         }
-      } else {
-        setTimeout(() => fitViewCustom(), 50);
       }
     }
     return () => {
@@ -975,6 +1132,7 @@ function ProblemsGraphInner({
   }, [
     typeFilter,
     selectedNodeId,
+    previewSelectedId,
     problemNodes,
     draftNode,
     addChildToNode,
@@ -986,6 +1144,7 @@ function ProblemsGraphInner({
     fitView,
     fitViewCustom,
     panToNode,
+    panXRatioForNode,
     onHoverNode,
     onHoverLeave,
     initialSelectedId,
@@ -1165,17 +1324,19 @@ function ProblemsGraphInner({
               </div>
             </Panel>
 
-            <Panel position="bottom-right">
-              <button
-                type="button"
-                onClick={handleAddNode}
-                className="rounded-lg bg-sky-700 px-4 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-sky-800"
-              >
-                + Add Node
-              </button>
-            </Panel>
+            {!draftNode && (
+              <Panel position="bottom-right">
+                <button
+                  type="button"
+                  onClick={handleAddNode}
+                  className="rounded-lg bg-sky-700 px-4 py-2 text-xs font-medium text-white shadow-sm transition-colors hover:bg-sky-800"
+                >
+                  + Add Node
+                </button>
+              </Panel>
+            )}
 
-            {editors.length > 0 && (
+            {canEdit && editors.length > 0 && (
               <Panel position="bottom-left">
                 <div className="min-w-[200px] max-w-[260px] rounded-lg border border-slate-200 bg-white py-1.5 shadow-md">
                   {canEdit && (
@@ -1246,14 +1407,14 @@ function ProblemsGraphInner({
                   <div className="px-3.5 py-2 pt-1">
                     <CustomTooltip
                       trigger={
-                        <div className="mb-1.5 hidden cursor-default flex-row items-center gap-x-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                        <div className="mb-1.5 flex cursor-default flex-row items-center gap-x-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
                           Editors <QuestionMarkCircledIcon className="h-3 w-3" />
                         </div>
                       }
                     >
                       Anyone can add items, but new additions are &apos;pending&apos; until an editor approves them.
                     </CustomTooltip>
-                    <div className="hidden flex-col gap-1">
+                    <div className="flex flex-col gap-1">
                       {editors.map((editor) => (
                         <div key={editor.id} className="flex items-center gap-1.5">
                           <div className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-300 text-[7px] font-bold text-white">

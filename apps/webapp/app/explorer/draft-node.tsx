@@ -236,7 +236,7 @@ function DraftNodeComponent({ data }: { data: any }) {
         </div>
       ) : (
         /* ── Empty: show URL input ── */
-        <div className="flex items-center gap-2 px-2 py-1">
+        <div className="flex items-center gap-1 px-2 py-1">
           <input
             ref={inputRef}
             type="text"
@@ -246,10 +246,22 @@ function DraftNodeComponent({ data }: { data: any }) {
             onPaste={handleInputPaste}
             placeholder={fetching ? 'Fetching metadata...' : 'Paste URL here, or enter new topic title.'}
             disabled={fetching}
-            className="nodrag w-full rounded border-none bg-sky-50 px-2 py-0.5 text-[11px] text-slate-600 placeholder-slate-400 focus:outline-none focus:ring-0 disabled:opacity-60"
+            className="nodrag min-w-0 flex-1 rounded border-none bg-sky-50 px-2 py-0.5 text-[10px] text-slate-600 placeholder-slate-400 focus:outline-none focus:ring-0 disabled:opacity-60"
           />
           {fetching && (
             <div className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-sky-600" />
+          )}
+          {!fetching && urlInput.trim().length > 0 && !/^https?:\/\/.+/i.test(urlInput.trim()) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTextSubmit(urlInput);
+              }}
+              className="shrink-0 rounded bg-sky-700 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-sky-800"
+            >
+              Save Topic
+            </button>
           )}
           {/* <button
             type="button"

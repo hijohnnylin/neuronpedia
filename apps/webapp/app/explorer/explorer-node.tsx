@@ -2,13 +2,11 @@
 
 import { Handle, Position } from '@xyflow/react';
 import { ExternalLink } from 'lucide-react';
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { NODE_HEIGHT } from './use-layout';
 
 export const ROOT_NODE_WIDTH = 240;
 export const DEFAULT_NODE_WIDTH = 250;
-
-const MAX_PREVIEW_CHILDREN = 8;
 
 export const TYPE_COLORS: Record<
   string,
@@ -79,26 +77,13 @@ export const TYPE_COLORS: Record<
   },
 };
 
-type ChildPreview = {
-  id: number;
-  title: string | null;
-  nodeTypes: string[];
-  approvalState: string;
-  author: string | null;
-};
-
 function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean }) {
-  const [isHovered, setIsHovered] = useState(false);
   const types: string[] = data.nodeTypes || [data.type || 'topic'];
   const primaryType = types[0] || 'topic';
   const colors = TYPE_COLORS[primaryType] || TYPE_COLORS.topic;
   const highlighted = selected || data.isDraft;
   const border = highlighted ? colors.selectedBorder : colors.border;
-  const children: ChildPreview[] = data.children || [];
-  const hasCollapsedChildren = (data.hiddenChildCount ?? 0) > 0;
-  const showPreview = isHovered && hasCollapsedChildren && !data.hoverDimmed;
-
-  const isDimmed = data.hoverDimmed || data.dimmed;
+  //const hasCollapsedChildren = (data.hiddenChildCount ?? 0) > 0;
 
   return (
     <div
@@ -106,20 +91,13 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
       style={{
         height: NODE_HEIGHT,
         ...(data.isRoot ? { width: ROOT_NODE_WIDTH } : { minWidth: DEFAULT_NODE_WIDTH, maxWidth: DEFAULT_NODE_WIDTH }),
-        ...(isDimmed ? { opacity: 0.3 } : {}),
-        ...(data.dimmed ? { filter: 'blur(1.4px) grayscale(0.5)' } : {}),
+        ...(data.dimmed ? { opacity: 0.3, filter: 'blur(1.4px) grayscale(0.5)' } : {}),
       }}
       onMouseEnter={() => {
-        if (hasCollapsedChildren && data.onHoverNode) {
-          setIsHovered(true);
-          data.onHoverNode();
-        }
+        data.onHoverNode?.();
       }}
       onMouseLeave={() => {
-        if (isHovered) {
-          setIsHovered(false);
-          data.onHoverLeave?.();
-        }
+        data.onHoverLeave?.();
       }}
     >
       <Handle
@@ -137,7 +115,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
       </div>
 
       <div className="my-0.5 mb-[0px] mt-[5px] flex w-full flex-col justify-start text-left">
-        <div className="mt-0.5 truncate font-sans text-[11px] font-normal leading-tight tracking-tight text-slate-800">
+        <div className="mt-[4px] truncate font-sans text-[9.5px] font-normal leading-tight tracking-tight text-slate-800">
           {data.label || '(untitled)'}
         </div>
         {primaryType === 'topic'
@@ -148,7 +126,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
               <div className="mt-[3px] truncate text-[8px] leading-tight text-slate-400">{data.author}</div>
             )}
       </div>
-      {data.hiddenChildCount > 0 && (
+      {Object.keys((data.descendantTypeCounts || {}) as Record<string, number>).length > 0 && (
         <div className="absolute bottom-1 right-1.5 flex gap-0.5">
           {Object.entries((data.descendantTypeCounts || {}) as Record<string, number>)
             .sort(([typeA], [typeB]) => typeA.localeCompare(typeB))
@@ -202,7 +180,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
           <ExternalLink size={10} className="-mt-[1px]" />
         </a>
       )} */}
-      {hasCollapsedChildren && !data.isDraft && (
+      {/* {hasCollapsedChildren && !data.isDraft && (
         <button
           type="button"
           title="Expand children"
@@ -210,7 +188,7 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
         >
           Expand &#8594;
         </button>
-      )}
+      )} */}
       {data.onAddChild && !data.isDraft && (
         <button
           type="button"
@@ -219,74 +197,10 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
             data.onAddChild();
           }}
           title="Add child node"
-          className="absolute -top-2.5 right-7 z-10 flex h-5 w-14 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-sky-600 bg-white text-[7.5px] font-medium text-sky-600 opacity-0 shadow transition-opacity hover:border-sky-600 hover:bg-sky-600 hover:text-white group-hover:opacity-100"
+          className="absolute -top-2 right-10 z-10 flex h-4 w-12 translate-x-full items-center justify-center gap-x-1.5 rounded-full border border-sky-600 bg-white text-[6.5px] font-medium leading-none text-sky-600 opacity-0 shadow transition-opacity hover:border-sky-600 hover:bg-sky-600 hover:text-white group-hover:opacity-100"
         >
           + Sub-Item
         </button>
-      )}
-
-      {showPreview && (
-        <div className="absolute left-full top-1/2 ml-8 w-56 -translate-y-1/2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-xl backdrop-blur-sm">
-          <div className="flex flex-col gap-0.5">
-            {children.slice(0, MAX_PREVIEW_CHILDREN).map((child) => (
-              <div
-                key={child.id}
-                className="flex flex-col items-start gap-0.5 rounded border-b border-slate-200 px-1 py-2 first:pt-0 last:border-b-0 last:pb-0"
-              >
-                {/* Tag(s) above item title */}
-                <div className="mb-0 flex shrink-0 gap-1.5">
-                  {child.nodeTypes.map((t) => (
-                    <span
-                      key={t}
-                      className={`text-[8px] font-bold uppercase leading-tight ${(TYPE_COLORS[t] || TYPE_COLORS.topic).label}`}
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-                <span
-                  className="line-clamp-2 max-w-xs break-words text-[10px] leading-tight text-slate-700"
-                  style={{
-                    display: '-webkit-box',
-                    WebkitBoxOrient: 'vertical',
-                    WebkitLineClamp: 2,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {child.title || '(untitled)'}
-                </span>
-                {child.author && <span className="text-[8px] text-slate-400">{child.author}</span>}
-                {(() => {
-                  const types = (data.childDescendantTypes || {})[child.id] as Record<string, number> | undefined;
-                  if (!types || Object.keys(types).length === 0) return null;
-                  return (
-                    <div className="mt-0.5 flex gap-0.5">
-                      {Object.entries(types).map(([type, count]) => (
-                        <span
-                          key={type}
-                          className={`rounded-[3px] px-1 py-[1px] text-[7px] font-semibold uppercase text-white ${(TYPE_COLORS[type] || TYPE_COLORS.topic).icon}`}
-                        >
-                          {count} {type}
-                          {count !== 1 ? 's' : ''}
-                        </span>
-                      ))}
-                    </div>
-                  );
-                })()}
-                {child.approvalState === 'PENDING' && (
-                  <span className="mt-0.5 self-start rounded-full border border-slate-300 bg-slate-100 px-1.5 py-[0.5px] text-[7px] font-semibold uppercase text-slate-500">
-                    Pending Approval
-                  </span>
-                )}
-              </div>
-            ))}
-            {children.length > MAX_PREVIEW_CHILDREN && (
-              <div className="mt-0.5 text-center text-[9px] text-slate-400">
-                +{children.length - MAX_PREVIEW_CHILDREN} more
-              </div>
-            )}
-          </div>
-        </div>
       )}
     </div>
   );

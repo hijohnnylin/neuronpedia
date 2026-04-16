@@ -538,8 +538,9 @@ export default function ConnectedNeuronsPane({
   // Layout constants - channels are centered, neurons positioned relative to channels
   const gapBetweenNeuronsAndChannels = 60;
   // Visual channel width (from leftmost to rightmost channel line edge)
-  // Each channel is 5px wide, spaced 36px apart
-  const visualChannelWidth = (resChannels.length - 1) * 36 + 5;
+  // Each channel is 5px wide, spaced channelSpacing apart
+  const channelSpacing = 20;
+  const visualChannelWidth = (resChannels.length - 1) * channelSpacing + 5;
   const horizontalSpacing = 30;
 
   // Calculate neuron extents to determine inner container width
@@ -700,7 +701,7 @@ export default function ConnectedNeuronsPane({
                 className="absolute text-[10px] font-medium text-slate-400"
                 style={{
                   // Center over the actual channel lines: from first channel to last channel + channel width
-                  left: `${channelStartX + ((resChannels.length - 1) * 36 + 5) / 2}px`,
+                  left: `${channelStartX + ((resChannels.length - 1) * channelSpacing + 5) / 2}px`,
                   top: `${channelsStartY - 34}px`,
                   transform: 'translateX(-50%)',
                   whiteSpace: 'nowrap',
@@ -729,7 +730,7 @@ export default function ConnectedNeuronsPane({
                     <div key={`lines-${neuron.index}`}>
                       {neuron.resChannels.map((channel) => {
                         const channelIndex = resChannels.findIndex((c) => c.id === channel.id);
-                        const channelLeft = channelStartX + channelIndex * 36;
+                        const channelLeft = channelStartX + channelIndex * channelSpacing;
                         const neuronLeft = position.left;
                         const neuronTop = position.top;
 
@@ -921,10 +922,14 @@ export default function ConnectedNeuronsPane({
                     : channelHeight;
 
                 return (
-                  <div key={channel.id} className="absolute" style={{ left: `${channelStartX + arrayIndex * 36}px` }}>
+                  <div
+                    key={channel.id}
+                    className="absolute"
+                    style={{ left: `${channelStartX + arrayIndex * channelSpacing}px` }}
+                  >
                     {/* Channel number label */}
                     <div
-                      className="absolute text-[9px] font-bold transition-colors"
+                      className="absolute text-[8px] font-medium transition-colors"
                       style={{
                         top: `${channelsStartY - 16}px`,
                         left: '50%',
@@ -987,35 +992,43 @@ export default function ConnectedNeuronsPane({
                                 onMouseLeave={() => setHoveredChannelId(null)}
                               >
                                 {/* Segments above current neuron */}
-                                {aboveSegments.map((segment, idx) => (
-                                  <div
-                                    key={`above-${segment.layer}`}
-                                    className="absolute w-[5px]"
-                                    style={{
-                                      top: `${segment.top - triggerTop}px`,
-                                      height: `${segment.height}px`,
-                                      background:
-                                        idx === 0
-                                          ? `linear-gradient(to bottom, transparent 0%, ${fillColor} 20%, ${fillColor} 100%)`
-                                          : fillColor,
-                                      transition: 'background 0.3s ease',
-                                      borderRadius: idx === 0 ? '2px 2px 0 0' : '0',
-                                    }}
-                                  />
-                                ))}
+                                {aboveSegments.map((segment, idx) => {
+                                  const isOutputOnly = isOutputChannel && !isInputChannel;
+                                  const aboveFillColor = isOutputOnly ? defaultColor : fillColor;
+                                  return (
+                                    <div
+                                      key={`above-${segment.layer}`}
+                                      className="absolute w-[5px]"
+                                      style={{
+                                        top: `${segment.top - triggerTop}px`,
+                                        height: `${segment.height}px`,
+                                        background:
+                                          idx === 0
+                                            ? `linear-gradient(to bottom, transparent 0%, ${aboveFillColor} 20%, ${aboveFillColor} 100%)`
+                                            : aboveFillColor,
+                                        transition: 'background 0.3s ease',
+                                        borderRadius: idx === 0 ? '2px 2px 0 0' : '0',
+                                      }}
+                                    />
+                                  );
+                                })}
                                 {/* Segments below current neuron */}
-                                {belowSegments.map((segment) => (
-                                  <div
-                                    key={`below-${segment.layer}`}
-                                    className="absolute w-[5px]"
-                                    style={{
-                                      top: `${segment.top - triggerTop}px`,
-                                      height: `${segment.height}px`,
-                                      background: fillColor,
-                                      transition: 'background 0.3s ease',
-                                    }}
-                                  />
-                                ))}
+                                {belowSegments.map((segment) => {
+                                  const isInputOnly = isInputChannel && !isOutputChannel;
+                                  const belowFillColor = isInputOnly ? defaultColor : fillColor;
+                                  return (
+                                    <div
+                                      key={`below-${segment.layer}`}
+                                      className="absolute w-[5px]"
+                                      style={{
+                                        top: `${segment.top - triggerTop}px`,
+                                        height: `${segment.height}px`,
+                                        background: belowFillColor,
+                                        transition: 'background 0.3s ease',
+                                      }}
+                                    />
+                                  );
+                                })}
                               </div>
                             </Tooltip.Trigger>
                             <Tooltip.Portal>
@@ -1209,10 +1222,12 @@ export default function ConnectedNeuronsPane({
                       const fullColor = '#0369a1';
                       const defaultColorSolid = '#b3d2e3';
 
+                      const isInputOnly = isInputChan && !isOutputChan;
                       const isFullHighlight =
                         isConnectedToHoveredNeuron ||
                         isChannelHovered ||
                         (nothingHovered && (isInputChan || isOutputChan));
+                      const bottomHighlight = isInputOnly ? false : isFullHighlight;
 
                       const fadeHeight = 16;
 
@@ -1224,7 +1239,7 @@ export default function ConnectedNeuronsPane({
                             left: '0px',
                             width: '5px',
                             height: `${fadeHeight}px`,
-                            background: isFullHighlight
+                            background: bottomHighlight
                               ? `linear-gradient(to bottom, ${fullColor} 0%, ${fullColor} 20%, #ffffff 100%)`
                               : `linear-gradient(to bottom, ${defaultColorSolid} 0%, ${defaultColorSolid} 20%, #ffffff 100%)`,
                             transition: 'background 0.3s ease',
@@ -1258,8 +1273,8 @@ export default function ConnectedNeuronsPane({
                 const uniqueOutputChannels = [...new Set(outputChannelIndices)];
 
                 // Rectangle dimensions - span the visual width of channel lines plus extra margin
-                // Channel lines are 5px wide, spaced 36px apart
-                // Visual span: from first line start to last line end = (n-1)*36 + 5
+                // Channel lines are 5px wide, spaced channelSpacing apart
+                // Visual span: from first line start to last line end = (n-1)*channelSpacing + 5
                 // Add extra width on each side (as if edge channels are wider)
                 const edgeChannelExtraWidth = 20;
                 const rectPadding = 30;
@@ -1287,7 +1302,7 @@ export default function ConnectedNeuronsPane({
                   <>
                     {/* Arrows/fades above rectangle for each channel */}
                     {resChannels.map((channel, idx) => {
-                      const channelX = channelStartX + idx * 36 + 2; // Center of 5px line
+                      const channelX = channelStartX + idx * channelSpacing + 2; // Center of 5px line
                       const isInputChannel = uniqueInputChannels.includes(channel.index);
 
                       // Check if nothing is hovered
@@ -1360,14 +1375,17 @@ export default function ConnectedNeuronsPane({
                       // Draw fade to white for non-input channels (covers the channel line)
                       // For default state, use solid color equivalent of rgba(3, 105, 161, 0.3) on white for smooth gradient
                       const defaultColorSolid = '#b3d2e3';
-                      const fadeBackground = isFullHighlight
-                        ? `linear-gradient(to bottom, ${fullColor} 0%, #ffffff 90%)`
-                        : `linear-gradient(to bottom, ${defaultColorSolid} 0%, #ffffff 90%)`;
+                      const isOutputOnly = isOutputChannel && !isInputChannel;
+                      const fadeBackground = isOutputOnly
+                        ? `linear-gradient(to bottom, ${defaultColorSolid} 0%, #ffffff 90%)`
+                        : isFullHighlight
+                          ? `linear-gradient(to bottom, ${fullColor} 0%, #ffffff 90%)`
+                          : `linear-gradient(to bottom, ${defaultColorSolid} 0%, #ffffff 90%)`;
 
                       return (
                         <div
                           key={`fade-${channel.id}`}
-                          className="absolute cursor-pointer"
+                          className={`absolute ${isOutputOnly ? '' : 'cursor-pointer'}`}
                           style={{
                             left: `${channelX - 2}px`,
                             top: `${rectTop - arrowAreaHeight}px`,
@@ -1376,8 +1394,8 @@ export default function ConnectedNeuronsPane({
                             background: fadeBackground,
                             transition: 'background 0.3s ease',
                           }}
-                          onMouseEnter={() => setHoveredChannelId(channel.id)}
-                          onMouseLeave={() => setHoveredChannelId(null)}
+                          onMouseEnter={isOutputOnly ? undefined : () => setHoveredChannelId(channel.id)}
+                          onMouseLeave={isOutputOnly ? undefined : () => setHoveredChannelId(null)}
                         />
                       );
                     })}
@@ -1415,7 +1433,7 @@ export default function ConnectedNeuronsPane({
 
                     {/* Arrows/fades below rectangle for each channel */}
                     {resChannels.map((channel, idx) => {
-                      const channelX = channelStartX + idx * 36 + 2.5; // Center of 5px line
+                      const channelX = channelStartX + idx * channelSpacing + 2.5; // Center of 5px line
                       const isOutputChannel = uniqueOutputChannels.includes(channel.index);
 
                       // Check if nothing is hovered
@@ -1480,15 +1498,18 @@ export default function ConnectedNeuronsPane({
                         return null;
                       }
 
-                      // Draw fade from white for non-output channels
-                      const fadeBackground = isFullHighlight
-                        ? `linear-gradient(to bottom, #ffffff 15%, ${fullColor} 100%)`
-                        : `linear-gradient(to bottom, #ffffff 15%, ${defaultColorSolid} 100%)`;
+                      // Input-only channels: always show low opacity below MLP, no hover changes
+                      const isInputOnly = isInputChannel && !isOutputChannel;
+                      const fadeBackground = isInputOnly
+                        ? `linear-gradient(to bottom, #ffffff 15%, ${defaultColorSolid} 100%)`
+                        : isFullHighlight
+                          ? `linear-gradient(to bottom, #ffffff 15%, ${fullColor} 100%)`
+                          : `linear-gradient(to bottom, #ffffff 15%, ${defaultColorSolid} 100%)`;
 
                       return (
                         <div
                           key={`fade-below-${channel.id}`}
-                          className="absolute cursor-pointer"
+                          className={`absolute ${isInputOnly ? '' : 'cursor-pointer'}`}
                           style={{
                             left: `${channelX - 2.5}px`,
                             top: `${belowRectTop}px`,
@@ -1497,8 +1518,8 @@ export default function ConnectedNeuronsPane({
                             background: fadeBackground,
                             transition: 'background 0.3s ease',
                           }}
-                          onMouseEnter={() => setHoveredChannelId(channel.id)}
-                          onMouseLeave={() => setHoveredChannelId(null)}
+                          onMouseEnter={isInputOnly ? undefined : () => setHoveredChannelId(channel.id)}
+                          onMouseLeave={isInputOnly ? undefined : () => setHoveredChannelId(null)}
                         />
                       );
                     })}

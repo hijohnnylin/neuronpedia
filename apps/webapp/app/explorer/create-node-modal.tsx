@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { MAX_TITLE_LENGTH } from './explorer-shared';
 
 const NODE_TYPES = ['topic', 'paper', 'tool', 'dataset', 'eval', 'replication', 'model'] as const;
 
@@ -104,6 +105,7 @@ export default function CreateNodeModal({
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              maxLength={MAX_TITLE_LENGTH}
               placeholder="e.g. Sparse Autoencoders"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
             />

@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { TYPE_COLORS as NODE_TYPE_COLORS } from './explorer-node';
-import { NODE_TYPES_LIST, type ProblemNodeData } from './explorer-shared';
+import { MAX_TITLE_LENGTH, NODE_TYPES_LIST, type ProblemNodeData } from './explorer-shared';
 
 export function DraftEditSidebar({
   draftNode,
@@ -88,6 +88,7 @@ export function DraftEditSidebar({
             type="text"
             value={draftNode.title || ''}
             onChange={(e) => updateDraft({ title: e.target.value })}
+            maxLength={MAX_TITLE_LENGTH}
             placeholder="e.g. Sparse Autoencoders"
             className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
           />

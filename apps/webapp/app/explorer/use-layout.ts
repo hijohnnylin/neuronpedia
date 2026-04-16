@@ -5,6 +5,7 @@ import { DRAFT_NODE_HEIGHT_POPULATED, DRAFT_NODE_HEIGHT_URL } from './draft-node
 import { DEFAULT_NODE_WIDTH, ROOT_NODE_WIDTH } from './explorer-node';
 
 export const NODE_HEIGHT = 60;
+export const LAYER_GAP = 30;
 const SIBLING_GAP = 4;
 
 const elk = new ELK();
@@ -74,7 +75,7 @@ export async function getLayoutedElements(nodes: Node[], edges: Edge[]) {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
       'elk.spacing.nodeNode': String(SIBLING_GAP),
-      'elk.layered.spacing.nodeNodeBetweenLayers': '20',
+      'elk.layered.spacing.nodeNodeBetweenLayers': String(LAYER_GAP),
       'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
       'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       'elk.separateConnectedComponents': 'true',
