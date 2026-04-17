@@ -18,7 +18,7 @@ export default function HomeModels() {
             key={model.id}
             href={`/${model.id}`}
             prefetch={false}
-            className="relative flex w-full flex-col items-start justify-center gap-x-2 gap-y-0.5 rounded px-3 py-3 pr-5 text-xs font-medium hover:bg-sky-100 hover:text-sky-800"
+            className="relative flex w-full flex-col items-start justify-center gap-x-2 gap-y-0.5 rounded px-3 py-2 pr-5 text-xs font-medium hover:bg-sky-100 hover:text-sky-800"
           >
             <div className="mb-1 text-left font-mono text-[12px] font-bold leading-tight text-sky-700">
               {model.displayNameShort}

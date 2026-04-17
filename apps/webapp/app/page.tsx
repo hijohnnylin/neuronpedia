@@ -546,7 +546,7 @@ export default function Page() {
                   </CustomTooltip>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-row gap-x-3">
+              <CardContent className="flex flex-1 flex-row gap-x-3 px-3">
                 <HomeReleases />
               </CardContent>
             </Card>
@@ -563,7 +563,7 @@ export default function Page() {
                   </CustomTooltip>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-row gap-x-3">
+              <CardContent className="flex flex-1 flex-row gap-x-3 px-3">
                 <HomeModels />
               </CardContent>
             </Card>
@@ -582,7 +582,7 @@ export default function Page() {
                   </CustomTooltip>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-1 flex-col items-start justify-start gap-x-3 pl-10">
+              <CardContent className="flex flex-1 flex-col items-start justify-start gap-x-3 px-3 pl-6">
                 <JumpToSAE modelId={DEFAULT_MODELID || ''} layer={DEFAULT_SOURCE || ''} modelOnSeparateRow />
                 <div className="mt-4 flex w-full cursor-pointer flex-col items-start justify-start border-t border-b-slate-100 pt-4 text-sm font-medium text-sky-700 outline-none">
                   <div className="text-[10px] font-medium uppercase text-slate-500">Jump to Feature</div>

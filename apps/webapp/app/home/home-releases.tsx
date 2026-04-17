@@ -1,9 +1,10 @@
 'use client';
 
-import { featuredStarReleases } from '@/components/nav/releases-dropdown';
+import { betaReleases, featuredStarReleases } from '@/components/nav/releases-dropdown';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { UNNAMED_AUTHOR_NAME } from '@/lib/utils/general';
 import { StarFilledIcon } from '@radix-ui/react-icons';
+import { CircleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 
 export default function HomeReleases() {
@@ -26,11 +27,16 @@ export default function HomeReleases() {
             key={release.name}
             href={`/${release.name}`}
             prefetch={false}
-            className="relative flex w-full flex-col items-start justify-center gap-x-2 gap-y-0.5 rounded px-3 py-3 pr-5 text-xs font-medium hover:bg-sky-100 hover:text-sky-800"
+            className="relative flex w-full flex-col items-start justify-center gap-x-2 gap-y-0.5 rounded px-3 py-2 pr-5 text-xs font-medium hover:bg-sky-100 hover:text-sky-800"
           >
             {featuredStarReleases.includes(release.name ?? '') && (
               <div className="mb-0 inline-flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-emerald-600">
                 <StarFilledIcon className="h-2 w-2" /> Featured
+              </div>
+            )}
+            {betaReleases.includes(release.name ?? '') && (
+              <div className="mb-0 inline-flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-yellow-600">
+                <CircleAlertIcon className="h-2 w-2" /> Beta
               </div>
             )}
             <div className="mb-1 text-left font-sans text-[12px] font-bold leading-tight text-sky-700">

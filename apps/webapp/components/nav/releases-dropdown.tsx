@@ -6,10 +6,11 @@ import { UNNAMED_AUTHOR_NAME } from '@/lib/utils/general';
 import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { StarFilledIcon } from '@radix-ui/react-icons';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown, CircleAlertIcon, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export const featuredStarReleases = ['gemma-scope', 'assistant-axis', 'circuit-tracer', 'gemma-scope-2'];
+export const betaReleases = ['sparse-circuits'];
 
 export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: boolean }) {
   const router = useRouter();
@@ -57,6 +58,11 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
                     {featuredStarReleases.includes(release.name ?? '') && (
                       <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-emerald-600">
                         <StarFilledIcon className="h-2 w-2" /> Featured
+                      </div>
+                    )}
+                    {betaReleases.includes(release.name ?? '') && (
+                      <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-yellow-600">
+                        <CircleAlertIcon className="h-2 w-2" /> Beta
                       </div>
                     )}
                     {/* <div className="whitespace-pre text-[10px]  font-medium text-slate-400">
