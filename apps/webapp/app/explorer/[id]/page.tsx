@@ -6,9 +6,8 @@ import { getServerSession } from 'next-auth';
 import ProblemsGraph from '../explorer-graph';
 
 export const metadata: Metadata = {
-  title: 'Open Problems in Mechanistic Interpretability',
-  description:
-    'Explore the landscape of open problems, tools, papers, and datasets in mechanistic interpretability research.',
+  title: 'Interpretability Explorer',
+  description: 'Find the latest tools, papers, and datasets in interpretability research and applications.',
 };
 
 export default async function ProblemNodePage(props: { params: Promise<{ id: string }> }) {

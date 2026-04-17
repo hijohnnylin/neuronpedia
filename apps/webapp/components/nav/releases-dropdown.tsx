@@ -9,6 +9,8 @@ import { StarFilledIcon } from '@radix-ui/react-icons';
 import { ChevronDown, Plus } from 'lucide-react';
 import Link from 'next/link';
 
+export const featuredStarReleases = ['gemma-scope', 'assistant-axis', 'circuit-tracer', 'gemma-scope-2'];
+
 export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: boolean }) {
   const router = useRouter();
   const { releases } = useGlobalContext();
@@ -29,23 +31,30 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
           className="forceShowScrollBar z-50 max-h-[550px] w-full cursor-pointer overflow-hidden overflow-y-scroll rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
         >
           {releases
-            .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))
             .filter((release) => release.featured)
+            .sort((a, b) => {
+              const aIsStar = featuredStarReleases.includes(a.name ?? '');
+              const bIsStar = featuredStarReleases.includes(b.name ?? '');
+              if (aIsStar && !bIsStar) return -1;
+              if (!aIsStar && bIsStar) return 1;
+              // If both are (or aren't) starred, order by date
+              return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
+            })
             .map((release) => (
               <DropdownMenu.Item
                 key={release.name}
-                className="flex max-w-[380px] flex-row items-center justify-between gap-x-1.5 border-b border-slate-100 hover:bg-slate-100 focus:outline-none"
+                className="flex max-w-[400px] flex-row items-center justify-between gap-x-1.5 border-b border-slate-100 hover:bg-slate-100 focus:outline-none"
               >
                 <button
                   type="button"
                   onClick={() => {
                     router.push(`/${release.name}`);
                   }}
-                  className="flex w-full flex-col gap-y-0 overflow-hidden px-6 py-2.5 text-left font-sans text-xs text-sky-700 focus:outline-none"
+                  className="flex w-full flex-col gap-y-0 overflow-hidden px-4 py-2.5 text-left font-sans text-xs text-sky-700 focus:outline-none"
                 >
                   <div className="mt-0 flex flex-row justify-between gap-x-3 text-[12px] font-medium">
                     <div>{release.descriptionShort}</div>
-                    {release.name === 'gemma-scope' && (
+                    {featuredStarReleases.includes(release.name ?? '') && (
                       <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-emerald-600">
                         <StarFilledIcon className="h-2 w-2" /> Featured
                       </div>

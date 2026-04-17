@@ -163,16 +163,16 @@ export default function Page() {
       </div>
 
       <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0">
-        <div className="my-5 mb-1 w-full overflow-hidden rounded-3xl border border-slate-200 bg-white px-0 pb-3 pt-1 shadow sm:max-w-screen-xl">
-          {/* <div
+        <div className="my-5 mb-1 w-full overflow-hidden rounded-3xl border border-slate-200 bg-white px-0 pb-3 pt-3 shadow sm:max-w-screen-xl">
+          <div
             className="ml-4 w-36 rounded-full bg-emerald-600 py-[5px] text-center text-[10px] font-medium uppercase text-white"
             title="Fully vetted and stabilized projects and collaborations."
           >
             Featured Releases
-          </div> */}
+          </div>
 
           <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-2 sm:flex-row sm:gap-y-2 sm:px-4 sm:pt-0">
-            <div className="relative z-0 mb-3 mt-1 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-3 sm:h-[250px] sm:min-h-[250px] sm:px-0">
+            <div className="relative z-0 mb-3 mt-1 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-2 sm:h-[250px] sm:min-h-[250px] sm:px-0">
               <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
                 <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/20 px-7 py-[6px] text-[11px] font-semibold text-[#262625]/60">
                   Lu et al. 2026
@@ -568,7 +568,7 @@ export default function Page() {
               </CardContent>
             </Card>
 
-            <Card className="flex flex-1 flex-col gap-x-3 bg-white">
+            <Card className="flex flex-1 flex-col gap-x-3 bg-white sm:max-w-[380px]">
               <CardHeader className="pb-3">
                 <CardTitle className="flex flex-row gap-x-2 text-slate-800">
                   <div>Jump To</div>

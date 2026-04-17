@@ -4,7 +4,7 @@ import { useGlobalContext } from '@/components/provider/global-provider';
 import { useCallback, useEffect, useState } from 'react';
 import { CommentItem } from './comment-item';
 import { TYPE_COLORS as NODE_TYPE_COLORS } from './explorer-node';
-import { MAX_TITLE_LENGTH, type DetailNode, type ProblemNodeData, TYPE_COLORS } from './explorer-shared';
+import { MAX_TITLE_LENGTH, type DetailNode, type ProblemNodeData } from './explorer-shared';
 
 export function NodeSidebar({
   selectedNode,
@@ -15,6 +15,7 @@ export function NodeSidebar({
   onDelete,
   onUpdated,
   allNodes,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onSelectNode,
   editOnSelect,
   onEditOnSelectConsumed,
@@ -404,7 +405,7 @@ export function NodeSidebar({
           )}
 
           {/* Parent */}
-          {node.parent && (
+          {/* {node.parent && (
             <div className="mt-3">
               <h3 className="text-xs font-semibold text-slate-500">Parent</h3>
               <button
@@ -423,10 +424,10 @@ export function NodeSidebar({
                 <span className="text-xs text-slate-800">{node.parent.title || '(untitled)'}</span>
               </button>
             </div>
-          )}
+          )} */}
 
           {/* Children */}
-          {node.children && node.children.length > 0 && (
+          {/* {node.children && node.children.length > 0 && (
             <div className="mt-3">
               <h3 className="text-xs font-semibold text-slate-500">Sub-items</h3>
               <div className="mt-1 flex flex-col gap-1">
@@ -450,10 +451,10 @@ export function NodeSidebar({
                 ))}
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Related Edges */}
-          {detailNode && (detailNode.edgesAsSource.length > 0 || detailNode.edgesAsTarget.length > 0) && (
+          {/* {detailNode && (detailNode.edgesAsSource.length > 0 || detailNode.edgesAsTarget.length > 0) && (
             <div className="mt-3 border-t border-slate-100 pt-3">
               <h3 className="text-xs font-semibold text-slate-500">Related Nodes</h3>
               <div className="mt-1 flex flex-col gap-1">
@@ -481,7 +482,7 @@ export function NodeSidebar({
                 ))}
               </div>
             </div>
-          )}
+          )} */}
 
           {/* Comments */}
           {detailNode && (

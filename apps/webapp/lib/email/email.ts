@@ -205,6 +205,31 @@ export const sendLoginEmail = async (emailAddress: string, signInURL: string) =>
   await sendEmail(emailAddress, undefined, subject, html);
 };
 
+export const sendProblemNodeLogNotificationEmail = async (args: {
+  actorName: string;
+  action: string;
+  details: string | null;
+  problemNodeId: number;
+}) => {
+  const nodeUrl = `${NEXT_PUBLIC_URL}/explorer/${args.problemNodeId}`;
+  const subject = `[Explorer] ${args.actorName} ${args.action} (node ${args.problemNodeId})`;
+  const html = `<body style="font-family: Helvetica, Arial, sans-serif; color: #222;">
+    <p>An edit was made to the Interpretability Explorer graph.</p>
+    <table cellpadding="4" cellspacing="0" style="border-collapse: collapse;">
+      <tr><td><strong>User:</strong></td><td>${args.actorName}</td></tr>
+      <tr><td><strong>Action:</strong></td><td>${args.action}</td></tr>
+      <tr><td><strong>Details:</strong></td><td>${args.details ?? ''}</td></tr>
+      <tr><td><strong>Node:</strong></td><td><a href="${nodeUrl}">${nodeUrl}</a></td></tr>
+    </table>
+  </body>`;
+
+  try {
+    await sendEmail(CONTACT_EMAIL_ADDRESS, undefined, subject, html);
+  } catch (error) {
+    console.error('Failed to send ProblemNodeLog notification email', error);
+  }
+};
+
 export const sendWelcomeEmail = async (emailAddress: string, unsubscribeCode: string) => {
   const subject = 'Welcome to Neuronpedia';
   // load the welcome.mjml file

@@ -1,7 +1,45 @@
 import { MAX_TITLE_LENGTH } from '@/app/explorer/explorer-shared';
 import { prisma } from '@/lib/db';
+import { sendProblemNodeLogNotificationEmail } from '@/lib/email/email';
 import { ProblemEdgeType, ProblemNodeApprovalState, ProblemNodeType } from '@prisma/client';
 import { AuthenticatedUser } from '../with-user';
+
+const NOTIFICATION_SKIP_USER_ID = 'cm3qpdtf3000013tco9h0rpen';
+
+async function recordProblemNodeLog(args: {
+  userId: string;
+  problemNodeId: number;
+  action: string;
+  details?: string | null;
+}) {
+  await prisma.problemNodeLog.create({
+    data: {
+      userId: args.userId,
+      problemNodeId: args.problemNodeId,
+      action: args.action,
+      details: args.details ?? null,
+    },
+  });
+
+  try {
+    if (args.userId !== NOTIFICATION_SKIP_USER_ID) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: args.userId },
+        select: { name: true },
+      });
+      const actorName = dbUser?.name ?? 'unknown';
+      // Fire-and-forget so email failures never break the main write path.
+      void sendProblemNodeLogNotificationEmail({
+        actorName,
+        action: args.action,
+        details: args.details ?? null,
+        problemNodeId: args.problemNodeId,
+      });
+    }
+  } catch (error) {
+    console.error('Failed to dispatch ProblemNodeLog notification', error);
+  }
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -212,13 +250,11 @@ export async function createProblemNode(
     include: problemNodeInclude,
   });
 
-  await prisma.problemNodeLog.create({
-    data: {
-      userId: user.id,
-      problemNodeId: node.id,
-      action: 'CREATED_NODE',
-      details: `Created ${(data.nodeTypes ?? ['topic']).join(', ')} node: ${data.title ?? '(untitled)'}`,
-    },
+  await recordProblemNodeLog({
+    userId: user.id,
+    problemNodeId: node.id,
+    action: 'CREATED_NODE',
+    details: `Created ${(data.nodeTypes ?? ['topic']).join(', ')} node: ${data.title ?? '(untitled)'}`,
   });
 
   return node;
@@ -249,13 +285,11 @@ export async function updateProblemNode(
     include: problemNodeInclude,
   });
 
-  await prisma.problemNodeLog.create({
-    data: {
-      userId: user.id,
-      problemNodeId: node.id,
-      action: 'UPDATED_NODE',
-      details: `Updated node: ${node.title ?? '(untitled)'}`,
-    },
+  await recordProblemNodeLog({
+    userId: user.id,
+    problemNodeId: node.id,
+    action: 'UPDATED_NODE',
+    details: `Updated node: ${node.title ?? '(untitled)'}`,
   });
 
   return node;
@@ -264,13 +298,11 @@ export async function updateProblemNode(
 export async function deleteProblemNode(id: number, user: AuthenticatedUser) {
   await assertUserCanEditNode(id, user);
 
-  await prisma.problemNodeLog.create({
-    data: {
-      userId: user.id,
-      problemNodeId: id,
-      action: 'DELETED_NODE',
-      details: `Deleted node ${id}`,
-    },
+  await recordProblemNodeLog({
+    userId: user.id,
+    problemNodeId: id,
+    action: 'DELETED_NODE',
+    details: `Deleted node ${id}`,
   });
 
   return prisma.problemNode.delete({ where: { id } });
@@ -296,13 +328,11 @@ export async function approveProblemNode(id: number, approved: boolean, user: Au
     include: problemNodeInclude,
   });
 
-  await prisma.problemNodeLog.create({
-    data: {
-      userId: user.id,
-      problemNodeId: node.id,
-      action: approved ? 'APPROVED_NODE' : 'REJECTED_NODE',
-      details: `${approved ? 'Approved' : 'Rejected'} node: ${node.title ?? '(untitled)'}`,
-    },
+  await recordProblemNodeLog({
+    userId: user.id,
+    problemNodeId: node.id,
+    action: approved ? 'APPROVED_NODE' : 'REJECTED_NODE',
+    details: `${approved ? 'Approved' : 'Rejected'} node: ${node.title ?? '(untitled)'}`,
   });
 
   return node;
@@ -374,13 +404,11 @@ export async function createProblemComment(
     },
   });
 
-  await prisma.problemNodeLog.create({
-    data: {
-      userId: user.id,
-      problemNodeId: data.problemNodeId,
-      action: 'COMMENT_ADDED',
-      details: `Added comment on node ${data.problemNodeId}`,
-    },
+  await recordProblemNodeLog({
+    userId: user.id,
+    problemNodeId: data.problemNodeId,
+    action: 'COMMENT_ADDED',
+    details: `Added comment on node ${data.problemNodeId}`,
   });
 
   return comment;

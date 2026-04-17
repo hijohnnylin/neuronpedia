@@ -9,7 +9,7 @@ export default function HomeModels() {
   const models = Object.values(globalModels);
 
   return (
-    <div className="forceShowScrollBar flex max-h-[335px] w-full flex-col divide-y divide-slate-100 overflow-y-scroll">
+    <div className="forceShowScrollBar flex max-h-[420px] w-full flex-col divide-y divide-slate-100 overflow-y-scroll">
       {models
         .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))
         .filter((model) => model.visibility === 'PUBLIC')

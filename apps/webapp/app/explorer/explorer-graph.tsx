@@ -448,6 +448,8 @@ function ProblemsGraphInner({
       .catch(() => {});
   }, []);
 
+  const [typeFilter, setTypeFilter] = useState('all');
+
   const clearPreviewTimer = useCallback(() => {
     if (previewTimerRef.current) {
       clearTimeout(previewTimerRef.current);
@@ -481,6 +483,8 @@ function ProblemsGraphInner({
       // relayouts can race with and clobber the first pass.
       if (!layoutReadyRef.current) return;
       if (draftNode) return;
+      // Disable hover previews while a type filter is active so the filtered view stays stable.
+      if (typeFilter !== 'all') return;
       if (id === selectedNodeId) {
         if (previewSelectedId != null) setPreviewSelectedId(null);
         return;
@@ -501,7 +505,7 @@ function ProblemsGraphInner({
         setPreviewSelectedId(id);
       }
     },
-    [clearPreviewTimer, draftNode, selectedNodeId, previewSelectedId, getRootIdOf],
+    [clearPreviewTimer, draftNode, typeFilter, selectedNodeId, previewSelectedId, getRootIdOf],
   );
 
   const onHoverLeave = useCallback(() => {
@@ -731,18 +735,22 @@ function ProblemsGraphInner({
   );
 
   const typeFilterOptions = useMemo(() => ['all', 'tool', 'replication', 'paper', 'dataset', 'eval', 'model'], []);
-  const [typeFilter, setTypeFilter] = useState('all');
 
   const positionCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const prevProblemNodesRef = useRef(problemNodes);
   const prevTypeFilterRef = useRef(typeFilter);
   const prevDraftNodeRef = useRef(draftNode);
 
-  const handleTypeFilter = useCallback((t: string) => {
-    setTypeFilter(t);
-    setSelectedNodeId(null);
-    window.history.replaceState(null, '', '/explorer');
-  }, []);
+  const handleTypeFilter = useCallback(
+    (t: string) => {
+      setTypeFilter(t);
+      setSelectedNodeId(null);
+      clearPreviewTimer();
+      setPreviewSelectedId(null);
+      window.history.replaceState(null, '', '/explorer');
+    },
+    [clearPreviewTimer],
+  );
 
   const selectNode = useCallback(
     (id: number) => {
@@ -984,8 +992,8 @@ function ProblemsGraphInner({
     // canEdit users that reloads with unapproved entries, or a draft being submitted) are handled
     // cheaply by the non-relayout branch using cached positions + parent-relative fallback — this
     // avoids a disruptive re-layout right as the user starts interacting.
-    const needsRelayout =
-      positionCacheRef.current.size === 0 || typeFilter !== prevTypeFilterRef.current;
+    const typeFilterChanged = typeFilter !== prevTypeFilterRef.current;
+    const needsRelayout = positionCacheRef.current.size === 0 || typeFilterChanged;
     const draftJustAppeared = !prevDraftNodeRef.current && draftNode != null;
     const draftJustChanged = prevDraftNodeRef.current !== draftNode;
     if (draftJustChanged) {
@@ -1044,6 +1052,9 @@ function ProblemsGraphInner({
             () => fitView({ padding: 0.3, duration: 300, nodes: layoutedNodes.filter((n) => focusIds.includes(n.id)) }),
             50,
           );
+        } else if (typeFilterChanged) {
+          lastAppliedRealSelectionRef.current = sid;
+          setTimeout(() => fitViewCustom(), 50);
         } else if (shouldAdjustView) {
           if (sid != null) {
             const target = layoutedNodes.find((n) => n.id === String(sid));
