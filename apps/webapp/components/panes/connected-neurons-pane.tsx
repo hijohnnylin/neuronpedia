@@ -1,8 +1,13 @@
+'use client';
+
 import FeatureDashboard from '@/app/[modelId]/[layer]/[index]/feature-dashboard';
+import { useGlobalContext } from '@/components/provider/global-provider';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/shadcn/hover-card';
+import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
+import * as Select from '@radix-ui/react-select';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { ExternalLinkIcon, HelpCircle } from 'lucide-react';
+import { ChevronDownIcon, ChevronLeft, ChevronRight, ChevronUpIcon, ExternalLinkIcon, HelpCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { LoadingSquare } from '../svg/loading-square';
@@ -399,12 +404,56 @@ function computeNeuronPositions(
 
 export default function ConnectedNeuronsPane({
   currentNeuron,
+  showSelectors = false,
 }: {
   currentNeuron: NeuronWithPartialRelations | undefined;
+  showSelectors?: boolean;
 }) {
+  const { getSourcesForSourceSet } = useGlobalContext();
   const [hoveredNeuronIndex, setHoveredNeuronIndex] = useState<string | null>(null);
   const [hoveredChannelId, setHoveredChannelId] = useState<string | null>(null);
   const [hoveredFeature, setHoveredFeature] = useState<NeuronWithPartialRelations | undefined>();
+
+  // Active state - the layer/index currently displayed in the panel
+  const [activeLayer, setActiveLayer] = useState<string>(currentNeuron?.layer || '');
+  const [activeIndex, setActiveIndex] = useState<string>(currentNeuron?.index || '');
+
+  // Selector state - the pending selection in the UI (shown in the dropdown/input)
+  const selectedSourceSet = activeLayer ? getSourceSetNameFromSource(activeLayer) : '';
+  const [selectedLayer, setSelectedLayer] = useState<string>(currentNeuron?.layer || '');
+  const [selectedIndex, setSelectedIndex] = useState<string>(currentNeuron?.index || '0');
+
+  // Keep selector + active state in sync when the currentNeuron prop changes
+  useEffect(() => {
+    if (currentNeuron?.layer) {
+      setActiveLayer(currentNeuron.layer);
+      setSelectedLayer(currentNeuron.layer);
+    }
+    if (currentNeuron?.index) {
+      setActiveIndex(currentNeuron.index);
+      setSelectedIndex(currentNeuron.index);
+    }
+  }, [currentNeuron?.layer, currentNeuron?.index]);
+
+  const goToSelected = () => {
+    if (!currentNeuron?.modelId || !selectedLayer) return;
+    if (selectedIndex === undefined || selectedIndex.trim().length === 0 || !/^\+?\d+$/.test(selectedIndex)) {
+      return;
+    }
+    setActiveLayer(selectedLayer);
+    setActiveIndex(selectedIndex);
+  };
+
+  const shiftActiveIndex = (delta: number) => {
+    if (!currentNeuron?.modelId || !activeLayer) return;
+    const currentIdx = parseInt(activeIndex, 10);
+    if (Number.isNaN(currentIdx)) return;
+    const newIdx = currentIdx + delta;
+    if (newIdx < 0) return;
+    const newIdxStr = newIdx.toString();
+    setActiveIndex(newIdxStr);
+    setSelectedIndex(newIdxStr);
+  };
 
   // State for API data
   const [sparsityData, setSparsityData] = useState<SparsityData | null>(null);
@@ -414,16 +463,16 @@ export default function ConnectedNeuronsPane({
 
   // const { setFeatureModalFeature, setFeatureModalOpen, getSource } = useGlobalContext();
 
-  // Fetch connected neurons data from API when currentNeuron changes
+  // Fetch connected neurons data from API when active layer/index changes
   useEffect(() => {
     const fetchConnectedNeurons = async () => {
-      if (!currentNeuron?.modelId || !currentNeuron?.layer || !currentNeuron?.index) {
+      if (!currentNeuron?.modelId || !activeLayer || !activeIndex) {
         setSparsityData(null);
         return;
       }
 
       // Extract numeric layer from layer string (e.g., "2-mlp" -> 2)
-      const layerMatch = currentNeuron.layer.match(/^(\d+)/);
+      const layerMatch = activeLayer.match(/^(\d+)/);
       if (!layerMatch) {
         setError('Invalid layer format');
         return;
@@ -435,7 +484,7 @@ export default function ConnectedNeuronsPane({
 
       try {
         const response = await fetch(
-          `/api/sparsity/connected-neurons?modelId=${encodeURIComponent(currentNeuron.modelId)}&layer=${layerNum}&index=${encodeURIComponent(currentNeuron.index)}`,
+          `/api/sparsity/connected-neurons?modelId=${encodeURIComponent(currentNeuron.modelId)}&layer=${layerNum}&index=${encodeURIComponent(activeIndex)}`,
         );
 
         if (!response.ok) {
@@ -463,7 +512,7 @@ export default function ConnectedNeuronsPane({
     };
 
     fetchConnectedNeurons();
-  }, [currentNeuron?.modelId, currentNeuron?.layer, currentNeuron?.index]);
+  }, [currentNeuron?.modelId, activeLayer, activeIndex]);
 
   // Derive channels and connected neurons from trace data (only if we have data)
   const resChannels = sparsityData ? extractChannels(sparsityData.trace_forward, sparsityData.trace_backward) : [];
@@ -536,7 +585,7 @@ export default function ConnectedNeuronsPane({
   };
 
   // Layout constants - channels are centered, neurons positioned relative to channels
-  const gapBetweenNeuronsAndChannels = 60;
+  const gapBetweenNeuronsAndChannels = 30;
   // Visual channel width (from leftmost to rightmost channel line edge)
   // Each channel is 5px wide, spaced channelSpacing apart
   const channelSpacing = 20;
@@ -621,12 +670,10 @@ export default function ConnectedNeuronsPane({
   return (
     // TODO: hide if not relevant model
     <div
-      className={`mb-2 hidden flex-col gap-x-2 overflow-hidden rounded-lg border bg-white px-3 pb-4 pt-2 text-xs shadow transition-all sm:mb-3 ${
-        true ? 'sm:flex' : 'sm:hidden'
-      }`}
+      className={`mb-2 flex w-full flex-col gap-x-2 overflow-hidden rounded-lg border bg-white px-3 pb-4 pt-2 text-xs shadow transition-all sm:mb-3`}
     >
       <div className="mb-1.5 flex w-full flex-row items-center justify-center gap-x-1 text-[10px] font-normal uppercase text-slate-400">
-        Explorer
+        Circuit Sparsity
         <Tooltip.Provider delayDuration={0} skipDelayDuration={0}>
           <Tooltip.Root>
             <Tooltip.Trigger asChild>
@@ -640,19 +687,124 @@ export default function ConnectedNeuronsPane({
                 sideOffset={5}
                 side="right"
               >
-                Explores the neural network connections between neurons and channels. Hover over the vertical lines for
-                details on residual stream channels, or hover over the neurons for details on the neurons.
+                This model is a weight-sparse transformer. Hover over the vertical lines for details on residual stream
+                channels, or hover over the neurons (circles) for a preview of its dashboard. You can also click the
+                lines or circles to navigate to their dashboards.
                 <Tooltip.Arrow className="fill-slate-500" />
               </Tooltip.Content>
             </Tooltip.Portal>
           </Tooltip.Root>
         </Tooltip.Provider>
       </div>
+      {showSelectors && currentNeuron?.modelId && selectedSourceSet && (
+        <div className="mb-4 flex w-full flex-row items-center justify-center gap-x-1.5">
+          <div className="flex flex-row divide-x divide-slate-300 overflow-hidden rounded bg-slate-200">
+            <button
+              type="button"
+              onClick={() => shiftActiveIndex(-1)}
+              disabled={parseInt(activeIndex, 10) <= 0 || Number.isNaN(parseInt(activeIndex, 10))}
+              className={`group flex h-10 min-h-[40px] select-none flex-col items-center justify-center px-1.5 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white ${
+                parseInt(activeIndex, 10) > 0 ? '' : 'pointer-events-none opacity-50'
+              }`}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <div className="mt-0.5 text-center text-[8px] font-medium uppercase leading-none text-slate-400 group-hover:text-white">
+                Prev
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => shiftActiveIndex(1)}
+              className="group flex h-10 min-h-[40px] select-none flex-col items-center justify-center px-1.5 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white"
+            >
+              <ChevronRight className="h-4 w-4" />
+              <div className="mt-0.5 text-center text-[8px] font-medium uppercase leading-none text-slate-400 group-hover:text-white">
+                Next
+              </div>
+            </button>
+          </div>
+          <Select.Root value={selectedLayer} onValueChange={(newVal) => setSelectedLayer(newVal)}>
+            <Select.Trigger className="flex h-10 max-h-[40px] min-h-[40px] flex-row items-center justify-center gap-x-1 whitespace-pre rounded border border-slate-300 bg-white px-2 font-mono text-xs font-medium text-sky-700 hover:bg-slate-50 focus:outline-none sm:pl-5 sm:pr-2">
+              <div className="flex flex-col">
+                <Select.Value />
+                <div className="mt-0.5 text-center text-[8px] font-medium leading-none text-slate-400">SOURCE</div>
+              </div>
+              <Select.Icon>
+                <ChevronDownIcon className="-mr-1 ml-0 w-4 leading-none" />
+              </Select.Icon>
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content
+                position="item-aligned"
+                align="center"
+                sideOffset={2}
+                className="z-30 cursor-pointer overflow-hidden rounded-md border border-slate-300 bg-white text-xs font-medium text-sky-700 shadow"
+              >
+                <Select.ScrollUpButton className="flex justify-center border-b text-slate-600">
+                  <ChevronUpIcon />
+                </Select.ScrollUpButton>
+                <Select.Viewport className="text-center">
+                  {getSourcesForSourceSet(currentNeuron.modelId, selectedSourceSet, true, false, false).map((l) => (
+                    <Select.Item
+                      key={l}
+                      value={l}
+                      className={`overflow-hidden border-b px-3 py-2 font-mono ${
+                        selectedLayer === l ? 'bg-sky-100 text-sky-700' : 'text-slate-600'
+                      } text-xs hover:bg-slate-100 focus:outline-none`}
+                    >
+                      <Select.ItemText>
+                        <span className="uppercase">{l}</span>
+                      </Select.ItemText>
+                    </Select.Item>
+                  ))}
+                </Select.Viewport>
+                <Select.ScrollDownButton className="flex justify-center border-t text-slate-600">
+                  <ChevronDownIcon />
+                </Select.ScrollDownButton>
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
+          <div className="flex h-10 max-h-[40px] min-h-[40px] flex-col items-center justify-center rounded border border-slate-300 bg-white px-0.5 py-0 text-center font-mono text-xs font-medium text-sky-700 placeholder-slate-400 focus-within:border-sky-700 sm:w-[60px] sm:px-1">
+            <input
+              type="text"
+              value={selectedIndex}
+              onChange={(e) => {
+                const newValue = parseInt(e.target.value, 10);
+                if (!Number.isNaN(newValue)) {
+                  setSelectedIndex(newValue.toString());
+                } else {
+                  setSelectedIndex('');
+                }
+              }}
+              onKeyDown={(event: React.KeyboardEvent<HTMLInputElement>) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  goToSelected();
+                }
+              }}
+              placeholder="0"
+              className="w-[50px] border-none bg-transparent px-0 py-0 text-center text-[11px] leading-none text-sky-700 placeholder-slate-400 focus:border-none focus:ring-0 sm:w-[60px] sm:text-xs"
+            />
+            <div className="mt-0.5 text-center font-mono text-[8px] font-medium leading-none text-slate-400">INDEX</div>
+          </div>
+          <button
+            type="button"
+            onClick={goToSelected}
+            className="flex h-10 max-h-[40px] min-h-[40px] select-none items-center justify-center rounded bg-slate-200 px-3 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white"
+          >
+            Go
+          </button>
+        </div>
+      )}
       {error && <div className="mb-2 rounded bg-red-50 px-2 py-1 text-[10px] text-red-600">Error: {error}</div>}
       <div
         className="relative mb-3 mt-0 flex-col"
         style={{
-          minHeight: `${Math.max(320, layerLabelPositions.length > 0 ? layerLabelPositions[layerLabelPositions.length - 1].maxY + 30 : 320)}px`,
+          minHeight: `${
+            isLoading || !sparsityData
+              ? 320
+              : Math.max(320, layerLabelPositions.length > 0 ? layerLabelPositions[layerLabelPositions.length - 1].maxY + 30 : 320)
+          }px`,
         }}
       >
         {/* Loading state - centered */}
@@ -667,8 +819,8 @@ export default function ConnectedNeuronsPane({
             No connected neurons data available
           </div>
         )}
-        {/* Content - only render when we have data */}
-        {sparsityData && (
+        {/* Content - only render when we have data and not loading */}
+        {sparsityData && !isLoading && (
           <>
             {/* <div>{debugData}</div> */}
 
@@ -1412,7 +1564,7 @@ export default function ConnectedNeuronsPane({
                     >
                       {/* Header text: Current [layer]@[index] - full width for background */}
                       <div className="mb-1 flex w-full items-center justify-center bg-sky-700 py-2 pt-2 text-center font-mono text-[10px] font-bold uppercase leading-none text-white">
-                        {currentNeuron?.layer} - Index {currentNeuronData.index}
+                        {activeLayer} - Index {currentNeuronData.index}
                       </div>
 
                       <div className="flex flex-col gap-x-2 text-[10px] font-bold">

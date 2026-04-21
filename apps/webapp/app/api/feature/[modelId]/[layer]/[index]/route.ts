@@ -64,10 +64,11 @@ export const GET = withOptionalUser(
     {
       params,
     }: {
-      params: { modelId: string; layer: string; index: string };
+      params: Promise<{ modelId: string; layer: string; index: string }>;
     },
   ) => {
-    const neuron = await getNeuronOptimized(params.modelId, params.layer, params.index, request.user);
+    const { modelId, layer, index } = await params;
+    const neuron = await getNeuronOptimized(modelId, layer, index, request.user);
     if (!neuron) {
       return NextResponse.json({ error: ERROR_NOT_FOUND_MESSAGE }, { status: 404 });
     }

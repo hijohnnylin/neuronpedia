@@ -1,15 +1,21 @@
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import ReleasesDropdown from '@/components/nav/releases-dropdown';
 import BrowserPane from '@/components/panes/browser-pane/browser-pane';
+import ConnectedNeuronsPane from '@/components/panes/connected-neurons-pane';
 import JumpToPane from '@/components/panes/jump-to-pane';
 import SearchExplanationsPane from '@/components/panes/search-explanations-pane';
 import SearchInferenceReleasePane from '@/components/panes/search-inference-release-pane';
 import SourceSimilarityMatrixPane from '@/components/panes/source-similarity-matrix-pane';
 import UmapPane from '@/components/panes/umap-pane';
 import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
+import {
+  CIRCUIT_SPARSITY_DEFAULT_INDEX,
+  CIRCUIT_SPARSITY_DEFAULT_LAYER,
+  CIRCUIT_SPARSITY_MODELS,
+} from '@/lib/utils/circuit-sparsity';
 import { SearchExplanationsType } from '@/lib/utils/general';
 import { getDefaultSourceSetAndSourceForRelease } from '@/lib/utils/source';
-import { SourceReleaseWithRelations } from '@/prisma/generated/zod';
+import { NeuronWithPartialRelations, SourceReleaseWithRelations } from '@/prisma/generated/zod';
 import Hero from './gemmascope/hero';
 
 export default function PageRelease({ release }: { release: SourceReleaseWithRelations }) {
@@ -50,6 +56,20 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
       <Hero release={release} />
 
       <div className="flex w-full max-w-screen-lg flex-col items-center pb-5 pt-5 text-slate-700 xl:max-w-screen-xl 2xl:max-w-screen-2xl">
+        {CIRCUIT_SPARSITY_MODELS.includes(defaultModelId || '') && (
+          <div className="w-full max-w-screen-md">
+            <ConnectedNeuronsPane
+              currentNeuron={
+                {
+                  modelId: defaultModelId,
+                  layer: CIRCUIT_SPARSITY_DEFAULT_LAYER,
+                  index: CIRCUIT_SPARSITY_DEFAULT_INDEX.toString(),
+                } as NeuronWithPartialRelations
+              }
+              showSelectors={true}
+            />
+          </div>
+        )}
         {isTemporalSaeRelease && defaultSource && <SourceSimilarityMatrixPane source={defaultSource} />}
         {defaultUmapSourceId && defaultUmapSourceSetName && (
           <UmapPane

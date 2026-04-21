@@ -95,6 +95,18 @@ import * as yup from 'yup';
  *                 minimum: 3000
  *                 maximum: 10000
  *                 default: 5000
+ *               qkTopFraction:
+ *                 type: number
+ *                 description: (Lorsa models only) Fraction of top Lorsa heads to run QK tracing on. Ignored for non-lorsa models.
+ *                 minimum: 0.05
+ *                 maximum: 0.5
+ *                 default: 0.5
+ *               qkTopk:
+ *                 type: number
+ *                 description: (Lorsa models only) Number of QK upstream contributors to return per Lorsa target node. Ignored for non-lorsa models.
+ *                 minimum: 1
+ *                 maximum: 6
+ *                 default: 6
  *     responses:
  *       200:
  *         description: Graph generated successfully
@@ -317,6 +329,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       validatedData.maxFeatureNodes,
       signedUrl,
       userName || 'Anonymous (CT)',
+      validatedData.qkTopFraction,
+      validatedData.qkTopk,
     );
 
     // download the file from S3

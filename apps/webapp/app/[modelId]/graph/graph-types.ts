@@ -195,6 +195,13 @@ export type CLTGraphNode = {
   tmpHoveredLink?: CLTGraphLink;
   tmpHoveredSourceLink?: CLTGraphLink;
   tmpHoveredTargetLink?: CLTGraphLink;
+
+  // QK tracing results (only present on lorsa feature nodes)
+  qk_tracing_results?: {
+    pair_wise_contributors: [string, string, number][];
+    top_q_marginal_contributors: [string, number][];
+    top_k_marginal_contributors: [string, number][];
+  };
 };
 
 export type CLTGraphLink = {

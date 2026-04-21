@@ -34,6 +34,92 @@ const MAX_RESPONSE_BYTES = 2 * 1024 * 1024; // 2MB — some SSR apps (e.g. LessW
 const OG_TITLE_RE = /<meta[^>]+property=["']og:title["']/i;
 const OG_DESC_RE = /<meta[^>]+property=["']og:description["']/i;
 
+// LessWrong and Alignment Forum share a codebase and database. Both sites are gated by aggressive
+// bot protection (Cloudflare/Vercel) that rejects non-browser TLS fingerprints regardless of headers.
+// Their public GraphQL endpoint at lesswrong.com/graphql is not gated and serves post data for both.
+// URLs look like https://www.{lesswrong.com,alignmentforum.org}/posts/<id>/<slug>.
+const LW_AF_HOSTS = new Set(['www.lesswrong.com', 'lesswrong.com', 'www.alignmentforum.org', 'alignmentforum.org']);
+const LW_POST_ID_RE = /\/posts\/([A-Za-z0-9]{10,24})(?:\/|$)/;
+
+async function fetchLessWrongMetadata(url: string): Promise<{
+  title: string | null;
+  description: string | null;
+  author: string | null;
+} | null> {
+  let postId: string | null = null;
+  try {
+    const parsed = new URL(url);
+    if (!LW_AF_HOSTS.has(parsed.hostname)) return null;
+    const match = parsed.pathname.match(LW_POST_ID_RE);
+    if (!match) return null;
+    [, postId] = match;
+  } catch {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch('https://www.lesswrong.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      body: JSON.stringify({
+        query:
+          '{ post(input: {selector: {_id: "' +
+          postId +
+          '"}}) { result { title user { displayName } contents { plaintextDescription } } } }',
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      console.log('[url-metadata] LW GraphQL non-OK', { postId, status: res.status });
+      return null;
+    }
+    const json = (await res.json()) as {
+      data?: {
+        post?: {
+          result?: {
+            title?: string | null;
+            user?: { displayName?: string | null } | null;
+            contents?: { plaintextDescription?: string | null } | null;
+          } | null;
+        };
+      };
+      errors?: unknown;
+    };
+    const result = json?.data?.post?.result;
+    if (!result) {
+      console.log('[url-metadata] LW GraphQL no result', { postId, errors: json?.errors });
+      return null;
+    }
+    const title = result.title ? result.title.slice(0, MAX_TITLE_LENGTH) : null;
+    const rawDescription = result.contents?.plaintextDescription ?? null;
+    // plaintextDescription returns the full post body; trim to a meta-description-like length.
+    const description = rawDescription
+      ? (() => {
+          const collapsed = rawDescription.replace(/\s+/g, ' ').trim();
+          return collapsed.length > 300 ? `${collapsed.slice(0, 300).trimEnd()}…` : collapsed;
+        })()
+      : null;
+    const author = result.user?.displayName ?? null;
+    console.log('[url-metadata] ✓ LW GraphQL', { postId, title, author });
+    return { title, description, author };
+  } catch (err) {
+    console.log('[url-metadata] LW GraphQL threw', {
+      postId,
+      error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
+    });
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function isPrivateUrl(urlString: string): boolean {
   try {
     const parsed = new URL(urlString);
@@ -61,6 +147,14 @@ export async function fetchUrlMetadata(url: string): Promise<{
     throw new Error('URLs pointing to private/internal networks are not allowed');
   }
 
+  // LessWrong / Alignment Forum: their bot protection blocks server-side HTML fetches regardless
+  // of headers (TLS fingerprinting). Use their public GraphQL API instead.
+  const lwMeta = await fetchLessWrongMetadata(url);
+  if (lwMeta) {
+    console.log('[url-metadata] ✓ via LW GraphQL', { url, elapsedMs: Date.now() - t0 });
+    return lwMeta;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
 
@@ -70,8 +164,19 @@ export async function fetchUrlMetadata(url: string): Promise<{
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"macOS"',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'no-cache',
+        Pragma: 'no-cache',
       },
       redirect: 'follow',
       signal: controller.signal,

@@ -39,7 +39,7 @@ export default function HomeReleases() {
                 <CircleAlertIcon className="h-2 w-2" /> Beta
               </div>
             )}
-            <div className="mb-1 text-left font-sans text-[12px] font-bold leading-tight text-sky-700">
+            <div className="mb-0.5 text-left font-sans text-[12px] font-bold leading-tight text-sky-700">
               <span>{release.description}</span>
             </div>
 

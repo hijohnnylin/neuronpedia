@@ -284,7 +284,11 @@ export function GraphProvider({
 
   const makeTooltipText = (node: CLTGraphNode) => {
     const label = getNodeSupernodeAndOverrideLabel(node);
-    return `${label.length === 0 ? 'Unlabeled' : getOverrideClerpForNode(node)} <br/> ${node.layer === 'E' ? 'Emb' : node.layer === 'Lgt' ? 'Logit' : `${node.isSuperNode ? '' : `Layer ${node.layer}`}`}`;
+    const explanationLine = label.length === 0 ? '[Unlabeled]' : getOverrideClerpForNode(node);
+    const lorsaLine = node.feature_type === 'lorsa' ? '▲ Attn/Lorsa Node' : '';
+    const layerLine =
+      node.layer === 'E' ? 'Emb' : node.layer === 'Lgt' ? 'Logit' : `${node.isSuperNode ? '' : `Layer ${node.layer}`}`;
+    return [explanationLine, lorsaLine, layerLine].filter((l) => l && l.length > 0).join(' <br/> ');
   };
 
   const getFilterGraphTypeForCurrentUser = (graph: GraphMetadata) => {

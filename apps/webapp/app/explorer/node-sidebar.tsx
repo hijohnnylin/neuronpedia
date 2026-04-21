@@ -185,7 +185,7 @@ export function NodeSidebar({
                         prev.includes(t) ? (prev.length > 1 ? prev.filter((x) => x !== t) : prev) : [...prev, t],
                       )
                     }
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase transition-colors ${
+                    className={`rounded-full border px-2.5 py-1 text-[10.5px] font-bold uppercase transition-colors ${
                       editNodeTypes.includes(t)
                         ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
                         : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
@@ -204,7 +204,7 @@ export function NodeSidebar({
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               maxLength={MAX_TITLE_LENGTH}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
             />
           </div>
           <div>
@@ -212,8 +212,8 @@ export function NodeSidebar({
             <textarea
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
-              rows={4}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+              rows={5}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
             />
           </div>
           <div>
@@ -222,7 +222,7 @@ export function NodeSidebar({
               type="text"
               value={editMainUrl}
               onChange={(e) => setEditMainUrl(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
             />
           </div>
           <div>
@@ -277,7 +277,7 @@ export function NodeSidebar({
               type="text"
               value={editAuthor}
               onChange={(e) => setEditAuthor(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
             />
           </div>
           <div>
@@ -285,7 +285,7 @@ export function NodeSidebar({
             <select
               value={editParentId ? String(editParentId) : ''}
               onChange={(e) => setEditParentId(e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
             >
               <option value="">None (root node)</option>
               {allNodes
@@ -327,7 +327,7 @@ export function NodeSidebar({
       ) : (
         /* ── View mode ── */
         <>
-          <h2 className="mt-2 text-lg font-semibold text-slate-900">
+          <h2 className="mt-2 text-base font-semibold leading-tight text-slate-800">
             {node.title || '(untitled)'}
             <span className="ml-1.5 text-xs font-normal text-slate-300">&middot;</span>
             <a
@@ -347,8 +347,8 @@ export function NodeSidebar({
               #{selectedNode.id}
             </a>
           </h2>
-          {node.author && <p className="mt-0.5 text-sm text-slate-500">{node.author}</p>}
-          {node.description && <p className="mt-1 text-xs leading-normal text-slate-600">{node.description}</p>}
+          {node.author && <p className="mt-2 text-sm text-slate-500">{node.author}</p>}
+          {node.description && <p className="mt-2 text-xs leading-normal text-slate-600">{node.description}</p>}
 
           {/* Links */}
           {(node.mainUrl || (node.additionalUrls && node.additionalUrls.length > 0)) && (

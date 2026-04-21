@@ -165,13 +165,13 @@ function DraftNodeComponent({ data }: { data: any }) {
               </span>
             ))}
           </div>
-          <span className="mt-0.5 truncate font-sans text-[11px] font-semibold text-slate-700">{data.draftTitle}</span>
+          <span className="mt-0.5 truncate font-sans text-[9px] font-medium text-slate-700">{data.draftTitle}</span>
           {data.draftUrl && (
             <a
               href={data.draftUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-0.5 truncate text-[9px] text-sky-600 hover:underline"
+              className="mt-0.5 truncate text-[7px] text-sky-600 hover:underline"
             >
               {data.draftUrl}
             </a>
@@ -200,7 +200,7 @@ function DraftNodeComponent({ data }: { data: any }) {
                 }
               }}
               placeholder="Paste additional URL..."
-              className="nodrag w-full rounded border-0 bg-sky-50 px-2 py-0.5 text-[10px] text-slate-500 placeholder-slate-300 focus:outline-none focus:ring-0"
+              className="nodrag w-full rounded border-0 bg-sky-50 px-2 py-1 text-[9px] leading-normal text-slate-500 placeholder-slate-400 focus:outline-none focus:ring-0"
             />
           </div>
           <div className="mb-1 mt-1.5 flex gap-1">
@@ -213,7 +213,7 @@ function DraftNodeComponent({ data }: { data: any }) {
                   data.onCancel?.();
                 }
               }}
-              className="flex-1 rounded border border-slate-200 py-0.5 text-center text-[10px] font-medium text-slate-600 hover:bg-slate-50"
+              className="flex-1 rounded border border-slate-200 py-1 text-center text-[9px] font-medium text-slate-600 hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -224,7 +224,7 @@ function DraftNodeComponent({ data }: { data: any }) {
                 e.stopPropagation();
                 data.onSubmitDraft?.();
               }}
-              className={`flex-1 rounded py-0.5 text-center text-[10px] font-medium ${
+              className={`flex-1 rounded py-1 text-center text-[9px] font-medium ${
                 data.saving
                   ? 'cursor-not-allowed bg-slate-300 text-slate-500'
                   : 'bg-sky-700 text-white hover:bg-sky-800'

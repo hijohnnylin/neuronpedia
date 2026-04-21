@@ -46,7 +46,7 @@ export function DraftEditSidebar({
   return (
     <div className="w-[420px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900">New Node</h2>
+        <h2 className="text-base font-semibold leading-tight text-slate-800">{draftNode.title || 'New Node'}</h2>
         <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600">
           ✕
         </button>
@@ -68,7 +68,7 @@ export function DraftEditSidebar({
                     const next = cur.includes(t) ? (cur.length > 1 ? cur.filter((x) => x !== t) : cur) : [...cur, t];
                     updateDraft({ nodeTypes: next });
                   }}
-                  className={`rounded-full border px-2.5 py-1 text-xs font-bold uppercase transition-colors ${
+                  className={`rounded-full border px-2.5 py-1 text-[10.5px] font-bold uppercase transition-colors ${
                     draftNode.nodeTypes.includes(t)
                       ? `${colors ? colors.icon : 'bg-slate-800'} border-transparent text-white`
                       : `${colors ? `${colors.border} ${colors.label}` : 'border-slate-200 text-slate-600'} bg-white hover:bg-slate-50`
@@ -90,7 +90,7 @@ export function DraftEditSidebar({
             onChange={(e) => updateDraft({ title: e.target.value })}
             maxLength={MAX_TITLE_LENGTH}
             placeholder="e.g. Sparse Autoencoders"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
           />
         </div>
 
@@ -101,8 +101,8 @@ export function DraftEditSidebar({
             value={draftNode.description || ''}
             onChange={(e) => updateDraft({ description: e.target.value })}
             placeholder="Optional description..."
-            rows={2}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+            rows={5}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
           />
         </div>
 
@@ -114,7 +114,7 @@ export function DraftEditSidebar({
             value={draftNode.mainUrl || ''}
             onChange={(e) => updateDraft({ mainUrl: e.target.value })}
             placeholder="https://..."
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
           />
         </div>
 
@@ -178,7 +178,7 @@ export function DraftEditSidebar({
             value={draftNode.author || ''}
             onChange={(e) => updateDraft({ author: e.target.value })}
             placeholder="Auto-populated from metadata"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
           />
         </div>
 
@@ -197,7 +197,7 @@ export function DraftEditSidebar({
                   : null,
               });
             }}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-sky-300 focus:outline-none focus:ring-1 focus:ring-sky-300"
           >
             <option value="">None (root node)</option>
             {existingNodes.map((n) => (
@@ -214,7 +214,7 @@ export function DraftEditSidebar({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
           >
             Cancel
           </button>
@@ -222,11 +222,11 @@ export function DraftEditSidebar({
             type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-4 py-2 text-xs font-medium transition-colors ${
               submitting ? 'cursor-not-allowed bg-slate-300 text-slate-500' : 'bg-sky-700 text-white hover:bg-sky-800'
             }`}
           >
-            {submitting ? 'Saving...' : 'Create Node'}
+            {submitting ? 'Saving...' : 'Save Item'}
           </button>
         </div>
       </div>

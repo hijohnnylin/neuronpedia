@@ -203,6 +203,7 @@ type FlowBuildParams = {
   descendantTypesCache?: Map<number, Record<string, number>>;
   totalDescendantTypes?: Map<number, Record<string, number>>;
   dimmedIds?: Set<number>;
+  filterDimmedIds?: Set<number>;
   hoverCallbacks?: { onHoverNode: (id: number) => void; onHoverLeave: () => void };
 };
 
@@ -217,6 +218,7 @@ function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges
     descendantTypesCache,
     totalDescendantTypes,
     dimmedIds,
+    filterDimmedIds,
     hoverCallbacks,
   } = params;
 
@@ -263,7 +265,8 @@ function buildFlowNodesAndEdges(params: FlowBuildParams): { nodes: Node[]; edges
         childDescendantTypes: descendantTypesCache
           ? Object.fromEntries((pn.children || []).map((c) => [c.id, descendantTypesCache.get(c.id) ?? {}]))
           : {},
-        dimmed: dimmedIds?.has(pn.id) ?? false,
+        dimmed: (dimmedIds?.has(pn.id) ?? false) && !(filterDimmedIds?.has(pn.id) ?? false),
+        filterDimmed: filterDimmedIds?.has(pn.id) ?? false,
         onAddChild: onAddChild ? () => onAddChild(pn.id) : undefined,
         onEditNode: onEditNode ? () => onEditNode(pn.id) : undefined,
         onHoverNode: hoverCallbacks ? () => hoverCallbacks.onHoverNode(pn.id) : undefined,
@@ -314,41 +317,47 @@ function ProblemsGraphInner({
   const { fitView, getNodes, setViewport } = useReactFlow();
   const flowContainerRef = useRef<HTMLDivElement>(null);
 
-  const fitViewCustom = useCallback(() => {
-    const container = flowContainerRef.current;
-    const allNodes = getNodes();
-    if (!container || allNodes.length === 0) {
-      fitView({ padding: 0.08, duration: 300 });
-      return;
-    }
-    // Calculate bounds of all nodes
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    allNodes.forEach((n) => {
-      const w = n.measured?.width ?? n.width ?? 270;
-      const h = n.measured?.height ?? n.height ?? 33;
-      minX = Math.min(minX, n.position.x);
-      minY = Math.min(minY, n.position.y);
-      maxX = Math.max(maxX, n.position.x + w);
-      maxY = Math.max(maxY, n.position.y + h);
-    });
-    const graphW = maxX - minX;
-    const graphH = maxY - minY;
-    const rect = container.getBoundingClientRect();
-    const bottomPadPx = rect.height * FIT_VIEW_PADDING_BOTTOM;
-    const availW = rect.width;
-    const availH = rect.height - FIT_VIEW_TOP_PX - bottomPadPx;
-    const zoomX = availW / graphW;
-    const zoomY = availH / graphH;
-    const zoom = Math.min(zoomX, zoomY, 1.5);
-    const scaledW = graphW * zoom;
-    const scaledH = graphH * zoom;
-    const x = (availW - scaledW) / 2 - minX * zoom;
-    const y = FIT_VIEW_TOP_PX + (availH - scaledH) / 2 - minY * zoom;
-    setViewport({ x, y, zoom }, { duration: 200 });
-  }, [fitView, getNodes, setViewport]);
+  const fitViewCustom = useCallback(
+    (opts?: { leftPx?: number; topPx?: number; rightPx?: number; bottomPx?: number }) => {
+      const container = flowContainerRef.current;
+      const allNodes = getNodes();
+      if (!container || allNodes.length === 0) {
+        fitView({ padding: 0.08, duration: 300 });
+        return;
+      }
+      // Calculate bounds of all nodes
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      allNodes.forEach((n) => {
+        const w = n.measured?.width ?? n.width ?? 270;
+        const h = n.measured?.height ?? n.height ?? 33;
+        minX = Math.min(minX, n.position.x);
+        minY = Math.min(minY, n.position.y);
+        maxX = Math.max(maxX, n.position.x + w);
+        maxY = Math.max(maxY, n.position.y + h);
+      });
+      const graphW = maxX - minX;
+      const graphH = maxY - minY;
+      const rect = container.getBoundingClientRect();
+      const topPx = opts?.topPx ?? FIT_VIEW_TOP_PX;
+      const bottomPx = opts?.bottomPx ?? rect.height * FIT_VIEW_PADDING_BOTTOM;
+      const leftPx = opts?.leftPx ?? 0;
+      const rightPx = opts?.rightPx ?? 0;
+      const availW = rect.width - leftPx - rightPx;
+      const availH = rect.height - topPx - bottomPx;
+      const zoomX = availW / graphW;
+      const zoomY = availH / graphH;
+      const zoom = Math.min(zoomX, zoomY, 1.5);
+      const scaledW = graphW * zoom;
+      const scaledH = graphH * zoom;
+      const x = leftPx + (availW - scaledW) / 2 - minX * zoom;
+      const y = topPx + (availH - scaledH) / 2 - minY * zoom;
+      setViewport({ x, y, zoom }, { duration: 200 });
+    },
+    [fitView, getNodes, setViewport],
+  );
 
   const panToNode = useCallback(
     (
@@ -892,8 +901,7 @@ function ProblemsGraphInner({
     });
     if (res.ok) {
       // Mirror the click-to-deselect logic: select the parent if it's a real node, otherwise close.
-      const parentIsRealNode =
-        parentId != null && parentId !== 1 && problemNodes.some((n) => n.id === parentId);
+      const parentIsRealNode = parentId != null && parentId !== 1 && problemNodes.some((n) => n.id === parentId);
       if (parentIsRealNode) {
         selectNode(parentId);
       } else {
@@ -984,6 +992,7 @@ function ProblemsGraphInner({
       descendantTypesCache,
       totalDescendantTypes,
       dimmedIds,
+      filterDimmedIds,
       hoverCallbacks: { onHoverNode, onHoverLeave },
     };
 
@@ -1054,7 +1063,7 @@ function ProblemsGraphInner({
           );
         } else if (typeFilterChanged) {
           lastAppliedRealSelectionRef.current = sid;
-          setTimeout(() => fitViewCustom(), 50);
+          setTimeout(() => fitViewCustom({ leftPx: 280, topPx: 110, rightPx: 20, bottomPx: 20 }), 50);
         } else if (shouldAdjustView) {
           if (sid != null) {
             const target = layoutedNodes.find((n) => n.id === String(sid));
@@ -1290,50 +1299,52 @@ function ProblemsGraphInner({
                     </div>
                   )}
                 </div>
-                {recentLogs.length > 0 && (
-                  <div className="hidden max-w-[240px] flex-col rounded-lg border border-slate-200 bg-white pb-0 shadow-md">
-                    <div
-                      className="sticky top-0 z-10 mb-0.5 border-slate-200 bg-slate-50 pb-1 pt-1 text-center text-[8px] font-medium uppercase text-slate-500"
-                      style={{ borderTopLeftRadius: 6, borderTopRightRadius: 6 }} // tailwind can't do only top
-                    >
-                      Recently Added
-                    </div>
-                    <div className="flex max-h-[230px] flex-col gap-0.5 overflow-y-auto px-1.5">
-                      {recentLogs.map((log) => (
-                        <button
-                          type="button"
-                          key={log.id}
-                          onClick={() => selectNode(log.problemNode.id)}
-                          className="flex items-start gap-0 rounded px-1.5 py-1 text-left transition-colors hover:bg-slate-200"
-                        >
-                          <div className="flex min-w-0 flex-1 flex-col">
-                            <div className="flex items-center gap-1">
-                              {log.problemNode.nodeTypes.map((t) => (
-                                <span
-                                  key={t}
-                                  className={`rounded-sm px-1 py-[0.5px] text-[7.5px] font-bold uppercase text-white ${(NODE_TYPE_COLORS[t] || NODE_TYPE_COLORS.topic).icon}`}
-                                >
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                            <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-snug text-slate-700">
-                              {log.problemNode.title || '(untitled)'}
-                            </span>
-
-                            <span className="text-[8px] text-slate-400">
-                              {log.user.name}
-                              {/* &middot;{' '} */}
-                              {/* {formatDistanceToNowStrict(new Date(log.timestamp), { addSuffix: true })} */}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </Panel>
+            {recentLogs.length > 0 && (
+              <div className="absolute left-4 top-[118px] z-10 max-w-[240px]">
+                <div className="flex max-w-[240px] flex-col rounded-lg border border-slate-200 bg-white pb-0 shadow-md">
+                  <div
+                    className="sticky top-0 z-10 mb-0.5 border-slate-200 bg-slate-50 pb-1 pt-1 text-center text-[8px] font-medium uppercase text-slate-500"
+                    style={{ borderTopLeftRadius: 6, borderTopRightRadius: 6 }} // tailwind can't do only top
+                  >
+                    Recently Added
+                  </div>
+                  <div className="flex max-h-[200px] flex-col gap-0.5 divide-y divide-slate-200 overflow-y-auto px-1.5 py-1.5">
+                    {recentLogs.map((log) => (
+                      <button
+                        type="button"
+                        key={log.id}
+                        onClick={() => selectNode(log.problemNode.id)}
+                        className="flex items-start gap-0 rounded px-1.5 pb-1 pt-1.5 text-left transition-colors hover:bg-slate-200"
+                      >
+                        <div className="flex min-w-0 flex-1 flex-col">
+                          <div className="flex items-center gap-1">
+                            {log.problemNode.nodeTypes.map((t) => (
+                              <span
+                                key={t}
+                                className={`rounded-sm px-1 py-[0.5px] text-[7.5px] font-bold uppercase text-white ${(NODE_TYPE_COLORS[t] || NODE_TYPE_COLORS.topic).icon}`}
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                          <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-snug text-slate-700">
+                            {log.problemNode.title || '(untitled)'}
+                          </span>
+
+                          <span className="text-[8px] text-slate-400">
+                            {/* {log.user.name} */}
+                            {/* &middot;{' '} */}
+                            {/* {formatDistanceToNowStrict(new Date(log.timestamp), { addSuffix: true })} */}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {!draftNode && (
               <Panel position="bottom-right">

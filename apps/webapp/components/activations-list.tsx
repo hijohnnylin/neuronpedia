@@ -1,6 +1,5 @@
 'use client';
 
-import { MODEL_HAS_CONNECTED_NEURONS } from '@/app/[modelId]/[layer]/[index]/feature-dashboard';
 import ActivationSingleForm from '@/components/activation-single-form';
 import { ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS } from '@/lib/utils/activations';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -10,6 +9,7 @@ import { Activation, ActivationPartialWithRelations, NeuronWithPartialRelations 
 import { useEffect, useState } from 'react';
 import 'react-loading-skeleton/dist/skeleton.css';
 import ActivationItem from './activation-item';
+import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
 import { useGlobalContext } from './provider/global-provider';
 
 export default function ActivationsList({
@@ -58,7 +58,7 @@ export default function ActivationsList({
   // used for showing correct snippet
   const [selectedRange, setSelectedRange] = useState(defaultRange);
   const [showLineBreaks, setShowLineBreaks] = useState(defaultShowLineBreaks);
-  const isConnectedNeuronsModel = MODEL_HAS_CONNECTED_NEURONS.includes(feature?.modelId || '');
+  const isConnectedNeuronsModel = CIRCUIT_SPARSITY_MODELS.includes(feature?.modelId || '');
   const [showRawTokens, setShowRawTokens] = useState(isConnectedNeuronsModel ? true : defaultShowRawTokens);
   const [dfaSplit, setDfaSplit] = useState(true);
   // used to determine colors
@@ -86,7 +86,7 @@ export default function ActivationsList({
       setOverallMaxValue(getMaxValueOfActivations(activations));
       let sortedActs = activations;
       // For models with connected neurons, always show all activations without filtering
-      const skipFiltering = MODEL_HAS_CONNECTED_NEURONS.includes(feature?.modelId || '');
+      const skipFiltering = CIRCUIT_SPARSITY_MODELS.includes(feature?.modelId || '');
 
       // For connected neurons models, split into top/bottom columns
       if (skipFiltering) {

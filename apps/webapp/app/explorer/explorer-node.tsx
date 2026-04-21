@@ -91,7 +91,11 @@ function ProblemNodeComponent({ data, selected }: { data: any; selected: boolean
       style={{
         height: NODE_HEIGHT,
         ...(data.isRoot ? { width: ROOT_NODE_WIDTH } : { minWidth: DEFAULT_NODE_WIDTH, maxWidth: DEFAULT_NODE_WIDTH }),
-        ...(data.dimmed ? { opacity: 0.3, filter: 'blur(1.4px) grayscale(0.5)' } : {}),
+        ...(data.dimmed
+          ? { opacity: 0.3, filter: 'blur(1.3px) grayscale(0.5)' }
+          : data.filterDimmed
+            ? { opacity: 0.4 }
+            : {}),
       }}
       onMouseEnter={() => {
         data.onHoverNode?.();

@@ -27,8 +27,9 @@ export const GRAPH_MAX_PROMPT_LENGTH_CHARS = 10000;
 export const GRAPH_BATCH_SIZE = 48;
 // this time estimate comes from testing different prompt lengths with batch size 48, and is only valid for gemma-2-2b, for a40
 // with nnsight we are using lazy encoder, so we need to add time for this
+// lorsa models always run with QK tracing enabled, which adds ~40s on top of the baseline lorsa overhead
 export const getEstimatedTimeFromNumTokens = (numTokens: number, slower: boolean = false, isLorsa: boolean = false) =>
-  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (slower ? 20 : 0) + (isLorsa ? 0 : 0);
+  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (slower ? 20 : 0) + (isLorsa ? 50 : 0);
 export const GRAPH_MAX_TOKENS = 64;
 export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'gemma-3-4b-it', 'qwen3-4b', 'qwen3-1.7b'];
 
@@ -53,9 +54,9 @@ export const GRAPH_DESIREDLOGITPROB_DEFAULT = 0.95;
 export const GRAPH_NODETHRESHOLD_MIN = 0.5;
 export const GRAPH_NODETHRESHOLD_MIN_LORSA = 0.3;
 export const GRAPH_NODETHRESHOLD_MAX = 0.95;
-export const GRAPH_NODETHRESHOLD_MAX_LORSA = 0.6;
+export const GRAPH_NODETHRESHOLD_MAX_LORSA = 0.7;
 export const GRAPH_NODETHRESHOLD_DEFAULT = 0.8;
-export const GRAPH_NODETHRESHOLD_DEFAULT_LORSA = 0.6;
+export const GRAPH_NODETHRESHOLD_DEFAULT_LORSA = 0.7;
 export const GRAPH_EDGETHRESHOLD_MIN = 0.65;
 export const GRAPH_EDGETHRESHOLD_MIN_LORSA = 0.5;
 export const GRAPH_EDGETHRESHOLD_MAX = 0.98;
@@ -65,10 +66,18 @@ export const GRAPH_EDGETHRESHOLD_DEFAULT_LORSA = 0.8;
 export const GRAPH_MAXFEATURENODES_MIN = 1500;
 export const GRAPH_MAXFEATURENODES_MIN_LORSA = 1500;
 export const GRAPH_MAXFEATURENODES_MAX = 10000;
-export const GRAPH_MAXFEATURENODES_MAX_LORSA = 5000;
+export const GRAPH_MAXFEATURENODES_MAX_LORSA = 3000;
 export const GRAPH_MAXFEATURENODES_DEFAULT = 5000;
 export const GRAPH_MAXFEATURENODES_DEFAULT_LORSA = 3000;
 export const GRAPH_SLUG_MIN = 2;
+
+// QK tracing is lorsa-only (passed as `enable_qk_tracing=true` for LORSA_MODELS)
+export const GRAPH_QKTOPFRACTION_MIN = 0.05;
+export const GRAPH_QKTOPFRACTION_MAX = 0.5;
+export const GRAPH_QKTOPFRACTION_DEFAULT = 0.5;
+export const GRAPH_QKTOPK_MIN = 1;
+export const GRAPH_QKTOPK_MAX = 6;
+export const GRAPH_QKTOPK_DEFAULT = 6;
 
 export const GRAPH_DYNAMIC_PRUNING_THRESHOLD_DEFAULT = 0.6;
 
@@ -116,6 +125,17 @@ export const graphGenerateSchemaClient = yup.object({
     .max(GRAPH_MAXFEATURENODES_MAX, `Must be at most ${GRAPH_MAXFEATURENODES_MAX}.`)
     .default(GRAPH_MAXFEATURENODES_DEFAULT)
     .required('This field is required.'),
+  qkTopFraction: yup
+    .number()
+    .min(GRAPH_QKTOPFRACTION_MIN, `Must be at least ${GRAPH_QKTOPFRACTION_MIN}.`)
+    .max(GRAPH_QKTOPFRACTION_MAX, `Must be at most ${GRAPH_QKTOPFRACTION_MAX}.`)
+    .default(GRAPH_QKTOPFRACTION_DEFAULT),
+  qkTopk: yup
+    .number()
+    .integer('Must be an integer.')
+    .min(GRAPH_QKTOPK_MIN, `Must be at least ${GRAPH_QKTOPK_MIN}.`)
+    .max(GRAPH_QKTOPK_MAX, `Must be at most ${GRAPH_QKTOPK_MAX}.`)
+    .default(GRAPH_QKTOPK_DEFAULT),
   slug: yup.string(),
 });
 
@@ -230,10 +250,13 @@ export const generateGraphAndUploadToS3 = async (
   maxFeatureNodes: number,
   signedUrl: string,
   userId: string | undefined,
+  qkTopFraction: number = GRAPH_QKTOPFRACTION_DEFAULT,
+  qkTopk: number = GRAPH_QKTOPK_DEFAULT,
 ) => {
   const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
   const action = 'generate-graph';
-  const batchSize = LORSA_MODELS.includes(modelId) ? LORSA_BATCH_SIZE : GRAPH_BATCH_SIZE;
+  const isLorsa = LORSA_MODELS.includes(modelId);
+  const batchSize = isLorsa ? LORSA_BATCH_SIZE : GRAPH_BATCH_SIZE;
 
   const body = {
     prompt,
@@ -247,6 +270,14 @@ export const generateGraphAndUploadToS3 = async (
     max_feature_nodes: maxFeatureNodes,
     signed_url: signedUrl,
     user_id: userId,
+    // QK tracing is always enabled for lorsa models
+    ...(isLorsa
+      ? {
+          enable_qk_tracing: true,
+          qk_top_fraction: qkTopFraction,
+          qk_topk: qkTopk,
+        }
+      : {}),
   };
   const response = await fetch(
     `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,

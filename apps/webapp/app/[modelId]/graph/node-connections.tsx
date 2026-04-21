@@ -1,8 +1,9 @@
 import { useGraphModalContext } from '@/components/provider/graph-modal-provider';
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { useGraphStateContext } from '@/components/provider/graph-state-provider';
-import { Circle, Expand, Minimize2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils/ui';
+import { ChevronRight, Circle, Expand, Minimize2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { CLTGraphNode } from './graph-types';
 import GraphFeatureLink from './np-feature-link';
@@ -136,6 +137,165 @@ function FeatureList({
   );
 }
 
+function QKTracingSection({
+  clickedNode,
+  nodesById,
+  hoveredId,
+  getNodeSupernodeAndOverrideLabel,
+  onHoverNode,
+  onClearHover,
+  onClickNode,
+}: {
+  clickedNode: CLTGraphNode;
+  nodesById: Map<string, CLTGraphNode>;
+  hoveredId: string | null;
+  getNodeSupernodeAndOverrideLabel: (node: CLTGraphNode) => string;
+  onHoverNode: (node: CLTGraphNode) => void;
+  onClearHover: () => void;
+  onClickNode: (node: CLTGraphNode, addToPinned: boolean) => void;
+}) {
+  const results = clickedNode.qk_tracing_results;
+  if (!results) return null;
+
+  const handleNodeClick = (nodeId: string, addToPinned: boolean) => {
+    const node = nodesById.get(nodeId);
+    if (node) onClickNode(node, addToPinned);
+  };
+
+  const handleNodeHover = (nodeId: string) => {
+    const node = nodesById.get(nodeId);
+    if (node) onHoverNode(node);
+  };
+
+  const renderNodeLabel = (nodeId: string) => {
+    const node = nodesById.get(nodeId);
+    if (node) {
+      const label = getNodeSupernodeAndOverrideLabel(node);
+      return (
+        <div className="flex min-w-0 flex-1 items-center gap-x-1">
+          <svg width={10} height={14} className="shrink-0">
+            <g className="fill-none stroke-slate-800 stroke-[0.7]">
+              <text fontSize={15} textAnchor="middle" dominantBaseline="central" dx={5} dy={5}>
+                {featureTypeToText(node.feature_type)}
+              </text>
+            </g>
+          </svg>
+          <span className="truncate text-left">{label}</span>
+          {node.layer !== 'E' && <span className="shrink-0 font-mono text-[9px] text-slate-500">L{node.layer}</span>}
+        </div>
+      );
+    }
+    return <span className="truncate text-left">{nodeId}</span>;
+  };
+
+  const { pair_wise_contributors, top_q_marginal_contributors, top_k_marginal_contributors } = results;
+
+  return (
+    <div className="mt-1 flex h-1/2 min-h-0 flex-col gap-y-1 overflow-y-auto">
+      <div className="flex flex-row gap-x-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-y-1">
+          <div className="sticky top-0 z-30 bg-white text-[10px] font-medium uppercase text-slate-500">
+            K Marginal (QK Trace)
+          </div>
+          <div className="flex flex-col gap-y-0.5 pl-1">
+            {top_k_marginal_contributors.map(([nodeId, score], idx) => (
+              <button
+                key={`k-${nodeId}-${idx}`}
+                type="button"
+                className={cn(
+                  'flex cursor-pointer items-center justify-between gap-x-1.5 rounded bg-slate-50 px-2 py-[3px] text-[10px] hover:bg-sky-100',
+                  nodeId === hoveredId && 'z-20 outline-dotted outline-[3px] outline-[#f0f]',
+                )}
+                onClick={(e) => handleNodeClick(nodeId, e.metaKey || e.ctrlKey)}
+                onMouseEnter={() => handleNodeHover(nodeId)}
+                onMouseLeave={onClearHover}
+              >
+                {renderNodeLabel(nodeId)}
+                <div className="shrink-0 font-mono">{score.toFixed(2)}</div>
+              </button>
+            ))}
+            {top_k_marginal_contributors.length === 0 && (
+              <div className="px-2 py-1 text-[10px] italic text-slate-400">None</div>
+            )}
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-y-1">
+          <div className="sticky top-0 z-30 bg-white text-[10px] font-medium uppercase text-slate-500">
+            Q Marginal (QK Trace)
+          </div>
+          <div className="flex flex-col gap-y-0.5 pr-1">
+            {top_q_marginal_contributors.map(([nodeId, score], idx) => (
+              <button
+                key={`q-${nodeId}-${idx}`}
+                type="button"
+                className={cn(
+                  'flex cursor-pointer items-center justify-between gap-x-1.5 rounded bg-slate-50 px-2 py-[3px] text-[10px] hover:bg-sky-100',
+                  nodeId === hoveredId && 'z-20 outline-dotted outline-[3px] outline-[#f0f]',
+                )}
+                onClick={(e) => handleNodeClick(nodeId, e.metaKey || e.ctrlKey)}
+                onMouseEnter={() => handleNodeHover(nodeId)}
+                onMouseLeave={onClearHover}
+              >
+                {renderNodeLabel(nodeId)}
+                <div className="shrink-0 font-mono">{score.toFixed(2)}</div>
+              </button>
+            ))}
+            {top_q_marginal_contributors.length === 0 && (
+              <div className="px-2 py-1 text-[10px] italic text-slate-400">None</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-y-1">
+        <div className="text-[10px] font-medium uppercase text-slate-500">Top Pairwise Contributors</div>
+        <div className="flex flex-col gap-y-0.5">
+          {pair_wise_contributors.map(([qId, kId, score], idx) => (
+            <div
+              key={`pw-${idx}`}
+              className="flex items-stretch overflow-hidden rounded bg-slate-50 py-1 pl-1 text-[10px]"
+            >
+              <button
+                type="button"
+                className={cn(
+                  'flex min-w-0 flex-1 cursor-pointer items-center gap-x-1 rounded px-2 py-[3px] hover:bg-sky-100',
+                  kId === hoveredId && 'z-20 outline-dotted outline-[3px] outline-[#f0f]',
+                )}
+                onClick={(e) => handleNodeClick(kId, e.metaKey || e.ctrlKey)}
+                onMouseEnter={() => handleNodeHover(kId)}
+                onMouseLeave={onClearHover}
+              >
+                <span className="shrink-0 text-[9px] font-bold text-slate-400">K:</span>
+                {renderNodeLabel(kId)}
+              </button>
+              <div className="flex shrink-0 items-center justify-center pl-1">
+                <ChevronRight className="h-3 w-3 text-slate-400/60" />
+              </div>
+              <button
+                type="button"
+                className={cn(
+                  'flex min-w-0 flex-1 cursor-pointer items-center gap-x-1 rounded px-2 py-[3px] hover:bg-sky-100',
+                  qId === hoveredId && 'z-20 outline-dotted outline-[3px] outline-[#f0f]',
+                )}
+                onClick={(e) => handleNodeClick(qId, e.metaKey || e.ctrlKey)}
+                onMouseEnter={() => handleNodeHover(qId)}
+                onMouseLeave={onClearHover}
+              >
+                <span className="shrink-0 text-[9px] font-bold text-slate-400">Q:</span>
+                {renderNodeLabel(qId)}
+              </button>
+              <div className="flex shrink-0 items-center border-l border-slate-200 bg-white/40 px-2 font-mono">
+                {score.toFixed(2)}
+              </div>
+            </div>
+          ))}
+          {pair_wise_contributors.length === 0 && <div className="px-2 py-1 text-[10px] text-slate-400">None</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GraphNodeConnections() {
   const {
     visState,
@@ -205,6 +365,18 @@ export default function GraphNodeConnections() {
       setFullNPFeatureDetail(setClickedNode, clickedNode);
     }
   }, [clickedNode]);
+
+  const nodesById = useMemo(() => {
+    const map = new Map<string, CLTGraphNode>();
+    selectedGraph?.nodes.forEach((n) => {
+      if (n.nodeId) map.set(n.nodeId, n);
+      if (n.node_id && !map.has(n.node_id)) map.set(n.node_id, n);
+      if (n.jsNodeId && !map.has(n.jsNodeId)) map.set(n.jsNodeId, n);
+    });
+    return map;
+  }, [selectedGraph]);
+
+  const hasQKTracing = Boolean(clickedNode?.qk_tracing_results);
 
   return (
     <>
@@ -318,34 +490,47 @@ export default function GraphNodeConnections() {
           )}
           {clickedNode && (
             <div
-              className={`mt-2 flex h-full w-full flex-1 flex-row gap-x-0 ${clickedNode?.featureDetailNP ? 'pb-0' : 'pb-0'}`}
+              className={`mt-1.5 flex h-full min-h-0 w-full flex-1 flex-col gap-y-0 ${clickedNode?.featureDetailNP ? 'pb-0' : 'pb-0'}`}
             >
-              <FeatureList
-                title="Input Features"
-                nodes={selectedGraph?.nodes || []}
-                linkType="source"
-                hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
-                visState={visState}
-                isEditingLabel={isEditingLabel}
-                getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
-                hoveredId={localHoveredId}
-                onHoverNode={handleHoverNode}
-                onClearHover={handleClearHover}
-                onClickNode={handleClickNode}
-              />
-              <FeatureList
-                title="Output Features"
-                nodes={selectedGraph?.nodes || []}
-                linkType="target"
-                hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
-                visState={visState}
-                isEditingLabel={isEditingLabel}
-                getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
-                hoveredId={localHoveredId}
-                onHoverNode={handleHoverNode}
-                onClearHover={handleClearHover}
-                onClickNode={handleClickNode}
-              />
+              <div className={`flex min-h-[50%] w-full flex-row gap-x-0 ${hasQKTracing ? 'h-1/2' : 'h-full flex-1'}`}>
+                <FeatureList
+                  title="Input Features"
+                  nodes={selectedGraph?.nodes || []}
+                  linkType="source"
+                  hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
+                  visState={visState}
+                  isEditingLabel={isEditingLabel}
+                  getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
+                  hoveredId={localHoveredId}
+                  onHoverNode={handleHoverNode}
+                  onClearHover={handleClearHover}
+                  onClickNode={handleClickNode}
+                />
+                <FeatureList
+                  title="Output Features"
+                  nodes={selectedGraph?.nodes || []}
+                  linkType="target"
+                  hasNPDashboards={selectedGraph ? graphModelHasNpDashboards(selectedGraph) : false}
+                  visState={visState}
+                  isEditingLabel={isEditingLabel}
+                  getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
+                  hoveredId={localHoveredId}
+                  onHoverNode={handleHoverNode}
+                  onClearHover={handleClearHover}
+                  onClickNode={handleClickNode}
+                />
+              </div>
+              {hasQKTracing && (
+                <QKTracingSection
+                  clickedNode={clickedNode}
+                  nodesById={nodesById}
+                  hoveredId={localHoveredId}
+                  getNodeSupernodeAndOverrideLabel={getNodeSupernodeAndOverrideLabel}
+                  onHoverNode={handleHoverNode}
+                  onClearHover={handleClearHover}
+                  onClickNode={handleClickNode}
+                />
+              )}
             </div>
           )}
         </div>

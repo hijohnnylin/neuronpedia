@@ -7,6 +7,7 @@ import FeatureSelector from '@/components/feature-selector/feature-selector';
 import FeatureStats from '@/components/feature-stats';
 import CommentsPane from '@/components/panes/comments-pane';
 import ConnectedNeuronsPane from '@/components/panes/connected-neurons-pane';
+import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
 import CosSimPane from '@/components/panes/cossim-pane';
 import EmbedsPane from '@/components/panes/embeds-pane';
 import ExplanationsPane from '@/components/panes/explanations-pane';
@@ -28,8 +29,6 @@ import {
 } from 'prisma/generated/zod';
 import { useEffect, useMemo, useState } from 'react';
 import BookmarkButton from './bookmark-button';
-
-export const MODEL_HAS_CONNECTED_NEURONS = ['circuitgpt-python'];
 
 export default function FeatureDashboard({
   initialNeuron,
@@ -248,8 +247,9 @@ export default function FeatureDashboard({
           }`}
         >
           {/* === CONNECTED NEURONS */}
-          {MODEL_HAS_CONNECTED_NEURONS.includes(currentNeuron?.modelId || '') &&
-            currentNeuron?.layer.includes('mlp') && <ConnectedNeuronsPane currentNeuron={currentNeuron} />}
+          {CIRCUIT_SPARSITY_MODELS.includes(currentNeuron?.modelId || '') && currentNeuron?.layer.includes('mlp') && (
+            <ConnectedNeuronsPane currentNeuron={currentNeuron} />
+          )}
 
           {/* === EXPLANATIONS */}
           <ExplanationsPane currentNeuron={currentNeuron} setCurrentNeuron={setCurrentNeuron} />
@@ -371,7 +371,7 @@ export default function FeatureDashboard({
 
         {/* === DEAD FEATURE */}
         {currentNeuron?.maxActApprox === 0 &&
-          !MODEL_HAS_CONNECTED_NEURONS.includes(currentNeuron?.modelId || '') &&
+          !CIRCUIT_SPARSITY_MODELS.includes(currentNeuron?.modelId || '') &&
           !hideDeadWarning &&
           !currentNeuron?.hasVector && (
             <div className="absolute left-0 top-0 flex h-full w-full flex-col items-center bg-slate-50 pt-12">

@@ -37,6 +37,12 @@ import {
   GRAPH_NODETHRESHOLD_MAX_LORSA,
   GRAPH_NODETHRESHOLD_MIN,
   GRAPH_NODETHRESHOLD_MIN_LORSA,
+  GRAPH_QKTOPFRACTION_DEFAULT,
+  GRAPH_QKTOPFRACTION_MAX,
+  GRAPH_QKTOPFRACTION_MIN,
+  GRAPH_QKTOPK_DEFAULT,
+  GRAPH_QKTOPK_MAX,
+  GRAPH_QKTOPK_MIN,
   graphGenerateSchemaClient,
   GraphTokenizeResponse,
   LORSA_MAX_TOKENS,
@@ -93,6 +99,8 @@ interface FormValues {
   nodeThreshold: number;
   edgeThreshold: number;
   maxFeatureNodes: number;
+  qkTopFraction: number;
+  qkTopk: number;
   sourceSetName: string;
   slug: string;
 }
@@ -178,6 +186,8 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     nodeThreshold: getNodeThresholdDefault(selectedModelId),
     edgeThreshold: getEdgeThresholdDefault(selectedModelId),
     maxFeatureNodes: getMaxFeatureNodesDefault(selectedModelId),
+    qkTopFraction: GRAPH_QKTOPFRACTION_DEFAULT,
+    qkTopk: GRAPH_QKTOPK_DEFAULT,
     slug: '',
   };
 
@@ -976,6 +986,96 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                               </div>
                             </div>
                           </div>
+
+                          {/* QK Tracing Settings Group (Lorsa models only) */}
+                          {LORSA_MODELS.includes(values.modelId) && (
+                            <div className="space-y-0 pb-3 pt-0">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label
+                                    htmlFor="qkTopFraction"
+                                    className="h-6 w-12 border-slate-300 px-0 text-left text-slate-500 md:text-[11px]"
+                                  >
+                                    QK Top Fraction
+                                  </Label>
+                                  <div className="mt-0.5 flex items-center space-x-2">
+                                    <Input
+                                      id="qkTopFraction"
+                                      name="qkTopFraction"
+                                      type="number"
+                                      value={values.qkTopFraction}
+                                      onChange={handleChange}
+                                      onBlur={handleBlur}
+                                      disabled={isGenerating}
+                                      className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
+                                      min={GRAPH_QKTOPFRACTION_MIN}
+                                      max={GRAPH_QKTOPFRACTION_MAX}
+                                      step={0.05}
+                                    />
+                                    <RadixSlider.Root
+                                      name="qkTopFraction"
+                                      value={[values.qkTopFraction]}
+                                      onValueChange={(newVal: number[]) => setFieldValue('qkTopFraction', newVal[0])}
+                                      min={GRAPH_QKTOPFRACTION_MIN}
+                                      max={GRAPH_QKTOPFRACTION_MAX}
+                                      disabled={isGenerating}
+                                      step={0.05}
+                                      className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                                    >
+                                      <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                                        <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                                      </RadixSlider.Track>
+                                      <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                                    </RadixSlider.Root>
+                                  </div>
+                                  {errors.qkTopFraction && touched.qkTopFraction && (
+                                    <p className="mt-1 text-xs text-red-500">{errors.qkTopFraction}</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <Label
+                                    htmlFor="qkTopk"
+                                    className="h-6 w-12 border-slate-300 px-0 text-left text-slate-500 md:text-[11px]"
+                                  >
+                                    QK Top K
+                                  </Label>
+                                  <div className="mt-0.5 flex items-center space-x-2">
+                                    <Input
+                                      id="qkTopk"
+                                      name="qkTopk"
+                                      type="number"
+                                      value={values.qkTopk}
+                                      onChange={handleChange}
+                                      onBlur={handleBlur}
+                                      disabled={isGenerating}
+                                      className="h-6 w-12 border-slate-300 px-0 text-center text-slate-600 md:text-[11px]"
+                                      min={GRAPH_QKTOPK_MIN}
+                                      max={GRAPH_QKTOPK_MAX}
+                                      step={1}
+                                    />
+                                    <RadixSlider.Root
+                                      name="qkTopk"
+                                      value={[values.qkTopk]}
+                                      onValueChange={(newVal: number[]) => setFieldValue('qkTopk', newVal[0])}
+                                      min={GRAPH_QKTOPK_MIN}
+                                      max={GRAPH_QKTOPK_MAX}
+                                      disabled={isGenerating}
+                                      step={1}
+                                      className="relative flex h-4 w-full flex-1 touch-none select-none items-center"
+                                    >
+                                      <RadixSlider.Track className="relative h-1.5 w-full flex-grow overflow-hidden rounded-full bg-slate-200">
+                                        <RadixSlider.Range className="absolute h-full rounded-full bg-sky-600" />
+                                      </RadixSlider.Track>
+                                      <RadixSlider.Thumb className="block h-4 w-4 rounded-full border-2 border-sky-600 bg-white shadow transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50" />
+                                    </RadixSlider.Root>
+                                  </div>
+                                  {errors.qkTopk && touched.qkTopk && (
+                                    <p className="mt-1 text-xs text-red-500">{errors.qkTopk}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 

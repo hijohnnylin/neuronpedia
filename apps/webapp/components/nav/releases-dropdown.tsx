@@ -10,7 +10,7 @@ import { ChevronDown, CircleAlertIcon, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export const featuredStarReleases = ['gemma-scope', 'assistant-axis', 'circuit-tracer', 'gemma-scope-2'];
-export const betaReleases = ['sparse-circuits'];
+export const betaReleases = ['sparse-circuits', 'llama-scope-2'];
 
 export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: boolean }) {
   const router = useRouter();
@@ -51,7 +51,7 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
                   onClick={() => {
                     router.push(`/${release.name}`);
                   }}
-                  className="flex w-full flex-col gap-y-0 overflow-hidden px-4 py-2.5 text-left font-sans text-xs text-sky-700 focus:outline-none"
+                  className="flex w-full flex-col gap-y-0 overflow-hidden px-4 py-2 text-left font-sans text-xs text-sky-700 focus:outline-none"
                 >
                   <div className="mt-0 flex flex-row justify-between gap-x-3 text-[12px] font-medium">
                     <div>{release.descriptionShort}</div>

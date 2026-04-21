@@ -518,7 +518,7 @@ export default function Page() {
       <div className="flex w-full flex-1 flex-col items-center justify-center bg-sky-100 py-12 sm:py-16 sm:pt-14">
         <div className="flex max-w-screen-xl flex-1 flex-col items-center gap-x-5 rounded-xl px-2 sm:px-0">
           <div className="flex flex-col text-center">
-            <div className="text-3xl font-black text-sky-800">Explore</div>
+            <div className="text-3xl font-black text-sky-800">Releases and Models</div>
             <div className="mt-3 text-[15px] font-medium leading-relaxed text-sky-800">
               Browse five+ terabytes of activations, explanations, and metadata. <br className="hidden sm:block" />
               Neuronpedia supports probes,{' '}
