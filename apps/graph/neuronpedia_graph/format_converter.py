@@ -7,10 +7,10 @@ from importlib.metadata import version as pkg_version
 from typing import Any
 
 import torch
-from lm_saes.backend.attribution import AttributionResult
-from lm_saes.backend.indexed_tensor import NodeIndexedMatrix
-from lm_saes.models.lorsa import LorsaConfig
-from lm_saes.models.sparse_dictionary import SparseDictionary
+from llamascopium.circuits.attribution import AttributionResult
+from llamascopium.circuits.indexed_tensor import NodeIndexedMatrix
+from llamascopium.models.lorsa import LorsaConfig
+from llamascopium.models.sparse_dictionary import SparseDictionary
 
 
 def cantor_pair(layer: int, index: int) -> int:
@@ -92,6 +92,78 @@ def _build_sae_metadata(
             "layer_idx": layer_idx,
         }
     return sae_metadata
+
+
+def _attach_qk_tracing_results(
+    ar: AttributionResult,
+    nodes: Any,
+    node_ids: list[str],
+    node_entries: list[dict[str, Any]],
+) -> None:
+    """Populate a ``qk_tracing_results`` object on each target lorsa node entry.
+
+    The shape mirrors OpenMOSS' reference server logic:
+        {
+            "pair_wise_contributors": [(q_node_id, k_node_id, attribution), ...],
+            "top_q_marginal_contributors": [(q_node_id, attribution), ...],
+            "top_k_marginal_contributors": [(k_node_id, attribution), ...],
+        }
+
+    Contributors whose upstream node was pruned out of the graph are dropped so
+    every referenced id is guaranteed to exist in ``node_entries``.
+    """
+    qk = getattr(ar, "qk_trace_results", None)
+    if qk is None:
+        return
+
+    def _node_offsets(dim: Any) -> list[int]:
+        offsets = nodes.nodes_to_offsets(dim)
+        if hasattr(offsets, "cpu"):
+            offsets = offsets.cpu()
+        return offsets.tolist()
+
+    def _ensure_entry(target_offset: int) -> dict[str, Any]:
+        entry = node_entries[target_offset].setdefault(
+            "qk_tracing_results",
+            {
+                "pair_wise_contributors": [],
+                "top_q_marginal_contributors": [],
+                "top_k_marginal_contributors": [],
+            },
+        )
+        return entry
+
+    target_offsets = _node_offsets(qk.pairs.dimensions[0])
+
+    for target_offset, (pairs_ni, _target_info) in zip(target_offsets, qk.pairs):
+        if target_offset < 0:
+            continue
+        q_offsets = _node_offsets(pairs_ni.dimensions[0])
+        k_offsets = _node_offsets(pairs_ni.dimensions[1])
+        values = pairs_ni.value.detach().cpu().tolist()
+        contributors: list[tuple[str, str, float]] = []
+        for q_off, k_off, value in zip(q_offsets, k_offsets, values):
+            if q_off < 0 or k_off < 0:
+                continue
+            contributors.append((node_ids[q_off], node_ids[k_off], float(value)))
+        _ensure_entry(target_offset)["pair_wise_contributors"] = contributors
+
+    for marginal, out_key in (
+        (qk.q_marginal, "top_q_marginal_contributors"),
+        (qk.k_marginal, "top_k_marginal_contributors"),
+    ):
+        marginal_target_offsets = _node_offsets(marginal.dimensions[0])
+        for target_offset, (marg_ni, _target_info) in zip(marginal_target_offsets, marginal):
+            if target_offset < 0:
+                continue
+            src_offsets = _node_offsets(marg_ni.dimensions[0])
+            values = marg_ni.value.detach().cpu().tolist()
+            contributors_1d: list[tuple[str, float]] = []
+            for src_off, value in zip(src_offsets, values):
+                if src_off < 0:
+                    continue
+                contributors_1d.append((node_ids[src_off], float(value)))
+            _ensure_entry(target_offset)[out_key] = contributors_1d
 
 
 def convert_to_neuronpedia_graph(
@@ -256,6 +328,8 @@ def convert_to_neuronpedia_graph(
     for entry, score in zip(node_entries, influence_scores):
         entry["influence"] = score
 
+    _attach_qk_tracing_results(ar, nodes, node_ids, node_entries)
+
     feature_details: dict[str, str] = {}
     if np_transcoder_source_set:
         feature_details["neuronpedia_source_set"] = np_transcoder_source_set
@@ -271,8 +345,8 @@ def convert_to_neuronpedia_graph(
         "node_threshold": node_threshold,
         "info": {
             "generator": {
-                "name": "lm-saes (CRM) by OpenMOSS",
-                "version": pkg_version("lm-saes"),
+                "name": "llamascopium (CRM) by OpenMOSS",
+                "version": pkg_version("llamascopium"),
                 "url": "https://github.com/OpenMOSS/Language-Model-SAEs",
             },
         },

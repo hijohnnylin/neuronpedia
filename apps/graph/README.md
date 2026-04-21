@@ -55,7 +55,7 @@ poetry run python start.py --model_id google/gemma-2-2b --transcoder_set mntss/c
 
 ### Start Server - CRM Backend (Lorsa + Transcoders)
 
-The CRM backend uses [lm-saes](https://github.com/OpenMOSS/Language-Model-SAEs) to generate Complete Replacement Model graphs. These graphs include both transcoder features (MLP decomposition) and Lorsa features (attention decomposition), enabling complete circuit tracing as described in [Bridging the Attention Gap](https://interp.open-moss.com/posts/complete-replacement).
+The Complete Replacement Model (CRM) backend uses [lm-saes](https://github.com/OpenMOSS/Language-Model-SAEs) to generate graphs. These graphs include both transcoder features (MLP decomposition) and Lorsa features (attention decomposition), enabling complete circuit tracing as described in [Bridging the Attention Gap](https://interp.open-moss.com/posts/complete-replacement).
 
 Requires `poetry install --extras crm` first.
 
@@ -106,7 +106,7 @@ curl -X POST http://localhost:5004/generate-graph \
 
 ### Example Request - CRM Graph with Lorsa Features
 
-This generates a CRM attribution graph for an acronym completion prompt on Qwen3-1.7B. The output includes both `cross layer transcoder` nodes (MLP features) and `lorsa` nodes (attention features).
+This generates a Complete Replacement Model (CRM) attribution graph for an acronym completion prompt on Qwen3-1.7B. The output includes both `cross layer transcoder` nodes (MLP features) and `lorsa` nodes (attention features).
 
 Start the server with `--backend lm-saes-crm` first (see above).
 
@@ -120,14 +120,33 @@ curl -X POST http://localhost:5004/generate-graph \
     "batch_size": 16,
     "max_n_logits": 10,
     "desired_logit_prob": 0.95,
-    "node_threshold": 0.8,
-    "edge_threshold": 0.85,
+    "node_threshold": 0.6,
+    "edge_threshold": 0.8,
     "slug_identifier": "acronym-ndag",
-    "max_feature_nodes": 5000
+    "max_feature_nodes": 3000,
+    "enable_qk_tracing": true,
+    "qk_top_fraction": 0.5,
+    "qk_topk": 4
   }' > acronym-ndag.json
 ```
 
 The output graph JSON will contain nodes with `feature_type` values including `"lorsa"` (attention features rendered as triangles in the UI) and `"lorsa error"` (attention reconstruction errors), in addition to the standard `"cross layer transcoder"`, `"mlp reconstruction error"`, `"embedding"`, and `"logit"` types.
+
+The CRM backend also supports optional **QK tracing**, which performs a second-order, pair-wise attribution over the Q/K pathways of the top Lorsa heads. When enabled, target Lorsa nodes are annotated with a `qk_tracing_results` object:
+
+```json
+{
+  "pair_wise_contributors": [[q_node_id, k_node_id, attribution], ...],
+  "top_q_marginal_contributors": [[q_node_id, attribution], ...],
+  "top_k_marginal_contributors": [[k_node_id, attribution], ...]
+}
+```
+
+QK tracing parameters (all optional):
+
+- `enable_qk_tracing` (bool, default `false`): Turn on QK tracing. Increases memory and is typically 2x–10x slower.
+- `qk_top_fraction` (float, default `0.6`): Fraction of the highest-influence Lorsa heads (among those surviving pruning) that are further QK-traced. `1.0` means all of them.
+- `qk_topk` (int, default `10`): Number of upstream contributors to keep per target Lorsa head, for each of pair-wise, Q-marginal, and K-marginal. Must satisfy `batch_size >= qk_topk`.
 
 Other test prompts from the [CRM paper](https://interp.open-moss.com/posts/complete-replacement):
 

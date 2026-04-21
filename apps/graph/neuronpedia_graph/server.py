@@ -202,6 +202,9 @@ class GraphGenerationRequest(BaseModel):
     signed_url: str | None = None
     user_id: str | None = None
     compress: bool = False
+    enable_qk_tracing: bool = False
+    qk_top_fraction: float = 0.6
+    qk_topk: int = 10
 
 
 class ForwardPassRequest(BaseModel):
@@ -678,6 +681,9 @@ async def generate_graph(req: Request):
                     signed_url=req_data.signed_url,
                     user_id=req_data.user_id,
                     compress=req_data.compress,
+                    enable_qk_tracing=req_data.enable_qk_tracing,
+                    qk_top_fraction=req_data.qk_top_fraction,
+                    qk_topk=req_data.qk_topk,
                 )
 
             print(f"Thread {threading.get_ident()} (worker): Prompt: '{prompt}'")

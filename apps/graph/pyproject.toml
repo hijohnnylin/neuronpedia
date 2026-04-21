@@ -15,12 +15,12 @@ pydantic = ">=2.11.4"
 torch = ">=2.11.0"
 transformers = ">=4.57.1"
 circuit-tracer = { git = "https://github.com/safety-research/circuit-tracer.git", tag = "v0.3.1" }
-lm-saes = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b23", optional = true }
+llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b34", optional = true }
 python-dotenv = "^1.1.0"
 hf-transfer = "^0.1.9"
 
 [tool.poetry.extras]
-crm = ["lm-saes"]
+crm = ["llamascopium"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
