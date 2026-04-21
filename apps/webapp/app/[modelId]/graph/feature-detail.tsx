@@ -2,7 +2,7 @@ import { useGraphModalContext } from '@/components/provider/graph-modal-provider
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { useGraphStateContext } from '@/components/provider/graph-state-provider';
 import { Button } from '@/components/shadcn/button';
-import { Circle } from 'lucide-react';
+import { Circle, Diamond, Triangle } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GroupedVirtuoso } from 'react-virtuoso';
 import FeatureDashboard from '../[layer]/[index]/feature-dashboard';
@@ -149,7 +149,13 @@ export default function GraphFeatureDetail() {
       >
         <div className="flex flex-row items-center justify-between gap-x-1.5 py-1 pl-3 pt-1 text-sm font-medium text-slate-600 sm:py-0">
           <div className="flex flex-1 flex-row items-center gap-x-2">
-            <Circle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
+            {node.feature_type === 'lorsa' ? (
+              <Triangle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 fill-[#f0f] text-[#f0f]" />
+            ) : node.feature_type === 'mlp reconstruction error' || node.feature_type === 'lorsa error' ? (
+              <Diamond className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
+            ) : (
+              <Circle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
+            )}
             {isEditingLabel ? (
               <div className="flex flex-1 flex-col items-start justify-start gap-y-1">
                 <input

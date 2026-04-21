@@ -2,7 +2,7 @@ import { useGraphModalContext } from '@/components/provider/graph-modal-provider
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { useGraphStateContext } from '@/components/provider/graph-state-provider';
 import { cn } from '@/lib/utils/ui';
-import { ChevronRight, Circle, Expand, Minimize2 } from 'lucide-react';
+import { ChevronRight, Circle, Diamond, Expand, Minimize2, Triangle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { CLTGraphNode } from './graph-types';
@@ -191,7 +191,7 @@ function QKTracingSection({
   const { pair_wise_contributors, top_q_marginal_contributors, top_k_marginal_contributors } = results;
 
   return (
-    <div className="mt-1 flex h-1/2 min-h-0 flex-col gap-y-1 overflow-y-auto">
+    <div className="mt-0.5 flex h-1/2 min-h-0 flex-col gap-y-1 overflow-y-auto">
       <div className="flex flex-row gap-x-2">
         <div className="flex min-w-0 flex-1 flex-col gap-y-1">
           <div className="sticky top-0 z-30 bg-white text-[10px] font-medium uppercase text-slate-500">
@@ -418,7 +418,14 @@ export default function GraphNodeConnections() {
           {clickedNode ? (
             <div className="flex flex-row items-center gap-x-1.5 text-xs font-medium text-slate-600">
               {/* {!clickedNode?.featureDetailNP && <div className="">F#{clickedNode?.feature}</div>} */}
-              <Circle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
+              {clickedNode.feature_type === 'lorsa' ? (
+                <Triangle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 fill-[#f0f] text-[#f0f]" />
+              ) : clickedNode.feature_type === 'mlp reconstruction error' ||
+                clickedNode.feature_type === 'lorsa error' ? (
+                <Diamond className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
+              ) : (
+                <Circle className="h-3.5 max-h-3.5 min-h-3.5 w-3.5 min-w-3.5 max-w-3.5 text-[#f0f]" />
+              )}
               <div className="flex-1 leading-tight">{getNodeSupernodeAndOverrideLabel(clickedNode)}</div>
               <GraphFeatureLink selectedGraph={selectedGraph} node={clickedNode} />
               {!clientCheckIsEmbed() && (

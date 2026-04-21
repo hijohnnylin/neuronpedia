@@ -28,16 +28,17 @@ export default function GraphFeatureLink({
             setFeatureModalOpen(true);
           }
         }}
-        className="flex min-w-[120px] shrink-0 flex-row items-center gap-x-1 whitespace-nowrap rounded-md bg-slate-200 px-[8px] py-[6px] text-[9px] font-medium leading-none text-slate-600 shadow-none hover:bg-sky-200 hover:text-sky-700 sm:mr-0 sm:px-3 sm:py-1.5 sm:pr-2.5 sm:text-[10px]"
+        className="flex min-w-[110px] shrink-0 flex-row items-center gap-x-1 whitespace-nowrap rounded-md bg-slate-200 px-[8px] py-[6px] text-[9px] font-medium leading-none text-slate-600 shadow-none hover:bg-sky-200 hover:text-sky-700 sm:mr-0 sm:px-2.5 sm:py-1.5 sm:text-[9px]"
       >
+        {node.feature_type === 'lorsa' && <div className="rounded bg-slate-300 px-1 leading-normal">LORSA</div>}
         <div className="flex flex-col gap-y-[3px] font-mono font-medium">
           <div className="">LAYER {getLayerFromFeatureAndGraph(selectedGraph?.metadata.scan, node, selectedGraph)}</div>
           <div className="">INDEX {getIndexFromFeatureAndGraph(selectedGraph?.metadata.scan, node, selectedGraph)}</div>
         </div>
-        <ArrowUpRightFromSquare className="ml-1 h-4 w-4" />
+        <ArrowUpRightFromSquare className="ml-0.5 h-3 w-3" />
       </Button>
     </div>
-  ) : (
+  ) : node.feature ? (
     <div className="text-xs">F# {node.feature}</div>
-  );
+  ) : null;
 }
