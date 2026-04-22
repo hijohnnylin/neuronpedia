@@ -99,6 +99,8 @@ def _attach_qk_tracing_results(
     nodes: Any,
     node_ids: list[str],
     node_entries: list[dict[str, Any]],
+    make_node: Any,
+    qk_only_nodes: dict[str, dict[str, Any]],
 ) -> None:
     """Populate a ``qk_tracing_results`` object on each target lorsa node entry.
 
@@ -109,18 +111,29 @@ def _attach_qk_tracing_results(
             "top_k_marginal_contributors": [(k_node_id, attribution), ...],
         }
 
-    Contributors whose upstream node was pruned out of the graph are dropped so
-    every referenced id is guaranteed to exist in ``node_entries``.
+    QK contributors whose upstream node was pruned out of the main graph are
+    still referenced by their ``node_id``. Their descriptor is written to the
+    side-channel ``qk_only_nodes`` dict (keyed by ``node_id``) so the UI can
+    resolve the id to a label/layer/feature for display in the node
+    connections panel without polluting the primary ``nodes`` / ``links``
+    arrays.
     """
     qk = getattr(ar, "qk_trace_results", None)
     if qk is None:
         return
 
+    pruned_ids: set[str] = set(node_ids)
+
+    def _to_cpu_list(tensor: Any) -> list[int]:
+        if hasattr(tensor, "cpu"):
+            tensor = tensor.cpu()
+        return tensor.tolist()
+
     def _node_offsets(dim: Any) -> list[int]:
-        offsets = nodes.nodes_to_offsets(dim)
-        if hasattr(offsets, "cpu"):
-            offsets = offsets.cpu()
-        return offsets.tolist()
+        return _to_cpu_list(nodes.nodes_to_offsets(dim))
+
+    def _activation_offsets(dim: Any) -> list[int]:
+        return _to_cpu_list(ar.activations.dimensions[0].nodes_to_offsets(dim))
 
     def _ensure_entry(target_offset: int) -> dict[str, Any]:
         entry = node_entries[target_offset].setdefault(
@@ -133,19 +146,55 @@ def _attach_qk_tracing_results(
         )
         return entry
 
+    def _resolve_contributor_ids(
+        dim: Any,
+        offsets_in_pruned: list[int],
+        offsets_in_activations: list[int],
+    ) -> list[str]:
+        """Return node_ids for every entry in ``dim``.
+
+        For contributors absent from the pruned graph, a descriptor is recorded
+        in ``qk_only_nodes`` (deduped by ``node_id``) and that id is returned.
+        """
+        resolved: list[str] = []
+        materialized: list[Any] | None = None
+        for i, off in enumerate(offsets_in_pruned):
+            if off >= 0:
+                resolved.append(node_ids[off])
+                continue
+            if materialized is None:
+                materialized = list(dim)
+            ni = materialized[i]
+            key = str(ni.key)
+            indices_tuple = tuple(int(v) for v in ni.indices[0].tolist())
+            act_off = offsets_in_activations[i]
+            activation = (
+                float(ar.activations.data[act_off].item()) if act_off >= 0 else 0.0
+            )
+            entry = make_node(key, indices_tuple, activation)
+            entry_id = entry["node_id"]
+            if entry_id not in pruned_ids and entry_id not in qk_only_nodes:
+                qk_only_nodes[entry_id] = entry
+            resolved.append(entry_id)
+        return resolved
+
     target_offsets = _node_offsets(qk.pairs.dimensions[0])
 
     for target_offset, (pairs_ni, _target_info) in zip(target_offsets, qk.pairs):
         if target_offset < 0:
             continue
-        q_offsets = _node_offsets(pairs_ni.dimensions[0])
-        k_offsets = _node_offsets(pairs_ni.dimensions[1])
+        q_dim = pairs_ni.dimensions[0]
+        k_dim = pairs_ni.dimensions[1]
+        q_ids = _resolve_contributor_ids(
+            q_dim, _node_offsets(q_dim), _activation_offsets(q_dim)
+        )
+        k_ids = _resolve_contributor_ids(
+            k_dim, _node_offsets(k_dim), _activation_offsets(k_dim)
+        )
         values = pairs_ni.value.detach().cpu().tolist()
-        contributors: list[tuple[str, str, float]] = []
-        for q_off, k_off, value in zip(q_offsets, k_offsets, values):
-            if q_off < 0 or k_off < 0:
-                continue
-            contributors.append((node_ids[q_off], node_ids[k_off], float(value)))
+        contributors: list[tuple[str, str, float]] = [
+            (q_id, k_id, float(v)) for q_id, k_id, v in zip(q_ids, k_ids, values)
+        ]
         _ensure_entry(target_offset)["pair_wise_contributors"] = contributors
 
     for marginal, out_key in (
@@ -156,13 +205,14 @@ def _attach_qk_tracing_results(
         for target_offset, (marg_ni, _target_info) in zip(marginal_target_offsets, marginal):
             if target_offset < 0:
                 continue
-            src_offsets = _node_offsets(marg_ni.dimensions[0])
+            src_dim = marg_ni.dimensions[0]
+            src_ids = _resolve_contributor_ids(
+                src_dim, _node_offsets(src_dim), _activation_offsets(src_dim)
+            )
             values = marg_ni.value.detach().cpu().tolist()
-            contributors_1d: list[tuple[str, float]] = []
-            for src_off, value in zip(src_offsets, values):
-                if src_off < 0:
-                    continue
-                contributors_1d.append((node_ids[src_off], float(value)))
+            contributors_1d: list[tuple[str, float]] = [
+                (sid, float(v)) for sid, v in zip(src_ids, values)
+            ]
             _ensure_entry(target_offset)[out_key] = contributors_1d
 
 
@@ -291,16 +341,63 @@ def convert_to_neuronpedia_graph(
                 "activation": activation,
             }
 
-        # Fallback (bias nodes, etc.)
-        fallback_id = f"{node_key}:{'_'.join(str(v) for v in indices)}"
+        # Bias leaves (surfaced as QK-trace sources when `enable_qk_tracing=True`).
+        # llamascopium exposes them under these hook-point suffixes:
+        #   blocks.{i}.attn.hook_b_O        -> attention output bias
+        #   blocks.{i}.mlp.hook_b_out       -> MLP output bias
+        #   {hook_point_out}.sae.hook_b_Q   -> Lorsa Q bias
+        #   {hook_point_out}.sae.hook_b_K   -> Lorsa K bias
+        #   {hook_point_out}.sae.hook_b_D   -> SAE / Lorsa reconstruction bias
+        bias_kind: str | None = None
+        bias_hook_point_out: str | None = None
+        for sae_suffix in (".sae.hook_b_Q", ".sae.hook_b_K", ".sae.hook_b_D"):
+            if node_key.endswith(sae_suffix):
+                bias_hook_point_out = node_key.removesuffix(sae_suffix)
+                metadata = sae_metadata.get(bias_hook_point_out)
+                is_lorsa = bool(metadata["is_lorsa"]) if metadata else False
+                b_letter = sae_suffix[-1]  # "Q" / "K" / "D"
+                bias_kind = f"{'lorsa' if is_lorsa else 'tc'}_b{b_letter}"
+                break
+        if bias_kind is None:
+            if node_key.endswith(".attn.hook_b_O"):
+                bias_kind = "attn_bO"
+            elif node_key.endswith(".mlp.hook_b_out"):
+                bias_kind = "mlp_bout"
+
+        if bias_kind is not None:
+            layer = (
+                int(sae_metadata[bias_hook_point_out]["layer_idx"])
+                if bias_hook_point_out and bias_hook_point_out in sae_metadata
+                else _parse_hook_layer(node_key)
+            )
+            pos = indices[0] if len(indices) > 0 else 0
+            node_id = f"{layer}_bias_{bias_kind}_{pos}"
+            return {
+                "node_id": node_id,
+                "jsNodeId": node_id,
+                "feature": None,
+                "feature_type": "bias",
+                "layer": layer,
+                "ctx_idx": pos,
+                "clerp": f"L{layer} Bias ({bias_kind})",
+                "activation": None,
+            }
+
+        # Unknown source key: keep a raw, readable id so the UI doesn't silently
+        # collapse distinct contributors, but still follow the `{layer}_..._{pos}`
+        # shape so frontend parsers don't choke.
+        layer = _parse_hook_layer(node_key)
+        pos = indices[0] if len(indices) > 0 else 0
+        safe_key = node_key.replace(".", "_")
+        fallback_id = f"{layer}_unknown_{safe_key}_{pos}"
         return {
             "node_id": fallback_id,
             "jsNodeId": fallback_id,
             "feature": None,
-            "feature_type": "bias",
-            "layer": 0,
-            "ctx_idx": indices[0] if len(indices) > 0 else 0,
-            "clerp": "bias",
+            "feature_type": "unknown",
+            "layer": layer,
+            "ctx_idx": pos,
+            "clerp": node_key,
             "activation": None,
         }
 
@@ -328,7 +425,10 @@ def convert_to_neuronpedia_graph(
     for entry, score in zip(node_entries, influence_scores):
         entry["influence"] = score
 
-    _attach_qk_tracing_results(ar, nodes, node_ids, node_entries)
+    qk_only_nodes: dict[str, dict[str, Any]] = {}
+    _attach_qk_tracing_results(
+        ar, nodes, node_ids, node_entries, make_node, qk_only_nodes
+    )
 
     feature_details: dict[str, str] = {}
     if np_transcoder_source_set:
@@ -360,9 +460,12 @@ def convert_to_neuronpedia_graph(
     if generation_settings:
         metadata["generation_settings"] = generation_settings
 
-    return {
+    result: dict[str, Any] = {
         "metadata": metadata,
         "qParams": {},
         "nodes": node_entries,
         "links": links,
     }
+    if qk_only_nodes:
+        result["qk_only_nodes"] = qk_only_nodes
+    return result

@@ -10,12 +10,12 @@ from typing import Any
 
 import requests as http_requests
 import torch
-from lm_saes.backend.attribution import AttributionResult, prune_attribution
-from lm_saes.backend.language_model import (
+from llamascopium.backend.attribution import AttributionResult, prune_attribution
+from llamascopium.backend.language_model import (
     LanguageModelConfig,
     TransformerLensLanguageModel,
 )
-from lm_saes.models.sparse_dictionary import SparseDictionary
+from llamascopium.models.sparse_dictionary import SparseDictionary
 
 from .format_converter import _build_sae_metadata, convert_to_neuronpedia_graph
 
@@ -62,7 +62,7 @@ def load_crm_model() -> tuple[
     )
     model = TransformerLensLanguageModel(cfg)
 
-    n_layers = model.model.cfg.n_layers
+    n_layers = model.cfg.n_layers
     print(f"[CRM] Model loaded: {n_layers} layers")
 
     print(
@@ -107,9 +107,11 @@ def generate_graph_crm(
     signed_url: str | None = None,
     user_id: str | None = None,
     compress: bool = False,
+    enable_qk_tracing: bool = False,
+    qk_top_fraction: float = 0.6,
+    qk_topk: int = 10,
 ) -> dict[str, Any]:
     """Run CRM attribution, prune, convert to Neuronpedia format, and optionally upload to S3."""
-    device = get_device()
     total_start = time.time()
 
     attribution_start = time.time()
@@ -120,13 +122,19 @@ def generate_graph_crm(
         desired_logit_prob=desired_logit_prob,
         batch_size=batch_size,
         max_features=max_feature_nodes,
+        enable_qk_tracing=enable_qk_tracing,
+        qk_top_fraction=qk_top_fraction,
+        qk_topk=qk_topk,
     )
     attribution_ms = (time.time() - attribution_start) * 1000
     print(f"[CRM] Attribution completed in {attribution_ms:.0f}ms")
 
-    ar.attribution = ar.attribution.to(device)
-    ar.activations = ar.activations.to(device)
-    ar.probs = ar.probs.to(device)
+    # Note: `model.attribute(...)` already returns tensors on the model's
+    # device, so there is no need to move them again. Previous versions called
+    # `.to(device)` here, but that triggers llamascopium's PyTree cattrs
+    # round-trip on `NodeIndexedMatrix` / `NodeDimension`, which can fail on
+    # fields like `DiscreteMapper` or `torch.device | str` that have no
+    # registered structure hooks.
 
     pruned = prune_attribution(
         ar.attribution,
@@ -136,12 +144,16 @@ def generate_graph_crm(
     )
     print("[CRM] Pruning completed")
 
-    generation_settings = {
+    generation_settings: dict[str, Any] = {
         "max_n_logits": max_n_logits,
         "desired_logit_prob": desired_logit_prob,
         "batch_size": batch_size,
         "max_feature_nodes": max_feature_nodes,
     }
+    if enable_qk_tracing:
+        generation_settings["enable_qk_tracing"] = enable_qk_tracing
+        generation_settings["qk_top_fraction"] = qk_top_fraction
+        generation_settings["qk_topk"] = qk_topk
 
     output = convert_to_neuronpedia_graph(
         ar,
