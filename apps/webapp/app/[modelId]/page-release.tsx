@@ -18,6 +18,8 @@ import { getDefaultSourceSetAndSourceForRelease } from '@/lib/utils/source';
 import { NeuronWithPartialRelations, SourceReleaseWithRelations } from '@/prisma/generated/zod';
 import Hero from './gemmascope/hero';
 
+export const LLAMA_SCOPE_2 = 'llama-scope-2';
+
 export default function PageRelease({ release }: { release: SourceReleaseWithRelations }) {
   const { defaultSourceSet, defaultSource } = getDefaultSourceSetAndSourceForRelease(release);
   const defaultModelId = defaultSourceSet?.modelId || '';
@@ -56,6 +58,55 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
       <Hero release={release} />
 
       <div className="flex w-full max-w-screen-lg flex-col items-center pb-5 pt-5 text-slate-700 xl:max-w-screen-xl 2xl:max-w-screen-2xl">
+        {release.name === LLAMA_SCOPE_2 && (
+          <div className="flex w-full flex-col items-center justify-center">
+            <div className="mb-4 flex max-w-screen-lg flex-col gap-y-2 text-sm text-slate-600">
+              <p>
+                OpenMOSS extended Anthropic&apos;s circuit tracing work to add interpretable attention in addition to
+                MLP transcoders, calling them
+                <a
+                  href="https://interp.open-moss.com/posts/complete-replacement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 text-sky-700 underline hover:text-sky-900"
+                >
+                  Complete Replacement Models
+                </a>
+                {` `}
+                (CRMs). Neuronpedia now supports generating CRM graphs on Qwen3-1.7B.
+              </p>
+              <p>
+                CRM graphs have a new node type to represent attention called
+                <a
+                  href="https://arxiv.org/abs/2504.20938"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-1 text-sky-700 underline hover:text-sky-900"
+                >
+                  LORSA
+                </a>
+                {` `}
+                (Low-Rank Sparse Attention), which are displayed as triangle ▲ nodes to visually distinguish them from
+                transcoder circle ⏺ nodes.
+              </p>
+              <p>
+                Since CRM graphs incorporate both transcoders and LORSA, they refer to two sets of dashboards. When
+                selecting LORSA (triangle) nodes, you&apos;ll see the LORSA dashboard, which shows attention Z patterns
+                when hovering over top activation tokens.
+              </p>
+              <p>
+                Additionally, LORSA nodes show QK tracing results under the Node Connections panel — including top
+                marginal and pairwise (query-feature, key-feature) contributors. These tell us why a LORSA feature
+                attends from one position to another.
+              </p>
+            </div>
+            <iframe
+              title="Circuit Tracing with Attention: Complete Replacement Models"
+              src="/qwen3-1.7b/graph?slug=dallas-austin&pruningThreshold=0.6&densityThreshold=0.20&embed=true"
+              className="h-[800px] w-full rounded-lg border border-slate-200 shadow-md"
+            />
+          </div>
+        )}
         {CIRCUIT_SPARSITY_MODELS.includes(defaultModelId || '') && (
           <div className="w-full max-w-screen-md">
             <ConnectedNeuronsPane

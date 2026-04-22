@@ -36,6 +36,7 @@ import Link from 'next/link';
 import FeatureSelector from '../components/feature-selector/feature-selector';
 import InferenceSearcher from '../components/inference-searcher/inference-searcher';
 import { CAP_BLOG_URL, CAP_PAPER_URL } from './[modelId]/assistant-axis/shared';
+import { getBlogDateString, getPostsMetaData, PostMetaData } from './blog/blog-util';
 import HomeModels from './home/home-models';
 import HomeNewsletterSignup from './home/home-newsletter-signup';
 import HomeReleases from './home/home-releases';
@@ -75,7 +76,18 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function Page() {
+export default async function Page() {
+  const posts = (await getPostsMetaData()) as PostMetaData[];
+  const latestPost = posts?.[0]
+    ? {
+        title: posts[0].title,
+        description: posts[0].description,
+        date: posts[0].date,
+        slug: posts[0].slug,
+        dateString: getBlogDateString(posts[0].date),
+      }
+    : undefined;
+
   return (
     <div className="flex w-full select-none flex-col items-center justify-center bg-slate-100 px-0 pt-8 sm:mt-0 sm:px-0">
       {IS_LOCALHOST && !DEMO_MODE && (
@@ -121,10 +133,10 @@ export default function Page() {
             <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
               <Button
                 variant="default"
-                size="sm"
-                className="flex w-[110px] max-w-[110px] flex-row gap-x-2 bg-slate-800 text-white transition-all hover:bg-slate-900"
+                size="default"
+                className="flex w-[110px] max-w-[110px] flex-row gap-x-2 bg-slate-700 text-white transition-all hover:bg-slate-900"
               >
-                <Github className="h-3.5 w-3.5" />
+                <Github className="h-4 w-4" />
                 <div className="flex flex-col gap-y-0.5">
                   <span className="text-xs leading-none">GitHub</span>
                 </div>
@@ -139,27 +151,35 @@ export default function Page() {
             <Link href="/gemma-scope">
               <Button
                 variant="default"
-                size="sm"
-                className="flex w-[135px] max-w-[135px] flex-row gap-x-2 bg-sky-600 text-xs text-white transition-all hover:bg-sky-700"
+                size="default"
+                className="flex w-[135px] max-w-[135px] flex-row gap-x-2 bg-sky-600 px-2 text-xs text-white transition-all hover:bg-sky-700"
               >
-                <Lightbulb className="h-3.5 w-3.5" />
+                <Lightbulb className="h-4 w-4" />
                 <span>New to Interp?</span>
               </Button>
             </Link>
             <Link href="/explorer">
               <Button
                 variant="default"
-                size="sm"
+                size="default"
                 title="[BETA] Browse the latest tools, papers, replications, problems and more."
-                className="hidden w-[135px] max-w-[135px] flex-row gap-x-2 bg-amber-500 text-xs text-white transition-all hover:bg-amber-600"
+                className="relative w-[120px] max-w-[120px] flex-row gap-x-2 overflow-hidden bg-indigo-500 px-2 text-xs text-white transition-all hover:bg-indigo-600"
               >
-                <Map className="h-3.5 w-3.5" />
-                <span>Field Explorer</span>
+                <Map className="-ml-1 h-4 w-4" />
+                <div className="flex flex-col gap-y-0.5">
+                  <span className="text-[11px] leading-none">Explorer</span>
+                  <span className="text-[8px] leading-none text-indigo-100">Tools & Papers</span>
+                </div>
+                <div className="absolute -right-2 -top-0.5" style={{ transform: 'rotate(35deg)' }}>
+                  <span className="bg-amber-300 px-3 py-0.5 pl-4 text-[7px] font-medium leading-none text-slate-800">
+                    BETA
+                  </span>
+                </div>
               </Button>
             </Link>
           </div>
         </div>
-        <HomeNewsletterSignup />
+        <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
       <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0">

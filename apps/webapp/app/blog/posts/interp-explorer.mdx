@@ -1,0 +1,208 @@
+---
+title: 'Interp Explorer, Circuit Tracing w/ Attention, and Weight-Sparse Transformers'
+description: 'Plus Library Updates and Awesome Community Projects'
+date: 2026-4-21
+author: Johnny Lin, David Chanin, Michael Hanna, and Community Contributors
+image: ASSET_BASE_URL/blog/apr/circuit-sparsity.gif
+imagePreview: ASSET_BASE_URL/blog/apr/circuit-sparsity.gif
+---
+
+<div className="mt-2"></div>
+
+Hey all!
+
+With frontier AI models, building interp applications/tools or getting started on research is cheap - it's often a matter of a few dollars and a well-crafted prompt. However, these outputs are not easily discoverable nor organized. So in addition to our usual collaborations and updates, we're releasing [**Interpretability Explorer (public beta)**](https://neuronpedia.org/explorer) - a crowdsourced, categorized, and curated reference of tools, papers, replications, and other resources. It's still in early beta as our editors fill it out, but we're opening it up now for you to make contributions as well.
+
+# In This Edition
+
+#### Releases
+
+- 🌎 Interpretability Explorer (Public Beta) [**➡️ Launch**](https://www.neuronpedia.org/explorer) - Crowdsourced interp tools, projects, resources.
+- 🧩 Circuit Tracing + Attention (OpenMOSS) [**➡️ Launch**](https://www.neuronpedia.org/qwen3-1.7b/graph?slug=dallas-austin) - Generate graphs with LORSA and QK Tracing.
+- 💡 Weight-Sparse Transformers (OpenAI) [**➡️ Launch**](https://www.neuronpedia.org/circuitgpt-python/6-mlp/5543) - Visualizer for Gao et al's weight-sparse model.
+
+#### Updates
+
+- [🧐 SAELens](https://github.com/decoderesearch/SAELens/tree/main) (David Chanin) - Adds [SynthSAEBench](https://decoderesearch.github.io/SAELens/latest/synth_sae_bench/): 16k synthetic features for easy SAE benchmarks against ground truth.
+- [⚡️ circuit-tracer](https://github.com/decoderesearch/circuit-tracer) (Michael Hanna) - Adds support for [Top-K transcoders](https://github.com/decoderesearch/circuit-tracer/pull/94), trained by [Zhao et al (Meta)](https://huggingface.co/facebook/crv-8b-instruct-transcoders).
+
+#### Community Projects
+
+- 🔬 Circuit-Motifs (Michael J. Kenney) [**➡️ Post**](https://open2interp.substack.com/p/applying-network-motif-analysis-to) - Applying network motif analysis to attribution graphs.
+- 👯 MechInterp-Replication (Zach Goldfine) [**➡️ GitHub (Beta)**](https://github.com/zachgoldfine44/mechinterp-replication) - Harness for replicating interp papers.
+- 🔨 InterpKit (Davide Zani) [**➡️ GitHub (Beta)**](https://github.com/z4nix/interpkit) - One-line mech interp for any HuggingFace model.
+- 🤼 NP-Feature-Compare [**➡️ Launch**](https://np-feature-compare.netlify.app/?left=gemma-3-4b%2F9-gemmascope-2-res-16k%2F83&right=gemma-3-4b-it%2F9-gemmascope-2-res-16k%2F83) - Compare Neuronpedia features side-by-side.
+
+🔊 Summary by NotebookLM - The Babble on [[Apple]]() [[Spotify]]()
+
+---
+
+## 🌎 Interpretability Explorer (Crowdsourced Beta)
+
+<img
+  src="ASSET_BASE_URL/blog/apr/newnode.gif"
+  alt="Browsing the explorer and adding a sub-item under Circuit Tracing"
+  className="h-auto w-full"
+/>
+
+"What are the latest mech interp tools? What extension works have been done on circuit tracing? Are there any replications for this paper?" These are questions that we find ourselves and community members frequently asking. To help connect people to the most relevant resources in mech interp, Interpretability Explorer is a crowdsourced map of the latest tools, papers, replications, and more, grouped by topic.
+
+Each node is [directly linkable/sharable](https://www.neuronpedia.org/explorer/164), so you can keep tabs on the topics that you care most about.
+
+It's new and is still in the seeding phase - help fill it out! Hover over any topic/node and click "+ Sub-Item". A wide range of submissions are accepted: blog posts, agent skills, datasets, notebooks, Youtube videos, etc. Interp Explorer wants your favorite interp stuff, so that other people can find and use it too. And of course, feedback is welcome.
+
+[**➡️ Launch Interpretability Explorer**](https://www.neuronpedia.org/explorer)
+
+---
+
+## 🧩 Circuit Tracing with Interpretable Attention (OpenMOSS)
+
+<img
+  src="ASSET_BASE_URL/blog/apr/lorsa.jpg"
+  alt="The Dallas Austin graph, now with Attention/LORSA"
+  className="h-auto w-full"
+/>
+
+Recently, OpenMOSS extended Anthropic's circuit tracing work to add interpretable attention in addition to MLP transcoders, calling them [Complete Replacement Models (CRMs)](https://interp.open-moss.com/posts/complete-replacement). Neuronpedia now supports generating CRM graphs on Qwen3-1.7B.
+
+CRM graphs have a new node type to represent attention called [LORSA](https://arxiv.org/abs/2504.20938) (Low-Rank Sparse Attention), which are displayed as triangle ▲ nodes to visually distinguish them from transcoder circle ⏺ nodes.
+
+Since CRM graphs incorporate both transcoders and LORSA, they refer to two sets of dashboards. When selecting LORSA (triangle) nodes, you'll see the LORSA dashboard, which shows attention Z patterns when hovering over top activation tokens.
+
+Additionally, LORSA nodes show QK tracing results under the Node Connections panel — including top marginal and pairwise (query-feature, key-feature) contributors. These tell us why a LORSA feature attends from one position to another.
+
+- [**➡️ Launch CRM Circuit Tracer**](https://www.neuronpedia.org/qwen3-1.7b/graph?slug=dallas-austin&pruningThreshold=0.7&densityThreshold=0.20) - Generate graphs for Qwen3-1.7B
+- Source Sets: [**➡️ Lorsa**](https://www.neuronpedia.org/qwen3-1.7b/llamascope-2-lorsa-16k-k64) [**➡️ Transcoders**](https://www.neuronpedia.org/qwen3-1.7b/llamascope-2-transcoder-16k-k64)
+- [**➡️ Example LORSA Dashboard**](https://www.neuronpedia.org/qwen3-1.7b/26-llamascope-2-lorsa-16k-k64/195)
+- [**➡️ OpenMOSS HuggingFace**](https://huggingface.co/OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B/tree/main)
+
+---
+
+## 💡 Weight-Sparse Transformers Beta (OpenAI)
+
+<img
+  src="ASSET_BASE_URL/blog/apr/circuit-sparsity.gif"
+  alt="Using the sparse circuits visualizer to examine residual channels in and out of an MLP, as well as details on an MLP neuron"
+  className="h-auto w-full"
+/>
+
+For the recent [Weight-Sparse Transformers](https://openai.com/index/understanding-neural-networks-through-sparse-circuits/) paper, we collaborated with OpenAI to release the following for the Python code model they trained:
+
+Note: This work has not yet been fully validated - exercise caution before using it for research.
+
+[**➡️ Visualizer + Release**](https://neuronpedia.org/sparse-circuits) (MLP only): The residual channels are the vertical lines pointing down, which go into the current MLP neuron in the middle. Other residual stream channels exit the bottom of the MLP. On the sides, other MLP neurons write to and from residual channels, with their auto-interp labels displayed. You can hover over each MLP neuron and residual channel for details.
+
+[**➡️ New Dashboard Variant**](https://neuronpedia.org/circuitgpt-python/2-mlp/4826): For this weight-sparse transformer, both positive and negative activations encode meaning, so we use a special dashboard that shows both the top positive and top negative activations side-by-side, and do auto-interp separately on each. In this [example MLP](https://neuronpedia.org/circuitgpt-python/2-mlp/4826), the top negative activations are the Python built-in function `sorted`, and the top positive activations are the keyword `for`.
+
+[**➡️ New Python-Code Auto-Interp + Labels**](https://github.com/decoderesearch/automated-interpretability/blob/f345c05baf23dd9bbed1f4f4ac734fdc54a7af42/neuron_explainer/explanations/explainer.py#L1589): Since this model is trained only on Python code, attempting to use existing auto-interp explainers yielded generic, unhelpful explanations like "snippets of code". So we wrote an explainer for Python code, which yields more specific labels like "for loop and its iterable". We use this auto-interp on all MLP neurons and residual channels at each layer.
+
+[**➡️ "Simplified" Python Dataset**](https://huggingface.co/datasets/neuronpedia/python-code-simplified): To generate the dashboards, we needed sample Python code. However, existing Python code datasets usually contain comments, variable names, and strings with words that this Python-code model wasn't trained on, resulting in uninterpretable top activations. So, we repurposed an [existing](https://huggingface.co/datasets/iamtarun/python_code_instructions_18k_alpaca) Python dataset and [simplified it](https://huggingface.co/datasets/neuronpedia/python-code-simplified) to remove/replace unrecognized strings, and generated dashboards with this instead, resulting in more interpretable dashboards.
+
+[**➡️ Weightpedia (Arnau MarinLlobet & Stefan Heimersheim)**](https://weightpedia.org): This wasn't created by us but it's awesome - it's a reference for interpreting individual weights of the same weight-sparse transformer. From Arnau:
+
+> Stefan Heimersheim and I are attempting to interpret individual weights of Gao et al.'s sparse transformer. We're examining random nonzero weights and trying to understand what each one does. Our current approach: for each weight, we ablate it (set to zero) and measure KL divergence across many dataset samples. We then inspect (1) dataset examples in different quantile bands of effect size, and (2) quantile-activating examples of the connected source and target activations. Our goal is to reach the bar of "can you write a regex or Python function that correctly predicts when this weight matters?"
+> We've uploaded initial weight visualizations and specific case studies at: [weightpedia.org](https://weightpedia.org).
+
+---
+
+## SAELens and Circuit-Tracer Updates
+
+### 🧐 SAELens Adds SynthSAEBench-16k (David Chanin)
+
+SynthSAEBench is 16k synthetic features that allows easy benchmarking of SAE architectures against ground truth. It's the followup work that's a "reference implementation" using SAELens' [Synthetic Data](https://decoderesearch.github.io/SAELens/latest/synthetic_data/) tools, with specific configurations to imitate real features. Benchmark results for five SAE architectures are below and linked [here](https://github.com/decoderesearch/SAELens/blob/main/docs/synth_sae_bench.md#raw-results-for-synthsaebench-16k-at-selected-l0s). As new SAE variants are added, we'll also run them on SynthSAEBench and include their results.
+
+<img
+  src="ASSET_BASE_URL/blog/apr/synthsaebench.jpg"
+  alt="Benchmark results for five SAE architectures with SynthSAEbench"
+  className="h-auto w-full max-w-screen-sm"
+/>
+
+Inspired by Karpathy's autoresearch experiments, David also experimented with [having Claude improve SAE performance autonomously](https://www.lesswrong.com/posts/rbqJoxFZtae9x93mx/letting-claude-do-autonomous-research-to-improve-saes) against SynthSAEBench-16k, with interesting lessons learned.
+
+### ⚡️ Circuit-Tracer Adds Top-K Transcoders Support + More (Michael Hanna)
+
+To support compatibility for [Zhao et al's (Meta) paper](https://arxiv.org/abs/2510.09312) on circuit-tracer, Michael and Zheng Zhao added support for Top-K transcoders for PLTs. The Zhao et al transcoders can be loaded directly [from here](https://huggingface.co/facebook/crv-8b-instruct-transcoders). Additionally, circuit-tracer now supports [loading local features](https://github.com/decoderesearch/circuit-tracer/pull/93).
+
+---
+
+## 🤝 Community Projects
+
+#### 🔬 Circuit-Motifs (Michael J. Kenney)
+
+[**➡️ Post**](https://open2interp.substack.com/p/applying-network-motif-analysis-to) | [**➡️ Github**](https://github.com/mkenney2/circuit-motifs)
+
+Michael on [Slack](https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3m2fulfeu-0LnVnF8yCrKJYQvWLuCQaQ):
+
+> Hi everyone! My name is Michael. My background and day job are in the physical sciences and ML. I'm very excited about the open interpretability community! I recently built a tool that applies network motif analysis (from systems biology) to attribution graphs. You can read about it in my blog post [here](https://open2interp.substack.com/p/applying-network-motif-analysis-to) and check out the tool [here](https://github.com/mkenney2/circuit-motifs).
+
+Michael's "circuit-motifs" tool loads any existing [Neuronpedia-compatible](https://www.neuronpedia.org/graph/validator) graph and performs network motif analysis. Go check out his post and try it on your own graphs!
+
+We're excited about the potential of cross-field pollination like this, especially from domain experts. Borrowing concepts from other fields lets us "stand on the shoulders of (similar) giants" and could help accelerate mech interp research in unexpected ways. These types of solutions also seem least likely for "autoresearch" agents to discover or try, thus giving humans an edge (for now 😅).
+
+---
+
+### 👯 MechInterp-Replication (Zach Goldfine)
+
+[**➡️ GitHub**](https://github.com/zachgoldfine44/mechinterp-replication) | [**📃 Replication: Emotions**](https://github.com/zachgoldfine44/mechinterp-replication/blob/main/writeup/emotions/emotions-zachgoldfine44-6models/draft.md) | [**🧑‍⚖️ Replication Review**](https://github.com/zachgoldfine44/mechinterp-replication/tree/main/writeup/emotions/emotions-zachgoldfine44-6models/reviews)
+
+MechInterp-Replication aims to be a easy-to-use harness for replicating mech interp papers across different models and vetting the replication's results - it even works locally on a Macbook.
+
+Get Started With Claude Code/Codex (from the [README](https://github.com/zachgoldfine44/mechinterp-replication#tldr)):
+
+> Please replicate the Geometry of Truth paper using the zachgoldfine44/mechinterp-replication harness on the Qwen-2.5-1.5B-Instruct model locally, and then open a pull request to that repo with the results as a replication attempt when done.
+
+Zach on Slack (shortened):
+
+> Hi! I'm currently learning mech interp research through the ARENA 3.0 curriculum.
+> I built a harness to kickstart a shared resource to replicate more papers across models: [MechInterp-Replication](https://github.com/zachgoldfine44/mechinterp-replication).
+> In the repo I used the harness for an initial replication attempt: a draft replication of Anthropic's (Sofroniew et al.'s) recent Emotion Concepts paper across 6 open-source models (Llama / Qwen / Gemma, 1B–9B).
+> Check it out and let me know what you think! And please use it to replicate a paper of your choosing, submit it, or suggest ways to improve the harness or existing replications.
+
+We're particularly excited about a well-crafted harness that encourages standardized structures (eg tables like the one below), validation, and outputs relevant data and figures. We're looking forward to: generation of code/notebooks in addition to data/markdown (for quick re-replications), more models and larger sizes, and benchmarking against manual human/AI-assisted replications. Neuronpedia plans to include replications generated by this harness in Interpretability Explorer.
+
+<img
+  src="ASSET_BASE_URL/blog/apr/emotions.png"
+  alt="Replication results of Emotions (Sofroniew et al) paper across different open source models"
+  className="h-auto w-full max-w-screen-sm"
+/>
+
+---
+
+### 🔨 InterpKit (Davide Zani)
+
+[**➡️ GitHub (Beta)**](https://github.com/z4nix/interpkit)
+
+InterpKit wants to make it dead-simple to do interp on any HuggingFace model, minimizing the code and scaffolding necessary to get started on experiments. InterpKit runs locally and bundles each action into a one-line command or API call.
+
+Example: With one CLI command, interpkit loads a model, extracts and applies a steering vector and compares the default and steered outputs:
+
+`interpkit steer gpt2 "My favorite animal is the" --positive " aquatic" --negative " earth" --at transformer.h.8 --scale 2`
+
+```
+  Rank   Original Token    Prob         Steered Token    Prob
+ ─────────────────────────────────────────────────────────────
+     1    dog             0.024    →     fish           0.013
+     2    black           0.016    →     p              0.009
+     3    p               0.014    →     wild           0.009
+```
+
+InterpKit is in early beta, but comes with [example notebooks](https://github.com/z4nix/InterpKit/tree/main/examples) and is iterating quickly on features like cloud GPU offloading. We're excited to see become fully fleshed out and support even more advanced mech interp features.
+
+---
+
+### 🤼 NP-Feature-Compare (Melissa Wessel)
+
+[**➡️ Launch**](https://np-feature-compare.netlify.app/?left=gemma-3-4b%2F9-gemmascope-2-res-16k%2F83&right=gemma-3-4b-it%2F9-gemmascope-2-res-16k%2F83) |
+[**➡️ GitHub**](https://github.com/melissawessel/np-feature-compare)
+
+NP-Feature-Compare is hosted, open-source tool to quickly compare two features on Neuronpedia side-by-side. The interface is well designed with intuitive selectors, it's fast and loads features immediately, and it has directly sharable links. In [the example](https://np-feature-compare.netlify.app/?left=gemma-3-4b%2F9-gemmascope-2-res-16k%2F83&right=gemma-3-4b-it%2F9-gemmascope-2-res-16k%2F83), we compare a feature on Gemma 3 4B (pretrained/base) against the one on Gemma 3 4B Instruct.
+
+<img
+  src="ASSET_BASE_URL/blog/apr/comparison.jpg"
+  alt="Feature Comparison Viewer comparing Gemma 3 4b base vs instruct feature."
+  className="h-auto w-full max-w-screen-sm"
+/>
+
+---
+
+As always, please [contact us](https://www.neuronpedia.org/contact) with your questions, feedback, and suggestions.

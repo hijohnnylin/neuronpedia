@@ -9,8 +9,14 @@ import { StarFilledIcon } from '@radix-ui/react-icons';
 import { ChevronDown, CircleAlertIcon, Plus } from 'lucide-react';
 import Link from 'next/link';
 
-export const featuredStarReleases = ['gemma-scope', 'assistant-axis', 'circuit-tracer', 'gemma-scope-2'];
-export const betaReleases = ['sparse-circuits', 'llama-scope-2'];
+export const featuredStarReleases = [
+  'gemma-scope',
+  'assistant-axis',
+  'circuit-tracer',
+  'llama-scope-2',
+  'gemma-scope-2',
+];
+export const betaReleases = ['sparse-circuits'];
 
 export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: boolean }) {
   const router = useRouter();

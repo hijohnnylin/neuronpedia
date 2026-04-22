@@ -11,7 +11,6 @@ import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
   ConnectionLineType,
   Controls,
-  MiniMap,
   Panel,
   ReactFlow,
   ReactFlowProvider,
@@ -33,7 +32,7 @@ import ProblemNodeComponent, {
   TYPE_COLORS as NODE_TYPE_COLORS,
   ROOT_NODE_WIDTH,
 } from './explorer-node';
-import { DRAFT_ID, TYPE_HEX_COLORS, type DetailNode, type ProblemNodeData } from './explorer-shared';
+import { DRAFT_ID, type DetailNode, type ProblemNodeData } from './explorer-shared';
 import { NodeSidebar } from './node-sidebar';
 import { LAYER_GAP, NODE_HEIGHT, getLayoutedElements } from './use-layout';
 
@@ -301,16 +300,26 @@ async function buildFlowGraph(params: FlowBuildParams) {
 
 type Editor = { id: string; name: string };
 
+type RecentLog = {
+  id: string;
+  timestamp: string;
+  action: string;
+  user: { name: string };
+  problemNode: { id: number; title: string | null; nodeTypes: string[] };
+};
+
 function ProblemsGraphInner({
   initialNodes,
   canEdit,
   initialSelectedId,
   editors,
+  initialRecentLogs,
 }: {
   initialNodes: ProblemNodeData[];
   canEdit: boolean;
   initialSelectedId?: number;
   editors: Editor[];
+  initialRecentLogs: RecentLog[];
 }) {
   const { data: session } = useSession();
   const { setSignInModalOpen, showToastMessage } = useGlobalContext();
@@ -406,6 +415,7 @@ function ProblemsGraphInner({
   const lastAppliedRealSelectionRef = useRef<number | null | undefined>(undefined);
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideSeen, setGuideSeen] = useState(true);
+  const [guideInitialIndex, setGuideInitialIndex] = useState(0);
 
   useEffect(() => {
     try {
@@ -413,7 +423,8 @@ function ProblemsGraphInner({
     } catch {}
   }, []);
 
-  const openGuide = useCallback(() => {
+  const openGuide = useCallback((index = 0) => {
+    setGuideInitialIndex(index);
     setGuideOpen(true);
     setGuideSeen(true);
     try {
@@ -430,7 +441,7 @@ function ProblemsGraphInner({
     },
     {
       type: 'video',
-      src: `${ASSET_BASE_URL}/demos/explorer-add.mp4`,
+      src: `${ASSET_BASE_URL}/blog/apr/newnode.mp4`,
       title: 'Add & Contribute',
       subtitle: 'Add Tools/Models/etc',
     },
@@ -442,20 +453,7 @@ function ProblemsGraphInner({
     },
   ];
 
-  type RecentLog = {
-    id: string;
-    timestamp: string;
-    action: string;
-    user: { name: string };
-    problemNode: { id: number; title: string | null; nodeTypes: string[] };
-  };
-  const [recentLogs, setRecentLogs] = useState<RecentLog[]>([]);
-  useEffect(() => {
-    fetch('/api/explorer/log/recent', { method: 'POST' })
-      .then((res) => res.json())
-      .then((data) => setRecentLogs(data))
-      .catch(() => {});
-  }, []);
+  const recentLogs = initialRecentLogs;
 
   const [typeFilter, setTypeFilter] = useState('all');
 
@@ -743,7 +741,7 @@ function ProblemsGraphInner({
     [updateDraftFields, submitDraft, startDraftEdit, handleDraftCancelled, draftSaving],
   );
 
-  const typeFilterOptions = useMemo(() => ['all', 'tool', 'replication', 'paper', 'dataset', 'eval', 'model'], []);
+  // const typeFilterOptions = useMemo(() => ['all', 'tool', 'replication', 'paper', 'dataset', 'eval', 'model'], []);
 
   const positionCacheRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const prevProblemNodesRef = useRef(problemNodes);
@@ -1212,7 +1210,7 @@ function ProblemsGraphInner({
                 className="!static !m-0 !shadow-none"
                 style={{ border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}
               />
-              <MiniMap
+              {/* <MiniMap
                 pannable
                 zoomable
                 position="top-right"
@@ -1223,29 +1221,94 @@ function ProblemsGraphInner({
                 }}
                 maskColor="rgba(100, 116, 139, 0.35)"
                 style={{ height: 100, width: 160, border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}
-              />
+              /> */}
             </Panel>
+
+            {selectedNodeId == null && (
+              <Panel position="top-center" className="pointer-events-none">
+                <div className="pointer-events-auto flex max-w-[300px] items-center gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 shadow">
+                  <span className="text-[11px] leading-snug text-slate-700">
+                    Add contributions by hovering over a node and clicking{' '}
+                    <span className="whitespace-nowrap rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px] text-slate-700">
+                      + Sub-Item
+                    </span>
+                    .
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openGuide(1)}
+                    className="whitespace-nowrap rounded-md border border-amber-500 bg-white px-2 py-1 text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                  >
+                    Show Me
+                  </button>
+                </div>
+              </Panel>
+            )}
 
             <Panel position="top-left">
               <div className="flex flex-col gap-2">
                 <div className="flex flex-row items-start gap-2">
-                  <div className="rounded-lg border border-slate-200 bg-white px-4 pb-3 pt-2.5 shadow-md">
-                    <div className="mb-1 flex w-full flex-row items-center justify-between">
-                      <h1 className="text-[15px] font-semibold text-slate-700">Interpretability Explorer</h1>
+                  <div className="flex flex-col gap-y-2 rounded-lg border border-slate-200 bg-white px-3 pb-0 pt-2.5 shadow">
+                    <div className="mb-0 flex w-full flex-row items-center justify-between gap-x-5">
+                      <h1 className="flex flex-row items-center gap-1 text-[15px] font-semibold text-slate-700">
+                        Interpretability Explorer{' '}
+                        <span className="mb-2.5 rounded bg-amber-500 px-1 py-[1px] text-[7.5px] font-bold uppercase tracking-wide text-white">
+                          Beta
+                        </span>
+                      </h1>
                       <button
                         type="button"
-                        onClick={openGuide}
+                        onClick={() => openGuide(0)}
                         className="relative flex items-center gap-1 rounded-md border border-emerald-500 bg-emerald-50 px-3 py-1 text-[10px] font-medium text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700"
                       >
                         {!guideSeen && (
                           <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
                         )}
                         <BookOpen className="h-3 w-3" />
-                        How-To Guide
+                        Guide
                       </button>
                     </div>
+                    {recentLogs.length > 0 && (
+                      <div className="flex w-full max-w-[300px] flex-col">
+                        <div className="sticky top-0 z-10 mb-0 rounded border-slate-200 bg-slate-100 pb-1 pt-1 text-center text-[8px] font-medium uppercase text-slate-500">
+                          Recently Added
+                        </div>
+                        <div className="flex max-h-[190px] flex-col gap-0.5 divide-y divide-slate-200 overflow-y-auto px-1.5 py-1.5">
+                          {recentLogs.map((log) => (
+                            <button
+                              type="button"
+                              key={log.id}
+                              onClick={() => selectNode(log.problemNode.id)}
+                              className="flex items-start gap-0 rounded px-1.5 pb-1 pt-1.5 text-left transition-colors hover:bg-slate-200"
+                            >
+                              <div className="flex min-w-0 flex-1 flex-col">
+                                <div className="flex items-center gap-1">
+                                  {log.problemNode.nodeTypes.map((t) => (
+                                    <span
+                                      key={t}
+                                      className={`rounded-sm px-1 py-[0.5px] text-[7.5px] font-bold uppercase text-white ${(NODE_TYPE_COLORS[t] || NODE_TYPE_COLORS.topic).icon}`}
+                                    >
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                                <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-snug text-slate-700">
+                                  {log.problemNode.title || '(untitled)'}
+                                </span>
 
-                    <div className="mb-0.5 mt-2.5 w-full text-center text-[8px] font-medium uppercase text-slate-400">
+                                <span className="text-[8px] text-slate-400">
+                                  {/* {log.user.name} */}
+                                  {/* &middot;{' '} */}
+                                  {/* {formatDistanceToNowStrict(new Date(log.timestamp), { addSuffix: true })} */}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* <div className="mb-0.5 mt-2.5 w-full text-center text-[8px] font-medium uppercase text-slate-400">
                       Filter by type
                     </div>
                     <div className="flex flex-wrap justify-center gap-1 pt-0">
@@ -1270,7 +1333,7 @@ function ProblemsGraphInner({
                           </button>
                         );
                       })}
-                    </div>
+                    </div> */}
                   </div>
                   {typeFilter !== 'all' && (
                     <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-md">
@@ -1301,50 +1364,6 @@ function ProblemsGraphInner({
                 </div>
               </div>
             </Panel>
-            {recentLogs.length > 0 && (
-              <div className="absolute left-4 top-[118px] z-10 max-w-[240px]">
-                <div className="flex max-w-[240px] flex-col rounded-lg border border-slate-200 bg-white pb-0 shadow-md">
-                  <div
-                    className="sticky top-0 z-10 mb-0.5 border-slate-200 bg-slate-50 pb-1 pt-1 text-center text-[8px] font-medium uppercase text-slate-500"
-                    style={{ borderTopLeftRadius: 6, borderTopRightRadius: 6 }} // tailwind can't do only top
-                  >
-                    Recently Added
-                  </div>
-                  <div className="flex max-h-[200px] flex-col gap-0.5 divide-y divide-slate-200 overflow-y-auto px-1.5 py-1.5">
-                    {recentLogs.map((log) => (
-                      <button
-                        type="button"
-                        key={log.id}
-                        onClick={() => selectNode(log.problemNode.id)}
-                        className="flex items-start gap-0 rounded px-1.5 pb-1 pt-1.5 text-left transition-colors hover:bg-slate-200"
-                      >
-                        <div className="flex min-w-0 flex-1 flex-col">
-                          <div className="flex items-center gap-1">
-                            {log.problemNode.nodeTypes.map((t) => (
-                              <span
-                                key={t}
-                                className={`rounded-sm px-1 py-[0.5px] text-[7.5px] font-bold uppercase text-white ${(NODE_TYPE_COLORS[t] || NODE_TYPE_COLORS.topic).icon}`}
-                              >
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                          <span className="mt-0.5 block overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-snug text-slate-700">
-                            {log.problemNode.title || '(untitled)'}
-                          </span>
-
-                          <span className="text-[8px] text-slate-400">
-                            {/* {log.user.name} */}
-                            {/* &middot;{' '} */}
-                            {/* {formatDistanceToNowStrict(new Date(log.timestamp), { addSuffix: true })} */}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {!draftNode && (
               <Panel position="bottom-right">
@@ -1523,6 +1542,7 @@ function ProblemsGraphInner({
         title="Interpretability Explorer Guide"
         description=""
         items={guideItems}
+        initialIndex={guideInitialIndex}
       />
     </>
   );
@@ -1533,11 +1553,13 @@ export default function ProblemsGraph({
   canEdit,
   initialSelectedId,
   editors,
+  initialRecentLogs,
 }: {
   initialNodes: ProblemNodeData[];
   canEdit: boolean;
   initialSelectedId?: number;
   editors: Editor[];
+  initialRecentLogs: RecentLog[];
 }) {
   return (
     <ReactFlowProvider>
@@ -1546,6 +1568,7 @@ export default function ProblemsGraph({
         canEdit={canEdit}
         initialSelectedId={initialSelectedId}
         editors={editors}
+        initialRecentLogs={initialRecentLogs}
       />
     </ReactFlowProvider>
   );

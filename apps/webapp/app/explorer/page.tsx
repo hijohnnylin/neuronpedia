@@ -1,6 +1,6 @@
 import { authOptions } from '@/app/api/auth/[...nextauth]/authOptions';
 import { prisma } from '@/lib/db';
-import { getProblemNodes } from '@/lib/db/problem';
+import { getProblemNodes, getRecentProblemCreations } from '@/lib/db/problem';
 import { Metadata } from 'next';
 import { getServerSession } from 'next-auth';
 import ProblemsGraph from './explorer-graph';
@@ -30,5 +30,14 @@ export default async function ProblemsPage() {
     orderBy: { name: 'asc' },
   });
 
-  return <ProblemsGraph initialNodes={JSON.parse(JSON.stringify(initialNodes))} canEdit={canEdit} editors={editors} />;
+  const recentLogs = await getRecentProblemCreations(8);
+
+  return (
+    <ProblemsGraph
+      initialNodes={JSON.parse(JSON.stringify(initialNodes))}
+      canEdit={canEdit}
+      editors={editors}
+      initialRecentLogs={JSON.parse(JSON.stringify(recentLogs))}
+    />
+  );
 }

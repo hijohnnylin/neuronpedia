@@ -19,20 +19,22 @@ export function MediaModal({
   title,
   description,
   items,
+  initialIndex = 0,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
   items: MediaItem[];
+  initialIndex?: number;
 }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hasMultiple = items.length > 1;
 
   useEffect(() => {
-    if (open) setCurrentIndex(0);
-  }, [open]);
+    if (open) setCurrentIndex(initialIndex);
+  }, [open, initialIndex]);
 
   useEffect(() => {
     if (videoRef.current) {
