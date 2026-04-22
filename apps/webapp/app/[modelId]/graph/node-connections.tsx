@@ -328,7 +328,13 @@ export default function GraphNodeConnections() {
   useEffect(() => {
     const unregister = registerClickedCallback((clickedId) => {
       if (clickedId && selectedGraph) {
-        const cNode = selectedGraph.nodes.find((e) => e.nodeId === clickedId);
+        const cNode =
+          selectedGraph.nodes.find((e) => e.nodeId === clickedId) ??
+          (selectedGraph.qk_only_nodes
+            ? Object.values(selectedGraph.qk_only_nodes).find(
+                (n) => n.nodeId === clickedId || n.node_id === clickedId || n.jsNodeId === clickedId,
+              )
+            : undefined);
         if (cNode) {
           setClickedNode(cNode);
         }
@@ -373,6 +379,17 @@ export default function GraphNodeConnections() {
       if (n.node_id && !map.has(n.node_id)) map.set(n.node_id, n);
       if (n.jsNodeId && !map.has(n.jsNodeId)) map.set(n.jsNodeId, n);
     });
+    // QK-only contributors: nodes referenced by qk_tracing_results whose
+    // pruned-out descriptors are carried on the graph side-channel. We merge
+    // them into the lookup so the QK tracing section can render their labels,
+    // but they are deliberately *not* in `selectedGraph.nodes`, so they do not
+    // appear in the link graph or in the Input/Output feature lists.
+    if (selectedGraph?.qk_only_nodes) {
+      Object.entries(selectedGraph.qk_only_nodes).forEach(([id, node]) => {
+        if (!map.has(id)) map.set(id, node);
+        if (node.jsNodeId && !map.has(node.jsNodeId)) map.set(node.jsNodeId, node);
+      });
+    }
     return map;
   }, [selectedGraph]);
 

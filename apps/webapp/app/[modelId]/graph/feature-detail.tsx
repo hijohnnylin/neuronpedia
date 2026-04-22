@@ -49,7 +49,17 @@ export default function GraphFeatureDetail() {
       currentDisplayedNodeRef.current = nodeIdToShow;
 
       if (nodeIdToShow && selectedGraph) {
-        const targetNode = selectedGraph.nodes.find((e) => e.nodeId === nodeIdToShow || e.featureId === nodeIdToShow);
+        const targetNode =
+          selectedGraph.nodes.find((e) => e.nodeId === nodeIdToShow || e.featureId === nodeIdToShow) ??
+          (selectedGraph.qk_only_nodes
+            ? Object.values(selectedGraph.qk_only_nodes).find(
+                (n) =>
+                  n.nodeId === nodeIdToShow ||
+                  n.featureId === nodeIdToShow ||
+                  n.node_id === nodeIdToShow ||
+                  n.jsNodeId === nodeIdToShow,
+              )
+            : undefined);
         if (targetNode) {
           // Get the max activation value across all nodes for scaling
           const maxActValue = Math.max(

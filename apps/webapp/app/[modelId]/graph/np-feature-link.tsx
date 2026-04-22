@@ -16,6 +16,11 @@ export default function GraphFeatureLink({
   if (!selectedGraph) {
     return null;
   }
+  // Bias leaves (and other non-feature source nodes) have no per-feature
+  // dashboard or index, so the link would be meaningless.
+  if (node.feature_type === 'bias' || node.feature_type === 'unknown') {
+    return null;
+  }
   return selectedGraph?.metadata.scan && graphModelHasNpDashboards(selectedGraph) && node.featureDetailNP ? (
     <div className="ml-1 flex flex-col gap-x-1 pl-0">
       <Button
