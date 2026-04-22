@@ -214,6 +214,43 @@
             "type": ["number", "null"],
             "description": "Activation to show in the activation histogram. Optional, from https://github.com/safety-research/circuit-tracer",
             "examples": [9.449039459228516]
+          },
+          "qk_tracing_results": {
+            "type": "object",
+            "description": "[Optional] Per-node QK tracing results. Present only on lorsa feature nodes when QK tracing was enabled. Each contributor id is guaranteed to resolve either to an entry in `nodes` or to an entry in the top-level `qk_only_nodes` dict.",
+            "properties": {
+              "pair_wise_contributors": {
+                "type": "array",
+                "description": "Top pairwise QK contributors: [q_node_id, k_node_id, attribution] triples.",
+                "items": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "prefixItems": [{ "type": "string" }, { "type": "string" }, { "type": "number" }]
+                }
+              },
+              "top_q_marginal_contributors": {
+                "type": "array",
+                "description": "Top marginal Q contributors: [q_node_id, attribution] pairs.",
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "prefixItems": [{ "type": "string" }, { "type": "number" }]
+                }
+              },
+              "top_k_marginal_contributors": {
+                "type": "array",
+                "description": "Top marginal K contributors: [k_node_id, attribution] pairs.",
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "prefixItems": [{ "type": "string" }, { "type": "number" }]
+                }
+              }
+            },
+            "required": ["pair_wise_contributors", "top_q_marginal_contributors", "top_k_marginal_contributors"]
           }
         },
         "required": ["node_id", "feature", "layer", "ctx_idx", "feature_type", "jsNodeId", "clerp"]
@@ -238,6 +275,40 @@
           }
         },
         "required": ["source", "target", "weight"]
+      }
+    },
+    "qk_only_nodes": {
+      "type": "object",
+      "description": "[Optional] Descriptors for QK tracing contributor nodes that were pruned out of `nodes` / `links`. Keyed by `node_id`. The UI uses this side-channel to resolve ids referenced by `qk_tracing_results` without polluting the main graph (so they do not appear as isolated nodes in the link graph, but can still be labeled in the node connections panel).",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "feature": {
+            "type": ["integer", "null"]
+          },
+          "layer": {
+            "type": ["string", "integer"]
+          },
+          "ctx_idx": {
+            "type": "integer"
+          },
+          "feature_type": {
+            "type": "string"
+          },
+          "jsNodeId": {
+            "type": "string"
+          },
+          "clerp": {
+            "type": "string"
+          },
+          "activation": {
+            "type": ["number", "null"]
+          }
+        },
+        "required": ["node_id", "feature_type", "layer", "ctx_idx", "jsNodeId", "clerp"]
       }
     }
   },

@@ -231,6 +231,13 @@ export type CLTGraph = {
   qParams: CLTGraphQParams;
   nodes: CLTGraphNode[];
   links: CLTGraphLink[];
+
+  // Side-channel descriptors for QK tracing contributors that were pruned out
+  // of `nodes` / `links`. Keyed by `node_id`. These nodes do NOT appear in the
+  // link graph; they exist only so the node connections panel can render a
+  // label (feature_type, layer, clerp, ...) for ids referenced by
+  // `qk_tracing_results`.
+  qk_only_nodes?: Record<string, CLTGraphNode>;
 };
 
 export enum FilterGraphType {

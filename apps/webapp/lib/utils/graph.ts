@@ -29,7 +29,7 @@ export const GRAPH_BATCH_SIZE = 48;
 // with nnsight we are using lazy encoder, so we need to add time for this
 // lorsa models always run with QK tracing enabled, which adds ~40s on top of the baseline lorsa overhead
 export const getEstimatedTimeFromNumTokens = (numTokens: number, slower: boolean = false, isLorsa: boolean = false) =>
-  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (slower ? 20 : 0) + (isLorsa ? 50 : 0);
+  11.2 * Math.log2(Math.max(numTokens, 4)) - 7 + (slower ? 20 : 0) + (isLorsa ? 20 : 0);
 export const GRAPH_MAX_TOKENS = 64;
 export const GRAPH_GENERATION_ENABLED_MODELS = ['gemma-2-2b', 'gemma-3-4b-it', 'qwen3-4b', 'qwen3-1.7b'];
 
@@ -76,8 +76,8 @@ export const GRAPH_QKTOPFRACTION_MIN = 0.05;
 export const GRAPH_QKTOPFRACTION_MAX = 0.5;
 export const GRAPH_QKTOPFRACTION_DEFAULT = 0.5;
 export const GRAPH_QKTOPK_MIN = 1;
-export const GRAPH_QKTOPK_MAX = 6;
-export const GRAPH_QKTOPK_DEFAULT = 6;
+export const GRAPH_QKTOPK_MAX = 5;
+export const GRAPH_QKTOPK_DEFAULT = 5;
 
 export const GRAPH_DYNAMIC_PRUNING_THRESHOLD_DEFAULT = 0.6;
 

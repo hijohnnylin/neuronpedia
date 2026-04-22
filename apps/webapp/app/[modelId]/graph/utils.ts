@@ -196,7 +196,9 @@ export function nodeTypeHasFeatureDetail(node: CLTGraphNode): boolean {
     node.feature_type !== 'embedding' &&
     node.feature_type !== 'mlp reconstruction error' &&
     node.feature_type !== 'lorsa error' &&
-    node.feature_type !== 'logit'
+    node.feature_type !== 'logit' &&
+    node.feature_type !== 'bias' &&
+    node.feature_type !== 'unknown'
   );
 }
 
@@ -469,6 +471,41 @@ export function formatCLTGraphData(data: CLTGraph, logitDiff: string | null): CL
   // @ts-ignore
   links.idToLink = Object.fromEntries(links.map((d) => [d.linkId, d]));
 
+  // Initialize minimal frontend fields on QK-only contributor nodes (which are
+  // intentionally absent from `nodes` / `links` and therefore skipped by the
+  // main loop above). They still need `nodeId`, `featureId`, empty
+  // source/target link arrays, etc. so the node connections panel and feature
+  // detail panel can render them when clicked/hovered.
+  if (data.qk_only_nodes) {
+    Object.values(data.qk_only_nodes).forEach((d) => {
+      if (!d) return;
+      // For nodes that don't have a `feature` (bias / unknown source leaves),
+      // fall back to `node_id` so distinct bias kinds at the same layer/ctx
+      // don't collapse to the same featureId.
+      d.featureId = d.feature != null ? `${d.layer}_${d.feature}_${d.ctx_idx}` : d.node_id;
+      d.active_feature_idx = d.feature;
+      d.featureIndex = d.feature;
+      d.ctx_from_end = data.metadata.prompt_tokens.length - d.ctx_idx;
+      if (ANTHROPIC_MODELS.has(data.metadata.scan)) {
+        d.nodeId = d.jsNodeId;
+      } else {
+        d.nodeId = d.node_id;
+      }
+      if (d.feature_type === 'logit') d.isLogit = true;
+      if (typeof d.feature_type === 'string' && d.feature_type.includes('error')) d.isError = true;
+      d.isFeature = !d.isLogit && !d.isError && d.feature_type !== 'bias' && d.feature_type !== 'unknown';
+      d.sourceLinks = [];
+      d.targetLinks = [];
+      if (!d.clerp) d.clerp = '';
+      d.remoteClerp = '';
+      // `ppClerp` is normally populated from `data.features` in link-graph.tsx,
+      // but QK-only nodes are not in `data.nodes` / `data.features`. Seed it
+      // from the server-provided `clerp` so label resolution (which falls back
+      // to `node.ppClerp`) doesn't render "undefined".
+      d.ppClerp = d.clerp;
+    });
+  }
+
   Object.assign(data, { nodes, features, links, byStream });
   return data;
 }
@@ -516,6 +553,8 @@ export function featureTypeToText(type: string): string {
   if (type === 'mlp reconstruction error') return '◆';
   if (type === 'lorsa error') return '◆';
   if (type === 'lorsa') return '▴';
+  if (type === 'bias') return '+';
+  if (type === 'unknown') return '?';
   return '●';
 }
 

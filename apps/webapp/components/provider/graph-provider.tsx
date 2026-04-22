@@ -666,7 +666,12 @@ export function GraphProvider({
       const sourceSet = data.metadata.feature_details?.neuronpedia_source_set || graph.sourceSetName;
       const lorsaSourceSet = data.metadata.feature_details?.neuronpedia_lorsa_source_set;
 
-      const features = formattedData.nodes
+      // Include QK-only contributor nodes in the feature-detail fetch so their
+      // clerp/activations render when clicked/hovered (they are never part of
+      // `nodes` / `links`, but still need `featureDetailNP` populated).
+      const allNodes: CLTGraphNode[] = [...formattedData.nodes, ...Object.values(formattedData.qk_only_nodes ?? {})];
+
+      const features = allNodes
         .filter((d) => nodeTypeHasFeatureDetail(d))
         .map((d) => {
           const layerNum = parseInt(d.layer, 10);
@@ -705,9 +710,9 @@ export function GraphProvider({
         batchesOfDetails.push(da);
       }
 
-      // put the details in the nodes
+      // put the details in the nodes (and in qk_only_nodes)
       const featureDetails = batchesOfDetails.flat(1);
-      formattedData.nodes.forEach((d) => {
+      allNodes.forEach((d) => {
         const feature = featureDetails.find((f) => {
           const nodeSourceSet = d.feature_type === 'lorsa' && lorsaSourceSet ? lorsaSourceSet : sourceSet;
           return (
@@ -979,7 +984,11 @@ export function GraphProvider({
                 });
                 // add it to the selectedGraph
                 if (selectedGraph) {
-                  const matchingNode = selectedGraph.nodes.find((n) => n.nodeId === node.nodeId);
+                  const matchingNode =
+                    selectedGraph.nodes.find((n) => n.nodeId === node.nodeId) ??
+                    (selectedGraph.qk_only_nodes
+                      ? Object.values(selectedGraph.qk_only_nodes).find((n) => n.nodeId === node.nodeId)
+                      : undefined);
                   if (matchingNode && matchingNode.featureDetailNP) {
                     matchingNode.featureDetailNP.activations = acts;
                   }
