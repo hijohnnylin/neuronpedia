@@ -4,6 +4,9 @@ const withMDX = require('@next/mdx')();
 
 const nextConfig = {
   outputFileTracingRoot: __dirname,
+  outputFileTracingIncludes: {
+    '/api-doc': ['./app/api/**/*.{ts,tsx}'],
+  },
   pageExtensions: ['js', 'jsx', 'mdx', 'ts', 'tsx'],
   output: 'standalone', // for docker
   reactStrictMode: false,
