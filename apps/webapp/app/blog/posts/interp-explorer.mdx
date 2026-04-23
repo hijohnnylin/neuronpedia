@@ -178,13 +178,11 @@ Example: With one CLI command, interpkit loads a model, extracts and applies a s
 
 `interpkit steer gpt2 "My favorite animal is the" --positive " aquatic" --negative " earth" --at transformer.h.8 --scale 2`
 
-```
-  Rank   Original Token    Prob         Steered Token    Prob
- ─────────────────────────────────────────────────────────────
-     1    dog             0.024    →     fish           0.013
-     2    black           0.016    →     p              0.009
-     3    p               0.014    →     wild           0.009
-```
+<img
+  src="ASSET_BASE_URL/blog/apr/interpkit.jpg"
+  alt="Steer outputs of InterpKit"
+  className="h-auto w-full max-w-screen-sm"
+/>
 
 InterpKit is in early beta, but comes with [example notebooks](https://github.com/z4nix/InterpKit/tree/main/examples) and is iterating quickly on features like cloud GPU offloading. We're excited to see become fully fleshed out and support even more advanced mech interp features.
 
