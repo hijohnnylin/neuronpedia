@@ -48,7 +48,7 @@ export default function NavBarButtons() {
 
       <Link
         href="/llama3.3-70b-it/nla"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className="relative hidden cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
         <div className="flex flex-col items-center justify-center px-1 text-xs font-normal leading-tight sm:text-[11.5px]">
           <div>Natural Language</div>

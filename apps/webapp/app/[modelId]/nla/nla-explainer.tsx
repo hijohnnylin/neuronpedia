@@ -190,12 +190,25 @@ export default function NLAExplainer() {
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-x-hidden bg-slate-50">
-      {/* Header */}
-      <div className={`${isEmbed ? 'hidden' : 'flex'} w-full items-center justify-center bg-slate-100 px-6 pb-6 pt-6`}>
-        <div className="relative flex w-full flex-row items-center justify-between gap-0">
-          <div className="flex flex-col items-start justify-center gap-y-0">
+      <div className="flex w-full items-center justify-center bg-slate-100 px-4 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
+        <div className="relative flex min-h-20 w-full flex-row items-center justify-between gap-0 sm:min-h-0">
+          <button
+            type="button"
+            id={NLA_TOUR_GUIDE_BUTTON_ELEMENT_ID}
+            onClick={handleStartTour}
+            className="absolute left-0 top-0 flex h-7 w-14 items-center justify-center gap-x-1 rounded-md border border-emerald-600 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-100 sm:hidden"
+          >
+            Tutorial
+            {!hasSeenTour && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-100"
+              />
+            )}
+          </button>
+          <div className="absolute left-1/2 top-1 flex w-64 -translate-x-1/2 flex-col items-center justify-center gap-y-0 sm:relative sm:left-0 sm:w-full sm:translate-x-0 sm:items-start">
             <div
-              className="-mt-2 mb-0.5 whitespace-nowrap text-base font-semibold leading-none text-slate-800"
+              className="whitespace-nowrap text-[11px] font-semibold leading-none text-slate-800 sm:-mt-2 sm:mb-0.5 sm:text-base"
               id="chat"
             >
               Natural Language Autoencoders
@@ -203,8 +216,8 @@ export default function NLAExplainer() {
             <CustomTooltip
               wide
               trigger={
-                <div className="mb-2 mt-0.5 cursor-pointer whitespace-nowrap text-[11px] text-slate-500">
-                  Fraser-Taliente, Kantamneni, Ong et al. 2026
+                <div className="mb-2 cursor-pointer whitespace-nowrap text-[8px] text-slate-500 sm:mt-0.5 sm:text-[11px]">
+                  Fraser-Taliente, Kantamneni, Ong et al. <span className="hidden sm:inline">2026</span>
                 </div>
               }
               side="right"
@@ -216,7 +229,7 @@ export default function NLAExplainer() {
                 Daniel M. Ziegler, Evan Hubinger, Joshua Batson, Jack Lindsey, Samuel Zimmerman, Samuel Marks
               </div>
             </CustomTooltip>
-            <div className="flex flex-row items-center justify-center gap-x-1">
+            <div className="hidden flex-row items-center justify-center gap-x-1 sm:flex">
               <button
                 type="button"
                 id={NLA_TOUR_GUIDE_BUTTON_ELEMENT_ID}
@@ -245,9 +258,12 @@ export default function NLAExplainer() {
           </div>
 
           <div
-            className={`absolute -top-2.5 left-1/2 flex -translate-x-1/2 flex-col items-center justify-start gap-x-5 gap-y-2`}
+            className={`absolute left-0 top-0 flex w-full flex-col items-center justify-center gap-x-5 gap-y-2 sm:-top-2.5 sm:left-1/2 sm:-translate-x-1/2`}
           >
-            <div className="flex flex-col items-center justify-center gap-y-1.5" id="nla-header">
+            <div
+              className="flex w-full flex-col items-end justify-center gap-y-1 sm:w-auto sm:items-center sm:gap-y-1.5"
+              id="nla-header"
+            >
               <ToggleGroup.Root
                 className="z-10 inline-flex h-7 overflow-hidden border-slate-200 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
                 type="single"
@@ -263,10 +279,13 @@ export default function NLAExplainer() {
                     key={opt.modelId}
                     value={opt.modelId}
                     aria-label={`${opt.displayName} (Layer ${opt.layer})`}
-                    className="relative flex cursor-pointer items-center justify-center gap-x-2 border bg-white px-5 text-[11px] font-medium text-slate-500 transition-colors first:rounded-l-lg last:rounded-r-lg hover:border-sky-700 hover:bg-sky-100 data-[state=on]:border data-[state=on]:border-sky-700 data-[state=on]:bg-sky-700 data-[state=off]:text-slate-500 data-[state=on]:text-white"
+                    className="relative flex cursor-pointer items-center justify-center border bg-white px-2 text-[11px] font-medium text-slate-500 transition-colors first:rounded-l-lg last:rounded-r-lg hover:border-sky-700 hover:bg-sky-100 data-[state=on]:border data-[state=on]:border-sky-700 data-[state=on]:bg-sky-700 data-[state=off]:text-slate-500 data-[state=on]:text-white sm:gap-x-2 sm:px-5"
                   >
-                    {opt.displayName}{' '}
-                    <div className="flex items-center justify-center gap-x-1">
+                    {/* Split displayName by space */}
+                    <span className="sm:hidden">{opt.displayName.split(' ')[0]}</span>
+                    <span className="hidden sm:inline">{opt.displayName}</span>
+
+                    <div className="hidden items-center justify-center gap-x-1 sm:flex">
                       <span className="text-[8px] font-medium uppercase transition-colors">Layer {opt.layer}</span>
                     </div>
                     <CustomTooltip
@@ -280,7 +299,7 @@ export default function NLAExplainer() {
                           aria-label={`About ${opt.displayName}`}
                           onClick={(e) => e.stopPropagation()}
                           onPointerDown={(e) => e.stopPropagation()}
-                          className="absolute right-2.5 top-[6.5px] items-center text-current opacity-70 transition-opacity hover:opacity-100"
+                          className="right-2.5 top-[6.5px] hidden items-center text-current opacity-70 transition-opacity hover:opacity-100 sm:absolute sm:block"
                         >
                           <QuestionMarkCircledIcon className="h-3 w-3" />
                         </span>
@@ -291,9 +310,9 @@ export default function NLAExplainer() {
                   </ToggleGroup.Item>
                 ))}
               </ToggleGroup.Root>
-              <div className="-mt-5 flex w-full flex-row items-center justify-center gap-x-[0px] gap-y-[1px] rounded-2xl border-0 border-slate-300 bg-slate-200 px-2 py-2 pt-5">
-                <div className="flex flex-row items-center justify-center gap-x-[0px] gap-y-[1px] divide-x divide-slate-200 overflow-hidden rounded-xl">
-                  {demosForModel.map((demo) => {
+              <div className="flex w-full flex-row items-end justify-end gap-x-[0px] gap-y-[1px] rounded-lg sm:-mt-5 sm:justify-center sm:rounded-2xl sm:bg-slate-200 sm:px-2 sm:py-2 sm:pt-5">
+                <div className="flex w-full max-w-[calc(100dvw-90px)] flex-row items-center justify-center gap-x-[0px] gap-y-[1px] divide-x divide-slate-200 overflow-x-scroll rounded-lg border border-slate-200 sm:w-auto sm:max-w-none sm:overflow-hidden sm:rounded-xl sm:border-none">
+                  {demosForModel.map((demo, index) => {
                     const label = demo.featuredDisplayName ?? demo.shareId;
                     const isActive = activeDemoCacheId === demo.cacheId;
                     return (
@@ -311,7 +330,7 @@ export default function NLAExplainer() {
                           )
                         }
                         disabled={isBusy}
-                        className={`w-[105px] min-w-[105px] max-w-[105px] px-0 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                        className={`${index === demosForModel.length - 1 ? 'hidden' : ''} flex-1 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-[105px] sm:min-w-[105px] sm:max-w-[105px] sm:flex-auto ${
                           isActive
                             ? 'border-sky-500 bg-sky-700 text-white'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-sky-100'
@@ -325,17 +344,17 @@ export default function NLAExplainer() {
                           const first = label.slice(0, firstSpace);
                           const second = label.slice(firstSpace + 1);
                           return (
-                            <span className="flex flex-row items-center justify-center gap-x-2 px-2">
-                              <span className="text-xl">{first}</span>
+                            <span className="flex flex-row items-center justify-center gap-x-1 px-1.5 sm:gap-x-2 sm:px-2">
+                              <span className="text-sm sm:text-xl">{first}</span>
                               {(() => {
                                 const secondFirstSpace = second.indexOf(' ');
                                 if (secondFirstSpace === -1) {
-                                  return <span className="text-[11px]">{second}</span>;
+                                  return <span className="text-[9px] sm:text-[10px]">{second}</span>;
                                 }
                                 const secondFirst = second.slice(0, secondFirstSpace);
                                 const secondRest = second.slice(secondFirstSpace + 1);
                                 return (
-                                  <span className="flex flex-col text-[10px] leading-tight">
+                                  <span className="flex flex-col text-[9px] leading-tight sm:text-[10px]">
                                     <span className="whitespace-nowrap">{secondFirst}</span>
                                     <span>{secondRest}</span>
                                   </span>
@@ -353,15 +372,15 @@ export default function NLAExplainer() {
                   type="button"
                   onClick={() => handleClear({ pinFreeChatDemo: true })}
                   disabled={isBusy}
-                  className={`ml-2 w-[90px] min-w-[90px] max-w-[90px] rounded-xl px-1 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  className={`ml-1 rounded-lg border border-slate-200 px-1 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:ml-2 sm:w-[90px] sm:min-w-[90px] sm:max-w-[90px] sm:rounded-xl sm:border-none sm:py-1.5 ${
                     activeDemoCacheId === NLA_FREE_CHAT_DEMO_CACHE_ID
                       ? 'border-sky-500 bg-sky-700 text-white'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-sky-100'
                   }`}
                 >
-                  <span className="flex flex-row items-center justify-center gap-x-2.5 px-2">
-                    <span className="text-xl">✏️</span>
-                    <span className="text-[11px] leading-tight">
+                  <span className="flex flex-row items-center justify-center gap-x-1 px-1.5 sm:gap-x-2.5 sm:px-2">
+                    <span className="text-xs sm:text-xl">✏️</span>
+                    <span className="text-[9px] leading-tight sm:text-[11px]">
                       Free
                       <br />
                       Chat
@@ -372,7 +391,7 @@ export default function NLAExplainer() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center justify-center">
+          <div className="hidden flex-col items-center justify-center sm:flex">
             <div className="flex flex-row items-center justify-center gap-0.5" id="nla-right-buttons">
               <div className="flex flex-1 flex-col gap-y-0.5">
                 <Link

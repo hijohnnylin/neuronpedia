@@ -5,7 +5,7 @@ import { Button } from '@/components/shadcn/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import { MAX_COMMENT_LENGTH } from '@/lib/nla-constants';
 import copy from 'copy-to-clipboard';
-import { CodeIcon, CopyIcon, LinkIcon, Loader2 } from 'lucide-react';
+import { LinkIcon, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 function describeShareTarget(draft: NlaShareDraft | null): string {
@@ -247,7 +247,7 @@ export default function ShareModal({
                 </div>
               </Button>
 
-              <Button
+              {/* <Button
                 variant="outline"
                 className="h-auto justify-start gap-3 py-2"
                 onClick={() => handleCopyOption('embed')}
@@ -271,7 +271,7 @@ export default function ShareModal({
                     HTML code snippet to embed this explanation
                   </div>
                 </div>
-              </Button>
+              </Button> */}
             </>
           )}
         </div>
