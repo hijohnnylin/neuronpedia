@@ -448,7 +448,7 @@ export default function NLAExplainer() {
               <div className="flex min-h-0 min-w-0 flex-[0.7] basis-0 flex-col overflow-x-hidden sm:flex-1">
                 <NLAInputChat />
               </div>
-              <div id={NLA_DETAILS_ELEMENT_ID} className="flex min-h-0 min-w-0 max-w-sm flex-1 basis-0 flex-col">
+              <div id={NLA_DETAILS_ELEMENT_ID} className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col sm:max-w-sm">
                 {/* Errors (including NLA server / rate-limit 429s) are now
                     rendered above the chat textarea on the left side via
                     `nla-input-chat.tsx` — see `pendingChatInputRestore`

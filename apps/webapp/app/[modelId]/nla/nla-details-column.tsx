@@ -399,10 +399,10 @@ export default function NLADetailsColumn() {
   }, [selectionPopover]);
 
   return (
-    <div ref={detailsColumnRef} className="relative flex min-h-0 w-full flex-1 flex-col rounded-xl">
+    <div ref={detailsColumnRef} className="relative flex min-h-0 w-full flex-1 flex-col rounded-md sm:rounded-xl">
       <div
-        className={`relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-white px-0 pt-0 transition-[border-color,box-shadow] ${
-          isLocked && !isHydratingDemo ? 'border-2 border-sky-600 shadow' : 'border-2 border-slate-100 shadow'
+        className={`relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md bg-white px-0 pt-0 transition-[border-color,box-shadow] sm:rounded-xl ${
+          isLocked && !isHydratingDemo ? 'border border-sky-600 shadow sm:border-2' : 'border-2 border-slate-100 shadow'
         }`}
       >
         {isHydratingDemo ? (
@@ -413,13 +413,13 @@ export default function NLADetailsColumn() {
         ) : (
           <>
             {hasContent && isLocked && selectedResult && (
-              <div className="pointer-events-none absolute right-1.5 top-1.5 z-10">
+              <div className="pointer-events-none absolute right-1 top-1 z-10 sm:right-1.5 sm:top-1.5">
                 <button
                   type="button"
                   onClick={() => handleShareExplanation()}
                   disabled={isLoading || isChatStreaming}
                   title="Share this explanation"
-                  className="pointer-events-auto flex h-6 items-center gap-x-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-medium text-slate-500 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="pointer-events-auto flex h-5 items-center gap-x-1 rounded border border-slate-200 bg-white px-2 text-[10px] font-medium text-slate-500 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50 sm:h-6 sm:rounded-md"
                 >
                   <Share2 className="h-3 w-3" />
                   Share
