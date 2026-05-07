@@ -597,10 +597,10 @@ export function NLAProvider({
   const handleSourceChange = useCallback(
     (newSourceId: string) => {
       if (newSourceId === selectedNlaSourceId) return;
-      if (hasExistingChat()) {
-        // eslint-disable-next-line no-alert
-        if (!window.confirm('Switching models will clear the chat. Continue?')) return;
-      }
+      // if (hasExistingChat()) {
+      //   // eslint-disable-next-line no-alert
+      //   if (!window.confirm('Switching models will clear the chat. Continue?')) return;
+      // }
       setSelectedNlaSourceId(newSourceId);
       resetResults();
       setChatMessages([{ role: 'user', content: '' }]);
@@ -615,10 +615,10 @@ export function NLAProvider({
   const handleModelChange = useCallback(
     (newModelId: string) => {
       if (newModelId === selectedModelId) return;
-      if (hasExistingChat()) {
-        // eslint-disable-next-line no-alert
-        if (!window.confirm('Switching models will clear the chat. Continue?')) return;
-      }
+      // if (hasExistingChat()) {
+      //   // eslint-disable-next-line no-alert
+      //   if (!window.confirm('Switching models will clear the chat. Continue?')) return;
+      // }
       setSelectedModelId(newModelId);
       resetResults();
       setChatMessages([{ role: 'user', content: '' }]);
