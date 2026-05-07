@@ -32,6 +32,19 @@ function clearStepCleanup() {
   activeStepCleanup = null;
 }
 
+// Cleanup for the AV-done MutationObserver. Kept in a separate slot from
+// `activeStepCleanup` because the watcher is set up in step 4's click
+// handler (so it can latch onto the streaming start/end transitions
+// before driver.js's step 4 → 5 animation delay swallows them) and must
+// survive into step 5 — where it both auto-advances to step 6 and gets
+// torn down by step 5's `onDeselected` (or the tour's `onDestroyed`).
+let avDoneWatcherCleanup: (() => void) | null = null;
+
+function clearAvDoneWatcher() {
+  avDoneWatcherCleanup?.();
+  avDoneWatcherCleanup = null;
+}
+
 // Reason a tour run is being torn down. Set by the various exit paths
 // (skip / close confirm / Done) and read in the main tour's
 // `onDestroyed` hook to decide what to do next:
@@ -145,6 +158,27 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         side: 'right',
         align: 'start',
         showButtons: ['next'],
+        // Pre-scroll the "?" chip into view and let layout settle for two
+        // animation frames before driver.js measures it for step 3's
+        // spotlight. We saw a rare race where step 3's highlight rectangle
+        // was offset from the chip — most likely because the chip was
+        // still being scrolled into view (smooth-scroll, late image/style
+        // load, or another late layout shift) when driver.js took its
+        // measurement. Settling layout up front makes the measurement
+        // happen against a stable rectangle.
+        onNextClick: (_element, _step, opts) => {
+          const target = document.getElementById(NLA_TOUR_LLAMA_LIE_QUESTION_ELEMENT_ID);
+          if (target) {
+            // 'instant' bypasses any inherited `scroll-behavior: smooth`;
+            // it's well-supported in all evergreen browsers.
+            target.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+          }
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (opts.driver.isActive()) opts.driver.moveNext();
+            });
+          });
+        },
       },
     },
     {
@@ -223,14 +257,40 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         align: 'center',
         showButtons: [],
       },
-      // Advance as soon as the user clicks Explain. The next step
-      // spotlights the streaming-progress panel while the AV runs;
-      // once "Explanations Generated" appears, that step auto-advances
-      // to the details-column step.
+      // Advance as soon as the user clicks Explain. The click handler
+      // also installs the watcher that auto-advances step 5 → step 6
+      // once the AV finishes; that watcher MUST be set up before we
+      // call `moveNext()` because driver.js's step 4 → 5 transition
+      // delay (animation / re-layout) can outlast the AV round-trip on
+      // fast/cached responses. Setting it up later — i.e., inside step
+      // 5's `onHighlighted` — would frequently race past both the
+      // streaming-start and streaming-end DOM transitions, leaving the
+      // tour wedged on "Generating explanation…".
       onHighlighted: (element, _step, opts) => {
         clearStepCleanup();
         if (!element) return;
         const onClick = () => {
+          // Wait for "Generating Explanations..." to first appear in
+          // the status panel (handleExplainPending → setIsLoading(true)
+          // → React render) and then disappear. That covers both
+          // fast-path cases:
+          //   • fast: the span re-renders to "Explanations Generated" first
+          //   • very fast: the whole `isExplainInFlight` branch unmounts
+          // and saves us from depending on the brief "Generated" window.
+          clearAvDoneWatcher();
+          let seenStreaming = isAvStreaming();
+          const tryAdvance = () => {
+            if (!seenStreaming) {
+              if (isAvStreaming()) seenStreaming = true;
+              return;
+            }
+            if (isAvStreaming()) return;
+            clearAvDoneWatcher();
+            if (opts.driver.isActive()) opts.driver.moveNext();
+          };
+          const observer = new MutationObserver(tryAdvance);
+          observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+          avDoneWatcherCleanup = () => observer.disconnect();
           if (opts.driver.isActive()) opts.driver.moveNext();
         };
         element.addEventListener('click', onClick, { once: true });
@@ -252,33 +312,13 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         side: 'bottom',
         align: 'center',
         // Auto-advances when the AV finishes; only show the (custom)
-        // close button so the user can still bail out.
+        // close button so the user can still bail out. Advancement is
+        // driven by the watcher set up in step 4's click handler — see
+        // that step's `onHighlighted` for the rationale.
         showButtons: [],
       },
-      // Wait for "Generating Explanations..." to first appear in the
-      // status panel (handleExplainPending → setIsLoading(true) → React
-      // render) and then disappear. That covers both fast-path cases:
-      //   • fast: the span re-renders to "Explanations Generated" first
-      //   • very fast: the whole `isExplainInFlight` branch unmounts
-      // and saves us from depending on the brief "Generated" window.
-      onHighlighted: (_element, _step, opts) => {
-        clearStepCleanup();
-        let seenStreaming = isAvStreaming();
-        const tryAdvance = () => {
-          if (!seenStreaming) {
-            if (isAvStreaming()) seenStreaming = true;
-            return;
-          }
-          if (isAvStreaming()) return;
-          clearStepCleanup();
-          if (opts.driver.isActive()) opts.driver.moveNext();
-        };
-        const observer = new MutationObserver(tryAdvance);
-        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-        activeStepCleanup = () => observer.disconnect();
-      },
       onDeselected: () => {
-        clearStepCleanup();
+        clearAvDoneWatcher();
       },
     },
     {
@@ -493,6 +533,7 @@ export function useNlaTour(options: NlaTourOptions) {
       },
       onDestroyed: () => {
         clearStepCleanup();
+        clearAvDoneWatcher();
         // Make sure the tour-only highlight range never persists after
         // the user closes the tour mid-step 5.
         optionsRef.current.setHighlightedRange(null);
