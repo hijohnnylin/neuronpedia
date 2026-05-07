@@ -136,7 +136,7 @@ export default async function Page() {
       </div>
 
       <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0">
-        <div className="mt-0 hidden overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-3 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-3">
+        <div className="mt-0 overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-3 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-3">
           <div
             className="w-full rounded-full pb-0 pt-0 text-center text-[10px] font-bold uppercase text-slate-400"
             title="Fully vetted and stabilized projects and collaborations."
@@ -177,7 +177,7 @@ export default async function Page() {
 
                       <HomeWatchIntroButton />
 
-                      <Link href={NLA_PAPER_URL} className="">
+                      <Link href={NLA_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
                         <button
                           type="button"
                           className="h-12 min-h-12 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
@@ -188,7 +188,7 @@ export default async function Page() {
                           </div>
                         </button>
                       </Link>
-                      <Link href={NLA_BLOG_URL} className="">
+                      <Link href={NLA_BLOG_URL} target="_blank" rel="noreferrer noopener" className="">
                         <button
                           type="button"
                           className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
@@ -254,7 +254,7 @@ export default async function Page() {
                       </div>
                     </button>
                   </Link>
-                  <Link href={CAP_BLOG_URL} className="">
+                  <Link href={CAP_BLOG_URL} target="_blank" rel="noreferrer noopener" className="">
                     <button type="button" className="h-14 min-h-14 transition-all hover:scale-105 sm:w-auto">
                       <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-amber-600 px-5 py-2 text-white shadow-sm shadow-amber-800/30 sm:px-3">
                         <svg
@@ -282,7 +282,7 @@ export default async function Page() {
                       </div>
                     </button>
                   </Link>
-                  <Link href={CAP_PAPER_URL} className="">
+                  <Link href={CAP_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
                     <button type="button" className="h-12 min-h-12 transition-all hover:scale-105 sm:w-auto">
                       <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-amber-600 px-5 py-2 text-white shadow-sm shadow-amber-800/30 sm:px-3">
                         <Scroll className="h-5 w-5" />
