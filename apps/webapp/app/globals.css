@@ -612,6 +612,12 @@ div[data-virtuoso-scroller='true'] table {
     margin-top: 0.5rem;
     margin-bottom: 0.5rem;
   }
+  @media (max-width: 640px) {
+    & p {
+      font-size: 10px;
+      line-height: 1.1;
+    }
+  }
 
   & p:first-child {
     margin-top: 0;

@@ -463,7 +463,7 @@ export default function NLAInputChat() {
     const isTourDemo = activeDemoCacheId === NLA_TOUR_LLAMA_LIE_CACHE_ID;
     const nonSmallSizeClass = isTourDemo
       ? 'px-[0.5px] py-0 text-[18px] leading-relaxed'
-      : 'px-[0.5px] py-0 text-[14px] leading-tight';
+      : 'px-[0.5px] py-0 text-[12px] sm:text-[14px] leading-tight';
 
     if (preview) {
       const colorClass = small ? 'text-slate-400' : 'text-slate-500';
@@ -1301,7 +1301,7 @@ export default function NLAInputChat() {
 
   return (
     <div
-      className={`relative flex min-h-0 flex-1 flex-col ${isEmbed ? 'rounded-none bg-slate-50 p-2 pb-2' : 'rounded-xl bg-slate-50 px-4 pb-2 pt-0'}`}
+      className={`relative flex min-h-0 flex-1 flex-col ${isEmbed ? 'rounded-none bg-slate-50 p-2 pb-2' : 'rounded-xl bg-slate-50 pb-2 pt-0 sm:px-4'}`}
     >
       {/* Animated spacer that pushes the status banner down to roughly the
           vertical center while the chat is blank, then collapses to 0 as
@@ -1309,7 +1309,7 @@ export default function NLAInputChat() {
           to the top via the same height transition. */}
       <div
         aria-hidden
-        className={`shrink-0 overflow-hidden transition-[height] duration-500 ease-out ${isBlankChat ? 'h-[20dvh]' : 'h-0'}`}
+        className={`shrink-0 overflow-hidden transition-[height] duration-500 ease-out ${isBlankChat ? 'h-[25px] sm:h-[20dvh]' : 'h-0'}`}
       />
       <div
         id="nla-chat-status"
@@ -1398,19 +1398,23 @@ export default function NLAInputChat() {
           </div>
         ) : !hasMessages ? (
           <div className="flex w-full flex-row items-center justify-center gap-x-2 divide-x divide-sky-800/20">
-            <div className="flex flex-1 flex-col items-center justify-center gap-y-0 px-4">
-              <span className="text-[14px] font-medium text-sky-700">Start Chat</span>
-              <span className="text-[11px] text-sky-600">Set up a scenario to analyze the model&apos;s thoughts.</span>
+            <div className="flex flex-1 flex-col items-center justify-center gap-y-0 sm:px-4">
+              <span className="text-xs font-medium text-sky-700 sm:text-[14px]">Start Chat</span>
+              <span className="text-[9px] text-sky-600 sm:text-[11px]">
+                Set up a scenario to analyze the model&apos;s thoughts.
+              </span>
             </div>
             <div className="flex flex-1 flex-col items-center justify-center gap-y-0 px-4">
-              <span className="text-[14px] font-medium text-sky-700">Choose Demo</span>
-              <span className="text-[11px] text-sky-600">Click one of the demos at the top to load a scenario.</span>
+              <span className="text-xs font-medium text-sky-700 sm:text-[14px]">Choose Demo</span>
+              <span className="text-[9px] text-sky-600 sm:text-[11px]">
+                Click one of the demos at the top to load a scenario.
+              </span>
             </div>
           </div>
         ) : pendingPositions.size === 0 && explainedPositions.size > 0 ? (
           <div className="flex w-full flex-col items-center justify-center gap-y-0.5">
-            <div className="flex w-full flex-row divide-x divide-sky-800/20">
-              <div className="flex flex-1 flex-col gap-y-0 pr-2 text-center">
+            <div className="flex w-full flex-row sm:divide-x sm:divide-sky-800/20">
+              <div className="hidden flex-1 flex-col gap-y-0 pr-2 text-center sm:flex">
                 <span className="text-[12px] font-medium text-slate-700">See Explanations</span>
                 <span className="text-[10.5px] font-medium text-slate-500">
                   Click{' '}
@@ -1418,7 +1422,7 @@ export default function NLAInputChat() {
                   <span className="border-b-[1.5px] border-sky-500 font-serif font-semibold">tokens</span>.
                 </span>
               </div>
-              <div className="flex flex-1 flex-col gap-y-0 px-2 text-center">
+              <div className="hidden flex-1 flex-col gap-y-0 px-2 text-center sm:flex">
                 <span className="text-[12px] font-medium text-slate-700">Explain Other Tokens</span>
                 <span className="text-[10.5px] font-medium text-slate-500">
                   Click <span className="font-serif font-semibold text-slate-400">gray tokens</span> to explain.
@@ -1496,8 +1500,8 @@ export default function NLAInputChat() {
             </div>
           </div>
         ) : (
-          <div className="flex w-full flex-row items-center justify-center gap-x-5 divide-x divide-amber-800/30">
-            <div className="flex flex-col">
+          <div className="flex w-full flex-row items-center justify-center gap-x-5 sm:divide-x sm:divide-amber-800/30">
+            <div className="hidden flex-col sm:flex">
               <div className="flex flex-1 flex-col gap-y-0 px-2 text-center">
                 <span className="text-[12px] font-medium text-amber-800">Select Tokens to Explain</span>
                 <span className="text-[11px] font-medium text-amber-600">
@@ -1563,7 +1567,7 @@ export default function NLAInputChat() {
           <div
             ref={scrollRef}
             onMouseDown={() => setLockedPosition(null)}
-            className="flex h-full max-h-full min-h-0 flex-1 flex-col gap-y-0 overflow-y-auto pb-3 pr-1 pt-4"
+            className="flex h-full max-h-full min-h-0 flex-1 flex-col gap-y-0 overflow-y-auto sm:pb-3 sm:pr-1 sm:pt-4"
           >
             {visibleMessages.map(({ msg, originalIdx }, idx) => {
               const group = groupForIndex(idx);
@@ -1573,16 +1577,18 @@ export default function NLAInputChat() {
               const canEdit = isUser && msg.content.length > 0 && !isChatStreaming && !isLoading;
               return (
                 <div key={originalIdx} className={`group flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`flex max-w-[85%] flex-col gap-y-0 px-0.5 ${isUser ? 'items-end' : 'items-start'}`}>
+                  <div
+                    className={`flex max-w-[95%] flex-col gap-y-0 px-0.5 sm:max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}
+                  >
                     {showChips ? (
                       <div
-                        className={`select-none rounded-xl px-3.5 ${isUser ? 'bg-white py-1 shadow' : 'bg-transparent py-0'}`}
+                        className={`select-none rounded-xl sm:px-3.5 ${isUser ? 'bg-white py-1 shadow' : 'bg-transparent py-0'}`}
                       >
                         {renderTokenGroup(group)}
                       </div>
                     ) : isUser && showChatTokens && !showChips && msg.content.length > 0 ? (
                       <div
-                        className={`select-none rounded-xl px-3.5 ${isUser ? 'bg-white py-1 shadow' : 'bg-transparent py-0'}`}
+                        className={`select-none rounded-xl sm:px-3.5 ${isUser ? 'bg-white py-1 shadow' : 'bg-transparent py-0'}`}
                       >
                         {renderTokenGroup(
                           buildSyntheticUserTurnPreviewGroup(
@@ -1597,7 +1603,7 @@ export default function NLAInputChat() {
                       </div>
                     ) : (
                       <div
-                        className={`whitespace-pre-wrap rounded-xl px-[18px] py-2 font-serif text-[14px] font-medium leading-relaxed text-slate-400 ${isUser ? 'bg-white shadow' : 'bg-transparent'}`}
+                        className={`whitespace-pre-wrap rounded-xl py-2 font-serif text-[14px] font-medium leading-relaxed text-slate-400 sm:px-[18px] ${isUser ? 'bg-white shadow' : 'bg-transparent'}`}
                       >
                         {msg.content.length > 0 ? (
                           msg.content
@@ -1675,7 +1681,7 @@ export default function NLAInputChat() {
             style={{ WebkitTapHighlightColor: 'transparent' }}
             className="w-full resize-none rounded-t-xl border-0 px-2.5 py-2.5 pr-11 text-[13px] leading-normal text-slate-800 placeholder-sky-600/60 outline-none ring-0 focus:outline-none focus:ring-0 disabled:placeholder-slate-300"
           />
-          <div className="mb-2 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-2">
+          <div className="mb-2 hidden w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-2 sm:flex">
             <NLAInputChatControls
               isBusy={isBusy}
               hasMessages={hasMessages}

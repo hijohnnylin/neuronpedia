@@ -196,7 +196,7 @@ export default function NLAExplainer() {
             type="button"
             id={NLA_TOUR_GUIDE_BUTTON_ELEMENT_ID}
             onClick={handleStartTour}
-            className="absolute left-0 top-0 flex h-7 w-14 items-center justify-center gap-x-1 rounded-md border border-emerald-600 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-100 sm:hidden"
+            className="absolute left-0 top-0 z-20 flex h-7 w-14 items-center justify-center gap-x-1 rounded-md border border-emerald-600 bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-600 transition-colors hover:bg-emerald-100 sm:hidden"
           >
             Tutorial
             {!hasSeenTour && (
@@ -206,7 +206,7 @@ export default function NLAExplainer() {
               />
             )}
           </button>
-          <div className="absolute left-1/2 top-1 flex w-64 -translate-x-1/2 flex-col items-center justify-center gap-y-0 sm:relative sm:left-0 sm:w-full sm:translate-x-0 sm:items-start">
+          <div className="absolute left-1/2 top-1 -ml-6 flex w-64 -translate-x-1/2 flex-col items-center justify-center gap-y-0 sm:relative sm:left-0 sm:ml-0 sm:w-full sm:translate-x-0 sm:items-start">
             <div
               className="whitespace-nowrap text-[11px] font-semibold leading-none text-slate-800 sm:-mt-2 sm:mb-0.5 sm:text-base"
               id="chat"
@@ -440,11 +440,11 @@ export default function NLAExplainer() {
 
       {/* Input / Results section */}
       <div
-        className={`mx-auto flex min-h-0 w-full max-w-screen-xl flex-1 flex-col items-stretch justify-start bg-slate-50 px-6 pb-2 pt-3`}
+        className={`mx-auto flex min-h-0 w-full max-w-screen-xl flex-1 flex-col items-stretch justify-start bg-slate-50 px-2 pb-2 sm:px-6 sm:pt-3`}
       >
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-y-1">
           <div className={`${isEmbed ? 'mt-0' : 'mt-2'} flex min-h-0 min-w-0 flex-1 flex-col gap-y-1`}>
-            <div className="flex min-h-0 w-full min-w-0 flex-1 flex-row gap-x-5">
+            <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-y-1 sm:flex-row sm:gap-x-5">
               <div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-x-hidden">
                 <NLAInputChat />
               </div>
