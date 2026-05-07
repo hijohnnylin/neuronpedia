@@ -138,7 +138,7 @@ export default async function Page() {
       <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0">
         <div className="mt-0 overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-3 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-3">
           <div
-            className="w-full rounded-full pb-0 pt-0 text-center text-[10px] font-bold uppercase text-slate-400"
+            className="w-full rounded-full pb-0 pt-0 text-center text-[9px] font-bold uppercase text-slate-400"
             title="Fully vetted and stabilized projects and collaborations."
           >
             Featured Release
@@ -151,20 +151,20 @@ export default async function Page() {
                     Fraser-Taliente, Kantamneni, Ong et al.
                   </div>
                   <div className="content">
-                    <div className="mt-4 text-[26px] font-bold leading-tight text-[#bf4d43] sm:mt-3 sm:whitespace-nowrap sm:px-10 sm:text-[32px] sm:leading-normal">
+                    <div className="mt-4 text-[26px] font-bold leading-tight tracking-tight text-[#bf4d43] sm:mt-3 sm:whitespace-nowrap sm:px-10 sm:text-[32px] sm:leading-normal">
                       Natural Language Autoencoders
                     </div>
                     <div className="mt-1 text-sm font-medium leading-none text-[#666663] sm:text-[14px]">
                       Translate a Model&apos;s Internal Thoughts Into Text
                     </div>
 
-                    <div className="mt-4 flex flex-col items-center justify-center gap-y-1 sm:mt-6 sm:flex-row sm:gap-x-2.5">
+                    <div className="mt-4 flex flex-col items-center justify-center gap-y-1 sm:mt-6 sm:flex-row sm:gap-x-1.5">
                       <Link href="/llama3.3-70b-it/nla" className="">
                         <button
                           type="button"
-                          className="h-16 min-h-16 w-32 min-w-32 transition-all hover:scale-105 sm:w-auto"
+                          className="mb-1 h-16 min-h-16 w-[150px] min-w-[150px] transition-all hover:scale-105 sm:mb-0 sm:w-auto sm:min-w-0"
                         >
-                          <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-[#CC785C]/80 px-6 py-2 text-[#000000] shadow-sm shadow-[#666663]/60">
+                          <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-[#CC785C] px-6 py-2 text-black shadow-sm shadow-[#666663]/60">
                             <MessagesSquare className="h-7 w-7" />
                             <div className="text-[13.5px] font-semibold leading-snug">
                               Launch
@@ -180,9 +180,9 @@ export default async function Page() {
                       <Link href={NLA_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
                         <button
                           type="button"
-                          className="h-12 min-h-12 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
+                          className="mt-1 h-12 min-h-12 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
                         >
-                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
                             <Scroll className="h-5 w-5" />
                             <div className="text-[12px] font-semibold leading-tight">Read Paper</div>
                           </div>
@@ -191,9 +191,9 @@ export default async function Page() {
                       <Link href={NLA_BLOG_URL} target="_blank" rel="noreferrer noopener" className="">
                         <button
                           type="button"
-                          className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105 sm:w-auto"
+                          className="h-14 min-h-14 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:w-auto sm:min-w-0"
                         >
-                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-5 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               fill="none"
