@@ -427,7 +427,7 @@ export default function NLADetailsColumn() {
               </div>
             )}
             {showEditorComment && (
-              <div className="flex w-full shrink-0 flex-col gap-y-1 rounded-t-[calc(0.75rem-2px)] border-amber-200 bg-amber-50 px-5 py-4">
+              <div className="flex w-full shrink-0 flex-col gap-y-1 rounded-t-[calc(0.75rem-2px)] border-amber-200 bg-amber-50 px-3 py-2 sm:px-5 sm:py-4">
                 <div className="-mt-0.5 mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">
                   Commentary by Human Editor
                 </div>
@@ -454,8 +454,8 @@ export default function NLADetailsColumn() {
               </div>
             )}
             <div className={`w-full shrink-0 bg-slate-100 ${showEditorComment ? '' : 'rounded-t-[calc(0.75rem-2px)]'}`}>
-              <div className={`flex w-full items-start px-3 py-3`}>
-                <div className="shrink px-2 text-start text-[11px] font-semibold uppercase text-slate-500">
+              <div className={`flex w-full items-start px-3 py-1.5 sm:py-3`}>
+                <div className="shrink px-0 text-start text-[11px] font-semibold uppercase text-slate-500 sm:px-2">
                   Explanation by activation verbalizer
                 </div>
               </div>
@@ -469,7 +469,7 @@ export default function NLADetailsColumn() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-y-4 px-5 pb-4 pt-5 text-xs text-slate-700">
+                <div className="flex flex-col gap-y-1.5 px-3 pb-4 pt-2 text-xs text-slate-700 sm:gap-y-4 sm:px-5 sm:pt-5">
                   {selectedResult ? (
                     <>
                       <div className="mb-1 flex w-full items-center justify-between gap-x-3">
@@ -518,7 +518,7 @@ export default function NLADetailsColumn() {
 
                       <div
                         ref={explanationContainerRef}
-                        className="flex flex-col gap-y-3"
+                        className="flex flex-col gap-y-0 sm:gap-y-3"
                         onMouseUp={handleExplanationMouseUp}
                       >
                         {paragraphsWithOffsets.map((p, i) => {
@@ -577,7 +577,7 @@ export default function NLADetailsColumn() {
                               <div
                                 data-paragraph-idx={i}
                                 data-paragraph-start={p.startOffset}
-                                className={`whitespace-pre-wrap rounded-md py-0.5 pr-8 font-medium leading-snug transition-colors selection:bg-amber-200 selection:text-slate-700 ${
+                                className={`whitespace-pre-wrap rounded-md py-0.5 pr-4 font-medium leading-snug transition-colors selection:bg-amber-200 selection:text-slate-700 sm:pr-8 ${
                                   isParagraphHighlighted
                                     ? 'bg-amber-100 text-slate-700'
                                     : dimNonHighlightText
@@ -591,14 +591,6 @@ export default function NLADetailsColumn() {
                           );
                         })}
                       </div>
-                      {/* {selectedPartial !== undefined && showRaw && (
-                <div className="mt-3 flex flex-col gap-y-0.5 pb-10">
-                  <div className="text-[10px] font-medium uppercase text-slate-400">Raw Response (pre-parsing)</div>
-                  <pre className="whitespace-pre-wrap break-words rounded-md border border-slate-200 bg-slate-100 px-3 py-2 font-mono text-[11px] leading-relaxed text-slate-600">
-                    {selectedPartial}
-                  </pre>
-                </div>
-              )} */}
                     </>
                   ) : selectedToken && (selectedIsGenerating || selectedIsPending) ? (
                     <>
@@ -620,7 +612,7 @@ export default function NLADetailsColumn() {
                         >
                           {p.label}
                         </div> */}
-                            <div className="whitespace-pre-wrap rounded-md bg-white py-0.5 pr-8 font-medium leading-snug text-slate-600">
+                            <div className="whitespace-pre-wrap rounded-md bg-white py-0.5 pr-4 font-medium leading-snug text-slate-600 sm:pr-8">
                               {renderParagraphWithHighlights(p.content, null, explanationSearchNeedle)}
                             </div>
                           </div>
@@ -659,7 +651,7 @@ export default function NLADetailsColumn() {
           </>
         )}
       </div>
-      <div className="absolute bottom-0 left-1.5 right-1.5 mb-[2px] rounded-b-xl bg-white/30 pb-1.5 pt-1.5 text-center text-[9px] text-rose-700 backdrop-blur-sm">
+      <div className="absolute bottom-0 left-1.5 right-1.5 mb-[2px] rounded-b-xl bg-white/30 pb-1 pt-1 text-center text-[9px] text-rose-700 backdrop-blur-sm sm:pb-1.5 sm:pt-1.5">
         NLAs can produce unexpected or incorrect explanations. See{' '}
         <a
           href="https://transformer-circuits.pub/2026/nla/index.html#discussion-and-limitations"

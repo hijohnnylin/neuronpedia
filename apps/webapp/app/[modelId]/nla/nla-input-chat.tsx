@@ -461,7 +461,7 @@ export default function NLAInputChat() {
     // gives the larger glyphs room to breathe across wrapped lines.
     const isTourDemo = activeDemoCacheId === NLA_TOUR_LLAMA_LIE_CACHE_ID;
     const nonSmallSizeClass = isTourDemo
-      ? 'px-[0.5px] py-0 text-[18px] leading-relaxed'
+      ? 'px-[0.5px] py-0 text-[14px] sm:text-[18px] leading-relaxed'
       : 'px-[0.5px] py-0 text-[12px] sm:text-[14px] leading-tight';
 
     if (preview) {
@@ -842,7 +842,7 @@ export default function NLAInputChat() {
 
     function renderLines(lines: { rows: React.ReactNode[][]; blankRowsAfter: number[] }, small: boolean) {
       const out: React.ReactNode[] = [];
-      const rowLeading = small ? 'leading-none' : 'leading-tight';
+      const rowLeading = small ? 'leading-none' : 'leading-none sm:leading-tight';
       lines.rows.forEach((row, i) => {
         out.push(
           <div key={`r${i}`} className={`flex flex-row flex-wrap items-start gap-x-[0px] gap-y-0 ${rowLeading}`}>
@@ -1314,7 +1314,7 @@ export default function NLAInputChat() {
       />
       <div
         id="nla-chat-status"
-        className={`sticky top-0 mt-0 flex h-[54px] min-h-[54px] w-full flex-col items-center justify-center gap-y-1.5 rounded-xl border-slate-700/30 px-3.5 py-0 transition-colors ${
+        className={`sticky top-0 mt-0 flex h-10 min-h-10 w-full flex-col items-center justify-center gap-y-1.5 rounded-md border-slate-700/30 px-2 py-0 transition-colors sm:h-[54px] sm:min-h-[54px] sm:rounded-xl sm:px-3.5 ${
           !isChatStreaming &&
           !isExplainInFlight &&
           !isHydratingDemo &&
@@ -1400,14 +1400,14 @@ export default function NLAInputChat() {
         ) : !hasMessages ? (
           <div className="flex w-full flex-row items-center justify-center gap-x-2 divide-x divide-sky-800/20">
             <div className="flex flex-1 flex-col items-center justify-center gap-y-0 sm:px-4">
-              <span className="text-xs font-medium text-sky-700 sm:text-[14px]">Start Chat</span>
-              <span className="text-[9px] text-sky-600 sm:text-[11px]">
+              <span className="text-[11px] font-medium text-sky-700 sm:text-[14px]">Start Chat</span>
+              <span className="text-center text-[9px] leading-tight text-sky-600 sm:text-[11px] sm:leading-normal">
                 Set up a scenario to analyze the model&apos;s thoughts.
               </span>
             </div>
             <div className="flex flex-1 flex-col items-center justify-center gap-y-0 px-4">
-              <span className="text-xs font-medium text-sky-700 sm:text-[14px]">Choose Demo</span>
-              <span className="text-[9px] text-sky-600 sm:text-[11px]">
+              <span className="text-[11px] font-medium text-sky-700 sm:text-[14px]">Choose Demo</span>
+              <span className="text-center text-[9px] leading-tight text-sky-600 sm:text-[11px] sm:leading-normal">
                 Click one of the demos at the top to load a scenario.
               </span>
             </div>
@@ -1447,7 +1447,7 @@ export default function NLAInputChat() {
                         onChange={(e) => setExplanationSearchInput(e.target.value)}
                         placeholder="Search Explanations"
                         disabled={isBusy}
-                        className={`box-border h-8 w-[170px] rounded-full border border-slate-200 bg-white py-0 pl-7 text-[11px] font-medium leading-none text-slate-700 outline-none placeholder:text-center placeholder:text-slate-400 focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        className={`box-border h-7 w-[170px] rounded-full border border-slate-200 bg-white py-0 pl-7 text-[11px] font-medium leading-none text-slate-700 outline-none placeholder:text-center placeholder:text-slate-400 focus:ring-1 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 ${
                           explanationSearchActive ? 'pr-9' : 'pr-2'
                         }`}
                         aria-label="Search explanations"
@@ -1512,9 +1512,9 @@ export default function NLAInputChat() {
               </div>
             </div>
             <div className="flex flex-row">
-              <div className="flex w-32 min-w-32 max-w-32 flex-col items-center justify-center gap-y-0 text-wrap text-[11px] font-medium leading-snug text-amber-800">
+              <div className="flex w-32 min-w-32 max-w-32 flex-row items-center justify-center gap-x-1 gap-y-0 text-wrap text-[11px] font-medium leading-snug text-amber-800 sm:flex-col">
                 <span
-                  className={`text-sm transition-colors ${
+                  className={`text-[12px] transition-colors sm:text-sm ${
                     limitPulse > 0 ? 'animate-pulse font-semibold text-red-600' : 'text-amber-800'
                   }`}
                 >
@@ -1540,7 +1540,7 @@ export default function NLAInputChat() {
                     tokenList.length === 0 ||
                     pendingPositions.size === 0
                   }
-                  className="flex h-9 items-center justify-center gap-x-1 rounded-md border border-sky-600 bg-sky-600 px-4 py-1 text-[12px] font-semibold text-white transition-colors hover:bg-sky-500/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-7 items-center justify-center gap-x-1 rounded-md border border-sky-600 bg-sky-600 px-2.5 py-1 text-[12px] font-semibold text-white transition-colors hover:bg-sky-500/90 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:px-4"
                 >
                   <Play className="h-3.5 w-3.5" />
                   Explain
@@ -1549,7 +1549,7 @@ export default function NLAInputChat() {
                   type="button"
                   onClick={handleClearPending}
                   disabled={isLoading || isChatStreaming || pendingPositions.size === 0}
-                  className="flex h-9 w-9 items-center justify-center rounded-md border-amber-100 bg-slate-300 text-[10.5px] font-medium text-slate-600 transition-colors hover:border-amber-500 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border-amber-100 bg-slate-300 text-[10.5px] font-medium text-slate-600 transition-colors hover:border-amber-500 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -1568,7 +1568,7 @@ export default function NLAInputChat() {
           <div
             ref={scrollRef}
             onMouseDown={() => setLockedPosition(null)}
-            className="flex h-full max-h-full min-h-0 flex-1 flex-col gap-y-0 overflow-y-auto sm:pb-3 sm:pr-1 sm:pt-4"
+            className="flex h-full max-h-full min-h-0 flex-1 flex-col gap-y-0 overflow-y-auto pt-1 sm:pb-3 sm:pr-1 sm:pt-4"
           >
             {visibleMessages.map(({ msg, originalIdx }, idx) => {
               const group = groupForIndex(idx);
@@ -1616,7 +1616,7 @@ export default function NLAInputChat() {
                       </div>
                     )}
                     {isUser && msg.content.length > 0 && (
-                      <div className="mt-1 flex items-center gap-x-1">
+                      <div className="mt-1 hidden items-center gap-x-1 sm:flex">
                         <button
                           type="button"
                           onClick={() => handleCopyMessage(originalIdx, msg.content)}
@@ -1680,7 +1680,7 @@ export default function NLAInputChat() {
             disabled={isBusy}
             placeholder="Type a message…"
             style={{ WebkitTapHighlightColor: 'transparent' }}
-            className="w-full resize-none rounded-t-xl border-0 px-2.5 py-2.5 pr-11 text-[13px] leading-normal text-slate-800 placeholder-sky-600/60 outline-none ring-0 focus:outline-none focus:ring-0 disabled:placeholder-slate-300"
+            className="w-full resize-none rounded-t-xl border-0 px-2.5 py-2 pr-11 text-[13px] leading-normal text-slate-800 placeholder-sky-600/60 outline-none ring-0 focus:outline-none focus:ring-0 disabled:placeholder-slate-300 sm:py-2.5"
           />
           <button
             type="button"

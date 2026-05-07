@@ -310,7 +310,7 @@ export default function NLAExplainer() {
                   </ToggleGroup.Item>
                 ))}
               </ToggleGroup.Root>
-              <div className="flex w-full flex-row items-end justify-end gap-x-[0px] gap-y-[1px] rounded-lg sm:-mt-5 sm:justify-center sm:rounded-2xl sm:bg-slate-200 sm:px-2 sm:py-2 sm:pt-5">
+              <div className="mt-1 flex w-full flex-row items-end justify-end gap-x-[0px] gap-y-[1px] rounded-lg sm:-mt-5 sm:justify-center sm:rounded-2xl sm:bg-slate-200 sm:px-2 sm:py-2 sm:pt-5">
                 <div className="flex w-full max-w-[calc(100dvw-90px)] flex-row items-center justify-center gap-x-[0px] gap-y-[1px] divide-x divide-slate-200 overflow-x-scroll rounded-lg border border-slate-200 sm:w-auto sm:max-w-none sm:overflow-hidden sm:rounded-xl sm:border-none">
                   {demosForModel.map((demo, index) => {
                     const label = demo.featuredDisplayName ?? demo.shareId;
@@ -443,9 +443,9 @@ export default function NLAExplainer() {
         className={`mx-auto flex min-h-0 w-full max-w-screen-xl flex-1 flex-col items-stretch justify-start bg-slate-50 px-2 pb-2 sm:px-6 sm:pt-3`}
       >
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-y-1">
-          <div className={`${isEmbed ? 'mt-0' : 'mt-2'} flex min-h-0 min-w-0 flex-1 flex-col gap-y-1`}>
+          <div className={`${isEmbed ? 'mt-0' : 'sm:mt-2'} flex min-h-0 min-w-0 flex-1 flex-col gap-y-1`}>
             <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-y-1 sm:flex-row sm:gap-x-5">
-              <div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col overflow-x-hidden">
+              <div className="flex min-h-0 min-w-0 flex-[0.7] basis-0 flex-col overflow-x-hidden sm:flex-1">
                 <NLAInputChat />
               </div>
               <div id={NLA_DETAILS_ELEMENT_ID} className="flex min-h-0 min-w-0 max-w-sm flex-1 basis-0 flex-col">
