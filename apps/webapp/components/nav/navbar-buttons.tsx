@@ -46,72 +46,37 @@ export default function NavBarButtons() {
         </Link>
       )}
 
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
-          Get Started
-          <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            sideOffset={-3}
-            className="z-50 min-w-[8rem] max-w-[24rem] overflow-hidden rounded-md bg-white p-1 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
-          >
-            <DropdownMenu.Item className="flex cursor-pointer items-center border-b border-slate-100 px-5 py-3 text-sm font-medium text-sky-700 outline-none hover:bg-sky-100 hover:text-sky-700">
-              <Link
-                href="https://github.com/hijohnnylin/neuronpedia#readme"
-                target="_blank"
-                prefetch={false}
-                rel="noreferrer"
-                className="flex w-full cursor-pointer flex-col items-start justify-center text-[13px]"
-              >
-                Running Neuronpedia
-                <span className="ml-0 pt-0.5 text-[11px] font-normal leading-snug text-slate-500">
-                  The latest README for getting started with Neuronpedia.
-                </span>
-              </Link>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item className="flex cursor-pointer items-center border-b border-slate-100 px-5 py-3 text-sm font-medium text-sky-700 outline-none hover:bg-sky-100 hover:text-sky-700">
-              <Link
-                href="https://docs.neuronpedia.org"
-                target="_blank"
-                prefetch={false}
-                rel="noreferrer"
-                className="flex w-full cursor-pointer flex-col items-start justify-center text-[13px]"
-              >
-                Usage Docs (To Be Updated)
-                <span className="ml-0 pt-0.5 text-[11px] font-normal leading-snug text-slate-500">
-                  What is Neuronpedia? How do I use it?
-                </span>
-              </Link>
-            </DropdownMenu.Item>
-            {releases.filter((r) => r.name === 'gemma-scope').length > 0 && (
-              <DropdownMenu.Item className="flex cursor-pointer items-center border-b border-slate-100 px-5 py-3 text-sm font-medium text-sky-700 outline-none hover:bg-sky-100 hover:text-sky-700">
-                <Link
-                  href="/gemma-scope"
-                  prefetch={false}
-                  rel="noreferrer"
-                  className="flex w-full cursor-pointer flex-col items-start justify-center text-[13px]"
-                >
-                  Gemma Scope
-                  <span className="ml-0 pt-0.5 text-[11px] font-normal leading-snug text-slate-500">
-                    A guided, beginner-friendly introduction to AI interpretability.
-                  </span>
-                </Link>
-              </DropdownMenu.Item>
-            )}
-
-            <DropdownMenu.Arrow className="fill-white" />
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
+      <Link
+        href="/llama3.3-70b-it/nla"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+      >
+        <div className="flex flex-col items-center justify-center px-1 text-xs font-normal leading-tight sm:text-[11.5px]">
+          <div>Natural Language</div>
+          <div>Autoencoders</div>
+        </div>
+        <span className="absolute -right-1.5 -top-1 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+          NEW
+        </span>
+      </Link>
 
       <Link
-        href="/api-doc"
-        prefetch={false}
-        rel="noreferrer"
-        className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        href="/llama3.3-70b-it/assistant-axis"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
-        API
+        Assistant Axis
+        <span className="absolute -right-2 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+          NEW
+        </span>
+      </Link>
+
+      <Link
+        href="/gemma-2-2b/graph"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+      >
+        Circuit Tracer
+        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-11 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+          UPDATE
+        </span>
       </Link>
 
       <ReleasesDropdown />
@@ -121,7 +86,7 @@ export default function NavBarButtons() {
           onClick={() => {
             setJumpToOpen(!jumpToOpen);
           }}
-          className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+          className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
         >
           Jump To
           <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
@@ -211,7 +176,7 @@ export default function NavBarButtons() {
       </DropdownMenu.Root>
 
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
+        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
           Search
           <ChevronDown className="ml-0.5 h-3.5 w-3.5" />
         </DropdownMenu.Trigger>
@@ -354,26 +319,6 @@ export default function NavBarButtons() {
       </Select.Root>
 
       <Link
-        href="/llama3.3-70b-it/assistant-axis"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
-      >
-        Assistant Axis
-        <span className="absolute -right-2 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
-          NEW
-        </span>
-      </Link>
-
-      <Link
-        href="/gemma-2-2b/graph"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
-      >
-        Circuit Tracer
-        <span className="absolute -right-2 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
-          NEW
-        </span>
-      </Link>
-
-      <Link
         href="/steer"
         prefetch={false}
         rel="noreferrer"
@@ -387,7 +332,7 @@ export default function NavBarButtons() {
           href="/sae-bench"
           prefetch={false}
           rel="noreferrer"
-          className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+          className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
         >
           SAE Evals
         </Link>
@@ -397,9 +342,77 @@ export default function NavBarButtons() {
         href="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/"
         target="_blank"
         rel="noreferrer"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
         Exports
+      </Link>
+
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
+          Guides
+          <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            sideOffset={-3}
+            className="z-50 min-w-[8rem] max-w-[24rem] overflow-hidden rounded-md bg-white p-1 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+          >
+            <DropdownMenu.Item className="flex cursor-pointer items-center border-b border-slate-100 px-5 py-3 text-sm font-medium text-sky-700 outline-none hover:bg-sky-100 hover:text-sky-700">
+              <Link
+                href="https://github.com/hijohnnylin/neuronpedia#readme"
+                target="_blank"
+                prefetch={false}
+                rel="noreferrer"
+                className="flex w-full cursor-pointer flex-col items-start justify-center text-[13px]"
+              >
+                Running Neuronpedia
+                <span className="ml-0 pt-0.5 text-[11px] font-normal leading-snug text-slate-500">
+                  The latest README for getting started with Neuronpedia.
+                </span>
+              </Link>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className="flex cursor-pointer items-center border-b border-slate-100 px-5 py-3 text-sm font-medium text-sky-700 outline-none hover:bg-sky-100 hover:text-sky-700">
+              <Link
+                href="https://docs.neuronpedia.org"
+                target="_blank"
+                prefetch={false}
+                rel="noreferrer"
+                className="flex w-full cursor-pointer flex-col items-start justify-center text-[13px]"
+              >
+                Usage Docs (To Be Updated)
+                <span className="ml-0 pt-0.5 text-[11px] font-normal leading-snug text-slate-500">
+                  What is Neuronpedia? How do I use it?
+                </span>
+              </Link>
+            </DropdownMenu.Item>
+            {releases.filter((r) => r.name === 'gemma-scope').length > 0 && (
+              <DropdownMenu.Item className="flex cursor-pointer items-center border-b border-slate-100 px-5 py-3 text-sm font-medium text-sky-700 outline-none hover:bg-sky-100 hover:text-sky-700">
+                <Link
+                  href="/gemma-scope"
+                  prefetch={false}
+                  rel="noreferrer"
+                  className="flex w-full cursor-pointer flex-col items-start justify-center text-[13px]"
+                >
+                  Gemma Scope
+                  <span className="ml-0 pt-0.5 text-[11px] font-normal leading-snug text-slate-500">
+                    A guided, beginner-friendly introduction to AI interpretability.
+                  </span>
+                </Link>
+              </DropdownMenu.Item>
+            )}
+
+            <DropdownMenu.Arrow className="fill-white" />
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+
+      <Link
+        href="/api-doc"
+        prefetch={false}
+        rel="noreferrer"
+        className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 pr-2.5 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+      >
+        API
       </Link>
 
       <Link

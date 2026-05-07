@@ -61,10 +61,10 @@ export default function NavBar({ session }: { session: Session | null }) {
               {SITE_NAME_VERCEL_DEPLOY ? (
                 <p className="ml-1.5 font-medium text-[#7B3F00] sm:mt-0">{SITE_NAME_VERCEL_DEPLOY}</p>
               ) : (
-                <p className="flex flex-col items-center justify-center font-normal text-sky-800 sm:mt-0">
+                <p className="flex flex-col items-start justify-start gap-y-[1px] pl-0.5 font-normal text-sky-800 sm:mt-0">
                   Neuronpedia
                   {pathname.endsWith('/graph') ? (
-                    <span className="hidden whitespace-nowrap text-[9px] font-semibold uppercase leading-none text-sky-700 sm:inline">
+                    <span className="hidden whitespace-nowrap text-[9px] font-semibold uppercase leading-none text-slate-600 sm:inline">
                       {' '}
                       Circuit Tracer
                     </span>

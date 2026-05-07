@@ -76,7 +76,7 @@ export const ListsOnActivationsScalarFieldEnumSchema = z.enum(['activationId','l
 
 export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier','token','expires']);
 
-export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','defaultGraphSourceSetName','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
+export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','openRouterId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','defaultGraphSourceSetName','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
 
 export const GraphHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','runpodServerlessUrl','modelId','createdAt','updatedAt']);
 
@@ -138,9 +138,11 @@ export const ProblemNodeCommentScalarFieldEnumSchema = z.enum(['id','problemNode
 
 export const ProblemNodeLogScalarFieldEnumSchema = z.enum(['id','timestamp','userId','problemNodeId','action','details']);
 
-export const NlaSourceScalarFieldEnumSchema = z.enum(['id','name','description','url','author','modelId','actor','critic','servers','norm','createdAt']);
+export const NlaSourceScalarFieldEnumSchema = z.enum(['id','modelId','displayName','description','url','author','av','ar','layerNum','servers','norm','createdAt']);
 
-export const NlaExplainCacheScalarFieldEnumSchema = z.enum(['id','text','numCompletionTokens','temperature','modelId','nlaSourceName','resultJson','createdAt']);
+export const NlaExplainCacheScalarFieldEnumSchema = z.enum(['id','text','textHash','numCompletionTokens','temperature','modelId','nlaSourceId','sortedPositions','tokens','resultJson','createdAt']);
+
+export const NlaExplainShareScalarFieldEnumSchema = z.enum(['id','cacheId','position','paragraph','highlightStart','highlightEnd','comment','featured','featuredDisplayName','createdAt']);
 
 export const SampleDatasetScalarFieldEnumSchema = z.enum(['id','name','description','url','createdByUserId','createdAt']);
 
@@ -1096,6 +1098,7 @@ export const ModelSchema = z.object({
   displayName: z.string(),
   creatorId: z.string(),
   tlensId: z.string().nullable(),
+  openRouterId: z.string().nullable(),
   dimension: z.number().int().nullable(),
   thinking: z.boolean(),
   defaultSourceSetName: z.string().nullable(),
@@ -1139,6 +1142,7 @@ export type ModelRelations = {
   graphHostSources: GraphHostSourceWithRelations[];
   graphMetadata: GraphMetadataWithRelations[];
   nlaSources: NlaSourceWithRelations[];
+  nlaExplainCaches: NlaExplainCacheWithRelations[];
   samples: SampleWithRelations[];
   probes: ProbeWithRelations[];
 };
@@ -1160,6 +1164,7 @@ export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSche
   graphHostSources: z.lazy(() => GraphHostSourceWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourceWithRelationsSchema).array(),
+  nlaExplainCaches: z.lazy(() => NlaExplainCacheWithRelationsSchema).array(),
   samples: z.lazy(() => SampleWithRelationsSchema).array(),
   probes: z.lazy(() => ProbeWithRelationsSchema).array(),
 }))
@@ -1182,6 +1187,7 @@ export type ModelPartialRelations = {
   graphHostSources?: GraphHostSourcePartialWithRelations[];
   graphMetadata?: GraphMetadataPartialWithRelations[];
   nlaSources?: NlaSourcePartialWithRelations[];
+  nlaExplainCaches?: NlaExplainCachePartialWithRelations[];
   samples?: SamplePartialWithRelations[];
   probes?: ProbePartialWithRelations[];
 };
@@ -1203,6 +1209,7 @@ export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelation
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
+  nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
 })).partial()
@@ -1224,6 +1231,7 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
+  nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
 }).partial())
@@ -3440,14 +3448,15 @@ export const ProblemNodeLogWithPartialRelationsSchema: z.ZodType<ProblemNodeLogW
 /////////////////////////////////////////
 
 export const NlaSourceSchema = z.object({
-  id: z.string().cuid(),
-  name: z.string(),
+  id: z.string(),
+  modelId: z.string(),
+  displayName: z.string(),
   description: z.string(),
   url: z.string(),
   author: z.string(),
-  modelId: z.string(),
-  actor: z.string(),
-  critic: z.string(),
+  av: z.string(),
+  ar: z.string(),
+  layerNum: z.number().int(),
   servers: z.string().array(),
   norm: z.number(),
   createdAt: z.coerce.date(),
@@ -3468,12 +3477,14 @@ export type NlaSourcePartial = z.infer<typeof NlaSourcePartialSchema>
 
 export type NlaSourceRelations = {
   model: ModelWithRelations;
+  cachedEntries: NlaExplainCacheWithRelations[];
 };
 
 export type NlaSourceWithRelations = z.infer<typeof NlaSourceSchema> & NlaSourceRelations
 
 export const NlaSourceWithRelationsSchema: z.ZodType<NlaSourceWithRelations> = NlaSourceSchema.merge(z.object({
   model: z.lazy(() => ModelWithRelationsSchema),
+  cachedEntries: z.lazy(() => NlaExplainCacheWithRelationsSchema).array(),
 }))
 
 // NLA SOURCE PARTIAL RELATION SCHEMA
@@ -3481,18 +3492,21 @@ export const NlaSourceWithRelationsSchema: z.ZodType<NlaSourceWithRelations> = N
 
 export type NlaSourcePartialRelations = {
   model?: ModelPartialWithRelations;
+  cachedEntries?: NlaExplainCachePartialWithRelations[];
 };
 
 export type NlaSourcePartialWithRelations = z.infer<typeof NlaSourcePartialSchema> & NlaSourcePartialRelations
 
 export const NlaSourcePartialWithRelationsSchema: z.ZodType<NlaSourcePartialWithRelations> = NlaSourcePartialSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
+  cachedEntries: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
 })).partial()
 
 export type NlaSourceWithPartialRelations = z.infer<typeof NlaSourceSchema> & NlaSourcePartialRelations
 
 export const NlaSourceWithPartialRelationsSchema: z.ZodType<NlaSourceWithPartialRelations> = NlaSourceSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
+  cachedEntries: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
 }).partial())
 
 /////////////////////////////////////////
@@ -3502,10 +3516,16 @@ export const NlaSourceWithPartialRelationsSchema: z.ZodType<NlaSourceWithPartial
 export const NlaExplainCacheSchema = z.object({
   id: z.string().cuid(),
   text: z.string(),
+  /**
+   * SHA-256 hex of `text` (UTF-8); used in the unique key so btree stays under Postgres row-size limits.
+   */
+  textHash: z.string(),
   numCompletionTokens: z.number().int(),
   temperature: z.number(),
   modelId: z.string(),
-  nlaSourceName: z.string(),
+  nlaSourceId: z.string(),
+  sortedPositions: z.number().int().array(),
+  tokens: z.string().array(),
   resultJson: z.string(),
   createdAt: z.coerce.date(),
 })
@@ -3519,6 +3539,107 @@ export type NlaExplainCache = z.infer<typeof NlaExplainCacheSchema>
 export const NlaExplainCachePartialSchema = NlaExplainCacheSchema.partial()
 
 export type NlaExplainCachePartial = z.infer<typeof NlaExplainCachePartialSchema>
+
+// NLA EXPLAIN CACHE RELATION SCHEMA
+//------------------------------------------------------
+
+export type NlaExplainCacheRelations = {
+  model: ModelWithRelations;
+  nlaSource: NlaSourceWithRelations;
+  explainShares: NlaExplainShareWithRelations[];
+};
+
+export type NlaExplainCacheWithRelations = z.infer<typeof NlaExplainCacheSchema> & NlaExplainCacheRelations
+
+export const NlaExplainCacheWithRelationsSchema: z.ZodType<NlaExplainCacheWithRelations> = NlaExplainCacheSchema.merge(z.object({
+  model: z.lazy(() => ModelWithRelationsSchema),
+  nlaSource: z.lazy(() => NlaSourceWithRelationsSchema),
+  explainShares: z.lazy(() => NlaExplainShareWithRelationsSchema).array(),
+}))
+
+// NLA EXPLAIN CACHE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type NlaExplainCachePartialRelations = {
+  model?: ModelPartialWithRelations;
+  nlaSource?: NlaSourcePartialWithRelations;
+  explainShares?: NlaExplainSharePartialWithRelations[];
+};
+
+export type NlaExplainCachePartialWithRelations = z.infer<typeof NlaExplainCachePartialSchema> & NlaExplainCachePartialRelations
+
+export const NlaExplainCachePartialWithRelationsSchema: z.ZodType<NlaExplainCachePartialWithRelations> = NlaExplainCachePartialSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  nlaSource: z.lazy(() => NlaSourcePartialWithRelationsSchema),
+  explainShares: z.lazy(() => NlaExplainSharePartialWithRelationsSchema).array(),
+})).partial()
+
+export type NlaExplainCacheWithPartialRelations = z.infer<typeof NlaExplainCacheSchema> & NlaExplainCachePartialRelations
+
+export const NlaExplainCacheWithPartialRelationsSchema: z.ZodType<NlaExplainCacheWithPartialRelations> = NlaExplainCacheSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  nlaSource: z.lazy(() => NlaSourcePartialWithRelationsSchema),
+  explainShares: z.lazy(() => NlaExplainSharePartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// NLA EXPLAIN SHARE SCHEMA
+/////////////////////////////////////////
+
+export const NlaExplainShareSchema = z.object({
+  id: z.string().cuid(),
+  cacheId: z.string(),
+  position: z.number().int().nullable(),
+  paragraph: z.number().int().nullable(),
+  highlightStart: z.number().int().nullable(),
+  highlightEnd: z.number().int().nullable(),
+  comment: z.string(),
+  featured: z.boolean(),
+  featuredDisplayName: z.string().nullable(),
+  createdAt: z.coerce.date(),
+})
+
+export type NlaExplainShare = z.infer<typeof NlaExplainShareSchema>
+
+/////////////////////////////////////////
+// NLA EXPLAIN SHARE PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const NlaExplainSharePartialSchema = NlaExplainShareSchema.partial()
+
+export type NlaExplainSharePartial = z.infer<typeof NlaExplainSharePartialSchema>
+
+// NLA EXPLAIN SHARE RELATION SCHEMA
+//------------------------------------------------------
+
+export type NlaExplainShareRelations = {
+  cache: NlaExplainCacheWithRelations;
+};
+
+export type NlaExplainShareWithRelations = z.infer<typeof NlaExplainShareSchema> & NlaExplainShareRelations
+
+export const NlaExplainShareWithRelationsSchema: z.ZodType<NlaExplainShareWithRelations> = NlaExplainShareSchema.merge(z.object({
+  cache: z.lazy(() => NlaExplainCacheWithRelationsSchema),
+}))
+
+// NLA EXPLAIN SHARE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type NlaExplainSharePartialRelations = {
+  cache?: NlaExplainCachePartialWithRelations;
+};
+
+export type NlaExplainSharePartialWithRelations = z.infer<typeof NlaExplainSharePartialSchema> & NlaExplainSharePartialRelations
+
+export const NlaExplainSharePartialWithRelationsSchema: z.ZodType<NlaExplainSharePartialWithRelations> = NlaExplainSharePartialSchema.merge(z.object({
+  cache: z.lazy(() => NlaExplainCachePartialWithRelationsSchema),
+})).partial()
+
+export type NlaExplainShareWithPartialRelations = z.infer<typeof NlaExplainShareSchema> & NlaExplainSharePartialRelations
+
+export const NlaExplainShareWithPartialRelationsSchema: z.ZodType<NlaExplainShareWithPartialRelations> = NlaExplainShareSchema.merge(z.object({
+  cache: z.lazy(() => NlaExplainCachePartialWithRelationsSchema),
+}).partial())
 
 /////////////////////////////////////////
 // SAMPLE DATASET SCHEMA

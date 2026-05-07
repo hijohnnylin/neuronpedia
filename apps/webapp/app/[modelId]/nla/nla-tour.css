@@ -1,0 +1,213 @@
+/*
+ * NLA tour theme — overrides driver.js's default popover styles.
+ *
+ * Scoped to `.driver-popover.nla-driver-popover` so it only applies to
+ * tours that opt in via `driver({ popoverClass: 'nla-driver-popover' })`,
+ * and so the extra class bumps specificity above the defaults shipped
+ * in `driver.js/dist/driver.css` (which use single-class selectors).
+ *
+ * Palette mirrors the rest of the NLA UI: white surface, slate text,
+ * sky primary actions.
+ */
+
+.driver-popover.nla-driver-popover {
+  padding: 24px 28px 20px;
+  border-radius: 24px;
+  min-width: 420px;
+  max-width: 420px;
+  color: #334155; /* slate-700 */
+  background-color: #ffffff; /* sky-50 */
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.18),
+    0 2px 6px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25); /* slate-400/25 */
+}
+
+.driver-popover.nla-driver-popover * {
+  font-family:
+    var(--font-inter),
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Helvetica Neue',
+    sans-serif;
+}
+
+/* Title */
+.driver-popover.nla-driver-popover .driver-popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0f172a; /* slate-900 */
+  /* Reserve space for the close button. */
+  padding-right: 28px;
+  margin-bottom: 10px;
+}
+
+/* Description */
+.driver-popover.nla-driver-popover .driver-popover-description {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #475569; /* slate-600 */
+}
+.driver-popover.nla-driver-popover .driver-popover-description p {
+  margin: 0;
+}
+.driver-popover.nla-driver-popover .driver-popover-description p + p {
+  margin-top: 8px;
+}
+.driver-popover.nla-driver-popover .driver-popover-description strong {
+  color: #0f172a; /* slate-900 */
+  font-weight: 600;
+}
+.driver-popover.nla-driver-popover .driver-popover-description em {
+  color: #334155; /* slate-700 */
+  font-style: italic;
+}
+.driver-popover.nla-driver-popover .driver-popover-description a {
+  color: #0369a1; /* sky-700 */
+  text-decoration: none;
+  border-bottom: 1px solid rgba(3, 105, 161, 0.35);
+}
+.driver-popover.nla-driver-popover .driver-popover-description a:hover {
+  border-bottom-color: #0369a1;
+}
+.driver-popover.nla-driver-popover .driver-popover-description a:focus,
+.driver-popover.nla-driver-popover .driver-popover-description a:focus-visible {
+  outline: none;
+  box-shadow: none;
+  ring: 0;
+}
+
+/* Close button (X in the corner) */
+.driver-popover.nla-driver-popover .driver-popover-close-btn {
+  top: 6px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 6px;
+  color: #94a3b8; /* slate-400 */
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+.driver-popover.nla-driver-popover .driver-popover-close-btn:hover,
+.driver-popover.nla-driver-popover .driver-popover-close-btn:focus {
+  color: #475569; /* slate-600 */
+  background-color: rgba(148, 163, 184, 0.18); /* slate-400/18 */
+}
+
+/* Footer (progress + nav buttons) */
+.driver-popover.nla-driver-popover .driver-popover-footer {
+  margin-top: 12px;
+  gap: 12px;
+}
+.driver-popover.nla-driver-popover .driver-popover-progress-text {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8; /* slate-400 */
+}
+.driver-popover.nla-driver-popover .driver-popover-navigation-btns {
+  gap: 8px;
+}
+.driver-popover.nla-driver-popover .driver-popover-navigation-btns button + button {
+  margin-left: 0; /* gap handles spacing now */
+}
+
+/* Buttons */
+.driver-popover.nla-driver-popover .driver-popover-footer button {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0; /* slate-200 */
+  background-color: #ffffff;
+  color: #475569; /* slate-600 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.driver-popover.nla-driver-popover .driver-popover-footer button:hover,
+.driver-popover.nla-driver-popover .driver-popover-footer button:focus {
+  background-color: #f1f5f9; /* slate-100 */
+  border-color: #cbd5e1; /* slate-300 */
+  color: #0f172a; /* slate-900 */
+}
+
+/* Primary (Next / Done) */
+.driver-popover.nla-driver-popover .driver-popover-next-btn {
+  background-color: #0369a1; /* sky-700 */
+  border-color: #0369a1;
+  color: #ffffff;
+}
+.driver-popover.nla-driver-popover .driver-popover-next-btn:hover,
+.driver-popover.nla-driver-popover .driver-popover-next-btn:focus {
+  background-color: #075985; /* sky-800 */
+  border-color: #075985;
+  color: #ffffff;
+}
+
+/* Disabled state */
+.driver-popover.nla-driver-popover .driver-popover-footer .driver-popover-btn-disabled {
+  opacity: 0.45;
+}
+
+/* "Skip tour" button — only injected on step 1's popover footer (see
+ * `onPopoverRender` in `nla-tour.tsx`). Specificity must beat the
+ * generic `.driver-popover-footer button` rule above so it doesn't
+ * pick up the sky primary-button theme: a text/link look reads as a
+ * secondary "out" without competing with the next/done button. */
+.driver-popover.nla-driver-popover .driver-popover-footer button.nla-tour-skip-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 0px solid #e2e8f0; /* slate-200 */
+  background-color: #ffffff;
+  color: #94a3b8; /* slate-400 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.driver-popover.nla-driver-popover .driver-popover-footer button.nla-tour-skip-btn:hover {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 0px solid #e2e8f0; /* slate-200 */
+  background-color: #f1f5f9; /* slate-100 */
+  color: #94a3b8; /* slate-400 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Arrow — driver.js renders this as a CSS triangle: a 0x0 element
+ * with `border: 5px solid <color>`, where 3 of the 4 sides are set to
+ * `transparent` per `.driver-popover-arrow-side-*`. We must NOT use
+ * shorthand `border-color` here (it would re-color the transparent
+ * sides and turn the triangle back into a square). Override per
+ * matching side so only the visible edge is repainted. */
+.driver-popover.nla-driver-popover .driver-popover-arrow.driver-popover-arrow-side-left {
+  border-left-color: #ffffff;
+}
+.driver-popover.nla-driver-popover .driver-popover-arrow.driver-popover-arrow-side-right {
+  border-right-color: #ffffff;
+}
+.driver-popover.nla-driver-popover .driver-popover-arrow.driver-popover-arrow-side-top {
+  border-top-color: #ffffff;
+}
+.driver-popover.nla-driver-popover .driver-popover-arrow.driver-popover-arrow-side-bottom {
+  border-bottom-color: #ffffff;
+}

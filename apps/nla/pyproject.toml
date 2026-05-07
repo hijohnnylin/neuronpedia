@@ -1,0 +1,25 @@
+[project]
+name = "nla-server"
+version = "0.1.0"
+description = "FastAPI server for NLA (Natural Language Autoencoder) inference"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "torch",
+    "transformers",
+    "safetensors",
+    "orjson",
+    "pyyaml",
+    "numpy",
+    "python-dotenv",
+    "huggingface-hub",
+    "sglang[all]==0.5.8.post1",
+    "accelerate>=1.13.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+]

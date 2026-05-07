@@ -129,6 +129,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     visibility: Visibility.UNLISTED,
     instruct: false,
     tlensId: null,
+    openRouterId: null,
     inferenceEnabled: false,
     dimension: null,
     defaultSourceId: null,

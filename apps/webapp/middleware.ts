@@ -1,14 +1,24 @@
 import { Ratelimit } from '@upstash/ratelimit';
+import { ipAddress } from '@vercel/functions';
 import { kv } from '@vercel/kv';
 import { NextRequest, NextResponse } from 'next/server';
-import { ipAddress } from "@vercel/functions";
 import { API_KEY_HEADER_NAME, CONTACT_EMAIL_ADDRESS, ENABLE_RATE_LIMITER, HIGHER_LIMIT_API_TOKENS } from './lib/env';
 
 const RATE_LIMIT_WINDOW = '60 m';
 
 const NO_LIMIT_ENDPOINTS = ['/api/steer-load'];
 
-const NORMAL_RATE_LIMITS = [
+// Rate-limit entry. `exact: true` requires path-component matching (pathname
+// === endpoint OR pathname.startsWith(endpoint + '/')) so the bucket isn't
+// shared with hyphen-suffixed siblings — e.g. `/api/nla/explain` with
+// `exact: true` will NOT also count requests to `/api/nla/explain-saelens`
+// or `/api/nla/explain-share`. Default (omitted/false) preserves the
+// historical loose `startsWith` matching, which is intentional for
+// catch-alls (`/`, `/api`) and the `/api/steer` family aggregation
+// (`/api/steer-chat`, `/api/steer-logits`, …).
+type RateLimitEntry = { endpoint: string; limit: number; exact?: boolean };
+
+const NORMAL_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/', limit: 25000 },
   { endpoint: '/api', limit: 25000 },
   { endpoint: '/api/activation/new', limit: 1000 },
@@ -32,9 +42,19 @@ const NORMAL_RATE_LIMITS = [
   { endpoint: '/api/explorer/comment/delete', limit: 60 },
   { endpoint: '/api/explorer/edge/new', limit: 60 },
   { endpoint: '/api/explorer/edge/delete', limit: 60 },
+  { endpoint: '/api/saelens/latent-decoder', limit: 3600 },
+  { endpoint: '/api/nla/explain-saelens', limit: 120 },
+  // Each NLA chat send issues 2 requests to /api/nla/completion (streaming
+  // chat + canonical re-tokenize), so 240/hour ≈ 120 user-perceived messages
+  // per hour. The chat UI divides by 2 before displaying the counter.
+  { endpoint: '/api/nla/completion', limit: 240 },
+  // `exact: true` so this bucket is independent of /api/nla/explain-saelens
+  // and /api/nla/explain-share (without `exact`, prefix-matching would also
+  // count those endpoints' requests against this bucket).
+  { endpoint: '/api/nla/explain', limit: 120, exact: true },
 ];
 
-const HIGHER_RATE_LIMITS = [
+const HIGHER_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/', limit: 25000 },
   { endpoint: '/api', limit: 25000 },
   { endpoint: '/api/activation/new', limit: 3000 }, // higher
@@ -48,13 +68,27 @@ const HIGHER_RATE_LIMITS = [
   { endpoint: '/api/source-set/new', limit: 10 },
   { endpoint: '/api/graph/tokenize', limit: 300 },
   { endpoint: '/api/auth/signin', limit: 5 },
+  { endpoint: '/api/saelens/latent-decoder', limit: 3600 },
+  { endpoint: '/api/nla/explain-saelens', limit: 120 },
+  { endpoint: '/api/nla/completion', limit: 240 },
+  { endpoint: '/api/nla/explain', limit: 120, exact: true },
 ];
 
-const normalRateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
+function pathMatchesEndpoint(pathname: string, endpoint: string, exact: boolean | undefined) {
+  if (exact) {
+    return pathname === endpoint || pathname.startsWith(`${endpoint}/`);
+  }
+  return pathname.startsWith(endpoint);
+}
 
-for (const { endpoint, limit } of NORMAL_RATE_LIMITS) {
+type CompiledLimiter = { endpoint: string; exact: boolean | undefined; limiter: Ratelimit };
+
+const normalRateLimiters: CompiledLimiter[] = [];
+
+for (const { endpoint, limit, exact } of NORMAL_RATE_LIMITS) {
   normalRateLimiters.push({
     endpoint,
+    exact,
     limiter: new Ratelimit({
       redis: kv,
       prefix: endpoint,
@@ -63,11 +97,12 @@ for (const { endpoint, limit } of NORMAL_RATE_LIMITS) {
   });
 }
 
-const higherRateLimiters: { endpoint: string; limiter: Ratelimit }[] = [];
+const higherRateLimiters: CompiledLimiter[] = [];
 
-for (const { endpoint, limit } of HIGHER_RATE_LIMITS) {
+for (const { endpoint, limit, exact } of HIGHER_RATE_LIMITS) {
   higherRateLimiters.push({
     endpoint,
+    exact,
     limiter: new Ratelimit({
       redis: kv,
       prefix: `higher-${endpoint}`,
@@ -107,8 +142,8 @@ export default async function middleware(request: NextRequest) {
   const rateLimitersToUse =
     apiKey && HIGHER_LIMIT_API_TOKENS.includes(apiKey) ? higherRateLimiters : normalRateLimiters;
 
-  for (const { endpoint, limiter } of rateLimitersToUse) {
-    if (pathname.startsWith(endpoint) && !NO_LIMIT_ENDPOINTS.some((ep) => pathname.startsWith(ep))) {
+  for (const { endpoint, exact, limiter } of rateLimitersToUse) {
+    if (pathMatchesEndpoint(pathname, endpoint, exact) && !NO_LIMIT_ENDPOINTS.some((ep) => pathname.startsWith(ep))) {
       // eslint-disable-next-line
       const { success, pending, limit, reset, remaining } = await limiter.limit(ip);
       requestHeaders.set('x-limit-remaining', remaining.toString());

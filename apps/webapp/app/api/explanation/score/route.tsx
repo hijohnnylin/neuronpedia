@@ -1,6 +1,11 @@
 import { prisma } from '@/lib/db';
 import { getAutoInterpKeyToUse } from '@/lib/db/userSecret';
 import { generateScoreEleuther } from '@/lib/external/autointerp-scorer-eleuther';
+import {
+  generateScoreNlaReconstructor,
+  generateScoreNlaVerbalizer,
+  generateScoreNlaVerbalizerLast,
+} from '@/lib/external/autointerp-scorer-nla';
 import { generateScoreRecallAlt } from '@/lib/external/autointerp-scorer-recall-json';
 import {
   ERROR_RECALL_ALT_FAILED,
@@ -92,7 +97,7 @@ import { getUserByName } from '../../../../lib/db/user';
 
 const scoreRequestSchema = object({
   explanationId: string().required(),
-  scorerModel: string().required(),
+  scorerModel: string().optional(),
   scorerType: string().required(),
 });
 
@@ -118,6 +123,35 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     });
     if (!explanationScoreType) {
       return NextResponse.json({ message: 'Unsupported explanation score type' }, { status: 400 });
+    }
+
+    // NLA scorers: no model needed, no activations needed — early return
+    const nlaScorers: Record<string, (exp: any, usr: any) => Promise<any>> = {
+      nla_reconstructor: generateScoreNlaReconstructor,
+      nla_verbalizer: generateScoreNlaVerbalizer,
+      nla_verbalizer_last: generateScoreNlaVerbalizerLast,
+    };
+    if (explanationScoreType.name in nlaScorers) {
+      const explanation = await prisma.explanation.findUnique({
+        where: { id: body.explanationId },
+      });
+      if (!explanation) {
+        return NextResponse.json({ message: `Explanation not found: ${body.explanationId}` }, { status: 404 });
+      }
+      const existingNlaScore = await prisma.explanationScore.findFirst({
+        where: {
+          explanationId: body.explanationId,
+          explanationScoreTypeName: explanationScoreType.name,
+        },
+      });
+      if (existingNlaScore) {
+        return NextResponse.json(
+          { message: 'NLA score already exists for this explanation' },
+          { status: 400 },
+        );
+      }
+      const score = await nlaScorers[explanationScoreType.name](explanation, request.user);
+      return NextResponse.json({ score });
     }
 
     // get the scorer model type
@@ -267,6 +301,10 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     if (error instanceof ValidationError) {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }
-    return NextResponse.json({ message: 'Unknown Error' }, { status: 500 });
+    console.error('/api/explanation/score error:', error);
+    return NextResponse.json(
+      { message: error instanceof Error ? error.message : 'Unknown Error' },
+      { status: 500 },
+    );
   }
 });

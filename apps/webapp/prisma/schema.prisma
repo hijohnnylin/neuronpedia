@@ -282,6 +282,7 @@ model Model {
   creatorId        String
 
   tlensId   String?
+  openRouterId String?
   dimension Int?
   thinking  Boolean @default(false)
 
@@ -319,6 +320,7 @@ model Model {
   graphHostSources     GraphHostSource[]
   graphMetadata        GraphMetadata[]
   nlaSources           NlaSource[]
+  nlaExplainCaches     NlaExplainCache[]
 
   samples Sample[]
   probes Probe[]
@@ -1140,36 +1142,80 @@ model ProblemNodeLog {
 }
 
 model NlaSource {
-  id          String   @id @default(cuid())
-  name        String
+  id          String
+  modelId     String
+  model       Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  displayName String   @default("")
   description String   @default("")
   url         String   @default("")
   author      String   @default("")
-  modelId     String
-  model       Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
-  actor       String
-  critic      String
+  av          String
+  ar          String
+  layerNum    Int
   servers     String[]
   norm        Float    @default(0.0)
 
-  createdAt DateTime @default(now())
+  cachedEntries NlaExplainCache[]
+  createdAt     DateTime @default(now())
 
-  @@unique([modelId, name])
-  @@unique([modelId, actor, critic])
+  @@id([modelId, id])
+  @@unique([modelId, ar, av, layerNum])
   @@index([modelId])
 }
 
 model NlaExplainCache {
   id                  String   @id @default(cuid())
   text                String
+  /// SHA-256 hex of `text` (UTF-8); used in the unique key so btree stays under Postgres row-size limits.
+  textHash            String   @default("") @db.VarChar(64)
   numCompletionTokens Int      @default(0)
   temperature         Float
-  modelId             String
-  nlaSourceName       String
-  resultJson          String
-  createdAt           DateTime @default(now())
 
-  @@unique([text, numCompletionTokens, temperature, modelId, nlaSourceName], name: "nla_explain_cache_key")
+  modelId     String
+  model       Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  nlaSourceId String
+  nlaSource   NlaSource @relation(fields: [modelId, nlaSourceId], references: [modelId, id], onDelete: Cascade)
+
+  // Always-non-empty, ascending-sorted list of token positions explained
+  // for this cache entry. Required: callers must pass `positions` and
+  // `[]` is rejected by the API. The unique key includes this so two
+  // requests for the same prompt but different position sets are
+  // independent rows.
+  sortedPositions Int[]
+  tokens          String[] @default([])
+  resultJson      String
+  createdAt       DateTime @default(now())
+
+  explainShares NlaExplainShare[]
+  
+  @@unique([textHash, numCompletionTokens, temperature, modelId, nlaSourceId, sortedPositions], name: "nla_explain_cache_key")
+  @@index([modelId, nlaSourceId])
+  @@index([modelId])
+}
+
+// Short-lived share pointer: maps a compact `/nla/[id]` URL to an
+// `NlaExplainCache` row plus the query-param snapshot (position,
+// paragraph vs text-range, optional comment). Recipients hit
+// `/nla/[shareId]` and are redirected to `/[modelId]/nla?...`.
+model NlaExplainShare {
+  id             String          @id @default(cuid())
+  cacheId        String
+  cache          NlaExplainCache @relation(fields: [cacheId], references: [id], onDelete: Cascade)
+
+  position       Int?
+  paragraph      Int?
+  highlightStart Int?
+  highlightEnd   Int?
+  comment        String          @default("")
+
+  featured       Boolean         @default(false)
+  featuredDisplayName String?
+
+  createdAt DateTime @default(now())
+
+  @@index([cacheId])
+  @@index([featured])
 }
 
 enum ProbeSampleType {

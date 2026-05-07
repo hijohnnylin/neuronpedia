@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import ActivationItem from './activation-item';
 import { useExplanationScoreDetailContext } from './provider/explanation-score-detail-provider';
 import { useGlobalContext } from './provider/global-provider';
-import { Button } from './shadcn/button';
 import { Dialog, DialogContent, DialogTitle } from './shadcn/dialog';
 import { LoadingSquare } from './svg/loading-square';
 
@@ -52,6 +51,18 @@ type EleutherEmbeddingJsonDetails = {
   str_tokens: string[];
 }[];
 
+type NlaVerbalizerJsonDetails = {
+  nla_explanation: string;
+  nla_text_used: string;
+  original_explanation: string;
+  embedding_model: string;
+  embedding_dimensions: number;
+  cosine_similarity: number;
+  hfRepoId: string;
+  hfFolderId: string;
+  index: number;
+};
+
 export default function ExplanationScoreDetailDialog() {
   const {
     explanationScoreDetailLoading,
@@ -64,6 +75,7 @@ export default function ExplanationScoreDetailDialog() {
   const [recallParsedJson, setRecallParsedJson] = useState<RecallAltJsonDetails>();
   const [eleutherFuzzOrRecallJson, setEleutherFuzzOrRecallJson] = useState<EleutherFuzzOrRecallJsonDetails>();
   const [eleutherEmbeddingJson, setEleutherEmbeddingJson] = useState<EleutherEmbeddingJsonDetails>();
+  const [nlaVerbalizerJson, setNlaVerbalizerJson] = useState<NlaVerbalizerJsonDetails>();
 
   const { explanationScoreTypes } = useGlobalContext();
 
@@ -102,6 +114,11 @@ export default function ExplanationScoreDetailDialog() {
         // sort by result["distance"]
         result.sort((a, b) => b.distance - a.distance);
         setEleutherEmbeddingJson(result);
+      } else if (
+        explanationScoreDetailScore.explanationScoreTypeName === 'nla_verbalizer' ||
+        explanationScoreDetailScore.explanationScoreTypeName === 'nla_verbalizer_last'
+      ) {
+        setNlaVerbalizerJson(parsedJson as NlaVerbalizerJsonDetails);
       }
     }
   }, [explanationScoreDetailScore]);
@@ -138,16 +155,6 @@ export default function ExplanationScoreDetailDialog() {
                     }
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    setExplanationScoreDetailOpen(false);
-                  }}
-                  className="absolute right-5 top-0 w-20 min-w-20"
-                >
-                  Close
-                </Button>
                 <div className="flex basis-1/3 flex-col">
                   <div className="mb-0 flex flex-row items-center gap-x-1 text-[10px] font-medium uppercase text-slate-400">
                     Explanation
@@ -387,6 +394,55 @@ export default function ExplanationScoreDetailDialog() {
                 </table>
               </div>
             )}
+
+            {(explanationScoreDetailScore?.explanationScoreTypeName === 'nla_verbalizer' ||
+              explanationScoreDetailScore?.explanationScoreTypeName === 'nla_verbalizer_last') &&
+              nlaVerbalizerJson && (
+                <div className="flex w-full flex-col gap-y-4 px-5 pb-10 pt-4 text-slate-600">
+                  <div className="flex flex-col gap-y-1">
+                    <div className="text-[10px] font-medium uppercase text-slate-400">
+                      NLA Explanation (Generated)
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap">
+                      {nlaVerbalizerJson.nla_explanation}
+                    </div>
+                  </div>
+                  {nlaVerbalizerJson.nla_text_used !== nlaVerbalizerJson.nla_explanation && (
+                    <div className="flex flex-col gap-y-1">
+                      <div className="text-[10px] font-medium uppercase text-slate-400">
+                        NLA Text Used for Comparison (Last Paragraph)
+                      </div>
+                      <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap">
+                        {nlaVerbalizerJson.nla_text_used}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-y-1">
+                    <div className="text-[10px] font-medium uppercase text-slate-400">
+                      Original Explanation (Being Scored)
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap">
+                      {nlaVerbalizerJson.original_explanation}
+                    </div>
+                  </div>
+                  <div className="flex flex-row gap-x-6">
+                    <div className="flex flex-col gap-y-1">
+                      <div className="text-[10px] font-medium uppercase text-slate-400">Embedding Model</div>
+                      <div className="text-xs font-mono text-slate-600">{nlaVerbalizerJson.embedding_model}</div>
+                    </div>
+                    <div className="flex flex-col gap-y-1">
+                      <div className="text-[10px] font-medium uppercase text-slate-400">Dimensions</div>
+                      <div className="text-xs font-mono text-slate-600">{nlaVerbalizerJson.embedding_dimensions}</div>
+                    </div>
+                    <div className="flex flex-col gap-y-1">
+                      <div className="text-[10px] font-medium uppercase text-slate-400">Cosine Similarity</div>
+                      <div className="text-xs font-mono text-slate-600">
+                        {nlaVerbalizerJson.cosine_similarity.toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
             {explanationScoreDetailScore?.explanationScoreTypeName === 'eleuther_embedding' && (
               <div className="flex w-full flex-col gap-y-2 px-5 pb-10 pt-2 text-slate-600">

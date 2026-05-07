@@ -1,10 +1,11 @@
 -- AlterTable
-ALTER TABLE "Activation" ADD COLUMN     "zKIndices" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
-ADD COLUMN     "zQIndices" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
-ADD COLUMN     "zValues" DOUBLE PRECISION[] DEFAULT ARRAY[]::DOUBLE PRECISION[];
+ALTER TABLE "Activation"
+  ADD COLUMN IF NOT EXISTS "zKIndices" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
+  ADD COLUMN IF NOT EXISTS "zQIndices" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
+  ADD COLUMN IF NOT EXISTS "zValues" DOUBLE PRECISION[] DEFAULT ARRAY[]::DOUBLE PRECISION[];
 
 -- CreateTable
-CREATE TABLE "NlaSource" (
+CREATE TABLE IF NOT EXISTS "NlaSource" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
@@ -21,7 +22,7 @@ CREATE TABLE "NlaSource" (
 );
 
 -- CreateTable
-CREATE TABLE "NlaExplainCache" (
+CREATE TABLE IF NOT EXISTS "NlaExplainCache" (
     "id" TEXT NOT NULL,
     "text" TEXT NOT NULL,
     "numCompletionTokens" INTEGER NOT NULL DEFAULT 0,
@@ -35,7 +36,7 @@ CREATE TABLE "NlaExplainCache" (
 );
 
 -- CreateTable
-CREATE TABLE "ActivationRaw" (
+CREATE TABLE IF NOT EXISTS "ActivationRaw" (
     "id" TEXT NOT NULL,
     "modelId" TEXT NOT NULL,
     "prompt" TEXT NOT NULL,
@@ -54,31 +55,43 @@ CREATE TABLE "ActivationRaw" (
 );
 
 -- CreateIndex
-CREATE INDEX "NlaSource_modelId_idx" ON "NlaSource"("modelId");
+CREATE INDEX IF NOT EXISTS "NlaSource_modelId_idx" ON "NlaSource"("modelId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "NlaSource_modelId_name_key" ON "NlaSource"("modelId", "name");
+CREATE UNIQUE INDEX IF NOT EXISTS "NlaSource_modelId_name_key" ON "NlaSource"("modelId", "name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "NlaSource_modelId_actor_critic_key" ON "NlaSource"("modelId", "actor", "critic");
+CREATE UNIQUE INDEX IF NOT EXISTS "NlaSource_modelId_actor_critic_key" ON "NlaSource"("modelId", "actor", "critic");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "NlaExplainCache_text_numCompletionTokens_temperature_modelI_key" ON "NlaExplainCache"("text", "numCompletionTokens", "temperature", "modelId", "nlaSourceName");
+CREATE UNIQUE INDEX IF NOT EXISTS "NlaExplainCache_text_numCompletionTokens_temperature_modelI_key" ON "NlaExplainCache"("text", "numCompletionTokens", "temperature", "modelId", "nlaSourceName");
 
 -- CreateIndex
-CREATE INDEX "ActivationRaw_modelId_idx" ON "ActivationRaw"("modelId");
+CREATE INDEX IF NOT EXISTS "ActivationRaw_modelId_idx" ON "ActivationRaw"("modelId");
 
 -- CreateIndex
-CREATE INDEX "ActivationRaw_creatorId_idx" ON "ActivationRaw"("creatorId");
+CREATE INDEX IF NOT EXISTS "ActivationRaw_creatorId_idx" ON "ActivationRaw"("creatorId");
 
 -- CreateIndex
-CREATE INDEX "ActivationRaw_prompt_idx" ON "ActivationRaw"("prompt");
+CREATE INDEX IF NOT EXISTS "ActivationRaw_prompt_idx" ON "ActivationRaw"("prompt");
 
 -- AddForeignKey
-ALTER TABLE "NlaSource" ADD CONSTRAINT "NlaSource_modelId_fkey" FOREIGN KEY ("modelId") REFERENCES "Model"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "NlaSource" ADD CONSTRAINT "NlaSource_modelId_fkey" FOREIGN KEY ("modelId") REFERENCES "Model"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "ActivationRaw" ADD CONSTRAINT "ActivationRaw_modelId_fkey" FOREIGN KEY ("modelId") REFERENCES "Model"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "ActivationRaw" ADD CONSTRAINT "ActivationRaw_modelId_fkey" FOREIGN KEY ("modelId") REFERENCES "Model"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "ActivationRaw" ADD CONSTRAINT "ActivationRaw_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "ActivationRaw" ADD CONSTRAINT "ActivationRaw_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

@@ -1248,7 +1248,7 @@ function ProblemsGraphInner({
             <Panel position="top-left">
               <div className="flex flex-col gap-2">
                 <div className="flex flex-row items-start gap-2">
-                  <div className="flex flex-col gap-y-2 rounded-lg border border-slate-200 bg-white px-3 pb-0 pt-2.5 shadow">
+                  <div className="flex flex-col gap-y-2 rounded-lg border border-slate-200 bg-white px-3 pb-2.5 pt-2.5 shadow">
                     <div className="mb-0 flex w-full flex-row items-center justify-between gap-x-5">
                       <h1 className="flex flex-row items-center gap-1 text-[15px] font-semibold text-slate-700">
                         Interpretability Explorer{' '}
@@ -1269,7 +1269,7 @@ function ProblemsGraphInner({
                       </button>
                     </div>
                     {recentLogs.length > 0 && (
-                      <div className="flex w-full max-w-[300px] flex-col">
+                      <div className="hidden w-full max-w-[300px] flex-col">
                         <div className="sticky top-0 z-10 mb-0 rounded border-slate-200 bg-slate-100 pb-1 pt-1 text-center text-[8px] font-medium uppercase text-slate-500">
                           Recently Added
                         </div>

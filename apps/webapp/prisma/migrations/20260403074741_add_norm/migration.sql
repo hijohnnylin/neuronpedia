@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "NlaSource" ADD COLUMN     "norm" DOUBLE PRECISION NOT NULL DEFAULT 0.0;

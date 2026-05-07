@@ -602,6 +602,118 @@ div[data-virtuoso-scroller='true'] table {
   border-radius: 4px;
 }
 
+/* NLA comment panel (react-markdown) — not `.prose`, so blog globals don't apply */
+.nla-markdown {
+  max-width: none;
+
+  & p {
+    font-size: 14px;
+    line-height: 1.45;
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  & p:first-child {
+    margin-top: 0;
+  }
+
+  & p:last-child {
+    margin-bottom: 0;
+  }
+
+  & h1,
+  & h2,
+  & h3,
+  & h4 {
+    font-weight: 600;
+    color: rgb(30 41 59);
+    margin-top: 0.5rem;
+    margin-bottom: 0.25rem;
+    line-height: 1.35;
+  }
+
+  & h1 {
+    font-size: 13px;
+  }
+
+  & h2 {
+    font-size: 12px;
+  }
+
+  & h3,
+  & h4 {
+    font-size: 11px;
+  }
+
+  & ul,
+  & ol {
+    margin: 0.375rem 0;
+    padding-left: 1.25rem;
+    font-size: 11px;
+  }
+
+  & li {
+    margin: 0.125rem 0;
+    line-height: 1.5;
+  }
+
+  & code:not(pre code) {
+    font-size: 11px;
+    background-color: rgb(251 191 36 / 0.5);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+  }
+
+  & pre {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    font-size: 11px;
+    line-height: 1.45;
+    background-color: rgb(15 23 42);
+    color: rgb(241 245 249);
+    border-radius: 0.375rem;
+    overflow-x: auto;
+  }
+
+  & pre code {
+    background: transparent;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  & blockquote {
+    margin: 0.375rem 0;
+    padding-left: 0.75rem;
+    border-left: 3px solid rgb(251 191 36);
+    color: rgb(71 85 105);
+    font-size: 11px;
+  }
+
+  & table {
+    font-size: 11px;
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.5rem 0;
+  }
+
+  & th,
+  & td {
+    border: 1px solid rgb(226 232 240);
+    padding: 0.25rem 0.5rem;
+  }
+
+  & th {
+    background: rgb(248 250 252);
+    font-weight: 600;
+  }
+
+  & hr {
+    margin: 0.5rem 0;
+    border: 0;
+    border-top: 1px solid rgb(226 232 240);
+  }
+}
+
 /* BLOG */
 
 .prose {
@@ -1232,3 +1344,47 @@ foreignObject canvas {
     --highlight: rgba(255, 255, 255, 0.15);
   }
 } */
+
+/* NLA explainer animations */
+@keyframes chip-loading-sweep {
+  0% {
+    left: 0;
+    width: 1px;
+    opacity: 0;
+  }
+  10% {
+    left: 0;
+    width: 1px;
+    opacity: 1;
+  }
+  25% {
+    left: 0;
+    width: 33%;
+    opacity: 1;
+  }
+  75% {
+    left: 67%;
+    width: 33%;
+    opacity: 1;
+  }
+  90% {
+    left: calc(100% - 1px);
+    width: 1px;
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 1px);
+    width: 1px;
+    opacity: 0;
+  }
+}
+@keyframes chip-amber-fade-in {
+  0% {
+    background-color: rgba(253, 230, 138, 0);
+    color: rgb(148 163 184);
+  }
+  100% {
+    background-color: rgb(253 230 138);
+    color: rgb(180 83 9);
+  }
+}

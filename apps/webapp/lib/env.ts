@@ -70,6 +70,7 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+export const HF_TOKEN = process.env.HF_TOKEN || '';
 
 // These keys are used to use OpenAI embedding via OpenAI, Azure, or OpenRouter. By default we use OpenAI directly and the AZURE fields can be kept blank.
 export const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || '';
@@ -112,6 +113,10 @@ export const GRAPH_SERVER_SECRET = process.env.GRAPH_SERVER_SECRET || '';
 export const USE_LOCALHOST_SPARSITY = process.env.USE_LOCALHOST_SPARSITY === 'true';
 export const SPARSITY_SERVER = process.env.SPARSITY_SERVER || 'http://localhost:5005';
 export const SPARSITY_SERVER_SECRET = process.env.SPARSITY_SERVER_SECRET || '';
+
+// NLA Server
+export const USE_LOCALHOST_NLA = process.env.USE_LOCALHOST_NLA === 'true';
+export const NLA_SERVER_SECRET = process.env.NLA_SERVER_SECRET || '';
 
 // Activations Server
 export const ACTIVATIONS_SERVER = process.env.ACTIVATIONS_SERVER || 'http://localhost:5010';

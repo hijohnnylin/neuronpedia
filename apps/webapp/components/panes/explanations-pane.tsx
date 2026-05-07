@@ -8,6 +8,7 @@ import {
   ERROR_REQUIRES_OPENROUTER,
   EXPLANATIONTYPE_HUMAN,
 } from '@/lib/utils/autointerp';
+import { getLayerNumFromSource } from '@/lib/utils/source';
 import {
   ExplanationScoreWithPartialRelations,
   ExplanationWithPartialRelations,
@@ -22,11 +23,26 @@ import {
   ExplanationType,
 } from '@prisma/client';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import * as Popover from '@radix-ui/react-popover';
+import { EventSourceParserStream } from 'eventsource-parser/stream';
 import { ChevronDownIcon, HelpCircle, Info, X } from 'lucide-react';
 import Link from 'next/link';
 import router from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '../svg/loading-spinner';
+import { LoadingSquare } from '../svg/loading-square';
+
+function cleanNlaPartialText(raw: string): string {
+  return raw
+    .replace(/<\/?explanation>/g, '')
+    .replace(/<explanation\s*$/g, '')
+    .replace(/<\/explanation\s*$/g, '')
+    .trim();
+}
+
+const NLA_MODELS_AND_LAYERS: Record<string, number[]> = {
+  // 'qwen2.5-7b-it': [20],
+};
 
 export default function ExplanationsPane({
   currentNeuron,
@@ -62,6 +78,12 @@ export default function ExplanationsPane({
   >(explanationScoreModelTypes.length > 0 ? explanationScoreModelTypes.filter((type) => type.featured)[0] : undefined);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isExplaining, setIsExplaining] = useState(false);
+  const [nlaPopoverOpen, setNlaPopoverOpen] = useState(false);
+  const [nlaLoading, setNlaLoading] = useState(false);
+  const [nlaPartialText, setNlaPartialText] = useState('');
+  const [nlaResult, setNlaResult] = useState<{ description: string; cosine_similarity: number | null } | null>(null);
+  const [nlaError, setNlaError] = useState<string | null>(null);
+  const nlaAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (explanationTypesFiltered.length > 0) {
@@ -87,6 +109,83 @@ export default function ExplanationsPane({
       .sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
     setExplanationTypesFiltered(filtered);
   }, [explanationTypes, currentNeuron, getSourceSet]);
+
+  const isNlaSupported = (() => {
+    if (!currentNeuron?.modelId || !currentNeuron?.layer) return false;
+    const allowedLayers = NLA_MODELS_AND_LAYERS[currentNeuron.modelId];
+    if (!allowedLayers) return false;
+    const layerNum = getLayerNumFromSource(currentNeuron.layer);
+    return allowedLayers.includes(layerNum);
+  })();
+
+  const handleNlaExplain = async () => {
+    const hfRepoId = currentNeuron?.source?.hfRepoId;
+    const hfFolderId = currentNeuron?.source?.hfFolderId;
+    const index = currentNeuron?.index !== undefined ? parseInt(currentNeuron.index, 10) : undefined;
+    if (!hfRepoId || !hfFolderId || index === undefined || Number.isNaN(index)) return;
+
+    nlaAbortRef.current?.abort();
+    const controller = new AbortController();
+    nlaAbortRef.current = controller;
+
+    setNlaPopoverOpen(true);
+    setNlaLoading(true);
+    setNlaPartialText('');
+    setNlaResult(null);
+    setNlaError(null);
+
+    try {
+      const res = await fetch('/api/nla/explain-saelens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hfRepoId, hfFolderId, index }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setNlaError(data.error || `Error: ${res.status}`);
+        setNlaLoading(false);
+        return;
+      }
+
+      if (!res.body) {
+        setNlaError('No response body');
+        setNlaLoading(false);
+        return;
+      }
+
+      const reader = res.body
+        .pipeThrough(new TextDecoderStream())
+        .pipeThrough(new EventSourceParserStream())
+        .getReader();
+
+      while (true) {
+        // eslint-disable-next-line no-await-in-loop
+        const { done, value } = await reader.read();
+        if (done) break;
+        const eventData = value.data;
+        if (eventData === '[DONE]') break;
+
+        const parsed = JSON.parse(eventData);
+        if ('done' in parsed && parsed.done === false) {
+          setNlaPartialText(cleanNlaPartialText(parsed.text || ''));
+        } else if ('description' in parsed) {
+          setNlaResult({
+            description: parsed.description,
+            cosine_similarity: parsed.cosine_similarity ?? null,
+          });
+          setNlaPartialText('');
+        }
+      }
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      setNlaError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setNlaLoading(false);
+      nlaAbortRef.current = null;
+    }
+  };
 
   return (
     <div className="relative mb-0 flex flex-col gap-x-2 overflow-hidden border bg-white px-0 pb-0 pt-2 text-xs transition-all sm:rounded-lg sm:shadow">
@@ -368,7 +467,9 @@ export default function ExplanationsPane({
                                     Generate New Score
                                   </div>
                                   <div className="flex w-full flex-row gap-x-2">
-                                    <div className="flex min-w-[calc(50%-35px)] max-w-[calc(50%-35px)] flex-1 flex-col items-center">
+                                    <div
+                                      className={`flex flex-1 flex-col items-center ${selectedExplanationScoreType?.name === 'eleuther_embedding' || selectedExplanationScoreType?.name.startsWith('nla_') ? '' : 'min-w-[calc(50%-35px)] max-w-[calc(50%-35px)]'}`}
+                                    >
                                       <DropdownMenu.Root>
                                         <DropdownMenu.Trigger asChild>
                                           <button
@@ -393,7 +494,10 @@ export default function ExplanationsPane({
                                               Scorer Types
                                             </div>
                                             {explanationScoreTypes
-                                              .filter((type) => type.featured)
+                                              .filter(
+                                                (type) =>
+                                                  type.featured || (type.name.startsWith('nla_') && isNlaSupported),
+                                              )
                                               .map((s) => (
                                                 <DropdownMenu.Item
                                                   key={s.name}
@@ -430,7 +534,10 @@ export default function ExplanationsPane({
                                     </div>
                                     <div
                                       className={`${
-                                        selectedExplanationScoreType?.name === 'eleuther_embedding' ? 'hidden' : 'flex'
+                                        selectedExplanationScoreType?.name === 'eleuther_embedding' ||
+                                        selectedExplanationScoreType?.name.startsWith('nla_')
+                                          ? 'hidden'
+                                          : 'flex'
                                       } min-w-[calc(50%-35px)] max-w-[calc(50%-35px)] flex-1 flex-row items-center justify-start gap-x-2 overflow-hidden text-ellipsis whitespace-pre`}
                                     >
                                       <DropdownMenu.Root>
@@ -497,7 +604,8 @@ export default function ExplanationsPane({
                                         }
                                         if (
                                           !selectedExplanationScoreModelType &&
-                                          selectedExplanationScoreType?.name !== 'eleuther_embedding'
+                                          selectedExplanationScoreType?.name !== 'eleuther_embedding' &&
+                                          !selectedExplanationScoreType?.name.startsWith('nla_')
                                         ) {
                                           alert('Please select a scorer model.');
                                           return;
@@ -873,6 +981,76 @@ export default function ExplanationsPane({
           </button>
         </div>
       </div>
+      {isNlaSupported && (
+        <div className="flex w-full flex-col border-t border-slate-200 px-3 py-3">
+          <div className="flex w-full items-center justify-center">
+            <Popover.Root open={nlaPopoverOpen} onOpenChange={setNlaPopoverOpen}>
+              <Popover.Trigger asChild>
+                <button
+                  type="button"
+                  onClick={handleNlaExplain}
+                  disabled={nlaLoading || !currentNeuron?.source?.hfRepoId || !currentNeuron?.source?.hfFolderId}
+                  className="flex max-w-[140px] flex-1 items-center justify-center rounded bg-slate-200 px-3 py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+                >
+                  {nlaLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Explain With NLA'}
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-50 min-h-[320px] w-[320px] rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-lg"
+                  sideOffset={6}
+                  side="bottom"
+                  onInteractOutside={() => setNlaPopoverOpen(false)}
+                >
+                  {nlaError && <div className="text-xs text-red-500">{nlaError}</div>}
+                  {!nlaError && nlaLoading && !nlaPartialText && (
+                    <div className="flex items-center justify-center gap-x-2 py-2 text-xs text-slate-400">
+                      <LoadingSquare size={18} />
+                      <span>Generating NLA explanation...</span>
+                    </div>
+                  )}
+                  {!nlaError && nlaLoading && nlaPartialText && (
+                    <div className="flex flex-col gap-y-2">
+                      <div className="whitespace-pre-wrap border-l-2 border-slate-200 pl-2 text-xs font-medium leading-snug text-slate-700">
+                        {nlaPartialText}
+                      </div>
+                      <div className="flex items-center gap-x-1.5 text-[10px] text-slate-400">
+                        <LoadingSquare size={14} />
+                      </div>
+                    </div>
+                  )}
+                  {nlaResult && (
+                    <div className="flex flex-col gap-y-2">
+                      <div className="whitespace-pre-wrap text-xs font-medium leading-snug text-slate-700">
+                        {nlaResult.description}
+                      </div>
+                      {nlaResult.cosine_similarity !== null && (
+                        <div className="flex items-center gap-x-1">
+                          <span className="text-[10px] text-slate-400">Cos Sim</span>
+                          <span
+                            className={`rounded border px-1.5 py-0.5 font-mono text-xs ${
+                              nlaResult.cosine_similarity >= 0.8
+                                ? 'border-emerald-400 bg-emerald-100'
+                                : nlaResult.cosine_similarity >= 0.6
+                                  ? 'border-yellow-400 bg-yellow-100'
+                                  : nlaResult.cosine_similarity >= 0.4
+                                    ? 'border-orange-400 bg-orange-100'
+                                    : 'border-red-400 bg-red-100'
+                            }`}
+                          >
+                            {nlaResult.cosine_similarity.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <Popover.Arrow className="fill-slate-200" />
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          </div>
+        </div>
+      )}
       {/* <div className="rounded-b-md px-2 py-2 pt-0">
         </div>
         <div className="relative mb-0 flex flex-col rounded-lg border border-slate-200 bg-white text-xs shadow transition-all sm:mt-0 ">             

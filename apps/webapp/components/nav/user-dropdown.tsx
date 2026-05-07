@@ -36,7 +36,20 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                     <ExternalLink className="h-3.5 w-3.5" />
                   </div>
                 </Link>
-
+              </>
+            )}
+            <div
+              className={`mx-auto flex w-full flex-col items-center justify-center gap-3 border-slate-200 pb-4 ${
+                user && 'mb-4 mt-4 border-b border-t pt-4'
+              } sm:hidden`}
+              onClick={() => {
+                setShowUserPopover(false);
+              }}
+            >
+              <NavBarButtons />
+            </div>
+            {user && (
+              <>
                 <button
                   type="button"
                   className="relative flex w-full items-center justify-center space-x-2 rounded-md p-2 text-left text-sm outline-none ring-0 transition-all duration-75 hover:bg-slate-100 sm:justify-start"
@@ -47,7 +60,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   }}
                 >
                   <Settings className="h-4 w-4" />
-                  <p className="text-base sm:text-sm">Settings + API</p>
+                  <p className="text-xs sm:text-sm">Settings + API</p>
                 </button>
 
                 <Link
@@ -56,7 +69,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   className="relative flex w-full items-center justify-center space-x-2 rounded-md p-2 text-left text-sm outline-none ring-0 transition-all duration-75 hover:bg-slate-100 sm:justify-start"
                 >
                   <LayoutList className="h-4 w-4" />
-                  <p className="text-base sm:text-sm">My Lists</p>
+                  <p className="text-xs sm:text-sm">My Lists</p>
                 </Link>
                 <Link
                   prefetch={false}
@@ -64,7 +77,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   className="relative flex w-full items-center justify-center space-x-2 rounded-md p-2 text-left text-sm outline-none ring-0 transition-all duration-75 hover:bg-slate-100 sm:justify-start"
                 >
                   <MoveUpLeft className="h-4 w-4" />
-                  <p className="text-base sm:text-sm">My Vectors</p>
+                  <p className="text-xs sm:text-sm">My Vectors</p>
                 </Link>
                 <button
                   type="button"
@@ -76,7 +89,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   }}
                 >
                   <Bookmark className="h-4 w-4" />
-                  <p className="text-base sm:text-sm">Bookmarks</p>
+                  <p className="text-xs sm:text-sm">Bookmarks</p>
                 </button>
 
                 <button
@@ -88,20 +101,10 @@ export default function UserDropdown({ session }: { session: Session | null }) {
                   }}
                 >
                   <LogOut className="h-4 w-4" />
-                  <p className="text-base sm:text-sm">Logout</p>
+                  <p className="text-xs sm:text-sm">Logout</p>
                 </button>
               </>
             )}
-            <div
-              className={`mx-auto flex w-full flex-col items-center justify-center gap-3 border-slate-200 pb-4 ${
-                user && 'mt-4 border-t pt-4'
-              } sm:hidden`}
-              onClick={() => {
-                setShowUserPopover(false);
-              }}
-            >
-              <NavBarButtons />
-            </div>
           </div>
         }
         align="end"
