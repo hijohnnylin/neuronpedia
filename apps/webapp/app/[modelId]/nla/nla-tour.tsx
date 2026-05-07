@@ -111,7 +111,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
     {
       popover: {
         title: "🤔 What's the model thinking?",
-        showButtons: ['next'],
+        showButtons: ['next', 'close'],
         description: `
           <p>
           AI models sometimes omit their reasoning, give <a href="https://www.anthropic.com/research/reasoning-models-dont-say-think" target="_blank" rel="noopener noreferrer" style="color:#0369a1;">inaccurate explanations</a>, or <a href="https://openai.com/index/detecting-and-reducing-scheming-in-ai-models/" target="_blank" rel="noopener noreferrer" style="color:#0369a1;">simply lie</a>.
@@ -157,7 +157,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         `,
         side: 'right',
         align: 'start',
-        showButtons: ['next'],
+        showButtons: ['next', 'close'],
         // Pre-scroll the "?" chip into view and let layout settle for two
         // animation frames before driver.js measures it for step 3's
         // spotlight. We saw a rare race where step 3's highlight rectangle
@@ -199,7 +199,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         align: 'start',
         // The user advances by clicking the chip; only keep the close
         // button visible so they can still bail out of the tour.
-        showButtons: [],
+        showButtons: ['close'],
       },
       // Tighten the spotlight around the narrow "?" chip so the focus
       // area doesn't overflow far past the token horizontally. Restored
@@ -255,7 +255,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         `,
         side: 'bottom',
         align: 'center',
-        showButtons: [],
+        showButtons: ['close'],
       },
       // Advance as soon as the user clicks Explain. The click handler
       // also installs the watcher that auto-advances step 5 → step 6
@@ -311,11 +311,12 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         `,
         side: 'bottom',
         align: 'center',
-        // Auto-advances when the AV finishes; only show the (custom)
-        // close button so the user can still bail out. Advancement is
-        // driven by the watcher set up in step 4's click handler — see
-        // that step's `onHighlighted` for the rationale.
-        showButtons: [],
+        // Auto-advances when the AV finishes; advancement is driven by
+        // the watcher set up in step 4's click handler — see that step's
+        // `onHighlighted` for the rationale. Keep the close button so
+        // the user can bail out if generation never completes (timeout
+        // or stuck server).
+        showButtons: ['close'],
       },
       onDeselected: () => {
         clearAvDoneWatcher();
@@ -335,7 +336,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         `,
         side: 'left',
         align: 'start',
-        showButtons: ['next'],
+        showButtons: ['next', 'close'],
       },
       // Set the in-explanation highlight range when this step opens,
       // and clear it when the user moves off the step (or closes the
@@ -364,7 +365,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         `,
         side: 'left',
         align: 'start',
-        showButtons: ['next'],
+        showButtons: ['next', 'close'],
       },
     },
     {
@@ -378,7 +379,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         `,
         side: 'bottom',
         align: 'center',
-        showButtons: ['next'],
+        showButtons: ['next', 'close'],
       },
     },
     {
@@ -392,7 +393,7 @@ function buildTourSteps(options: { setHighlightedRange: NlaTourOptions['setHighl
         `,
         side: 'bottom',
         align: 'center',
-        showButtons: ['next'],
+        showButtons: ['next', 'close'],
         // Override the default Done behavior so we can soft-navigate to
         // the wrap-up state in `onDestroyed` (no hard page reload).
         // Setting `exitMode = 'finish'` is the only signal the destroy
