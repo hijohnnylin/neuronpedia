@@ -258,7 +258,7 @@ export default function NLAExplainer() {
           </div>
 
           <div
-            className={`absolute left-0 top-0 flex w-full flex-col items-center justify-center gap-x-5 gap-y-2 sm:-top-2.5 sm:left-1/2 sm:-translate-x-1/2`}
+            className={`absolute left-0 top-0 flex w-full flex-col items-center justify-center gap-x-5 gap-y-2 sm:-top-2.5 sm:left-1/2 sm:w-auto sm:-translate-x-1/2`}
           >
             <div
               className="flex w-full flex-col items-end justify-center gap-y-1 sm:w-auto sm:items-center sm:gap-y-1.5"
