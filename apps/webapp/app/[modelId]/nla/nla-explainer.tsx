@@ -330,7 +330,7 @@ export default function NLAExplainer() {
                           )
                         }
                         disabled={isBusy}
-                        className={`${index === demosForModel.length - 1 ? 'hidden' : ''} flex-1 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-[105px] sm:min-w-[105px] sm:max-w-[105px] sm:flex-auto ${
+                        className={`${index === demosForModel.length - 1 ? 'hidden sm:flex' : ''} flex-1 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:w-[105px] sm:min-w-[105px] sm:max-w-[105px] sm:flex-auto ${
                           isActive
                             ? 'border-sky-500 bg-sky-700 text-white'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-sky-100'
