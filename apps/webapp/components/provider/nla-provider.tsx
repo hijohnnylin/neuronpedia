@@ -1199,7 +1199,9 @@ export function NLAProvider({
       const effectiveSelection = positionsOverride ?? selectedTokenPositions;
       if (!fullText.trim() || isLoading) return;
       if (fullText.length > MAX_TEXT_LENGTH) {
-        setError(`Text must be ${MAX_TEXT_LENGTH} characters or less (currently ${fullText.length})`);
+        setError(
+          `Max chat character length of ${MAX_TEXT_LENGTH} exceeded. Please start a new chat by clicking "Free Chat".`,
+        );
         return;
       }
 

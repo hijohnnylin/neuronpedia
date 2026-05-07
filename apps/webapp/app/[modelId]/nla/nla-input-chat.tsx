@@ -1,6 +1,5 @@
 'use client';
 
-import CustomTooltip from '@/components/custom-tooltip';
 import { useNlaContext } from '@/components/provider/nla-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { CHARS_PER_TOKEN_ESTIMATE, CONFIDENCE_THRESHOLD, EXPLANATION_TOKEN_ESTIMATE } from '@/lib/nla-constants';
@@ -750,23 +749,25 @@ export default function NLAInputChat() {
       );
     }
 
-    return (
-      <Fragment key={tok.position}>
-        <CustomTooltip delayDuration={400} side="top" trigger={chipEl} minMargin className={tooltipTriggerClassName}>
-          <div className="flex flex-col items-center justify-center text-[10px] font-medium leading-normal text-slate-500">
-            {isExplained ? (
-              'Click to lock explanation details or share.'
-            ) : (
-              <>
-                Click to select for explanation.
-                <br />
-                Click and drag to select multiple tokens.
-              </>
-            )}
-          </div>
-        </CustomTooltip>
-      </Fragment>
-    );
+    return <span className={tooltipTriggerWrapperClass}>{chipEl}</span>;
+
+    // return (
+    //   <Fragment key={tok.position}>
+    //     <CustomTooltip delayDuration={400} side="top" trigger={chipEl} minMargin className={tooltipTriggerClassName}>
+    //       <div className="flex flex-col items-center justify-center text-[10px] font-medium leading-normal text-slate-500">
+    //         {isExplained ? (
+    //           'Click to lock explanation details or share.'
+    //         ) : (
+    //           <>
+    //             Click to select for explanation.
+    //             <br />
+    //             Click and drag to select multiple tokens.
+    //           </>
+    //         )}
+    //       </div>
+    //     </CustomTooltip>
+    //   </Fragment>
+    // );
   }
 
   function renderTokenGroup(
@@ -1681,6 +1682,20 @@ export default function NLAInputChat() {
             style={{ WebkitTapHighlightColor: 'transparent' }}
             className="w-full resize-none rounded-t-xl border-0 px-2.5 py-2.5 pr-11 text-[13px] leading-normal text-slate-800 placeholder-sky-600/60 outline-none ring-0 focus:outline-none focus:ring-0 disabled:placeholder-slate-300"
           />
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Are you sure you want to reset the chat?')) {
+                setError(null);
+                onClear();
+              }
+            }}
+            disabled={isBusy || (!hasMessages && tokenList.length > 0)}
+            title="Clear chat"
+            className="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-md border-rose-200 bg-rose-100 text-rose-400 transition-colors hover:border-rose-600 hover:bg-rose-200 hover:text-rose-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:bg-slate-100 sm:hidden"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
           <div className="mb-2 hidden w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-2 sm:flex">
             <NLAInputChatControls
               isBusy={isBusy}

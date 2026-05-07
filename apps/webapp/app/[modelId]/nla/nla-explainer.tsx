@@ -216,7 +216,7 @@ export default function NLAExplainer() {
             <CustomTooltip
               wide
               trigger={
-                <div className="mb-2 cursor-pointer whitespace-nowrap text-[8px] text-slate-500 sm:mt-0.5 sm:text-[11px]">
+                <div className="mb-2 mt-[1px] cursor-pointer whitespace-nowrap text-[8px] text-slate-500 sm:mt-0.5 sm:text-[11px]">
                   Fraser-Taliente, Kantamneni, Ong et al. <span className="hidden sm:inline">2026</span>
                 </div>
               }

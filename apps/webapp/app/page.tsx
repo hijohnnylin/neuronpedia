@@ -186,22 +186,22 @@ export default async function Page() {
       </div>
 
       <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0">
-        <div className="mb-1 mt-0 w-full overflow-hidden rounded-3xl border border-slate-200 bg-white px-0 pb-3 pt-3 shadow sm:mt-5 sm:max-w-screen-xl">
-          {/* <div
-            className="ml-4 w-36 rounded-full bg-emerald-600 py-[5px] text-center text-[10px] font-medium uppercase text-white"
+        <div className="mt-0 hidden overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-3 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-3">
+          <div
+            className="w-full rounded-full pb-0 pt-0 text-center text-[10px] font-bold uppercase text-slate-400"
             title="Fully vetted and stabilized projects and collaborations."
           >
-            Featured Releases
-          </div> */}
-          <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-2 sm:flex-col sm:gap-y-0 sm:px-4 sm:pt-0">
-            <div className="hidden w-full flex-row items-center justify-center sm:pb-2 sm:pt-0">
+            Featured Release
+          </div>
+          <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-2 sm:flex-col sm:gap-y-0 sm:px-7 sm:pt-0">
+            <div className="flex w-full flex-row items-center justify-center sm:pb-2 sm:pt-0">
               <div className="relative z-0 mb-3 mt-1 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-2 sm:h-[240px] sm:min-h-[240px] sm:max-w-[800px] sm:px-0">
                 <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
-                  <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/20 px-5 py-[6px] text-[11px] font-semibold text-[#262625]/60">
+                  <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/20 px-8 py-[6px] text-[11px] font-semibold text-[#262625]/70">
                     Fraser-Taliente, Kantamneni, Ong et al.
                   </div>
                   <div className="content">
-                    <div className="mt-4 text-[26px] font-bold leading-tight text-[#bf4d43] sm:mt-3 sm:text-[34px] sm:leading-normal">
+                    <div className="mt-4 text-[26px] font-bold leading-tight text-[#bf4d43] sm:mt-3 sm:whitespace-nowrap sm:px-10 sm:text-[34px] sm:leading-normal">
                       Natural Language Autoencoders
                     </div>
                     <div className="mt-1 text-sm font-medium leading-none text-[#666663] sm:text-[15px]">
@@ -274,246 +274,246 @@ export default async function Page() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div className="flex w-full flex-col gap-x-4 sm:flex-row">
-              <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
-                <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-amber-600/20 px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
-                  <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-amber-600/20 px-7 py-[6px] text-[11px] font-semibold text-amber-700/80">
-                    Lu et al.
-                  </div>
-                  <div className="content">
-                    <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-2xl">
-                      <span className="font-bold text-amber-600">Assistant Axis</span>
-                    </div>
-                    <div className="mt-0 text-sm font-medium leading-tight text-amber-700 sm:mt-0.5 sm:text-[13px]">
-                      Monitor and Stabilize the Character of an LLM
-                    </div>
-
-                    <div className="mt-4 flex flex-col items-center justify-center gap-y-1 sm:mt-6 sm:flex-row sm:gap-x-2.5">
-                      <Link href="/llama3.3-70b-it/assistant-axis" className="">
-                        <button type="button" className="h-16 min-h-16 transition-all hover:scale-105 sm:w-auto">
-                          <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-amber-700 px-5 py-2 text-white shadow-sm shadow-amber-800/30">
-                            <SquareActivity className="h-6 w-6" style={{ transform: 'rotate(90deg)' }} />
-                            <div className="text-[13.5px] font-semibold leading-snug">
-                              Launch
-                              <br />
-                              Monitor
-                            </div>
-                          </div>
-                        </button>
-                      </Link>
-                      <Link href={CAP_BLOG_URL} className="">
-                        <button type="button" className="h-14 min-h-14 transition-all hover:scale-105 sm:w-auto">
-                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-amber-600 px-5 py-2 text-white shadow-sm shadow-amber-800/30 sm:px-3">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              id="Anthropic-Icon--Streamline-Svg-Logos"
-                              height="24"
-                              width="24"
-                              className="flex-shrink-0"
-                            >
-                              <desc>Anthropic Icon Streamline Icon: https://streamlinehq.com</desc>
-                              <path
-                                fill="#FFFFFF"
-                                d="m13.788825 3.932 6.43325 16.136075h3.5279L17.316725 3.932H13.788825Z"
-                                strokeWidth="0.25"
-                              />
-                              <path
-                                fill="#FFFFFF"
-                                d="m6.325375 13.682775 2.20125 -5.67065 2.201275 5.67065H6.325375ZM6.68225 3.932 0.25 20.068075h3.596525l1.3155 -3.3886h6.729425l1.315275 3.3886h3.59655L10.371 3.932H6.68225Z"
-                                strokeWidth="0.25"
-                              />
-                            </svg>
-                            <div className="text-[12px] font-semibold leading-tight">Read Post</div>
-                          </div>
-                        </button>
-                      </Link>
-                      <Link href={CAP_PAPER_URL} className="">
-                        <button type="button" className="h-12 min-h-12 transition-all hover:scale-105 sm:w-auto">
-                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-amber-600 px-5 py-2 text-white shadow-sm shadow-amber-800/30 sm:px-3">
-                            <Scroll className="h-5 w-5" />
-                            <div className="text-[12px] font-semibold leading-tight">Read Paper</div>
-                          </div>
-                        </button>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
+        <div className="flex w-full max-w-screen-xl flex-col gap-x-4 sm:flex-row sm:px-3">
+          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
+            <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-amber-600/20 px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
+              <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-amber-600/20 px-7 py-[6px] text-[11px] font-semibold text-amber-700/80">
+                Lu et al.
               </div>
+              <div className="content">
+                <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-2xl">
+                  <span className="font-bold text-amber-600">Assistant Axis</span>
+                </div>
+                <div className="mt-0 text-sm font-medium leading-tight text-amber-700 sm:mt-0.5 sm:text-[13px]">
+                  Monitor and Stabilize the Character of an LLM
+                </div>
 
-              <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
-                <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-emerald-600/20 px-3 py-7 text-center text-emerald-700 shadow-sm shadow-emerald-700/40 sm:gap-y-0 sm:px-5 sm:py-7">
-                  <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-emerald-600/30 px-7 py-[6px] text-[11px] font-semibold text-emerald-700/80">
-                    Multi-Org
-                  </div>
-                  <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-2xl">Circuit Tracer</div>
-                  <div className="mt-0 text-sm font-medium leading-tight sm:mt-0.5 sm:text-[13px]">
-                    Trace the Internal Reasoning Steps of a Model
-                  </div>
-
-                  <div className="mt-3 flex w-full flex-col items-center justify-center gap-y-2 sm:mt-5 sm:flex-row sm:gap-x-2">
-                    <a href="/gemma-2-2b/graph" className="flex-1 text-white">
-                      <button
-                        type="button"
-                        className="h-16 min-h-16 w-full rounded-xl bg-emerald-800 shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-900"
-                      >
-                        <div className="flex flex-row items-center justify-center px-5 py-2 font-bold leading-none">
-                          <Route className="mr-2.5 h-6 w-6" />
-                          <div className="text-[13.5px] font-semibold leading-snug text-white">
-                            Launch
-                            <br />
-                            Tracer
-                          </div>
-                        </div>
-                      </button>
-                    </a>
-
-                    <a
-                      href="https://www.youtube.com/playlist?list=PL05yUGfKO5wP6S5_12z7LG30LZigRYx1e"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 text-white"
-                    >
-                      <button
-                        type="button"
-                        className="flex h-12 min-h-12 w-28 min-w-28 flex-row items-center justify-center rounded-xl bg-emerald-600 px-0 py-0 font-bold leading-none shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
-                      >
-                        <Youtube className="mr-2.5 h-6 w-6" />
-                        <div className="text-[12px] font-bold leading-tight text-white">
-                          Watch
+                <div className="mt-4 flex flex-col items-center justify-center gap-y-1 sm:mt-6 sm:flex-row sm:gap-x-2.5">
+                  <Link href="/llama3.3-70b-it/assistant-axis" className="">
+                    <button type="button" className="h-16 min-h-16 transition-all hover:scale-105 sm:w-auto">
+                      <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-amber-700 px-5 py-2 text-white shadow-sm shadow-amber-800/30">
+                        <SquareActivity className="h-6 w-6" style={{ transform: 'rotate(90deg)' }} />
+                        <div className="text-[13.5px] font-semibold leading-snug">
+                          Launch
                           <br />
-                          Demo
+                          Monitor
                         </div>
-                      </button>
-                    </a>
-
-                    <Link href="/graph/info" className="flex-1 text-white">
-                      <button
-                        type="button"
-                        className="h-12 min-h-12 w-28 min-w-28 rounded-xl bg-emerald-600 shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
-                      >
-                        <div className="flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                          <Newspaper className="mr-2 h-5 min-h-5 w-5 min-w-5" />
-                          <div className="text-[12px] font-bold leading-tight text-white">
-                            Read
-                            <br />
-                            Post
-                          </div>
-                        </div>
-                      </button>
-                    </Link>
-                  </div>
+                      </div>
+                    </button>
+                  </Link>
+                  <Link href={CAP_BLOG_URL} className="">
+                    <button type="button" className="h-14 min-h-14 transition-all hover:scale-105 sm:w-auto">
+                      <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-amber-600 px-5 py-2 text-white shadow-sm shadow-amber-800/30 sm:px-3">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          id="Anthropic-Icon--Streamline-Svg-Logos"
+                          height="24"
+                          width="24"
+                          className="flex-shrink-0"
+                        >
+                          <desc>Anthropic Icon Streamline Icon: https://streamlinehq.com</desc>
+                          <path
+                            fill="#FFFFFF"
+                            d="m13.788825 3.932 6.43325 16.136075h3.5279L17.316725 3.932H13.788825Z"
+                            strokeWidth="0.25"
+                          />
+                          <path
+                            fill="#FFFFFF"
+                            d="m6.325375 13.682775 2.20125 -5.67065 2.201275 5.67065H6.325375ZM6.68225 3.932 0.25 20.068075h3.596525l1.3155 -3.3886h6.729425l1.315275 3.3886h3.59655L10.371 3.932H6.68225Z"
+                            strokeWidth="0.25"
+                          />
+                        </svg>
+                        <div className="text-[12px] font-semibold leading-tight">Read Post</div>
+                      </div>
+                    </button>
+                  </Link>
+                  <Link href={CAP_PAPER_URL} className="">
+                    <button type="button" className="h-12 min-h-12 transition-all hover:scale-105 sm:w-auto">
+                      <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-amber-600 px-5 py-2 text-white shadow-sm shadow-amber-800/30 sm:px-3">
+                        <Scroll className="h-5 w-5" />
+                        <div className="text-[12px] font-semibold leading-tight">Read Paper</div>
+                      </div>
+                    </button>
+                  </Link>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
-                <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gBlue/10 px-3 py-7 text-center text-slate-600 shadow-sm shadow-gBlue/40 sm:gap-y-0 sm:px-5 sm:py-7">
-                  <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-gBlue/15 px-6 py-[6px] text-[11px] font-semibold text-gBlue/80">
-                    Google Deepmind
-                  </div>
-                  <div className="content">
-                    <div className="mt-2 text-[24px] font-bold sm:mt-1.5">
-                      <span className="font-bold text-gBlue">Gemma Scope 2</span>
+          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
+            <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-emerald-600/20 px-3 py-7 text-center text-emerald-700 shadow-sm shadow-emerald-700/40 sm:gap-y-0 sm:px-5 sm:py-7">
+              <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-emerald-600/30 px-7 py-[6px] text-[11px] font-semibold text-emerald-700/80">
+                Multi-Org
+              </div>
+              <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-2xl">Circuit Tracer</div>
+              <div className="mt-0 text-sm font-medium leading-tight sm:mt-0.5 sm:text-[13px]">
+                Trace the Internal Reasoning Steps of a Model
+              </div>
+
+              <div className="mt-3 flex w-full flex-col items-center justify-center gap-y-2 sm:mt-5 sm:flex-row sm:gap-x-2">
+                <a href="/gemma-2-2b/graph" className="flex-1 text-white">
+                  <button
+                    type="button"
+                    className="h-16 min-h-16 w-full rounded-xl bg-emerald-800 shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-900"
+                  >
+                    <div className="flex flex-row items-center justify-center px-5 py-2 font-bold leading-none">
+                      <Route className="mr-2.5 h-6 w-6" />
+                      <div className="text-[13.5px] font-semibold leading-snug text-white">
+                        Launch
+                        <br />
+                        Tracer
+                      </div>
                     </div>
-                    <div className="mt-1 text-[13px] font-medium leading-tight text-slate-500 sm:mb-1 sm:mt-0">
-                      SAEs and Transcoders for Gemma 3
+                  </button>
+                </a>
+
+                <a
+                  href="https://www.youtube.com/playlist?list=PL05yUGfKO5wP6S5_12z7LG30LZigRYx1e"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 text-white"
+                >
+                  <button
+                    type="button"
+                    className="flex h-12 min-h-12 w-28 min-w-28 flex-row items-center justify-center rounded-xl bg-emerald-600 px-0 py-0 font-bold leading-none shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
+                  >
+                    <Youtube className="mr-2.5 h-6 w-6" />
+                    <div className="text-[12px] font-bold leading-tight text-white">
+                      Watch
+                      <br />
+                      Demo
                     </div>
+                  </button>
+                </a>
 
-                    <div className="mt-4 flex flex-row items-center justify-center gap-3 gap-x-2 sm:mt-5">
-                      <Link href="/gemma-scope-2" className="">
-                        <button
-                          type="button"
-                          className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105"
-                          title="Browse the Release on Neuronpedia"
-                        >
-                          <div className="flex h-14 min-h-14 flex-row items-center justify-center rounded-xl bg-gBlue px-3 py-2.5 text-white shadow">
-                            <Folder className="mr-2 h-6 w-6" />
-                            <div className="text-[12.5px] font-semibold leading-snug">
-                              Browse
-                              <br />
-                              Data
-                            </div>
-                          </div>
-                        </button>
-                      </Link>
-
-                      <a
-                        href="https://deepmind.google/blog/gemma-scope-2-helping-the-ai-safety-community-deepen-understanding-of-complex-language-model-behavior/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className=""
-                      >
-                        <button
-                          type="button"
-                          className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
-                          title="Read Google DeepMind Blog Post"
-                        >
-                          <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                            <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gYellow py-2.5 text-white shadow">
-                              <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                                <path
-                                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                                  fill="#FFFFFF"
-                                />
-                                <path
-                                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                                  fill="#FFFFFF"
-                                />
-                                <path
-                                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                                  fill="#FFFFFF"
-                                />
-                                <path
-                                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                                  fill="#FFFFFF"
-                                />
-                                <path d="M1 1h22v22H1z" fill="none" />
-                              </svg>
-                            </div>
-                          </div>
-                        </button>
-                      </a>
-                      <a
-                        href="https://huggingface.co/google/gemma-scope-2"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className=""
-                        title="View Hugging Face Release"
-                      >
-                        <button
-                          type="button"
-                          className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
-                        >
-                          <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                            <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gRed py-2.5 text-white shadow">
-                              <SmileIcon className="h-5 w-5" />
-                            </div>
-                          </div>
-                        </button>
-                      </a>
-
-                      <a
-                        href="https://colab.research.google.com/drive/1NhWjg7n0nhfW--CjtsOdw5A5J_-Bzn4r"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className=""
-                      >
-                        <button
-                          type="button"
-                          className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
-                          title="Open Colab Tutorial Notebook"
-                        >
-                          <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                            <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gGreen py-2.5 text-white shadow">
-                              <Notebook className="h-5 w-5" />
-                            </div>
-                          </div>
-                        </button>
-                      </a>
+                <Link href="/graph/info" className="flex-1 text-white">
+                  <button
+                    type="button"
+                    className="h-12 min-h-12 w-28 min-w-28 rounded-xl bg-emerald-600 shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
+                  >
+                    <div className="flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                      <Newspaper className="mr-2 h-5 min-h-5 w-5 min-w-5" />
+                      <div className="text-[12px] font-bold leading-tight text-white">
+                        Read
+                        <br />
+                        Post
+                      </div>
                     </div>
-                  </div>
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
+            <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gBlue/10 px-3 py-7 text-center text-slate-600 shadow-sm shadow-gBlue/40 sm:gap-y-0 sm:px-5 sm:py-7">
+              <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-gBlue/15 px-6 py-[6px] text-[11px] font-semibold text-gBlue/80">
+                Google Deepmind
+              </div>
+              <div className="content">
+                <div className="mt-2 text-[24px] font-bold sm:mt-1.5">
+                  <span className="font-bold text-gBlue">Gemma Scope 2</span>
+                </div>
+                <div className="mt-1 text-[13px] font-medium leading-tight text-slate-500 sm:mb-1 sm:mt-0">
+                  SAEs and Transcoders for Gemma 3
+                </div>
+
+                <div className="mt-4 flex flex-row items-center justify-center gap-3 gap-x-2 sm:mt-5">
+                  <Link href="/gemma-scope-2" className="">
+                    <button
+                      type="button"
+                      className="h-14 min-h-14 w-28 min-w-28 transition-all hover:scale-105"
+                      title="Browse the Release on Neuronpedia"
+                    >
+                      <div className="flex h-14 min-h-14 flex-row items-center justify-center rounded-xl bg-gBlue px-3 py-2.5 text-white shadow">
+                        <Folder className="mr-2 h-6 w-6" />
+                        <div className="text-[12.5px] font-semibold leading-snug">
+                          Browse
+                          <br />
+                          Data
+                        </div>
+                      </div>
+                    </button>
+                  </Link>
+
+                  <a
+                    href="https://deepmind.google/blog/gemma-scope-2-helping-the-ai-safety-community-deepen-understanding-of-complex-language-model-behavior/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className=""
+                  >
+                    <button
+                      type="button"
+                      className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
+                      title="Read Google DeepMind Blog Post"
+                    >
+                      <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                        <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gYellow py-2.5 text-white shadow">
+                          <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
+                            <path
+                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                              fill="#FFFFFF"
+                            />
+                            <path
+                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                              fill="#FFFFFF"
+                            />
+                            <path
+                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                              fill="#FFFFFF"
+                            />
+                            <path
+                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                              fill="#FFFFFF"
+                            />
+                            <path d="M1 1h22v22H1z" fill="none" />
+                          </svg>
+                        </div>
+                      </div>
+                    </button>
+                  </a>
+                  <a
+                    href="https://huggingface.co/google/gemma-scope-2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className=""
+                    title="View Hugging Face Release"
+                  >
+                    <button
+                      type="button"
+                      className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
+                    >
+                      <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                        <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gRed py-2.5 text-white shadow">
+                          <SmileIcon className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </button>
+                  </a>
+
+                  <a
+                    href="https://colab.research.google.com/drive/1NhWjg7n0nhfW--CjtsOdw5A5J_-Bzn4r"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className=""
+                  >
+                    <button
+                      type="button"
+                      className="h-12 max-h-12 min-h-12 w-12 min-w-12 max-w-12 transition-all hover:scale-105"
+                      title="Open Colab Tutorial Notebook"
+                    >
+                      <div className="flex w-full flex-row items-center justify-center px-0 py-0 font-bold leading-none">
+                        <div className="flex h-12 min-h-12 w-12 min-w-12 max-w-12 flex-row items-center justify-center rounded-xl bg-gGreen py-2.5 text-white shadow">
+                          <Notebook className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </button>
+                  </a>
                 </div>
               </div>
             </div>

@@ -659,13 +659,13 @@ export default function NLADetailsColumn() {
           </>
         )}
       </div>
-      <div className="absolute bottom-0 left-1.5 right-1.5 mb-[2px] rounded-b-xl bg-white/30 pb-1.5 pt-1.5 text-center text-[9px] text-rose-600 backdrop-blur-sm">
+      <div className="absolute bottom-0 left-1.5 right-1.5 mb-[2px] rounded-b-xl bg-white/30 pb-1.5 pt-1.5 text-center text-[9px] text-rose-700 backdrop-blur-sm">
         NLAs can produce unexpected or incorrect explanations. See{' '}
         <a
           href="https://transformer-circuits.pub/2026/nla/index.html#discussion-and-limitations"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-rose-600 underline"
+          className="text-rose-700 underline"
         >
           limitations
         </a>

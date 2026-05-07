@@ -202,10 +202,15 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   };
 
   if (!text || typeof text !== 'string') {
-    return NextResponse.json({ error: 'text is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Text is required.' }, { status: 400 });
   }
   if (text.length > MAX_TEXT_LENGTH) {
-    return NextResponse.json({ error: `text must be ${MAX_TEXT_LENGTH} characters or less` }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: `Max chat character length of ${MAX_TEXT_LENGTH} exceeded. Please start a new chat by clicking "Free Chat".`,
+      },
+      { status: 400 },
+    );
   }
 
   const effectiveCompletionTokens = Math.min(completionTokens ?? 0, MAX_COMPLETION_TOKENS);
