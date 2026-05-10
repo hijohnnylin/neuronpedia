@@ -1537,8 +1537,8 @@ export default function NLAInputChat() {
               <div className="flex flex-1 flex-col gap-y-0 px-2 text-center">
                 <span className="text-[12px] font-medium text-amber-800">Select Tokens to Explain</span>
                 <span className="text-[11px] font-medium text-amber-600">
-                  Click <span className="font-serif font-semibold text-slate-500">gray tokens</span>, or drag to select
-                  multiple tokens.{' '}
+                  Click <span className="font-serif font-semibold text-slate-500">gray tokens</span>, and use shift/drag
+                  for multiple tokens.{' '}
                 </span>
               </div>
             </div>
