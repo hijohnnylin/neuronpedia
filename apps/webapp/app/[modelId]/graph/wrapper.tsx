@@ -27,7 +27,7 @@ export default function GraphWrapper({ hasSlug, showGenerateModal }: { hasSlug: 
   return (
     <GraphModalProvider>
       <div
-        className={`${isEmbed ? 'h-[calc(100%_-_20px)] max-h-screen min-h-[calc(100%_-_20px)]' : 'h-[calc(100vh_-_75px)] max-h-[calc(100vh_-_75px)] min-h-[calc(100vh_-_75px)]'} flex w-full flex-col justify-center px-1 text-slate-700 sm:px-4`}
+        className={`${isEmbed ? 'h-screen max-h-screen min-h-screen' : 'h-[calc(100vh_-_75px)] max-h-[calc(100vh_-_75px)] min-h-[calc(100vh_-_75px)]'} flex w-full flex-col justify-center px-1 text-slate-700 sm:px-4`}
       >
         <div className="flex w-full flex-1 flex-col items-center justify-center overflow-hidden">
           {/* <div>{JSON.stringify(visState)}</div> */}
