@@ -173,6 +173,12 @@ export default function NLAInputChat() {
   const [dragMode, setDragMode] = useState<'select' | 'deselect' | null>(null);
   const dragStartPositionRef = useRef<number | null>(null);
   const preDragSelectionRef = useRef<Set<number> | null>(null);
+  // Anchor for shift+click range selection. Updated on every non-shift
+  // mousedown that starts a drag/select, so subsequent shift+clicks extend
+  // from the last "starting" click (Finder/GitHub-style multi-select).
+  // Survives across drag-end (unlike `dragStartPositionRef`, which is
+  // cleared when `dragMode` falls back to null).
+  const selectionAnchorRef = useRef<number | null>(null);
   const [limitPulse, setLimitPulse] = useState(0);
 
   useEffect(() => {
@@ -199,21 +205,22 @@ export default function NLAInputChat() {
     return () => clearTimeout(t);
   }, [limitPulse]);
 
-  const applyDragRange = useCallback(
-    (currentPosition: number, mode: 'select' | 'deselect') => {
-      const start = dragStartPositionRef.current;
-      const preDrag = preDragSelectionRef.current;
-      if (start === null || preDrag === null) return;
-      const lo = Math.min(start, currentPosition);
-      const hi = Math.max(start, currentPosition);
+  // Shared range-select core used by both click-and-drag and shift+click.
+  // `anchorPosition` and `currentPosition` define the inclusive token range;
+  // `basis` is the selection set the result is built off of (the pre-drag
+  // snapshot for drags, the live selection for shift+click).
+  const applySelectRangeFrom = useCallback(
+    (anchorPosition: number, currentPosition: number, basis: Set<number>, mode: 'select' | 'deselect') => {
+      const lo = Math.min(anchorPosition, currentPosition);
+      const hi = Math.max(anchorPosition, currentPosition);
       // Skip already-explained positions — they're locked (can't be
       // deselected, and shouldn't count toward the pending-selection limit).
       const inRange = tokenList
         .filter((t) => t.position >= lo && t.position <= hi && !explainedPositions.has(t.position))
         .map((t) => t.position)
-        .sort((a, b) => Math.abs(a - start) - Math.abs(b - start));
+        .sort((a, b) => Math.abs(a - anchorPosition) - Math.abs(b - anchorPosition));
 
-      const next = new Set(preDrag);
+      const next = new Set(basis);
       let pendingCount = 0;
       next.forEach((p) => {
         if (!explainedPositions.has(p)) pendingCount += 1;
@@ -236,6 +243,16 @@ export default function NLAInputChat() {
       onApplySelection(next);
     },
     [onApplySelection, tokenList, explainedPositions],
+  );
+
+  const applyDragRange = useCallback(
+    (currentPosition: number, mode: 'select' | 'deselect') => {
+      const start = dragStartPositionRef.current;
+      const preDrag = preDragSelectionRef.current;
+      if (start === null || preDrag === null) return;
+      applySelectRangeFrom(start, currentPosition, preDrag, mode);
+    },
+    [applySelectRangeFrom],
   );
 
   const toggleSinglePosition = useCallback(
@@ -623,6 +640,19 @@ export default function NLAInputChat() {
         return;
       }
       e.preventDefault();
+      // Shift+click extends selection from the last anchor (the most
+      // recent click that initiated a drag/select) up to this chip — a
+      // one-shot range select that doesn't enter drag mode and doesn't
+      // move the anchor, so subsequent shift+clicks keep extending from
+      // the same origin (Finder/GitHub-style multi-select). Range filter
+      // skips already-explained positions and caps at the per-run limit
+      // (pulses the counter if the cap is hit, same as drag).
+      if (e.shiftKey && selectionAnchorRef.current !== null) {
+        setLockedPosition(null);
+        applySelectRangeFrom(selectionAnchorRef.current, tok.position, selectedTokenPositions, 'select');
+        setSelectedPosition(tok.position);
+        return;
+      }
       const shouldSelect = !isInSelection;
       if (shouldSelect && cannotAdd) {
         setLimitPulse((c) => c + 1);
@@ -638,6 +668,7 @@ export default function NLAInputChat() {
       setDragMode(mode);
       applyDragRange(tok.position, mode);
       setSelectedPosition(mode === 'select' ? tok.position : null);
+      selectionAnchorRef.current = tok.position;
     };
 
     const handleMouseEnter = () => {
