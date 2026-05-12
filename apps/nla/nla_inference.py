@@ -1139,10 +1139,19 @@ class NLAReconstructor:
         # so torchao never sees lm_head as a Linear and any tied-embedding
         # edge cases (Gemma-style `tie_word_embeddings=True`) cannot affect
         # `embed_tokens` via shared storage.
+        # ignore_mismatched_sizes=True: the NLA reconstructor checkpoint stores
+        # `lm_head.weight` as a [d, d] value-head-style projection rather than
+        # the canonical [vocab, d] LM head shape, and may omit `model.norm.weight`
+        # entirely (the truncated reconstructor doesn't use either). Both get
+        # replaced with `Identity()` immediately below, so the loaded `lm_head`
+        # values are discarded anyway. Transformers <5 warned and loaded; 5.x
+        # raises on mismatch by default — this preserves the prior behavior
+        # without weakening any other validation.
         backbone = AutoModelForCausalLM.from_pretrained(
             local_path,
             torch_dtype=dtype,
             trust_remote_code=True,
+            ignore_mismatched_sizes=True,
         )
 
         # Identity replacements happen BEFORE any quantization so torchao only
