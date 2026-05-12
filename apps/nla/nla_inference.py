@@ -233,6 +233,29 @@ def load_nla_config(
     return cfg
 
 
+def _tokenize_chat_with_merges(tokenizer: Any, content: str) -> list[int]:
+    """Tokenize a single-turn user message via the model's chat template,
+    preserving BPE merges for multi-byte tokens.
+
+    Workaround for transformers 5.x: `apply_chat_template(..., tokenize=True)`
+    byte-falls-back on multi-byte BPE-merged tokens (e.g. the NLA injection
+    char `㎡` U+33A1 → token 105565 for Llama-3.3) instead of consulting
+    the merge table — even though `tokenizer.encode()` on the same string
+    still merges correctly. We render the template to a string then re-encode.
+
+    `add_special_tokens=False` because the rendered string already contains
+    `<|begin_of_text|>` and other markers as literals; the tokenizer
+    recognizes them as registered added tokens during encode() and emits
+    them as their canonical single-token IDs.
+    """
+    rendered = tokenizer.apply_chat_template(
+        [{"role": "user", "content": content}],
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+    return tokenizer.encode(rendered, add_special_tokens=False)
+
+
 def _validate_config_against_tokenizer(cfg: NLAConfig, tokenizer: Any) -> None:
     """Assert injection char/neighbors match the live tokenizer."""
     live_inj = tokenizer.encode(cfg.injection_char, add_special_tokens=False)
@@ -243,11 +266,7 @@ def _validate_config_against_tokenizer(cfg: NLAConfig, tokenizer: Any) -> None:
     assert live_inj[0] != tokenizer.unk_token_id, f"{cfg.injection_char!r} maps to UNK"
 
     content = cfg.verbalizer_prompt_template.format(injection_char=cfg.injection_char)
-    ids = tokenizer.apply_chat_template(
-        [{"role": "user", "content": content}],
-        tokenize=True,
-        add_generation_prompt=True,
-    )
+    ids = _tokenize_chat_with_merges(tokenizer, content)
     matches = [i for i, tok in enumerate(ids) if tok == cfg.injection_token_id]
     assert len(matches) == 1, (
         f"injection token appears {len(matches)}x in canonical prompt (expected 1)."
@@ -556,11 +575,7 @@ class NLAClient:
                 INJECT_PLACEHOLDER, self.cfg.injection_char
             )
 
-        input_ids = self.tokenizer.apply_chat_template(
-            [{"role": "user", "content": content}],
-            tokenize=True,
-            add_generation_prompt=True,
-        )
+        input_ids = _tokenize_chat_with_merges(self.tokenizer, content)
         ids_t = torch.tensor(input_ids, dtype=torch.long).unsqueeze(0)
 
         with torch.no_grad():
