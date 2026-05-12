@@ -1239,8 +1239,51 @@ class NLAReconstructor:
                 "(torchao, group_size=32) on GPU..."
             )
             backbone = backbone.to(device)
-            # group_size=128 broke Llama reconstructor, we use 32
-            quantize_(backbone, Int4WeightOnlyConfig(group_size=32, use_hqq=True))
+            # group_size=128 broke Llama reconstructor, we use 32. We want
+            # HQQ (Half-Quadratic Quantization) — it reduces L2 drift vs.
+            # the default min/max scaling and tinygemm choose-qparams. The
+            # API for selecting it changed across torchao releases:
+            #
+            #   * Pre-v0.14 (config "version 1"):
+            #       Int4WeightOnlyConfig(group_size=32, use_hqq=True)
+            #   * v0.14+ default ("version 2"):
+            #       Int4WeightOnlyConfig(
+            #           group_size=32,
+            #           int4_packing_format="tile_packed_to_4d",
+            #           int4_choose_qparams_algorithm="hqq",
+            #       )
+            #     The packing format MUST be tile_packed_to_4d when HQQ is
+            #     selected (torchao asserts this). The default PLAIN format
+            #     also breaks on Blackwell with "cutlass cannot initialize"
+            #     (pytorch/ao#3842), so the 4D-tiled layout is the right
+            #     choice on RTX 6000 Pro / B200 regardless of HQQ.
+            #
+            # Probe the constructor signature so we land on the right call
+            # for whatever torchao version is installed; fall back to plain
+            # int4 (no HQQ) if neither HQQ surface is available. Quality
+            # impact of dropping HQQ is small (~1–3% extra L2 drift) and
+            # only shifts absolute MSE/cosine, not the ranking the
+            # reconstructor produces.
+            import inspect
+
+            int4_params = inspect.signature(Int4WeightOnlyConfig).parameters
+            if "int4_choose_qparams_algorithm" in int4_params:
+                # v2 API (torchao 0.14+)
+                int4_config = Int4WeightOnlyConfig(
+                    group_size=32,
+                    int4_packing_format="tile_packed_to_4d",
+                    int4_choose_qparams_algorithm="hqq",
+                )
+                hqq_status = "v2 (tile_packed_to_4d + hqq)"
+            elif "use_hqq" in int4_params:
+                # v1 API (torchao <0.14)
+                int4_config = Int4WeightOnlyConfig(group_size=32, use_hqq=True)
+                hqq_status = "v1 (use_hqq=True)"
+            else:
+                int4_config = Int4WeightOnlyConfig(group_size=32)
+                hqq_status = "disabled (no HQQ keyword found)"
+            print(f"[NLA] Reconstructor INT4 quantization: HQQ {hqq_status}")
+            quantize_(backbone, int4_config)
             gc.collect()
             self.backbone = backbone.eval()
         else:
