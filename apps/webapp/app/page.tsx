@@ -135,17 +135,17 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0">
-        <div className="mt-0 overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-3 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-3">
+      <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0 sm:pb-5">
+        <div className="mt-0 overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-1 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-2">
           <div
-            className="w-full rounded-full pb-0 pt-0 text-center text-[9px] font-bold uppercase text-slate-400"
+            className="w-full rounded-full pb-0 pt-1 text-center text-[9px] font-bold uppercase text-[#262625]/40"
             title="Fully vetted and stabilized projects and collaborations."
           >
             Featured Release
           </div>
           <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-2 sm:flex-col sm:gap-y-0 sm:px-7 sm:pt-0">
             <div className="flex w-full flex-row items-center justify-center sm:pb-2 sm:pt-0">
-              <div className="relative z-0 mb-3 mt-1 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-2 sm:h-[240px] sm:min-h-[240px] sm:max-w-[800px] sm:px-0">
+              <div className="relative z-0 mb-3 mt-0 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-1 sm:h-[240px] sm:min-h-[240px] sm:max-w-[800px] sm:px-0">
                 <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
                   <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/20 px-8 py-[6px] text-[11px] font-semibold text-[#262625]/70">
                     Fraser-Taliente, Kantamneni, Ong et al.
@@ -471,7 +471,7 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="mb-5 mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:flex-row">
+      <div className="mb-5 mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:mb-7 sm:flex-row">
         <div className="flex basis-[55%] flex-col items-center justify-center text-center text-sm sm:text-base">
           <div className="mt-0 flex flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-0 sm:flex-row">
             <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
