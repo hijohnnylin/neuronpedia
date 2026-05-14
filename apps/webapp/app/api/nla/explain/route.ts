@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { nlaFetch } from '@/lib/db/nla-source';
-import { MAX_TEXT_LENGTH, MAX_TOKENS_TO_EXPLAIN } from '@/lib/nla-constants';
+import { formatChatForModel, isChatMessageArray } from '@/lib/nla-chat-template';
+import { EXPLAIN_MAX_NEW_TOKENS, MAX_TEXT_LENGTH, MAX_TOKENS_TO_EXPLAIN } from '@/lib/nla-constants';
 import { nlaExplainTextHash } from '@/lib/nla-explain-cache-hash';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
@@ -292,24 +293,145 @@ function mergePriorAggregates(a: PriorAggregate, b: PriorAggregate): PriorAggreg
   };
 }
 
+/**
+ * @swagger
+ * /api/nla/explain:
+ *   post:
+ *     summary: Explain NLA Activations at Token Positions
+ *     tags:
+ *       - NLA
+ *     security:
+ *       - apiKey: []
+ *       - {}
+ *     description: |
+ *       Returns natural-language descriptions of the activations at the
+ *       requested token positions in a prompt, produced by the Natural
+ *       Language Autoencoder (NLA) at a specific source (AV/AR
+ *       pair). See the `GET /api/nla/sources` for available NLA sources.
+ *
+ *       Provide either `text` (a chat-templated string) OR `messages`
+ *       (an array of `{role, content}` chat turns that the server will
+ *       template using the model's chat template).
+ *
+ *       Each request may target at most 16 *new* (uncached) positions.
+ *       Previously-explained positions for the same `(text, modelId,
+ *       nlaSourceId, temperature)` are served from cache and don't count
+ *       toward this limit.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - modelId
+ *               - nlaSourceId
+ *               - positions
+ *             properties:
+ *               modelId:
+ *                 type: string
+ *                 description: The Neuronpedia model id (e.g. `gemma-2-9b-it`).
+ *               nlaSourceId:
+ *                 type: string
+ *                 description: The NLA source id for this model (e.g. `gemmascope-9-res-131k`). See `GET /api/nla/sources`.
+ *               text:
+ *                 type: string
+ *                 description: Pre-chat-templated prompt string. Provide this OR `messages`. Max 16384 characters.
+ *               messages:
+ *                 type: array
+ *                 description: Chat-format turns. Server applies the model's chat template. Provide this OR `text`.
+ *                 items:
+ *                   type: object
+ *                   required: [role, content]
+ *                   properties:
+ *                     role: { type: string, enum: [user, assistant] }
+ *                     content: { type: string }
+ *               positions:
+ *                 type: array
+ *                 description: Token positions (0-indexed) to explain. Up to 16 new positions per request.
+ *                 items: { type: integer, minimum: 0 }
+ *               temperature:
+ *                 type: number
+ *                 description: Sampling temperature for the NLA explainer. Default `0.7`.
+ *             example:
+ *               modelId: gemma-2-9b-it
+ *               nlaSourceId: gemmascope-9-res-131k
+ *               messages:
+ *                 - role: user
+ *                   content: What is the capital of France?
+ *               positions: [4, 5]
+ *               temperature: 0.7
+ *     responses:
+ *       200:
+ *         description: Explanations for the requested positions, plus the canonical token list of the prompt.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       position: { type: integer }
+ *                       token: { type: string }
+ *                       description: { type: string }
+ *                 layer_index: { type: integer }
+ *                 prompt_length: { type: integer }
+ *       400:
+ *         description: Invalid request (missing text/messages, bad positions, too many new positions, etc).
+ *       429:
+ *         description: Rate-limited. Default cap is 120 requests/hour per IP.
+ */
 export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   const body = await request.json();
-  const { text, temperature, modelId, nlaSourceId, positions, tokens, priorCacheId } = body as {
+  const {
+    text: rawText,
+    messages,
+    temperature,
+    modelId,
+    nlaSourceId,
+    positions,
+    tokens,
+    priorCacheId,
+    stream,
+  } = body as {
     text?: string;
+    messages?: unknown;
     temperature?: number;
     modelId?: string;
     nlaSourceId?: string;
     positions?: number[];
     tokens?: string[];
     priorCacheId?: string;
+    stream?: boolean;
   };
 
+  // Render server-side when the caller passes `messages` instead of a
+  // pre-templated `text`. We prefer `text` if both are supplied so the
+  // frontend (which always sends the rendered string) is unaffected.
+  let text: string | undefined = typeof rawText === 'string' ? rawText : undefined;
+  if (!text && isChatMessageArray(messages)) {
+    if (!modelId) {
+      return NextResponse.json(
+        { error: 'modelId is required when using `messages` (so the server can pick the chat template).' },
+        { status: 400 },
+      );
+    }
+    text = formatChatForModel(modelId, messages);
+  }
+
   if (!text || typeof text !== 'string') {
-    return NextResponse.json({ error: 'text is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Provide either `text` or `messages`.' }, { status: 400 });
   }
   if (text.length > MAX_TEXT_LENGTH) {
     return NextResponse.json({ error: `text must be ${MAX_TEXT_LENGTH} characters or less` }, { status: 400 });
   }
+  // Default the API contract to non-streaming JSON. The frontend explicitly
+  // passes `stream: true` to opt into the SSE-with-cacheId behavior it was
+  // built against; external callers omit it and get a single JSON object.
+  const wantsStream = stream === true;
 
   // Positions are required: every cache row is keyed on (prompt, source,
   // sortedPositions). The client now sends the *cumulative* set of positions
@@ -479,7 +601,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       temperature: effectiveTemperature,
       stream: true,
       positions: missing,
-      max_new_tokens: 256,
+      max_new_tokens: EXPLAIN_MAX_NEW_TOKENS,
     }),
   });
 
@@ -492,6 +614,51 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     return NextResponse.json({ error: 'No response body from NLA server' }, { status: 502 });
   }
 
+  // ── Non-streaming API path ─────────────────────────────────────────
+  // Buffer the upstream SSE into a single JSON payload. This is the
+  // default for external callers (and any caller that doesn't pass
+  // `stream: true`). The cache row is written before responding so the
+  // returned `cacheId` is immediately valid for follow-up requests.
+  if (!wantsStream) {
+    const parsed = await collectExplainResults(nlaResponse.body);
+    const merged = new Map(prior.byPosition);
+    parsed.results.forEach((r) => {
+      const p = r.position;
+      if (typeof p === 'number' && Number.isInteger(p) && p >= 0) merged.set(p, r);
+    });
+    const orderedResults = sortedPositions
+      .map((p) => merged.get(p))
+      .filter((r): r is ExplainResultRecord => Boolean(r));
+    const layerIndex = parsed.layer_index || prior.layerIndex || 0;
+    const promptLength = parsed.prompt_length || prior.promptLength || orderedResults.length;
+    let cacheId: string | null = null;
+    if (orderedResults.length > 0) {
+      try {
+        const row = await upsertUnionRow({
+          text,
+          temperature: effectiveTemperature,
+          modelId: effectiveModelId,
+          nlaSourceId: effectiveNlaSourceId,
+          sortedPositions,
+          tokens: tokensToStore,
+          results: orderedResults,
+          layerIndex,
+          promptLength,
+        });
+        cacheId = row.id;
+      } catch (err) {
+        console.error('Failed to cache NLA explain results:', err);
+      }
+    }
+    return NextResponse.json({
+      results: orderedResults,
+      layer_index: layerIndex,
+      prompt_length: promptLength,
+      ...(cacheId ? { cacheId } : {}),
+    });
+  }
+
+  // ── Streaming path (frontend) ──────────────────────────────────────
   // Tee: one branch streams to the client; the other is consumed in the
   // background to assemble the union cache row.
   const [clientBody, collectBody] = nlaResponse.body.tee();

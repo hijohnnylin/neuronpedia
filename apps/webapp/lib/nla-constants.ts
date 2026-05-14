@@ -12,6 +12,12 @@ export const DEFAULT_COMPLETION_TOKENS = 256;
 // `/api/nla/explain` route (request validation + cache key sanity check).
 export const MAX_TOKENS_TO_EXPLAIN = 16;
 
+// Max new tokens the NLA server may generate per explanation. Forwarded
+// in the body of `/api/nla/explain` → upstream `/explain` calls. Kept here
+// at the top of the constants file so the cap is visible alongside the
+// other NLA limits rather than buried in the route handler.
+export const EXPLAIN_MAX_NEW_TOKENS = 256;
+
 // Maximum length of a user-authored share comment (stored/round-tripped
 // via the `?comment=` URL param and rendered above the details column).
 // Over-length comments loaded from the URL are truncated to this cap.

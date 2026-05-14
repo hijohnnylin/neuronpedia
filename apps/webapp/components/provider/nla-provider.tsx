@@ -1368,6 +1368,13 @@ export function NLAProvider({
             modelId: selectedModelId || undefined,
             nlaSourceId: effectiveSourceId || undefined,
             positions: positionsArg,
+            // The route defaults to non-streaming JSON for documented
+            // external API consumers. The chat UI opts back into SSE
+            // (live underline animation + cacheId URL injection) by
+            // explicitly setting `stream: true`. The response handler
+            // below already accepts either content-type, so this is
+            // strictly a request to receive the streamed format.
+            stream: true,
             // Persisted alongside the cache row so a `?id=...` deep-link
             // can hydrate state without re-tokenizing.
             tokens: resolvedTokens.map((t) => t.token),
