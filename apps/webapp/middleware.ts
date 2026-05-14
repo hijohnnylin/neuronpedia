@@ -47,11 +47,18 @@ const NORMAL_RATE_LIMITS: RateLimitEntry[] = [
   // Each NLA chat send issues 2 requests to /api/nla/completion (streaming
   // chat + canonical re-tokenize), so 240/hour ≈ 120 user-perceived messages
   // per hour. The chat UI divides by 2 before displaying the counter.
+  // External API callers issue 1 request per generation (no post-stream
+  // re-tokenize), so they effectively get 2x the throughput vs the UI —
+  // intentional, since we don't want researchers to burn through their
+  // budget on the UI's double-fire pattern.
   { endpoint: '/api/nla/completion', limit: 240 },
   // `exact: true` so this bucket is independent of /api/nla/explain-saelens
   // and /api/nla/explain-share (without `exact`, prefix-matching would also
   // count those endpoints' requests against this bucket).
   { endpoint: '/api/nla/explain', limit: 120, exact: true },
+  // Cheap read-only metadata endpoint; generous default so docs/SDK calls
+  // never get rate-limited mid-flight.
+  { endpoint: '/api/nla/sources', limit: 1200 },
 ];
 
 const HIGHER_RATE_LIMITS: RateLimitEntry[] = [
@@ -72,6 +79,7 @@ const HIGHER_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api/nla/explain-saelens', limit: 120 },
   { endpoint: '/api/nla/completion', limit: 240 },
   { endpoint: '/api/nla/explain', limit: 120, exact: true },
+  { endpoint: '/api/nla/sources', limit: 1200 },
 ];
 
 function pathMatchesEndpoint(pathname: string, endpoint: string, exact: boolean | undefined) {
