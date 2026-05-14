@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { nlaFetch } from '@/lib/db/nla-source';
-import { MAX_TEXT_LENGTH } from '@/lib/nla-constants';
+import { MAX_TEXT_LENGTH, MAX_TOKENS_TO_EXPLAIN } from '@/lib/nla-constants';
 import { nlaExplainTextHash } from '@/lib/nla-explain-cache-hash';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
@@ -424,6 +424,29 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     missingCount: missing.length,
     willCallUpstreamNlaForMissing: missing.length > 0,
   });
+
+  // Cap NEW (non-cached) positions only. The cumulative `positions` set may
+  // exceed MAX_TOKENS_TO_EXPLAIN when prior rows already cover the excess
+  // (cache hits are free), but anything we'd actually forward to the
+  // upstream NLA server must respect the per-request cap.
+  if (missing.length > MAX_TOKENS_TO_EXPLAIN) {
+    console.log('[nla-explain route] too many new positions to explain', {
+      requestedCount: sortedPositions.length,
+      priorCachedCount: prior.byPosition.size,
+      missingCount: missing.length,
+      maxNewPerRequest: MAX_TOKENS_TO_EXPLAIN,
+    });
+    return NextResponse.json(
+      {
+        error:
+          `Too many new token positions to explain in a single request: ` +
+          `received ${missing.length} new positions (${prior.byPosition.size} of ` +
+          `${sortedPositions.length} requested were already cached); ` +
+          `the limit is ${MAX_TOKENS_TO_EXPLAIN} new positions per request.`,
+      },
+      { status: 400 },
+    );
+  }
 
   // 4. All requested positions already cached across prior rows — just
   // materialize a union row pointing at the same data and return.
