@@ -86,6 +86,7 @@ export default function NLAInputChat() {
     error: providerError,
     pendingChatInputRestore,
     setPendingChatInputRestore,
+    setIsEditingMessage,
   } = useNlaContext();
   const nlaSourceId = selectedNlaSource?.id;
   const [typedText, setTypedText] = useState('');
@@ -94,6 +95,28 @@ export default function NLAInputChat() {
   // surfaced via the `x-limit-remaining` response header (set by the
   // top-level rate-limit middleware). `null` until the first response.
   const [limitRemaining, setLimitRemaining] = useState<number | null>(null);
+
+  // Inline-edit state for assistant messages. `editingAssistantIdx` is the
+  // `chatMessages` index of the bubble the user is currently editing
+  // (`null` when not editing); `editingAssistantText` is the working copy
+  // of just the assistant `content` (chat-template special tokens are not
+  // exposed to the editor, so the user can't corrupt the templating).
+  const [editingAssistantIdx, setEditingAssistantIdx] = useState<number | null>(null);
+  const [editingAssistantText, setEditingAssistantText] = useState('');
+  const isEditingAssistant = editingAssistantIdx !== null;
+  // Index of an assistant bubble whose new content is currently being
+  // re-tokenized after save. Drives a small inline "Tokenizing…" indicator
+  // above that bubble so the user can see why the chips haven't appeared
+  // yet on the freshly edited message.
+  const [retokenizingIdx, setRetokenizingIdx] = useState<number | null>(null);
+
+  // Mirror the edit-active flag onto the provider so demo buttons, the
+  // model switcher, and any other peer widgets freeze while the user is
+  // composing an assistant edit. Reset on unmount as a safety net.
+  useEffect(() => {
+    setIsEditingMessage(isEditingAssistant);
+    return () => setIsEditingMessage(false);
+  }, [isEditingAssistant, setIsEditingMessage]);
 
   // The provider sets `pendingChatInputRestore` when an upstream failure
   // (e.g. explain 429) rolls the chat back; we drain it here into the
@@ -166,7 +189,7 @@ export default function NLAInputChat() {
     });
     return s;
   }, [selectedTokenPositions, explainedPositions]);
-  const isSelectionPhase = !isLoading && !isChatStreaming;
+  const isSelectionPhase = !isLoading && !isChatStreaming && !isEditingAssistant;
   const selectionLimitReached = pendingPositions.size >= MAX_TOKENS_TO_EXPLAIN;
   const sourceNorm = selectedNlaSource?.norm ?? 0;
 
@@ -307,7 +330,10 @@ export default function NLAInputChat() {
   const isExplainInFlight = isLoading || autoExplainPending;
   // Demo hydrate counts as "busy" so the textarea, send button, and
   // selection chips are disabled while we're swapping in a new cache.
-  const isBusy = isChatStreaming || isExplainInFlight || isHydratingDemo;
+  // Assistant-edit mode also counts as busy — while the user is composing
+  // an edit, the composer/send/clear/demo controls and all chip
+  // interactions must freeze so we can't race new state into the edit.
+  const isBusy = isChatStreaming || isExplainInFlight || isHydratingDemo || isEditingAssistant;
 
   const [explanationSearchInput, setExplanationSearchInput] = useState('');
   const [explanationSearchDebouncedTrimmed, setExplanationSearchDebouncedTrimmed] = useState('');
@@ -596,6 +622,10 @@ export default function NLAInputChat() {
     }
 
     const handleActivateKeyboard = () => {
+      // While the user is mid-edit on an assistant message, no chip
+      // interactions are allowed — selection and focus were cleared on
+      // edit-entry and must stay cleared until save/cancel.
+      if (isEditingAssistant) return;
       // Any chip click clears the per-paragraph and per-range highlights
       // — they're anchored to whatever the previous focus token was, and
       // a deep link's preset highlight shouldn't bleed across navigations.
@@ -624,6 +654,8 @@ export default function NLAInputChat() {
       // Stop the chat-area unlock handler from clearing the lock the
       // moment we set it (mousedown bubbles up from the chip).
       e.stopPropagation();
+      // Block chip interactions while editing an assistant message.
+      if (isEditingAssistant) return;
       // Same reset as the keyboard path — see handleActivateKeyboard.
       setHighlightedParagraph(null);
       setHighlightedRange(null);
@@ -672,6 +704,10 @@ export default function NLAInputChat() {
     };
 
     const handleMouseEnter = () => {
+      // Don't drive hover focus / drag selection while editing an
+      // assistant message — keeps the details column blank and chips
+      // stylistically quiet until the edit is resolved.
+      if (isEditingAssistant) return;
       if (dragMode !== null && isSelectionPhase && !isExplained) {
         applyDragRange(tok.position, dragMode);
         setSelectedPosition(dragMode === 'select' ? tok.position : null);
@@ -914,7 +950,7 @@ export default function NLAInputChat() {
 
   async function sendMessage() {
     const trimmed = typedText.trim();
-    if (!trimmed || isChatStreaming || isLoading) return;
+    if (!trimmed || isChatStreaming || isLoading || isEditingAssistant) return;
     setError(null);
     onUserEdit();
 
@@ -1298,7 +1334,7 @@ export default function NLAInputChat() {
   const isBlankChat = !hasMessages && !isChatStreaming && !isExplainInFlight;
 
   const handleEditUserMessage = (originalIdx: number, content: string) => {
-    if (isChatStreaming || isLoading) return;
+    if (isChatStreaming || isLoading || isEditingAssistant) return;
     // eslint-disable-next-line no-alert
     const confirmed = window.confirm(
       'Are you sure you want to edit this message? It will clear the rest of the chat messages.',
@@ -1308,6 +1344,94 @@ export default function NLAInputChat() {
     truncateChatFrom(originalIdx);
     setTypedText(content);
     setError(null);
+  };
+
+  // Enter the inline editor for an assistant message. Same destructive
+  // semantics as user-message edit: a confirm gate, then we clear all
+  // selections + details focus so nothing reads stale state. The
+  // editor only exposes the message `content` text — the surrounding
+  // chat-template tokens are re-applied by `tokenizerFormat.formatChat`
+  // on save, so the user can't desync the templating.
+  const handleStartAssistantEdit = (originalIdx: number, content: string) => {
+    if (isChatStreaming || isLoading || isEditingAssistant) return;
+    // eslint-disable-next-line no-alert
+    const confirmed = window.confirm(
+      'Are you sure you want to edit this assistant message? It will clear the rest of the chat messages and their explanations.',
+    );
+    if (!confirmed) return;
+    onUserEdit();
+    // Deselect everything: pending-for-explanation set, the hover/lock
+    // focus that drives the details column, and any anchored highlights.
+    onApplySelection(new Set());
+    setSelectedPosition(null);
+    setLockedPosition(null);
+    setHighlightedParagraph(null);
+    setHighlightedRange(null);
+    setHighlightComment(null);
+    setEditingAssistantIdx(originalIdx);
+    setEditingAssistantText(content);
+    setError(null);
+  };
+
+  const handleCancelAssistantEdit = () => {
+    setEditingAssistantIdx(null);
+    setEditingAssistantText('');
+  };
+
+  // Commit the assistant-edit: truncate from the edited message onward
+  // (this drops all later messages AND clears every cached explanation /
+  // partial / pending-selection for those positions — important so we
+  // never display stale chips from the old content under the new one),
+  // re-append the assistant message with the new content, then
+  // re-tokenize the resulting chat so the user can immediately pick
+  // tokens to explain on the freshly edited bubble.
+  const handleSaveAssistantEdit = async () => {
+    if (editingAssistantIdx === null) return;
+    const idx = editingAssistantIdx;
+    const newContent = editingAssistantText;
+    const newMessage: ChatMessage = { role: 'assistant', content: newContent };
+
+    // Closure-capture the future message list so the retokenize call
+    // below doesn't have to wait for chatMessages state to flush.
+    const newMessages: ChatMessage[] = [...chatMessages.slice(0, idx), newMessage];
+
+    // `truncateChatFrom(idx)` drops chatMessages[idx..end] plus the
+    // matching tokens / resultMap / partialMap / selection / focus.
+    truncateChatFrom(idx);
+    setChatMessages((prev) => [...prev, newMessage]);
+    setEditingAssistantIdx(null);
+    setEditingAssistantText('');
+    setRetokenizingIdx(idx);
+
+    try {
+      const canonicalText = tokenizerFormat.formatChat(newMessages);
+      const res = await fetch('/api/nla/completion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: canonicalText,
+          completion_tokens: 0,
+          modelId: modelId || undefined,
+          nlaSourceId: nlaSourceId || undefined,
+        }),
+      });
+      const tokRemainingHeader = res.headers.get('x-limit-remaining');
+      if (tokRemainingHeader !== null) {
+        setLimitRemaining(Number(tokRemainingHeader));
+      }
+      if (res.ok) {
+        const data = (await res.json()) as { tokens?: TokenInfo[] };
+        if (Array.isArray(data.tokens)) {
+          setTokenList(data.tokens);
+          setLastTokenizedText(canonicalText);
+        }
+      }
+    } catch {
+      // ignore — surviving chips for prior turns still render with the
+      // filtered tokenList that `truncateChatFrom` left behind.
+    } finally {
+      setRetokenizingIdx(null);
+    }
   };
 
   // Tracks which user message is currently showing the "copied" checkmark
@@ -1606,12 +1730,73 @@ export default function NLAInputChat() {
               const showChips =
                 !!group && (group.contentTokens.length > 0 || (showChatTokens && group.headerTokens.length > 0));
               const isUser = msg.role === 'user';
-              const canEdit = isUser && msg.content.length > 0 && !isChatStreaming && !isLoading;
+              const isEditingThisAssistant = !isUser && editingAssistantIdx === originalIdx;
+              // Per-message edit/copy buttons are only allowed when no
+              // edit is currently in progress on any bubble — keeps the
+              // user from jumping between edit targets and clobbering
+              // the working edit.
+              const canEditUser =
+                isUser && msg.content.length > 0 && !isChatStreaming && !isLoading && !isEditingAssistant;
+              const canEditAssistant =
+                !isUser && msg.content.length > 0 && !isChatStreaming && !isLoading && !isEditingAssistant;
+
+              // Inline editor for an assistant bubble: a focused textarea
+              // prefilled with just the assistant `content` (no special
+              // chat tokens), plus Cancel/Save. Save commits via
+              // `handleSaveAssistantEdit` which truncates + retokenizes.
+              if (isEditingThisAssistant) {
+                return (
+                  <div key={originalIdx} className="group flex w-full justify-start">
+                    <div className="flex w-full max-w-[95%] flex-col gap-y-1 px-0.5 sm:max-w-[85%]">
+                      <div className="flex w-full flex-col gap-y-1.5 rounded-xl bg-white px-2 py-2 shadow sm:px-3">
+                        <ReactTextareaAutosize
+                          value={editingAssistantText}
+                          onChange={(e) => setEditingAssistantText(e.target.value)}
+                          minRows={3}
+                          maxRows={12}
+                          autoFocus
+                          aria-label="Edit assistant message content"
+                          className="w-full resize-none rounded-md border border-sky-200 px-2 py-1.5 font-serif text-[14px] leading-relaxed text-slate-700 outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                        />
+                        <div className="flex flex-row items-center justify-end gap-x-1.5">
+                          <button
+                            type="button"
+                            onClick={handleCancelAssistantEdit}
+                            className="rounded-md border border-slate-200 bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-200"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveAssistantEdit}
+                            disabled={editingAssistantText.length === 0}
+                            title="Save and retokenize"
+                            className="rounded-md border border-sky-600 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-sky-500/90 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              const isRetokenizingThis = !isUser && retokenizingIdx === originalIdx;
               return (
                 <div key={originalIdx} className={`group flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`flex max-w-[95%] flex-col gap-y-0 px-0.5 sm:max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}
                   >
+                    {isRetokenizingThis && (
+                      <div
+                        className="mb-0 ml-3 flex items-center gap-x-1 px-1 text-[10px] font-medium leading-none text-slate-400"
+                        aria-live="polite"
+                      >
+                        <LoadingSquare size={12} />
+                        <span>Tokenizing…</span>
+                      </div>
+                    )}
                     {showChips ? (
                       <div
                         className={`select-none rounded-xl sm:px-3.5 ${isUser ? 'bg-white py-1 shadow' : 'bg-transparent py-0'}`}
@@ -1651,9 +1836,10 @@ export default function NLAInputChat() {
                         <button
                           type="button"
                           onClick={() => handleCopyMessage(originalIdx, msg.content)}
+                          disabled={isEditingAssistant}
                           title="Copy message"
                           aria-label="Copy message"
-                          className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-slate-400"
                         >
                           {copiedMessageIdx === originalIdx ? (
                             <Check className="h-3 w-3 text-sky-600" />
@@ -1664,9 +1850,37 @@ export default function NLAInputChat() {
                         <button
                           type="button"
                           onClick={() => handleEditUserMessage(originalIdx, msg.content)}
-                          disabled={!canEdit}
+                          disabled={!canEditUser}
                           title="Edit message (clears the rest of the chat)"
                           aria-label="Edit message"
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                    {!isUser && msg.content.length > 0 && (
+                      <div className="ml-4 mt-0 hidden items-center gap-x-1 sm:flex">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(originalIdx, msg.content)}
+                          disabled={isEditingAssistant}
+                          title="Copy message"
+                          aria-label="Copy message"
+                          className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                        >
+                          {copiedMessageIdx === originalIdx ? (
+                            <Check className="h-3 w-3 text-sky-600" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartAssistantEdit(originalIdx, msg.content)}
+                          disabled={!canEditAssistant}
+                          title="Edit assistant message (clears the rest of the chat and their explanations)"
+                          aria-label="Edit assistant message"
                           className="flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-slate-400"
                         >
                           <Pencil className="h-3 w-3" />
@@ -1761,7 +1975,7 @@ export default function NLAInputChat() {
               <button
                 type="button"
                 onClick={() => (isChatStreaming ? handleStop() : sendMessage())}
-                disabled={isExplainInFlight || (!isChatStreaming && !typedText.trim())}
+                disabled={isExplainInFlight || isEditingAssistant || (!isChatStreaming && !typedText.trim())}
                 className="flex h-7 w-7 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isChatStreaming ? (

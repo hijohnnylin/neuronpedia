@@ -386,6 +386,12 @@ type NLAContextType = {
   // Drop `chatMessages[idx..end]` and reset the explain/tokenize state.
   // Used by the per-message edit flow.
   truncateChatFrom: (idx: number) => void;
+  // True while the user is in the inline-editor for an assistant message.
+  // The chat panel owns the actual edit state; the flag is mirrored here so
+  // other regions (demo buttons, model switcher, details column) can also
+  // freeze interactions while the edit is pending.
+  isEditingMessage: boolean;
+  setIsEditingMessage: Dispatch<SetStateAction<boolean>>;
 
   // share modal
   isShareModalOpen: boolean;
@@ -480,6 +486,7 @@ export function NLAProvider({
   const [lastTokenizedText, setLastTokenizedText] = useState<string | null>(null);
   const [activeDemoCacheId, setActiveDemoCacheId] = useState<string | null>(null);
   const [isHydratingDemo, setIsHydratingDemo] = useState(false);
+  const [isEditingMessage, setIsEditingMessage] = useState(false);
   const [chatScrollNonce, setChatScrollNonce] = useState(0);
   const [explanationSearchNeedle, setExplanationSearchNeedle] = useState('');
   const [explanationSearchResetNonce, setExplanationSearchResetNonce] = useState(0);
@@ -1963,6 +1970,8 @@ export function NLAProvider({
       explainDisabled,
       cancelPendingAutoExplain,
       truncateChatFrom,
+      isEditingMessage,
+      setIsEditingMessage,
       isShareModalOpen,
       setIsShareModalOpen,
       shareDraft,
@@ -2021,6 +2030,7 @@ export function NLAProvider({
       explainDisabled,
       cancelPendingAutoExplain,
       truncateChatFrom,
+      isEditingMessage,
       isShareModalOpen,
       shareDraft,
       shareError,

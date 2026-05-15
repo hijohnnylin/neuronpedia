@@ -114,6 +114,7 @@ export default function NLAExplainer() {
     isChatStreaming,
     isLoading,
     isHydratingDemo,
+    isEditingMessage,
     chatMessages,
     tokenizerFormat,
     activeDemoCacheId,
@@ -141,7 +142,9 @@ export default function NLAExplainer() {
   // Mirrors the chat panel's `isBusy`: disable demo-load and model-switch
   // while a chat stream, explanation, or demo hydrate is in flight so the
   // user can't race new state into a partially-rendered run.
-  const isBusy = isChatStreaming || isLoading || isHydratingDemo;
+  // Also freezes while the user is composing an assistant-message edit
+  // so loading a new demo can't clobber the working edit state.
+  const isBusy = isChatStreaming || isLoading || isHydratingDemo || isEditingMessage;
 
   const startTour = useNlaTour({
     selectedModelId,
