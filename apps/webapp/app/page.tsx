@@ -105,7 +105,7 @@ export default async function Page() {
         </div>
       )}
 
-      <div className="mb-5 mt-2 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:flex-row">
+      <div className="mb-1 mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:flex-row">
         <div className="flex basis-[55%] flex-col items-center justify-center text-center text-sm sm:text-base">
           <div className="text-lg font-medium text-slate-800 sm:text-[19px]">
             Neuronpedia is an{' '}
@@ -132,10 +132,61 @@ export default async function Page() {
           <div className="mt-0 text-sm font-normal text-slate-600 sm:text-[14px]">
             Explore, visualize, and steer the internals of AI models.
           </div>
+          <div className="mt-2 flex flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2 sm:flex-row">
+            <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
+              <Button
+                variant="default"
+                size="default"
+                className="flex w-[110px] max-w-[110px] flex-row gap-x-2 bg-slate-700 text-white transition-all hover:bg-slate-900"
+              >
+                <Github className="h-4 w-4" />
+                <div className="flex flex-col gap-y-0.5">
+                  <span className="text-xs leading-none">GitHub</span>
+                </div>
+              </Button>
+            </Link>
+            {/* <Link href="https://docs.neuronpedia.org" target="_blank" rel="noreferrer">
+              <Button variant="default" size="sm" className="w-[165px] gap-x-2 bg-sky-600 text-white hover:bg-sky-700">
+                <BookOpenText className="h-5 w-5" />
+                <span>Get Started</span>
+              </Button>
+            </Link> */}
+            <Link href="/gemma-scope">
+              <Button
+                variant="default"
+                size="default"
+                className="flex w-[135px] max-w-[135px] flex-row gap-x-2 bg-sky-600 px-2 text-xs text-white transition-all hover:bg-sky-700"
+              >
+                <Lightbulb className="h-4 w-4" />
+                <span>New to Interp?</span>
+              </Button>
+            </Link>
+            <Link href="/explorer" className="">
+              <Button
+                variant="default"
+                size="default"
+                title="[BETA] Browse the latest tools, papers, replications, problems and more."
+                className="relative w-[120px] max-w-[120px] flex-row gap-x-2 overflow-hidden bg-indigo-500 px-2 text-xs text-white transition-all hover:bg-indigo-600"
+              >
+                <Map className="-ml-1 h-4 w-4" />
+                <div className="flex flex-col gap-y-0.5">
+                  <span className="text-[11px] leading-none">Explorer</span>
+                  <span className="text-[8px] leading-none text-indigo-100">Tools & Papers</span>
+                </div>
+                <div className="absolute -right-2 -top-0.5" style={{ transform: 'rotate(35deg)' }}>
+                  <span className="bg-amber-300 px-3 py-0.5 pl-4 text-[7px] font-medium leading-none text-slate-800">
+                    BETA
+                  </span>
+                </div>
+              </Button>
+            </Link>
+          </div>
         </div>
+
+        <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
-      <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0 sm:pb-5">
+      <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0 sm:pb-16">
         <div className="mt-0 overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-1 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-2">
           <div
             className="w-full rounded-full pb-0 pt-1 text-center text-[9px] font-bold uppercase text-[#262625]/40"
@@ -469,61 +520,6 @@ export default async function Page() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="mb-5 mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:mb-7 sm:flex-row">
-        <div className="flex basis-[55%] flex-col items-center justify-center text-center text-sm sm:text-base">
-          <div className="mt-0 flex flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-0 sm:flex-row">
-            <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
-              <Button
-                variant="default"
-                size="default"
-                className="flex w-[110px] max-w-[110px] flex-row gap-x-2 bg-slate-700 text-white transition-all hover:bg-slate-900"
-              >
-                <Github className="h-4 w-4" />
-                <div className="flex flex-col gap-y-0.5">
-                  <span className="text-xs leading-none">GitHub</span>
-                </div>
-              </Button>
-            </Link>
-            {/* <Link href="https://docs.neuronpedia.org" target="_blank" rel="noreferrer">
-              <Button variant="default" size="sm" className="w-[165px] gap-x-2 bg-sky-600 text-white hover:bg-sky-700">
-                <BookOpenText className="h-5 w-5" />
-                <span>Get Started</span>
-              </Button>
-            </Link> */}
-            <Link href="/gemma-scope">
-              <Button
-                variant="default"
-                size="default"
-                className="flex w-[135px] max-w-[135px] flex-row gap-x-2 bg-sky-600 px-2 text-xs text-white transition-all hover:bg-sky-700"
-              >
-                <Lightbulb className="h-4 w-4" />
-                <span>New to Interp?</span>
-              </Button>
-            </Link>
-            <Link href="/explorer" className="">
-              <Button
-                variant="default"
-                size="default"
-                title="[BETA] Browse the latest tools, papers, replications, problems and more."
-                className="relative w-[120px] max-w-[120px] flex-row gap-x-2 overflow-hidden bg-indigo-500 px-2 text-xs text-white transition-all hover:bg-indigo-600"
-              >
-                <Map className="-ml-1 h-4 w-4" />
-                <div className="flex flex-col gap-y-0.5">
-                  <span className="text-[11px] leading-none">Explorer</span>
-                  <span className="text-[8px] leading-none text-indigo-100">Tools & Papers</span>
-                </div>
-                <div className="absolute -right-2 -top-0.5" style={{ transform: 'rotate(35deg)' }}>
-                  <span className="bg-amber-300 px-3 py-0.5 pl-4 text-[7px] font-medium leading-none text-slate-800">
-                    BETA
-                  </span>
-                </div>
-              </Button>
-            </Link>
-          </div>
-        </div>
-        <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
       <div className="grid w-full grid-cols-2 items-center justify-center gap-x-12 gap-y-5 bg-white px-5 py-5 md:flex md:h-[95px] md:min-h-[95px] md:grid-cols-3 md:flex-row md:py-0">

@@ -1,0 +1,153 @@
+---
+title: 'Natural Language Autoencoders 🔢➡️🔤'
+description: 'Our New Anthropic Collaboration, Contribution Opportunities, and More SAEs'
+date: 2026-5-17
+author: Johnny Lin, David Chanin
+image: ASSET_BASE_URL/blog/nllama2.gif
+imagePreview: ASSET_BASE_URL/blog/nllama2.gif
+---
+
+<div className="mt-2"></div>
+
+_This post is human-written and not AI generated or edited._
+
+If we could reliably read an AI model's thoughts, we'd be able to build safer AI systems. However, when we look inside a running model, we see huge arrays of numbers ("activations") that are difficult to understand.
+
+**Natural Language Autoencoders (NLAs)** are models that directly _translate_ these activations into natural language, so that we can read a model's internal thoughts in plain English.
+
+## ➡️ [**Launch NLAs on Neuronpedia**](https://www.neuronpedia.org/nla)
+
+- [**Paper**](https://transformer-circuits.pub/2026/nla/index.html) by Fraser-Taliente, Kantamneni, Ong et al, [**Anthropic Post**](https://www.anthropic.com/research/natural-language-autoencoders), and [**Intro Video**](https://www.youtube.com/watch?v=j2knrqAzYVY)
+- [**GitHub**](https://github.com/kitft/natural_language_autoencoders) - Train your own NLAs (and [submit them](mailto:johnny@neuronpedia.org) to Neuronpedia)
+- [**Anthropic Tweet**](https://x.com/AnthropicAI/status/2052435436157452769?s=20), [**Neuronpedia Tweet**](https://x.com/neuronpedia/status/2052439639160762879), [**LessWrong**](https://www.lesswrong.com/posts/oeYesesaxjzMAktCM/natural-language-autoencoders-produce-unsupervised), [**HN**](https://news.ycombinator.com/item?id=48052537)
+
+NLAs build on top of previous work by [Pan et al](https://arxiv.org/pdf/2412.08686), [Karvonen et al](https://arxiv.org/pdf/2512.15674), [Huang et al](https://arxiv.org/pdf/2512.15712) and others, with a key difference that NLAs are a pair of models trained in a mostly unsupervised manner: an Activation Verbalizer (AV) that translates activations into text, and an Activation Reconstructor (AR) that translates the text back into activations (for "scoring").
+
+In this newsletter, we cover the NLA release, new features since the NLA release, and **🙋 opportunities to contribute**: ways that you can add value to interpretability research that don't necessarily require a ton of experience. Opportunities to contribute are not an invitation to copy paste the thing into Claude/Codex and then copy paste the results back to us. Please use the AI as a copilot, not the director.
+
+---
+
+## 🧍 Aside: Human-Labeling & Sunsetting the Babble
+
+We're now explicitly labeling our posts as _human-written_. They've been and always will be human-written. We're not anti-using-AI (we use it all the time for coding and tasks), but at least in the current stage of AI development, we're think it's significantly better to be explicit.
+
+Also, until now, we've used NotebookLM to generate an AI podcast summary for each post. It was an interesting experiment (and honestly, half of it was an excuse to use 'The Babble' pun as it relates to the Residual Stream). We'll no longer be doing this: even though The Babble is a summary tool, its net value wasn't high enough vs time invested and confusion about what it was. Goodbye to the Babble for now - but don't worry, Rizz the Frog is still here with us in the Residual Stream. 🌈🏞️
+
+Okay, now back to NLAs!
+
+---
+
+## ⚠️ NLAs - Word of the Day: Confabulation
+
+NLAs are not perfect - they're relatively new, and a significant shortcoming is that NLAs can **confabulate**, or produce unexpected outputs or incorrect explanations. Read the paper's [limitations](https://transformer-circuits.pub/2026/nla/index.html#discussion-and-limitations) section for details.
+
+🙋 **Opportunity to Contribute**: Reliable NLA evals/benchmarks that aren't easily gameable.
+
+---
+
+## 🆕 NLAs - Edit Assistant Message
+
+Thanks to a feature request from Joseph Bloom, in your NLA chat, you can now edit the assistant message in addition to the user message:
+
+<img src="ASSET_BASE_URL/blog/nla-edit.gif" alt="Editing the assistant response from cat to dog." />
+_We edit the assistant response from cat to dog, then explain the dog token._
+
+---
+
+## 🆕 NLAs - API + Notebook
+
+Neuronpedia exposes an NLA API for researchers to run experiments. The API currently supports the same two NLAs as the frontend, both running NLAs trained by Anthropic: `gemma-3-27b-it` with NLA source `kitft-l41` and `llama3.3-70b-it` with NLA source `kitft-l53`. To ensure everyone has access, the default limit is a 120 explanation requests per hour per user (each explanation request can be for up to 16 tokens). If you need a higher limit for your research, please email us.
+
+- ➡️ [**Example Notebook**](https://github.com/hijohnnylin/neuronpedia/blob/main/apps/nla/api_demo.ipynb)
+- ➡️ [**API Doc**](https://www.neuronpedia.org/api-doc#tag/nla)
+
+---
+
+## 🆕 NLAs - Train Your Own & Add to Neuronpedia
+
+Anthropic provides an [**open source library**](https://github.com/kitft/natural_language_autoencoders) for training and loading NLAs.
+
+🙋 **Opportunity to Contribute**: New NLAs - Neuronpedia is accepting NLAs from contributors/researchers (similar to what we do for circuit tracer and SAEs). This gives us greater breadth of model coverage, and allows other researchers to compare NLAs from different models and layers. If you train an NLA that you'd like to share on Neuronpedia, [let us know](mailto:johnny@neuronpedia.org)!
+
+🙋 **Opportunity to Contribute**: NLA improvements/tweaks - update the way that NLAs are trained (eg warm-start prompts, hyperparameters, etc), or even a larger change that qualifies as a new NLA variant. Please submit these contributions as PRs to the public [**GitHub**](https://github.com/kitft/natural_language_autoencoders).
+
+---
+
+## 🆕 NLAs - Generate SAE Explanations and Scores
+
+While experimenting with NLAs, we decided to throw SAE features/vectors into them to see what would happen. Surprisingly, they generated passable explanations for some SAE features. This was super unscientific, but then again, so was the way in which penicillin was discovered, so why not. 🤷 This section should be taken with a massive block of salt, as we (Decode) have no idea why this (sometimes) works. Special thanks to David Chanin for training SAEs to experiment with earlier NLA models.
+
+### Why This May Be Valuable / Interesting
+
+- **Cost**: Autointerp explanations can be expensive if using a frontier model, and scoring is even more expensive. With NLA explanations, we do generation with the AV, which is a cheaper model.
+- **Subjective Error**: Autointerp explanations have many "vibes-based" configs: the wording or structure of the prompt given to the model, the data you show the model (activations, logits, etc), thinking settings, etc. By contrast, AVs simply read the activations and output text.
+- **Perspective**: Autointerp explanations are generally some form of asking an external model "what's the pattern in these text snippets?". The space of outputs from this differs significantly than NLA AV outputs, which are less of an answer to a question, and more "raw" translation of the activations.
+
+### NLA Explanations for SAE Latents
+
+<img
+  src="ASSET_BASE_URL/blog/nla-explain.gif"
+  alt="Here's Gemma's activation verbalizer labeling an SAE latent - its explanation is similar to the auto-interp label we generated with Gemini Flash 2.5."
+/>
+_Here's Gemma's activation verbalizer labeling an SAE latent - its explanation is similar to the auto-interp label we
+generated with Gemini Flash 2.5._
+
+We found that NLAs can do labeling of SAE latents, with no modification required.
+Instead of explaining a model's activations at a specific position in a conversation, here we simply pass the SAE vector
+to the NLA's activation verbalizer. This sometimes resulted in reasonable explanations matching the top activating texts
+for the latent (and also sometimes matching auto-interp explanations too).
+
+- ➡️ [**Gemma-3-27B-IT SAE Feature**](https://www.neuronpedia.org/gemma-3-27b-it/41-gemmascope-2-res-262k/10) - Try it yourself on random Gemma 27B features.
+
+**🙋 Opportunity to Contribute**: Formal Writeup - We need a writeup and theory of why this works, ideally with real tests and fleshed out experiments. Francesco Zaffino is working on formalizing a [notebook](https://colab.research.google.com/drive/1DYXHO61ns2iDmiySYrp9VRFzYKMYItxI?usp=sharing) that improves NLA labels and shows comparisons of Neuronpedia labels with NLA labels.
+
+### NLA Scores for Auto-Interp Explanations
+
+<img
+  src="ASSET_BASE_URL/blog/nla-score.gif"
+  alt="Demonstrating two methods of scoring non-NLA auto-interp explanations on the same SAE latent as above."
+/>
+_Demonstrating two methods of scoring non-NLA auto-interp explanations on the same SAE latent as above._
+
+We found that NLAs can be used for scoring non-NLA auto-interp labels. We created three new explanation scoring methods on Neuronpedia
+using NLAs that can be used now:
+
+1. `nla_reconstructor`: (Works Poorly) Pass the non-NLA feature label into the activation reconstructor to get an activation vector. Calculate cosine similarity between the resulting vector and the SAE vector. We found that with this method, the score was almost always very bad. This approach likely has some conceptual error - eg we probably need to do something to move the vector closer to the space of the model's activations.
+2. `nla_verbalizer`: (Works Okay) Generate an activation verbalizer explanation, then get its text embedding vector. Calculate cosine similarity between this vector and the text embedding vector of the feature label, which we use as the score.
+3. `nla_verbalizer_last`: (Works Okay+) Same as `nla_verbalizer`, except we only use the last paragraph of the activation verbalizer explanation when generating the text embedding vector. This works slightly better because the NLAs trained by kitft happened to generate three paragraph explanations, with the last paragraph about the token itself, and the first two paragraphs about greater context. But since NLA explanations will not always be structured this way, this explanation method is extremely hacky.
+
+- ➡️ [**Gemma-3-27B-IT SAE Feature**](https://www.neuronpedia.org/gemma-3-27b-it/41-gemmascope-2-res-262k/10) - Try the new explanation scoring methods on Gemma features.
+
+---
+
+## More SAEs and Auto-Interps
+
+We have more SAEs, dashboards, and auto-interps! These are middle layer SAEs different sizes. SAELens integration support by David Chanin.
+
+- [Qwen 3 1.7B - Layer 14: Adam Karvonen](https://www.neuronpedia.org/qwen3-1.7b/14-resid-batchtopk-65k__l0-80)
+- [Qwen 3 8B - Layer 18: Adam Karvonen](https://www.neuronpedia.org/qwen3-8b/18-resid-batchtopk-65k__l0-80)
+- [Qwen 3 14B - Layer 20: Adam Karvonen](https://www.neuronpedia.org/qwen3-14b/20-resid-batchtopk-65k__l0-80)
+- [Qwen 3 32B - Layer 32: Adam Karvonen](https://www.neuronpedia.org/qwen3-32b/32-resid-batchtopk-65k)
+- [Qwen 3.5 2B - Layer 11: Qwen Scope](https://www.neuronpedia.org/qwen3.5-2b/11-qwenscope-res-32k)
+- [Qwen 3.5 9B - Layer 15: Qwen Scope](https://www.neuronpedia.org/qwen3.5-9b/15-qwenscope-res-64k)
+- [Qwen 3.5 27B - Layer 31: Qwen Scope](https://www.neuronpedia.org/qwen3.5-27b/31-qwenscope-res-80k)
+- [Olmo 3 32B - Layer 32: Bartosz Cywiński](https://www.neuronpedia.org/olmo-3-1125-32b/32-res-batchtopk-131k)
+
+As usual, the top activations, explanations, and other metadata are all available in our exports bucket:
+
+- [Neuronpedia Exports](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/)
+
+Please do not hammer the API to get features individually. We do employ rate limiting so you will get errors back eventually, disrupting your workflow.
+
+---
+
+## Bonus
+
+<img
+  src="ASSET_BASE_URL/blog/toserveman3.png"
+  alt="A mockup of what a literal translation app between activation matrices and English would look like. The left is an array of numbers labeled Llama's Thoughts, the right is the text 'I just read To Serve Man... Great book!"
+/>
+
+---
+
+As always, please [contact us](https://www.neuronpedia.org/contact) with your questions, feedback, and suggestions.

@@ -4,6 +4,7 @@ import { Button } from '@/components/shadcn/button';
 import emailSpellChecker from '@zootools/email-spell-checker';
 import { MailIcon } from 'lucide-react';
 import { signIn } from 'next-auth/react';
+import Link from 'next/link';
 import { useState } from 'react';
 import { generateFromEmail } from 'unique-username-generator';
 import isEmail from 'validator/lib/isEmail';
@@ -16,7 +17,6 @@ type LatestPost = {
   dateString: string;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function HomeNewsletterSignup({ latestPost }: { latestPost?: LatestPost }) {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -57,10 +57,10 @@ export default function HomeNewsletterSignup({ latestPost }: { latestPost?: Late
   return (
     <div className="flex w-full flex-1 flex-col items-stretch gap-y-2.5 rounded-xl px-5 py-3.5">
       {/* put back after new blog post */}
-      {/* {latestPost && (
+      {latestPost && (
         <Link
           href={`/blog/${latestPost.slug}`}
-          className="group flex flex-col rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 transition-all hover:border-sky-300 hover:bg-sky-50"
+          className="group flex flex-col rounded-lg border border-slate-200 bg-white px-4 py-3 transition-all hover:border-sky-300 hover:bg-sky-50"
         >
           <div className="mb-0.5 flex flex-row items-center justify-start gap-x-2">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">Latest Update</div>
@@ -79,11 +79,11 @@ export default function HomeNewsletterSignup({ latestPost }: { latestPost?: Late
           </div>
           <div className="mt-[3px] text-[11px] font-medium leading-snug text-slate-400">{latestPost.description}</div>
         </Link>
-      )} */}
+      )}
       <div className="flex w-full flex-col items-center gap-y-2 px-1 sm:flex-row sm:gap-x-4 sm:gap-y-0">
-        <div className="flex flex-col items-center text-center sm:items-start sm:gap-y-0 sm:text-left">
+        <div className="flex flex-row items-center gap-x-1.5 text-center sm:flex-col sm:items-start sm:gap-y-0 sm:text-left">
           <div className="mb-0 flex flex-row items-center justify-center text-[13px] font-semibold text-slate-700">
-            <MailIcon className="mr-1.5 h-4 w-4" /> Get Updates
+            <MailIcon className="mr-1.5 h-4 w-4" /> Newsletter
           </div>
           <div className="text-xs text-slate-500">
             <a

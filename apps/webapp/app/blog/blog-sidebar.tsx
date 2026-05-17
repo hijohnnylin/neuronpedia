@@ -34,7 +34,7 @@ export default function BlogSidebar() {
         <div className="hidden flex-col items-center justify-center pb-3 sm:flex">
           <h1 className="whitespace-pre text-sm font-bold sm:pb-1.5 sm:text-[18px]">
             The Babble{' '}
-            <a href="/blog/nlas#human-labeling--sunsetting-the-babble" className="text-sm text-sky-700 hover:underline">
+            <a href="/blog/nlas#-nlas---word-of-the-day-confabulation" className="text-sm text-sky-700 hover:underline">
               (Deprecated)
             </a>
           </h1>
