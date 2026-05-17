@@ -65,6 +65,30 @@ Gemma-3-12b           bfloat16     32      A100 80GB      0.31
                                   source-extract phase becomes the new
                                   serialization bottleneck across parallel
                                   /explains. Lower if you OOM under load.
+  NLA_RECONSTRUCTOR_MAX_CONCURRENT — max concurrent /score reconstructor
+                                  forward passes (default: 4). The (N+1)th
+                                  request gets HTTP 429 immediately. /score
+                                  is otherwise blocking torch on the event
+                                  loop; this gate plus an executor-thread
+                                  offload (run_in_executor) keeps the loop
+                                  responsive under load. The same
+                                  reconstructor is also called from
+                                  /describe via _ReconstructionBatcher,
+                                  which is NOT gated by this semaphore (it
+                                  has its own coalescing and is already
+                                  bounded by NLA_MAX_CONCURRENT) — bump
+                                  this only if you see /score-driven
+                                  contention.
+  NLA_MAX_DESCRIBE_REQUESTS     — max concurrent in-flight /describe
+                                  requests (default: 32). The (N+1)th
+                                  request gets HTTP 429 immediately.
+                                  Complements NLA_MAX_CONCURRENT (which
+                                  bounds verbalizer streams) by capping
+                                  the *request* count — without this, a
+                                  flash crowd of /describe callers would
+                                  pile up unbounded waiters on the
+                                  verbalizer semaphore, holding HTTP
+                                  connections open until they time out.
 
 Per-request shape limits (bound the SIZE of one request, complementing the
 concurrency gates above which bound the COUNT of in-flight requests):
@@ -279,6 +303,25 @@ if MAX_CONCURRENT_EXPLAINS < 1:
         f"NLA_MAX_CONCURRENT_EXPLAINS must be >= 1, got {MAX_CONCURRENT_EXPLAINS}"
     )
 SOURCE_MAX_CONCURRENT = int(os.environ.get("NLA_SOURCE_MAX_CONCURRENT", "4"))
+# Per-request /score gate. Reconstructor forward passes are blocking torch
+# work; we offload them via run_in_executor and cap parallelism to keep
+# VRAM bounded and avoid starving the rest of the server. (N+1)th request
+# fails fast with 429.
+RECONSTRUCTOR_MAX_CONCURRENT = int(
+    os.environ.get("NLA_RECONSTRUCTOR_MAX_CONCURRENT", "4")
+)
+if RECONSTRUCTOR_MAX_CONCURRENT < 1:
+    raise ValueError(
+        f"NLA_RECONSTRUCTOR_MAX_CONCURRENT must be >= 1, got {RECONSTRUCTOR_MAX_CONCURRENT}"
+    )
+# Per-request /describe gate. Bounds the number of concurrent /describe
+# *requests* (orthogonal to NLA_MAX_CONCURRENT, which bounds verbalizer
+# streams across the whole server). (N+1)th request fails fast with 429.
+MAX_DESCRIBE_REQUESTS = int(os.environ.get("NLA_MAX_DESCRIBE_REQUESTS", "32"))
+if MAX_DESCRIBE_REQUESTS < 1:
+    raise ValueError(
+        f"NLA_MAX_DESCRIBE_REQUESTS must be >= 1, got {MAX_DESCRIBE_REQUESTS}"
+    )
 # Reconstructor (HF) batch size — coalesces score() calls from streaming
 # fan-outs in /describe and /explain into one forward pass. Larger batches
 # amortize the per-call overhead (kernel launches, attention setup) but
@@ -483,6 +526,15 @@ _verbalizer_semaphore: asyncio.Semaphore | None = None
 # Gate concurrent GPU work on the source model (model.generate, extract).
 # Initialized in lifespan() because asyncio.Semaphore needs a running loop.
 _source_semaphore: asyncio.Semaphore | None = None
+# Bounds concurrent /score requests. Each /score does one reconstructor
+# forward pass via run_in_executor; sized by NLA_RECONSTRUCTOR_MAX_CONCURRENT.
+# (N+1)th request gets HTTP 429. Initialized in lifespan().
+_reconstructor_semaphore: asyncio.Semaphore | None = None
+# Bounds concurrent /describe requests. Sized by NLA_MAX_DESCRIBE_REQUESTS.
+# Distinct from _verbalizer_semaphore (which gates per-vector sglang
+# streams across the whole server). (N+1)th request gets HTTP 429.
+# Initialized in lifespan().
+_describe_semaphore: asyncio.Semaphore | None = None
 
 
 def _cuda_idx(device: str) -> int | None:
@@ -669,9 +721,12 @@ def load_models():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _source_semaphore, _explain_semaphore, _verbalizer_semaphore
+    global _reconstructor_semaphore, _describe_semaphore
     _source_semaphore = asyncio.Semaphore(SOURCE_MAX_CONCURRENT)
     _explain_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXPLAINS)
     _verbalizer_semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    _reconstructor_semaphore = asyncio.Semaphore(RECONSTRUCTOR_MAX_CONCURRENT)
+    _describe_semaphore = asyncio.Semaphore(MAX_DESCRIBE_REQUESTS)
     load_models()
     print(
         f"[NLA] source-model concurrency gate: max={SOURCE_MAX_CONCURRENT} "
@@ -684,6 +739,14 @@ async def lifespan(app: FastAPI):
     print(
         f"[NLA] verbalizer fan-out gate (server-wide): max={MAX_CONCURRENT} "
         f"(NLA_MAX_CONCURRENT)"
+    )
+    print(
+        f"[NLA] /score concurrency gate: max={RECONSTRUCTOR_MAX_CONCURRENT} "
+        f"(NLA_RECONSTRUCTOR_MAX_CONCURRENT)"
+    )
+    print(
+        f"[NLA] /describe concurrency gate: max={MAX_DESCRIBE_REQUESTS} "
+        f"(NLA_MAX_DESCRIBE_REQUESTS)"
     )
     print(
         f"[NLA] reconstruction batch size: {RECONSTRUCTION_BATCH_SIZE} "
@@ -1465,6 +1528,8 @@ async def root():
         "max_concurrent": MAX_CONCURRENT,
         "max_concurrent_explains": MAX_CONCURRENT_EXPLAINS,
         "source_max_concurrent": SOURCE_MAX_CONCURRENT,
+        "reconstructor_max_concurrent": RECONSTRUCTOR_MAX_CONCURRENT,
+        "max_describe_requests": MAX_DESCRIBE_REQUESTS,
         "limits": {
             "max_input_chars": MAX_INPUT_CHARS,
             "max_positions_per_request": MAX_POSITIONS_PER_REQUEST,
@@ -1489,6 +1554,21 @@ async def describe(req: DescribeRequest):
     if nla_client is None:
         raise HTTPException(status_code=503, detail="NLA client not loaded")
 
+    # Request-level fail-fast — orthogonal to the per-vector verbalizer gate
+    # below. Without this, a flash crowd of /describe callers would each
+    # consume HTTP connections + per-task buffers while waiting on
+    # _verbalizer_semaphore, with no upper bound on the wait queue.
+    assert _describe_semaphore is not None  # set in lifespan()
+    if _describe_semaphore.locked():
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"All {MAX_DESCRIBE_REQUESTS} /describe slot(s) in use. "
+                f"Try again shortly. Raise NLA_MAX_DESCRIBE_REQUESTS to "
+                f"permit more parallel callers."
+            ),
+        )
+
     n = len(req.activations)
     logger.info(
         f"/describe: {n} vector(s), shape=({len(req.activations[0])},), "
@@ -1505,147 +1585,216 @@ async def describe(req: DescribeRequest):
             )
         vectors.append(v)
 
-    if req.stream:
+    # Acquire the request-level slot AFTER cheap validation so 400s don't
+    # consume slots, but BEFORE we either spin up streaming tasks or run
+    # the non-streaming loop. For streaming, ownership of the slot
+    # transfers into event_stream's finally; for non-streaming, the
+    # outer try/finally below releases it.
+    await _describe_semaphore.acquire()
+    sema_owned_by_stream = False
 
-        async def event_stream():
-            queue: asyncio.Queue = asyncio.Queue()
-            # Server-wide verbalizer gate — shared with /explain and any other
-            # concurrent /describe so total in-flight streams ≤ MAX_CONCURRENT.
-            assert _verbalizer_semaphore is not None  # set in lifespan()
-            verb_sema = _verbalizer_semaphore
-            batcher = (
-                _ReconstructionBatcher(
-                    nla_reconstructor, n, RECONSTRUCTION_BATCH_SIZE
-                )
-                if nla_reconstructor is not None
-                else None
-            )
+    try:
+        if req.stream:
 
-            async def _stream_one(v: np.ndarray, idx: int):
-                # Whether we still owe the batcher a skip() if we exit
-                # before successfully handing ownership to it.
-                needs_skip = batcher is not None
+            async def event_stream():
                 try:
-                    async with verb_sema:
-                        t0 = time.perf_counter()
-                        last_out: dict = {"text": ""}
-                        async for out in nla_client.async_generate_stream(
-                            v,
-                            temperature=req.temperature,
-                            max_new_tokens=req.max_new_tokens,
-                        ):
-                            last_out = out
-                            await queue.put(
-                                json.dumps(
-                                    {"index": idx, "text": out["text"], "done": False}
+                    queue: asyncio.Queue = asyncio.Queue()
+                    # Server-wide verbalizer gate — shared with /explain and any other
+                    # concurrent /describe so total in-flight streams ≤ MAX_CONCURRENT.
+                    assert _verbalizer_semaphore is not None  # set in lifespan()
+                    verb_sema = _verbalizer_semaphore
+                    batcher = (
+                        _ReconstructionBatcher(
+                            nla_reconstructor, n, RECONSTRUCTION_BATCH_SIZE
+                        )
+                        if nla_reconstructor is not None
+                        else None
+                    )
+
+                    async def _stream_one(v: np.ndarray, idx: int):
+                        # Whether we still owe the batcher a skip() if we exit
+                        # before successfully handing ownership to it.
+                        needs_skip = batcher is not None
+                        try:
+                            async with verb_sema:
+                                t0 = time.perf_counter()
+                                last_out: dict = {"text": ""}
+                                async for out in nla_client.async_generate_stream(
+                                    v,
+                                    temperature=req.temperature,
+                                    max_new_tokens=req.max_new_tokens,
+                                ):
+                                    last_out = out
+                                    await queue.put(
+                                        json.dumps(
+                                            {
+                                                "index": idx,
+                                                "text": out["text"],
+                                                "done": False,
+                                            }
+                                        )
+                                    )
+                                logger.info(
+                                    f"/describe: [{idx + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s"
                                 )
-                            )
-                        logger.info(
-                            f"/describe: [{idx + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s"
-                        )
-                        description = nla_client._extract_text(
-                            last_out,
-                            True,
-                            context=f"/describe index={idx}",
-                        )
-                        mse = None
-                        cos = None
+                                description = nla_client._extract_text(
+                                    last_out,
+                                    True,
+                                    context=f"/describe index={idx}",
+                                )
+                                mse = None
+                                cos = None
+                                if batcher is not None:
+                                    # Ownership of skip-bookkeeping transfers to
+                                    # the batcher the moment we call score(): it
+                                    # always either resolves the future or sets
+                                    # the exception on it, and decrements the
+                                    # unsubmitted counter as part of submission.
+                                    needs_skip = False
+                                    t0 = time.perf_counter()
+                                    mse, cos = await batcher.score(description, v)
+                                    logger.info(
+                                        f"/describe: [{idx + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} "
+                                        f"in {time.perf_counter() - t0:.2f}s (batched)"
+                                    )
+                                await queue.put(
+                                    DescriptionResult(
+                                        description=description,
+                                        mse=mse,
+                                        cosine_similarity=cos,
+                                    ).model_dump_json()
+                                )
+                        finally:
+                            if needs_skip and batcher is not None:
+                                batcher.skip()
+
+                    tasks = [
+                        asyncio.create_task(_stream_one(v, i))
+                        for i, v in enumerate(vectors)
+                    ]
+                    try:
+                        done_count = 0
+                        while done_count < n:
+                            item = await queue.get()
+                            yield f"data: {item}\n\n"
+                            parsed = json.loads(item)
+                            if "description" in parsed:
+                                done_count += 1
+                        await asyncio.gather(*tasks)
+                        yield "data: [DONE]\n\n"
+                    finally:
                         if batcher is not None:
-                            # Ownership of skip-bookkeeping transfers to
-                            # the batcher the moment we call score(): it
-                            # always either resolves the future or sets
-                            # the exception on it, and decrements the
-                            # unsubmitted counter as part of submission.
-                            needs_skip = False
-                            t0 = time.perf_counter()
-                            mse, cos = await batcher.score(description, v)
-                            logger.info(
-                                f"/describe: [{idx + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} "
-                                f"in {time.perf_counter() - t0:.2f}s (batched)"
-                            )
-                        await queue.put(
-                            DescriptionResult(
-                                description=description,
-                                mse=mse,
-                                cosine_similarity=cos,
-                            ).model_dump_json()
-                        )
+                            await batcher.aclose()
                 finally:
-                    if needs_skip and batcher is not None:
-                        batcher.skip()
+                    # Always release the request-level slot, regardless of
+                    # whether the stream completed cleanly, errored, or the
+                    # client disconnected mid-stream (FastAPI calls
+                    # generator.aclose(), which fires this finally).
+                    _describe_semaphore.release()
 
-            tasks = [
-                asyncio.create_task(_stream_one(v, i)) for i, v in enumerate(vectors)
-            ]
-            try:
-                done_count = 0
-                while done_count < n:
-                    item = await queue.get()
-                    yield f"data: {item}\n\n"
-                    parsed = json.loads(item)
-                    if "description" in parsed:
-                        done_count += 1
-                await asyncio.gather(*tasks)
-                yield "data: [DONE]\n\n"
-            finally:
-                if batcher is not None:
-                    await batcher.aclose()
+            sema_owned_by_stream = True
+            return StreamingResponse(event_stream(), media_type="text/event-stream")
 
-        return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-    # Non-streaming path
-    results = []
-    for i, v in enumerate(vectors):
-        t0 = time.perf_counter()
-        description = await nla_client.async_generate(
-            v,
-            temperature=req.temperature,
-            max_new_tokens=req.max_new_tokens,
-            context=f"/describe index={i}",
-        )
-        logger.info(
-            f"/describe: [{i + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s"
-        )
-
-        mse = None
-        cos = None
-        if nla_reconstructor is not None:
+        # Non-streaming path
+        results = []
+        for i, v in enumerate(vectors):
             t0 = time.perf_counter()
-            mse, cos = nla_reconstructor.score(description, v)
+            description = await nla_client.async_generate(
+                v,
+                temperature=req.temperature,
+                max_new_tokens=req.max_new_tokens,
+                context=f"/describe index={i}",
+            )
             logger.info(
-                f"/describe: [{i + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} "
-                f"in {time.perf_counter() - t0:.2f}s"
+                f"/describe: [{i + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s"
             )
 
-        results.append(
-            DescriptionResult(
-                description=description,
-                mse=mse,
-                cosine_similarity=cos,
-            )
-        )
+            mse = None
+            cos = None
+            if nla_reconstructor is not None:
+                t0 = time.perf_counter()
+                mse, cos = nla_reconstructor.score(description, v)
+                logger.info(
+                    f"/describe: [{i + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} "
+                    f"in {time.perf_counter() - t0:.2f}s"
+                )
 
-    return DescribeResponse(results=results)
+            results.append(
+                DescriptionResult(
+                    description=description,
+                    mse=mse,
+                    cosine_similarity=cos,
+                )
+            )
+
+        return DescribeResponse(results=results)
+    finally:
+        # Streaming path transferred ownership into event_stream's finally.
+        # All other exits (validation error, non-streaming success, raised
+        # exception in the non-streaming loop) release here.
+        if not sema_owned_by_stream:
+            _describe_semaphore.release()
 
 
 @app.post("/score", response_model=ScoreResponse)
 async def score(req: ScoreRequest):
-    """Score an existing text description against the original activation vector."""
+    """Score an existing text description against the original activation vector.
+
+    The reconstructor forward pass is blocking torch work, so we run it on
+    a thread-pool executor (via run_in_executor) to keep the FastAPI event
+    loop responsive — otherwise concurrent /describe streams, /health,
+    etc. would all stall while a /score is in flight. Concurrency is
+    capped by NLA_RECONSTRUCTOR_MAX_CONCURRENT to bound VRAM and keep the
+    executor pool from drowning.
+    """
     if nla_reconstructor is None:
         raise HTTPException(status_code=503, detail="NLA reconstructor not loaded")
+
+    assert _reconstructor_semaphore is not None  # set in lifespan()
+    if _reconstructor_semaphore.locked():
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"All {RECONSTRUCTOR_MAX_CONCURRENT} /score slot(s) in use. "
+                f"Try again shortly. Raise NLA_RECONSTRUCTOR_MAX_CONCURRENT "
+                f"to permit more parallel callers."
+            ),
+        )
 
     logger.info(
         f"/score: description={req.description[:80]!r}... "
         f"activation_shape=({len(req.activation)},)"
     )
 
-    t0 = time.perf_counter()
-    v = np.array(req.activation, dtype=np.float32)
-    mse, cos = nla_reconstructor.score(req.description, v)
-    logger.info(
-        f"/score: mse={mse:.3f} cos={cos:.3f} in {time.perf_counter() - t0:.2f}s"
-    )
-    return ScoreResponse(mse=mse, cosine_similarity=cos)
+    async with _reconstructor_semaphore:
+        t0 = time.perf_counter()
+        v = np.array(req.activation, dtype=np.float32)
+        loop = asyncio.get_running_loop()
+        # `NLAReconstructor.reconstruct()` (called inside .score()) is NOT
+        # decorated with @torch.no_grad / @torch.inference_mode, so under a
+        # default-grad context it would build an autograd graph per call.
+        # We wrap the executor body in inference_mode to (a) keep VRAM
+        # bounded — no graph retained — and (b) sidestep any autograd-engine
+        # thread-safety quirks now that we're invoking from a thread pool
+        # rather than the event loop. Concurrency is bounded by
+        # _reconstructor_semaphore above; PyTorch's default CUDA stream
+        # serializes the actual GPU work, so executor parallelism mostly
+        # buys us a responsive event loop, not raw throughput.
+        # Bind locally so the closure captures a guaranteed-non-None
+        # reference (the module-level `nla_reconstructor` could in
+        # principle be cleared during shutdown).
+        reconstructor = nla_reconstructor
+        description = req.description
+
+        def _blocking_score():
+            with torch.inference_mode():
+                return reconstructor.score(description, v)
+
+        mse, cos = await loop.run_in_executor(None, _blocking_score)
+        logger.info(
+            f"/score: mse={mse:.3f} cos={cos:.3f} in {time.perf_counter() - t0:.2f}s"
+        )
+        return ScoreResponse(mse=mse, cosine_similarity=cos)
 
 
 @app.post("/compare", response_model=CompareResponse)
