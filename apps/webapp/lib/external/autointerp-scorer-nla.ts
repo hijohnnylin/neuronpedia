@@ -1,13 +1,28 @@
 import { prisma } from '@/lib/db';
-import { getNlaHeaders, getNlaServerUrl } from '@/lib/db/nla-source';
+import { nlaFetch } from '@/lib/db/nla-source';
 import { getOAIEmbedding } from '@/lib/external/embedding';
-import { fetchDecoderLatent } from '@/lib/utils/saelens';
+import { getNlaSaeFormat } from '@/lib/utils/nla';
+import { fetchDecoderLatent, getSAEFormatConfig, SAEFormat } from '@/lib/utils/saelens';
+import { getLayerNumFromSource } from '@/lib/utils/source';
 import { Explanation } from '@prisma/client';
 import { AuthenticatedUser } from '../with-user';
 
 const EMBEDDING_MODEL = 'text-embedding-3-large';
 const EMBEDDING_DIMENSIONS = 256;
 
+/**
+ * Loads everything the NLA scorers need to talk to the right NLA server
+ * about the right activation:
+ *   - the W_dec row (one decoder latent), pulled with format-aware
+ *     filename + tensor key
+ *   - the matching `NlaSource` row, used to resolve which GPU server
+ *     cluster owns this (model, layer)
+ *
+ * SAE format inference mirrors the client: we consult the
+ * (model, layer) -> SAEFormat allowlist in `lib/utils/nla.ts`. Layers
+ * not in the allowlist default to SAELens for backward compatibility
+ * with legacy SAE checkpoints.
+ */
 async function fetchLatentForExplanation(explanation: Explanation) {
   const source = await prisma.source.findUnique({
     where: {
@@ -26,9 +41,30 @@ async function fetchLatentForExplanation(explanation: Explanation) {
     throw new Error(`Invalid feature index: ${explanation.index}`);
   }
 
-  const safetensorsPath = `${source.hfFolderId}/sae_weights.safetensors`;
-  const latent = await fetchDecoderLatent(source.hfRepoId, safetensorsPath, index);
-  return { latent, source, index };
+  const layerNum = getLayerNumFromSource(explanation.layer);
+  const saeFormat = getNlaSaeFormat(explanation.modelId, layerNum) ?? SAEFormat.SAELens;
+  const { weightsFilename } = getSAEFormatConfig(saeFormat);
+  const safetensorsPath = `${source.hfFolderId}/${weightsFilename}`;
+  const latent = await fetchDecoderLatent(source.hfRepoId, safetensorsPath, index, saeFormat);
+
+  // Resolve the NlaSource row that owns this (model, layer). The scorer
+  // can't pass an explicit nlaSourceId (no UI surface for it today), so
+  // we do the same (modelId, layerNum) lookup that the explain-saelens
+  // route does. Stable ordering by id so repeat scorings of the same
+  // (modelId, layerNum) hit the same row when multiple match (rare;
+  // differs only by ar/av).
+  const nlaSource = await prisma.nlaSource.findFirst({
+    where: { modelId: explanation.modelId, layerNum },
+    orderBy: { id: 'asc' },
+  });
+  if (!nlaSource) {
+    throw new Error(
+      `No NLA source configured for modelId="${explanation.modelId}", layerNum=${layerNum}. ` +
+        `Configure an NlaSource for this (model, layer) pair before running NLA scorers.`,
+    );
+  }
+
+  return { latent, source, index, saeFormat, layerNum, nlaSourceId: nlaSource.id };
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -47,12 +83,16 @@ function cosineSimilarity(a: number[], b: number[]): number {
 // ─── nla_reconstructor ──────────────────────────────────────────────────────
 
 export const generateScoreNlaReconstructor = async (explanation: Explanation, user: AuthenticatedUser) => {
-  const { latent, source, index } = await fetchLatentForExplanation(explanation);
+  const { latent, source, index, nlaSourceId } = await fetchLatentForExplanation(explanation);
 
-  const nlaUrl = await getNlaServerUrl();
-  const nlaResponse = await fetch(`${nlaUrl}/score`, {
+  // `nlaFetch` (vs the legacy single-shot `getNlaServerUrl()`) gives us
+  // shuffle + failover across the NlaSource row's `servers[]`, plus
+  // automatic auth-header injection. The request-level fail-fast
+  // semaphores on the NLA server (`NLA_RECONSTRUCTOR_MAX_CONCURRENT`)
+  // mean we may see 429s under load — those bubble up as scorer errors
+  // for the user to retry, which is the desired contract.
+  const nlaResponse = await nlaFetch(explanation.modelId, nlaSourceId, '/score', {
     method: 'POST',
-    headers: getNlaHeaders(),
     body: JSON.stringify({
       description: explanation.description,
       activation: latent.values,
@@ -79,7 +119,7 @@ export const generateScoreNlaReconstructor = async (explanation: Explanation, us
       value: nlaResult.cosine_similarity,
       explanationId: explanation.id,
       explanationScoreTypeName: 'nla_reconstructor',
-      explanationScoreModelName: `${explanation.modelId}_nla_reconstructor`,
+      explanationScoreModelName: `nla_reconstructor`,
       initiatedByUserId: user.id,
       jsonDetails: JSON.stringify(jsonDetails),
     },
@@ -94,13 +134,13 @@ async function generateScoreNlaVerbalizerInner(
   useLastParagraph: boolean,
 ) {
   const scorerType = useLastParagraph ? 'nla_verbalizer_last' : 'nla_verbalizer';
-  const { latent, source, index } = await fetchLatentForExplanation(explanation);
+  const { latent, source, index, nlaSourceId } = await fetchLatentForExplanation(explanation);
 
-  // 1. Get NLA explanation via /describe (non-streaming)
-  const nlaUrl = await getNlaServerUrl();
-  const describeResponse = await fetch(`${nlaUrl}/describe`, {
+  // 1. Get NLA explanation via /describe (non-streaming). Same nlaFetch
+  // semantics as nla_reconstructor above — shuffle + failover across the
+  // (model, layer) NlaSource's `servers[]`.
+  const describeResponse = await nlaFetch(explanation.modelId, nlaSourceId, '/describe', {
     method: 'POST',
-    headers: getNlaHeaders(),
     body: JSON.stringify({
       activations: [latent.values],
       temperature: 0.7,
@@ -160,7 +200,7 @@ async function generateScoreNlaVerbalizerInner(
       value: cossim,
       explanationId: explanation.id,
       explanationScoreTypeName: scorerType,
-      explanationScoreModelName: `${explanation.modelId}_nla_verbalizer`,
+      explanationScoreModelName: scorerType,
       initiatedByUserId: user.id,
       jsonDetails: JSON.stringify(jsonDetails),
     },

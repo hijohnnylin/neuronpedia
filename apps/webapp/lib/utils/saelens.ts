@@ -11,9 +11,8 @@ function convertBF16ToF32(bf16: Uint16Array): number[] {
   const result = new Array<number>(bf16.length);
   const buf = new ArrayBuffer(4);
   const view = new DataView(buf);
-  // eslint-disable-next-line no-plusplus
+
   for (let i = 0; i < bf16.length; i++) {
-    // eslint-disable-next-line no-bitwise
     view.setUint32(0, bf16[i] << 16, true);
     result[i] = view.getFloat32(0, true);
   }
@@ -22,22 +21,20 @@ function convertBF16ToF32(bf16: Uint16Array): number[] {
 
 function convertF16ToF32(f16: Uint16Array): number[] {
   const result = new Array<number>(f16.length);
-  // eslint-disable-next-line no-plusplus
+
   for (let i = 0; i < f16.length; i++) {
     const h = f16[i];
-    // eslint-disable-next-line no-bitwise
+
     const sign = (h >> 15) & 0x1;
-    // eslint-disable-next-line no-bitwise
+
     const exponent = (h >> 10) & 0x1f;
-    // eslint-disable-next-line no-bitwise
+
     const mantissa = h & 0x3ff;
     if (exponent === 0) {
-      // eslint-disable-next-line no-restricted-properties
       result[i] = (sign ? -1 : 1) * 2 ** -14 * (mantissa / 1024);
     } else if (exponent === 31) {
       result[i] = mantissa === 0 ? (sign ? -Infinity : Infinity) : NaN;
     } else {
-      // eslint-disable-next-line no-restricted-properties
       result[i] = (sign ? -1 : 1) * 2 ** (exponent - 15) * (1 + mantissa / 1024);
     }
   }
@@ -70,17 +67,78 @@ export interface DecoderLatentResult {
 }
 
 /**
- * Fetches a single decoder latent vector (one row of W_dec) from a SAELens
- * safetensors file on HuggingFace, using HTTP Range requests so only the
- * header + one row of data are ever downloaded.
+ * On-HuggingFace SAE checkpoint formats we know how to fetch a decoder row
+ * from. The two formats agree on the actual W_dec layout (rows = latents,
+ * cols = d_model) but disagree on the safetensors filename and the tensor
+ * key used inside it. Adding a new format = one entry in `SAE_FORMAT_CONFIG`
+ * below.
  */
-export async function fetchDecoderLatent(repo: string, path: string, index: number): Promise<DecoderLatentResult> {
+export enum SAEFormat {
+  // SAELens-native checkpoints (sae_weights.safetensors, uppercase W_dec).
+  // This is the historical default and what every existing call site uses.
+  SAELens = 'SAELens',
+  // Google's gemma-scope-2 release. Despite the "gemma-scope-2" repo name,
+  // SAELens loads these via its `gemma_3` loader. Layout:
+  //   - file:   {folder}/params.safetensors
+  //   - tensor: lowercase `w_dec`, shape (num_latents, d_model)
+  // See sae_lens/loading/pretrained_sae_loaders.py:gemma_3_sae_huggingface_loader.
+  GemmaScope2 = 'GemmaScope2',
+}
+
+interface SAEFormatConfig {
+  /** Filename inside the HF folder that holds the SAE weights. */
+  weightsFilename: string;
+  /** Top-level safetensors tensor key for the decoder matrix. */
+  decoderTensorKey: string;
+}
+
+const SAE_FORMAT_CONFIG: Record<SAEFormat, SAEFormatConfig> = {
+  [SAEFormat.SAELens]: {
+    weightsFilename: 'sae_weights.safetensors',
+    decoderTensorKey: 'W_dec',
+  },
+  [SAEFormat.GemmaScope2]: {
+    weightsFilename: 'params.safetensors',
+    decoderTensorKey: 'w_dec',
+  },
+};
+
+/**
+ * Look up the on-disk layout for a given SAE checkpoint format. Useful when
+ * the caller needs to construct the safetensors path themselves (e.g. the
+ * `/api/nla/explain-saelens` route, which builds `${folder}/${weightsFilename}`
+ * from a folder id stored in Postgres).
+ */
+export function getSAEFormatConfig(format: SAEFormat): SAEFormatConfig {
+  return SAE_FORMAT_CONFIG[format];
+}
+
+/**
+ * Fetches a single decoder latent vector (one row of the decoder matrix)
+ * from an SAE safetensors file on HuggingFace, using HTTP Range requests
+ * so only the header + one row of data are ever downloaded.
+ *
+ * @param format Optional. Picks which tensor key inside the safetensors
+ *   header to read (SAELens → `W_dec`, GemmaScope2 → `w_dec`). Defaults to
+ *   `SAEFormat.SAELens` to preserve the historical behavior of every
+ *   existing caller. Note that `format` does NOT influence `path` —
+ *   callers are still responsible for passing the correct safetensors
+ *   filename (see `getSAEFormatConfig` for that).
+ */
+export async function fetchDecoderLatent(
+  repo: string,
+  path: string,
+  index: number,
+  format: SAEFormat = SAEFormat.SAELens,
+): Promise<DecoderLatentResult> {
   if (!path.endsWith('.safetensors')) {
     throw new Error('path must point to a .safetensors file');
   }
   if (!Number.isInteger(index) || index < 0) {
     throw new Error('index must be a non-negative integer');
   }
+
+  const { decoderTensorKey } = getSAEFormatConfig(format);
 
   const fileUrl = `https://huggingface.co/${repo}/resolve/main/${path}`;
 
@@ -99,9 +157,9 @@ export async function fetchDecoderLatent(repo: string, path: string, index: numb
   }
   const headerJson = JSON.parse(await headerRes.text());
 
-  const wDec = headerJson.W_dec;
+  const wDec = headerJson[decoderTensorKey];
   if (!wDec) {
-    throw new Error('W_dec tensor not found in this safetensors file');
+    throw new Error(`Decoder tensor "${decoderTensorKey}" not found in this safetensors file (format=${format})`);
   }
 
   const { dtype, shape, data_offsets: dataOffsets } = wDec;
@@ -110,7 +168,7 @@ export async function fetchDecoderLatent(repo: string, path: string, index: numb
     throw new Error(`Unsupported dtype: ${dtype}`);
   }
   if (shape.length !== 2) {
-    throw new Error(`Expected 2D W_dec tensor, got ${shape.length}D`);
+    throw new Error(`Expected 2D ${decoderTensorKey} tensor, got ${shape.length}D`);
   }
 
   const [numLatents, dModel] = shape;
@@ -118,7 +176,7 @@ export async function fetchDecoderLatent(repo: string, path: string, index: numb
     throw new Error(`index ${index} out of range [0, ${numLatents - 1}]`);
   }
 
-  // Compute the exact byte range for one row of W_dec
+  // Compute the exact byte range for one row of the decoder matrix
   const dataStart = 8 + headerSize + dataOffsets[0];
   const rowBytes = dModel * bytesPerElement;
   const rowStart = dataStart + index * rowBytes;

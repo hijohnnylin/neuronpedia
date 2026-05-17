@@ -8,6 +8,8 @@ import {
   ERROR_REQUIRES_OPENROUTER,
   EXPLANATIONTYPE_HUMAN,
 } from '@/lib/utils/autointerp';
+import { getNlaSaeFormat } from '@/lib/utils/nla';
+import { SAEFormat } from '@/lib/utils/saelens';
 import { getLayerNumFromSource } from '@/lib/utils/source';
 import {
   ExplanationScoreWithPartialRelations,
@@ -39,10 +41,6 @@ function cleanNlaPartialText(raw: string): string {
     .replace(/<\/explanation\s*$/g, '')
     .trim();
 }
-
-const NLA_MODELS_AND_LAYERS: Record<string, number[]> = {
-  // 'qwen2.5-7b-it': [20],
-};
 
 export default function ExplanationsPane({
   currentNeuron,
@@ -110,19 +108,40 @@ export default function ExplanationsPane({
     setExplanationTypesFiltered(filtered);
   }, [explanationTypes, currentNeuron, getSourceSet]);
 
-  const isNlaSupported = (() => {
-    if (!currentNeuron?.modelId || !currentNeuron?.layer) return false;
-    const allowedLayers = NLA_MODELS_AND_LAYERS[currentNeuron.modelId];
-    if (!allowedLayers) return false;
+  // Resolve once: returns the SAE format for the current (model, layer) if
+  // it's in the allowlist, else undefined. Both `isNlaSupported` and
+  // `handleNlaExplain` derive from this so they can't drift. The same
+  // allowlist is consulted server-side by the NLA scorers (see
+  // `lib/utils/nla.ts` and `lib/external/autointerp-scorer-nla.ts`).
+  const nlaSaeFormat: SAEFormat | undefined = (() => {
+    if (!currentNeuron?.modelId || !currentNeuron?.layer) return undefined;
     const layerNum = getLayerNumFromSource(currentNeuron.layer);
-    return allowedLayers.includes(layerNum);
+    return getNlaSaeFormat(currentNeuron.modelId, layerNum);
   })();
+  const isNlaSupported = nlaSaeFormat !== undefined;
 
   const handleNlaExplain = async () => {
     const hfRepoId = currentNeuron?.source?.hfRepoId;
     const hfFolderId = currentNeuron?.source?.hfFolderId;
     const index = currentNeuron?.index !== undefined ? parseInt(currentNeuron.index, 10) : undefined;
-    if (!hfRepoId || !hfFolderId || index === undefined || Number.isNaN(index)) return;
+    const modelId = currentNeuron?.modelId;
+    const layerStr = currentNeuron?.layer;
+    if (
+      !hfRepoId ||
+      !hfFolderId ||
+      index === undefined ||
+      Number.isNaN(index) ||
+      !nlaSaeFormat ||
+      !modelId ||
+      !layerStr
+    )
+      return;
+
+    // Server uses (modelId, layerNum) to look up the right NlaSource row
+    // (and therefore which NLA GPU server cluster to call). The same
+    // helper is used a few lines above when computing nlaSaeFormat, so
+    // these stay consistent.
+    const layerNum = getLayerNumFromSource(layerStr);
 
     nlaAbortRef.current?.abort();
     const controller = new AbortController();
@@ -138,7 +157,7 @@ export default function ExplanationsPane({
       const res = await fetch('/api/nla/explain-saelens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hfRepoId, hfFolderId, index }),
+        body: JSON.stringify({ hfRepoId, hfFolderId, index, format: nlaSaeFormat, modelId, layerNum }),
         signal: controller.signal,
       });
 
@@ -1024,7 +1043,7 @@ export default function ExplanationsPane({
                       <div className="whitespace-pre-wrap text-xs font-medium leading-snug text-slate-700">
                         {nlaResult.description}
                       </div>
-                      {nlaResult.cosine_similarity !== null && (
+                      {/* {nlaResult.cosine_similarity !== null && (
                         <div className="flex items-center gap-x-1">
                           <span className="text-[10px] text-slate-400">Cos Sim</span>
                           <span
@@ -1041,7 +1060,7 @@ export default function ExplanationsPane({
                             {nlaResult.cosine_similarity.toFixed(2)}
                           </span>
                         </div>
-                      )}
+                      )} */}
                     </div>
                   )}
                   <Popover.Arrow className="fill-slate-200" />

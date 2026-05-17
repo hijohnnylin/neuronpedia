@@ -41,7 +41,7 @@ export default async function Page() {
       <div className="-mb-4 mt-4 flex w-full max-w-screen-sm justify-center px-2 sm:px-0">
         <HomeNewsletterSignup />
       </div>
-      <div className="flex h-full w-full max-w-screen-lg flex-col items-start justify-start px-2 pt-4 text-slate-800 sm:flex-row sm:items-center sm:justify-center sm:gap-x-7 sm:px-0">
+      <div className="flex h-full w-full max-w-screen-lg flex-col items-start justify-start px-2 pt-4 text-slate-800 sm:flex-row sm:items-start sm:justify-center sm:gap-x-7 sm:px-0">
         <BlogSidebar />
 
         <Card className="mt-4 h-full w-full bg-white">

@@ -32,7 +32,12 @@ export default function BlogSidebar() {
           </a>
         </div>
         <div className="hidden flex-col items-center justify-center pb-3 sm:flex">
-          <h1 className="whitespace-pre text-sm font-bold sm:pb-1.5 sm:text-[18px]">The Babble</h1>
+          <h1 className="whitespace-pre text-sm font-bold sm:pb-1.5 sm:text-[18px]">
+            The Babble{' '}
+            <a href="/blog/nlas#human-labeling--sunsetting-the-babble" className="text-sm text-sky-700 hover:underline">
+              (Deprecated)
+            </a>
+          </h1>
           <h2 className="mt-0 text-center text-xs font-medium text-slate-600 sm:text-[13px]">Podcast by NotebookLM</h2>
           <div className="flex flex-row items-center justify-center gap-x-2">
             <a

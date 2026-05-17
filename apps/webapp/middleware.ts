@@ -23,6 +23,7 @@ const NORMAL_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api', limit: 25000 },
   { endpoint: '/api/activation/new', limit: 1000 },
   { endpoint: '/api/explanation/search', limit: 200 },
+  { endpoint: '/api/explanation/score', limit: 120, exact: true },
   { endpoint: '/api/steer', limit: 120 },
   { endpoint: '/api/search-topk-by-token', limit: 500 },
   { endpoint: '/api/search-all', limit: 1600 },
