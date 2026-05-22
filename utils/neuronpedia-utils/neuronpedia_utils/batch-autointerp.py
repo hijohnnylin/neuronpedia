@@ -40,10 +40,29 @@ from neuron_explainer.explanations.explainer import (
     MaxActivationAndLogitsExplainer,
     MaxActivationAndLogitsGeneralExplainer,
     MaxActivationExplainer,
+    NeuronExplainer,
     PythonCodeExplainer,
     TokenActivationPairExplainer,
 )
 from neuron_explainer.explanations.prompt_builder import PromptFormat
+
+# Patch NeuronExplainer.strip_explanation to tolerate None/non-string completions.
+# The upstream library assumes the LLM always returns a string, but some providers
+# (or content filters) occasionally return None or non-string content. Without
+# this, the call crashes with `'NoneType' object has no attribute 'startswith'`
+# and dumps a noisy traceback. Treating it as a blank explanation lets the
+# existing downstream fallback (use top activation token, or mark as failed)
+# handle it cleanly.
+_original_strip_explanation = NeuronExplainer.strip_explanation
+
+
+def _safe_strip_explanation(self, explanation):  # type: ignore[no-untyped-def]
+    if not isinstance(explanation, str) or not explanation:
+        return ""
+    return _original_strip_explanation(self, explanation)
+
+
+NeuronExplainer.strip_explanation = _safe_strip_explanation  # type: ignore[assignment]
 
 UPLOAD_EXPLANATION_AUTHORID = os.getenv("DEFAULT_CREATOR_ID")
 if UPLOAD_EXPLANATION_AUTHORID is None:
