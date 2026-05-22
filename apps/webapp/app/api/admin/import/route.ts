@@ -31,8 +31,19 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
   const modelId = searchParams.get('modelId');
   const sourceId = searchParams.get('sourceId');
   const explanations = searchParams.get('explanations') || ExplanationImportType.TRUE;
+  const explanationBatchStartParam = searchParams.get('explanationBatchStart');
+  let explanationBatchStart: number | null = null;
   if (!modelId || !sourceId) {
     return NextResponse.json({ error: 'modelId and sourceId are required query parameters' }, { status: 400 });
+  }
+  if (explanationBatchStartParam !== null) {
+    if (!/^\d+$/.test(explanationBatchStartParam)) {
+      return NextResponse.json(
+        { error: 'explanationBatchStart must be a non-negative integer when specified' },
+        { status: 400 },
+      );
+    }
+    explanationBatchStart = Number.parseInt(explanationBatchStartParam, 10);
   }
   const path = `${DATASET_BASE_PATH}${modelId}/${sourceId}`;
   console.log('Importing data from', path);
@@ -201,18 +212,19 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
 
           for (const [index, explanationsPath] of explanationsPaths.entries()) {
             enqueueProgress(controller, index / explanationsPaths.length, `(4 of 4) Importing Explanations...`);
-            // // Only import specific batch files
-            // const filename = explanationsPath.split('/').pop() || '';
-            // const batchMatch = filename.match(/^batch-(\d+)\.jsonl\.gz$/);
-            // if (!batchMatch) {
-            //   console.log(`Skipping non-batch file: ${filename}`);
-            //   continue;
-            // }
-            // const batchNumber = parseInt(batchMatch[1], 10);
-            // if (batchNumber < 7) {
-            //   console.log(`Skipping batch ${batchNumber} (outside range)`);
-            //   continue;
-            // }
+            if (explanationBatchStart !== null) {
+              const filename = explanationsPath.split('/').pop() || '';
+              const batchMatch = filename.match(/^batch-(\d+)\.jsonl\.gz$/);
+              if (!batchMatch) {
+                console.log(`Skipping non-batch file: ${filename}`);
+                continue;
+              }
+              const batchNumber = Number.parseInt(batchMatch[1], 10);
+              if (batchNumber < explanationBatchStart) {
+                console.log(`Skipping batch ${batchNumber} (before explanationBatchStart)`);
+                continue;
+              }
+            }
             console.log('Importing explanations from', explanationsPath);
             const explanationsJsonlString = await downloadAndDecompressFile(explanationsPath);
             const lines = explanationsJsonlString.trim().split('\n');
