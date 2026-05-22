@@ -9,10 +9,11 @@ import { NextResponse } from 'next/server';
  * @swagger
  * /api/steer-logits:
  *   post:
- *     summary: Steer (Graph Specific)
+ *     summary: Steer Graph Features (2/2) - Steer + Logits
  *     description: |
  *       Generates default and steered completions from an attribution graph prompt, returning top logits for each generated token.
  *       This is equivalent to the steer button in the /circuit-tracer subgraph (bottom left). In our example, we negatively steer on a "Texas" feature to have the model generate "Albany" instead of "Austin".
+ *       To get the token positions to steer on, you first tokenize the prompt using the `/api/graph/tokenize` endpoint.
  *       This endpoint currently supports only `gemma-2-2b` and `qwen3-4b`.
  *     tags:
  *       - Attribution Graphs
