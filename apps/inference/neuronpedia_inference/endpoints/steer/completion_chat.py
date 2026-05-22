@@ -51,6 +51,7 @@ from neuronpedia_inference.inference_utils.steering import (
     stream_lock,
 )
 from neuronpedia_inference.inference_utils.vllm_monitor import get_monitor
+from neuronpedia_inference.nnsight_health import watch_async_iter
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, with_request_lock
 from neuronpedia_inference.utils import make_logprob_from_logits
@@ -300,23 +301,25 @@ async def completion_chat(request: SteerCompletionChatPostRequest):
 
     generation_start = time.time()
 
-    generator = run_batched_generate(
-        promptTokenized=promptTokenized,
-        inputPrompt=inputPromptForPersona if is_assistant_axis else promptChat,
-        features=features,
-        steer_types=request.types,
-        strength_multiplier=float(request.strength_multiplier),
-        seed=int(request.seed),
-        temperature=float(request.temperature),
-        freq_penalty=float(request.freq_penalty),
-        max_new_tokens=int(request.n_completion_tokens),
-        steer_special_tokens=steer_special_tokens,
-        steer_method=steer_method,
-        normalize_steering=normalize_steering,
-        use_stream_lock=request.stream if request.stream is not None else False,
-        custom_hf_model_id=custom_hf_model_id,
-        n_logprobs=(request.n_logprobs or 0),
-        is_assistant_axis=is_assistant_axis,
+    generator = watch_async_iter(
+        run_batched_generate(
+            promptTokenized=promptTokenized,
+            inputPrompt=inputPromptForPersona if is_assistant_axis else promptChat,
+            features=features,
+            steer_types=request.types,
+            strength_multiplier=float(request.strength_multiplier),
+            seed=int(request.seed),
+            temperature=float(request.temperature),
+            freq_penalty=float(request.freq_penalty),
+            max_new_tokens=int(request.n_completion_tokens),
+            steer_special_tokens=steer_special_tokens,
+            steer_method=steer_method,
+            normalize_steering=normalize_steering,
+            use_stream_lock=request.stream if request.stream is not None else False,
+            custom_hf_model_id=custom_hf_model_id,
+            n_logprobs=(request.n_logprobs or 0),
+            is_assistant_axis=is_assistant_axis,
+        )
     )
 
     if request.stream:

@@ -2,14 +2,10 @@ import logging
 from typing import Any
 
 import einops
+import nnsight
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
-
-# from transformer_lens.model_bridge import TransformerBridge
-from neuronpedia_inference.config import Config
-from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
 from neuronpedia_inference_client.models.activation_single_post200_response import (
     ActivationSinglePost200Response,
 )
@@ -21,6 +17,11 @@ from neuronpedia_inference_client.models.activation_single_post_request import (
 )
 from nnterp import StandardizedTransformer
 from transformer_lens import ActivationCache, HookedTransformer
+
+# from transformer_lens.model_bridge import TransformerBridge
+from neuronpedia_inference.config import Config
+from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.shared import Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -196,9 +197,9 @@ def process_activations(
         layer_num = get_layer_num_from_sae_id(layer)
         with model.trace(tokens):
             if "resid_post" in hook_name:
-                outputs = model.layers_output[layer_num].save()
+                outputs = nnsight.save(model.layers_output[layer_num])
             elif "hook_mlp_in" in hook_name:
-                outputs = model.mlps_input[layer_num].save()
+                outputs = nnsight.save(model.mlps_input[layer_num])
             else:
                 raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
         cache = {hook_name: outputs}

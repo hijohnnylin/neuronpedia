@@ -2,6 +2,7 @@ import logging
 from typing import Any
 
 import einops
+import nnsight
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
@@ -291,9 +292,9 @@ def process_activations_batch(
         layer_num = get_layer_num_from_sae_id(layer)
         with model.trace(padded_tokens):
             if "resid_post" in hook_name:
-                outputs = model.layers_output[layer_num].save()
+                outputs = nnsight.save(model.layers_output[layer_num])
             elif "hook_mlp_in" in hook_name:
-                outputs = model.mlps_input[layer_num].save()
+                outputs = nnsight.save(model.mlps_input[layer_num])
             else:
                 raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
         cache = {hook_name: outputs}

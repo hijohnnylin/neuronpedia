@@ -79,6 +79,10 @@ from neuronpedia_inference.endpoints.util.similarity_matrix_pred import (
     router as similarity_matrix_pred_router,
 )
 from neuronpedia_inference.logging import initialize_logging
+from neuronpedia_inference.nnsight_health import (
+    detect_and_mark,
+    get_nnsight_health,
+)
 from neuronpedia_inference.sae_manager import SAEManager  # noqa: F401
 from neuronpedia_inference.shared import (  # noqa: F401
     STR_TO_DTYPE,
@@ -164,6 +168,20 @@ app.include_router(v1_router)
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/health/nnsight")
+async def nnsight_health_check():
+    """Fast probe of the nnsight runtime.
+
+    Returns 200 if nnsight has not been observed in the corrupted-mount
+    state described in `nnsight_health.py`, otherwise 503. Intended to
+    be polled by an external health checker so the host can be drained
+    or restarted without having to issue a full (slow) steering request.
+    """
+    healthy, details = get_nnsight_health()
+    payload = {"status": "healthy" if healthy else "unhealthy", **details}
+    return JSONResponse(content=payload, status_code=200 if healthy else 503)
 
 
 USE_TLENS_BRIDGE = False
@@ -435,7 +453,7 @@ async def initialize(
 async def check_secret_key(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    if request.url.path == "/health":
+    if request.url.path in ("/health", "/health/nnsight"):
         return await call_next(request)
 
     config = Config.get_instance()
@@ -503,6 +521,7 @@ async def log_and_check_cuda_error(
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):  # noqa: ARG001
+    detect_and_mark(exc)
     return JSONResponse(
         status_code=500,
         content={

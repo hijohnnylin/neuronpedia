@@ -1,5 +1,6 @@
 import logging
 
+import nnsight
 import torch
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -99,9 +100,9 @@ async def activation_topk_by_token(
         layer_num = get_layer_num_from_sae_id(source)
         with model.trace(tokens):
             if "resid_post" in hook_name:
-                outputs = model.layers_output[layer_num].save()
+                outputs = nnsight.save(model.layers_output[layer_num])
             elif "hook_mlp_in" in hook_name:
-                outputs = model.mlps_input[layer_num].save()
+                outputs = nnsight.save(model.mlps_input[layer_num])
             else:
                 raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
         cache = {hook_name: outputs}

@@ -3,6 +3,7 @@ import re
 from typing import Any
 
 import einops
+import nnsight
 import torch
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -219,9 +220,9 @@ class ActivationProcessor:
                         layer_num = self._get_layer_num(selected_source)
                         hook_name = sae_manager.get_sae_hook(selected_source)
                         if "resid_post" in hook_name:
-                            outputs = model.layers_output[layer_num].save()
+                            outputs = nnsight.save(model.layers_output[layer_num])
                         elif "hook_mlp_in" in hook_name:
-                            outputs = model.mlps_input[layer_num].save()
+                            outputs = nnsight.save(model.mlps_input[layer_num])
                         else:
                             raise ValueError(
                                 f"Unsupported hook name for nnsight: {hook_name}"

@@ -1,6 +1,7 @@
 import logging
 import re
 
+import nnsight
 import numpy as np
 import torch
 from fastapi import APIRouter
@@ -178,14 +179,14 @@ class ActivationProcessor:
                 cache = {}
                 with model.trace(padded_tokens):
                     if "resid_post" in hook_name:
-                        outputs = model.layers_output[layer_num].save()
+                        outputs = nnsight.save(model.layers_output[layer_num])
                     elif "resid_pre" in hook_name:
                         if layer_num == 0:
-                            outputs = model.embeddings_output.save()
+                            outputs = nnsight.save(model.embeddings_output)
                         else:
-                            outputs = model.layers_output[layer_num - 1].save()
+                            outputs = nnsight.save(model.layers_output[layer_num - 1])
                     elif "hook_mlp_in" in hook_name:
-                        outputs = model.mlps_input[layer_num].save()
+                        outputs = nnsight.save(model.mlps_input[layer_num])
                     else:
                         raise ValueError(
                             f"Unsupported hook name for nnsight: {hook_name}"
