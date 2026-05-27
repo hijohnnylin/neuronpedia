@@ -219,8 +219,8 @@ def prepare_model_cache(args: argparse.Namespace) -> tuple[str, bool]:
     if args.hf_cache_dir is not None:
         cache_dir = os.path.abspath(os.path.expanduser(args.hf_cache_dir))
         os.makedirs(cache_dir, exist_ok=True)
-        print(f"Using Hugging Face model cache directory: {cache_dir}")
-        return cache_dir, False
+        print(f"Using Hugging Face model cache directory, will delete after this run: {cache_dir}")
+        return cache_dir, True
 
     cache_dir = tempfile.mkdtemp(prefix="headvis-model-cache-")
     if args.keep_hf_cache:
