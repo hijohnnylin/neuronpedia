@@ -119,8 +119,8 @@ model User {
   graphMetadataDataPutRequests GraphMetadataDataPutRequest[]
   graphMetadataSubgraphs       GraphMetadataSubgraph[]
 
-  samples                      Sample[]
-  probes                       Probe[]
+  samples Sample[]
+  probes  Probe[]
 
   isProblemEditor      Boolean              @default(false)
   problemNodesCreated  ProblemNode[]        @relation(name: "problemNodeCreatedBy")
@@ -281,10 +281,10 @@ model Model {
   displayName      String @default("")
   creatorId        String
 
-  tlensId   String?
+  tlensId      String?
   openRouterId String?
-  dimension Int?
-  thinking  Boolean @default(false)
+  dimension    Int?
+  thinking     Boolean @default(false)
 
   visibility Visibility @default(PRIVATE)
 
@@ -321,15 +321,46 @@ model Model {
   graphMetadata        GraphMetadata[]
   nlaSources           NlaSource[]
   nlaExplainCaches     NlaExplainCache[]
+  headMetrics          ModelHeadMetrics[]
 
   samples Sample[]
-  probes Probe[]
+  probes  Probe[]
 
   @@unique([defaultSourceSetName, id])
   @@unique([defaultSourceId, id])
   @@unique([defaultGraphSourceSetName, id])
   @@index(visibility)
   @@index(creatorId)
+}
+
+model ModelHeadMetrics {
+  id String @id @default(cuid())
+
+  modelId String
+  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  layer     Int
+  headIndex Int
+
+  modelName          String
+  datasetName        String
+  nSequences         Int
+  seqLen             Int
+  dtype              String
+  attnImplementation String
+
+  selfAttentionScore Float?
+  prevTokenScore     Float?
+  patternEntropy     Float?
+  qkDistance         Float?
+  qkDistanceVariance Float?
+  inductionScore     Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([modelId, datasetName, nSequences, seqLen, dtype, attnImplementation, layer, headIndex])
+  @@index([modelId])
 }
 
 model GraphHostSource {
@@ -858,7 +889,7 @@ model Vote {
 }
 
 model Activation {
-  id                 String                    @id @default(cuid())
+  id                 String   @id @default(cuid())
   tokens             String[]
   dataIndex          String?
   index              String
@@ -869,19 +900,19 @@ model Activation {
   maxValueTokenIndex Int
   minValue           Float
   values             Float[]
-  dfaValues          Float[]                   @default([])
+  dfaValues          Float[]  @default([])
   dfaTargetIndex     Int?
   dfaMaxValue        Float?
-  zQIndices          Int[]                     @default([])
-  zKIndices          Int[]                     @default([])
-  zValues            Float[]                   @default([])
+  zQIndices          Int[]    @default([])
+  zKIndices          Int[]    @default([])
+  zValues            Float[]  @default([])
 
-  neuron             Neuron                    @relation(fields: [modelId, layer, index], references: [modelId, layer, index], onDelete: Cascade)
-  explanations       ExplanationActivationV1[]
-  savedSearch        SavedSearchActivation[]
-  creatorId          String
-  creator            User                      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  createdAt          DateTime                  @default(now())
+  neuron       Neuron                    @relation(fields: [modelId, layer, index], references: [modelId, layer, index], onDelete: Cascade)
+  explanations ExplanationActivationV1[]
+  savedSearch  SavedSearchActivation[]
+  creatorId    String
+  creator      User                      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt    DateTime                  @default(now())
 
   lossValues         Float[] @default([])
   logitContributions String?
@@ -1059,7 +1090,7 @@ enum ProblemEdgeType {
 
 model ProblemNode {
   id              Int                      @id @default(autoincrement())
-  nodeTypes       ProblemNodeType[]         @default([topic])
+  nodeTypes       ProblemNodeType[]        @default([topic])
   parentId        Int?
   parent          ProblemNode?             @relation(name: "ProblemNodeParent", fields: [parentId], references: [id], onDelete: SetNull)
   children        ProblemNode[]            @relation(name: "ProblemNodeParent")
@@ -1088,17 +1119,17 @@ model ProblemNode {
 }
 
 model ProblemEdge {
-  id           String          @id @default(cuid())
-  sourceNodeId Int
-  sourceNode   ProblemNode     @relation(name: "problemEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
-  targetNodeId Int
-  targetNode   ProblemNode     @relation(name: "problemEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  id            String                   @id @default(cuid())
+  sourceNodeId  Int
+  sourceNode    ProblemNode              @relation(name: "problemEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNodeId  Int
+  targetNode    ProblemNode              @relation(name: "problemEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
   type          ProblemEdgeType
   approvalState ProblemNodeApprovalState @default(PENDING)
   approverId    String?
-  approver      User?                   @relation(name: "problemEdgeApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  approver      User?                    @relation(name: "problemEdgeApprover", fields: [approverId], references: [id], onDelete: SetNull)
   createdById   String
-  createdBy     User                    @relation(name: "problemEdgeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy     User                     @relation(name: "problemEdgeCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -1142,9 +1173,9 @@ model ProblemNodeLog {
 }
 
 model NlaSource {
-  id          String
-  modelId     String
-  model       Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  id      String
+  modelId String
+  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   displayName String   @default("")
   description String   @default("")
@@ -1157,7 +1188,7 @@ model NlaSource {
   norm        Float    @default(0.0)
 
   cachedEntries NlaExplainCache[]
-  createdAt     DateTime @default(now())
+  createdAt     DateTime          @default(now())
 
   @@id([modelId, id])
   @@unique([modelId, ar, av, layerNum])
@@ -1165,11 +1196,11 @@ model NlaSource {
 }
 
 model NlaExplainCache {
-  id                  String   @id @default(cuid())
+  id                  String @id @default(cuid())
   text                String
   /// SHA-256 hex of `text` (UTF-8); used in the unique key so btree stays under Postgres row-size limits.
-  textHash            String   @default("") @db.VarChar(64)
-  numCompletionTokens Int      @default(0)
+  textHash            String @default("") @db.VarChar(64)
+  numCompletionTokens Int    @default(0)
   temperature         Float
 
   modelId     String
@@ -1188,7 +1219,7 @@ model NlaExplainCache {
   createdAt       DateTime @default(now())
 
   explainShares NlaExplainShare[]
-  
+
   @@unique([textHash, numCompletionTokens, temperature, modelId, nlaSourceId, sortedPositions], name: "nla_explain_cache_key")
   @@index([modelId, nlaSourceId])
   @@index([modelId])
@@ -1199,17 +1230,17 @@ model NlaExplainCache {
 // paragraph vs text-range, optional comment). Recipients hit
 // `/nla/[shareId]` and are redirected to `/[modelId]/nla?...`.
 model NlaExplainShare {
-  id             String          @id @default(cuid())
-  cacheId        String
-  cache          NlaExplainCache @relation(fields: [cacheId], references: [id], onDelete: Cascade)
+  id      String          @id @default(cuid())
+  cacheId String
+  cache   NlaExplainCache @relation(fields: [cacheId], references: [id], onDelete: Cascade)
 
   position       Int?
   paragraph      Int?
   highlightStart Int?
   highlightEnd   Int?
-  comment        String          @default("")
+  comment        String @default("")
 
-  featured       Boolean         @default(false)
+  featured            Boolean @default(false)
   featuredDisplayName String?
 
   createdAt DateTime @default(now())
@@ -1241,12 +1272,12 @@ enum ReductionMethod {
 }
 
 model SampleDataset {
-  id               String   @id @default(cuid())
-  name             String   @unique
-  description      String?
-  url              String?
-  createdByUserId  String
-  createdAt        DateTime @default(now())
+  id              String   @id @default(cuid())
+  name            String   @unique
+  description     String?
+  url             String?
+  createdByUserId String
+  createdAt       DateTime @default(now())
 
   samples Sample[]
 
@@ -1254,37 +1285,37 @@ model SampleDataset {
 }
 
 model Sample {
-  id                String    @id @default(cuid())
-  type              ProbeSampleType
+  id   String          @id @default(cuid())
+  type ProbeSampleType
 
   // modelId, datasetName, and sampleIndex uniquely identify a sample on disk
-  modelId           String
-  model             Model       @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  modelId String
+  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
-  datasetId         String
-  dataset           SampleDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  datasetId String
+  dataset   SampleDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
 
-  sampleIndex       Int
+  sampleIndex Int
 
-  groundTruth       Boolean
+  groundTruth Boolean
 
-  conversation              Json
-  conversationTokenized     Int[]
-  conversationTokenizedStr  String[]
-  finalResponseStartIndex   Int
+  conversation             Json
+  conversationTokenized    Int[]
+  conversationTokenizedStr String[]
+  finalResponseStartIndex  Int
 
   // HNSW index managed manually via SQL (Prisma can't create pgvector indexes):
   //   CREATE INDEX "Sample_conversationEmbedding_idx" ON "Sample" USING hnsw ("conversationEmbedding" vector_cosine_ops);
   conversationEmbedding Unsupported("vector(256)")?
 
-  userId String
-  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  elo               Float     @default(1500)
-  vettedAt          DateTime?
-  vettedBy          String?   // AI model to vet the ground truth
-  createdAt         DateTime  @default(now())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  elo       Float     @default(1500)
+  vettedAt  DateTime?
+  vettedBy  String? // AI model to vet the ground truth
+  createdAt DateTime  @default(now())
 
-  probeMatches      ProbeMatch[]
+  probeMatches ProbeMatch[]
 
   @@unique([modelId, datasetId, sampleIndex])
   @@index([type])
@@ -1308,7 +1339,7 @@ model Probe {
   layers          Int[]
   weights         Float[]
   bias            Float
-  weightsBlob     Bytes?            // for non-linear architectures (MLP, etc.) — not yet implemented
+  weightsBlob     Bytes? // for non-linear architectures (MLP, etc.) — not yet implemented
   elo             Float             @default(1500)
   createdAt       DateTime          @default(now())
 
@@ -1327,7 +1358,7 @@ model ProbeMatch {
   probeId      String
   probe        Probe    @relation(fields: [probeId], references: [id], onDelete: Cascade)
   sampleId     String
-  sample       Sample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  sample       Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
   probeCorrect Boolean
   probeScore   Float
   tokenScores  Float[]
@@ -1361,8 +1392,8 @@ model ProbeLog {
 }
 
 model ProcessLock {
-  name        String    @id
-  startedAt   DateTime  @default(now())
-  expiresAt   DateTime  // is ignorable/deleted after expiresAt
-  details     Json?
+  name      String   @id
+  startedAt DateTime @default(now())
+  expiresAt DateTime // is ignorable/deleted after expiresAt
+  details   Json?
 }

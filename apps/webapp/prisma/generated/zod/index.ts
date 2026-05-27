@@ -78,6 +78,8 @@ export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier','toke
 
 export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','openRouterId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','defaultGraphSourceSetName','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
 
+export const ModelHeadMetricsScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','selfAttentionScore','prevTokenScore','patternEntropy','qkDistance','qkDistanceVariance','inductionScore','createdAt','updatedAt']);
+
 export const GraphHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','runpodServerlessUrl','modelId','createdAt','updatedAt']);
 
 export const GraphHostSourceOnSourceSetScalarFieldEnumSchema = z.enum(['sourceSetName','sourceSetModelId','graphHostSourceId']);
@@ -1143,6 +1145,7 @@ export type ModelRelations = {
   graphMetadata: GraphMetadataWithRelations[];
   nlaSources: NlaSourceWithRelations[];
   nlaExplainCaches: NlaExplainCacheWithRelations[];
+  headMetrics: ModelHeadMetricsWithRelations[];
   samples: SampleWithRelations[];
   probes: ProbeWithRelations[];
 };
@@ -1165,6 +1168,7 @@ export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSche
   graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourceWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCacheWithRelationsSchema).array(),
+  headMetrics: z.lazy(() => ModelHeadMetricsWithRelationsSchema).array(),
   samples: z.lazy(() => SampleWithRelationsSchema).array(),
   probes: z.lazy(() => ProbeWithRelationsSchema).array(),
 }))
@@ -1188,6 +1192,7 @@ export type ModelPartialRelations = {
   graphMetadata?: GraphMetadataPartialWithRelations[];
   nlaSources?: NlaSourcePartialWithRelations[];
   nlaExplainCaches?: NlaExplainCachePartialWithRelations[];
+  headMetrics?: ModelHeadMetricsPartialWithRelations[];
   samples?: SamplePartialWithRelations[];
   probes?: ProbePartialWithRelations[];
 };
@@ -1210,6 +1215,7 @@ export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelation
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
+  headMetrics: z.lazy(() => ModelHeadMetricsPartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
 })).partial()
@@ -1232,8 +1238,76 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
+  headMetrics: z.lazy(() => ModelHeadMetricsPartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// MODEL HEAD METRICS SCHEMA
+/////////////////////////////////////////
+
+export const ModelHeadMetricsSchema = z.object({
+  id: z.string().cuid(),
+  modelId: z.string(),
+  layer: z.number().int(),
+  headIndex: z.number().int(),
+  modelName: z.string(),
+  datasetName: z.string(),
+  nSequences: z.number().int(),
+  seqLen: z.number().int(),
+  dtype: z.string(),
+  attnImplementation: z.string(),
+  selfAttentionScore: z.number().nullable(),
+  prevTokenScore: z.number().nullable(),
+  patternEntropy: z.number().nullable(),
+  qkDistance: z.number().nullable(),
+  qkDistanceVariance: z.number().nullable(),
+  inductionScore: z.number().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type ModelHeadMetrics = z.infer<typeof ModelHeadMetricsSchema>
+
+/////////////////////////////////////////
+// MODEL HEAD METRICS PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ModelHeadMetricsPartialSchema = ModelHeadMetricsSchema.partial()
+
+export type ModelHeadMetricsPartial = z.infer<typeof ModelHeadMetricsPartialSchema>
+
+// MODEL HEAD METRICS RELATION SCHEMA
+//------------------------------------------------------
+
+export type ModelHeadMetricsRelations = {
+  model: ModelWithRelations;
+};
+
+export type ModelHeadMetricsWithRelations = z.infer<typeof ModelHeadMetricsSchema> & ModelHeadMetricsRelations
+
+export const ModelHeadMetricsWithRelationsSchema: z.ZodType<ModelHeadMetricsWithRelations> = ModelHeadMetricsSchema.merge(z.object({
+  model: z.lazy(() => ModelWithRelationsSchema),
+}))
+
+// MODEL HEAD METRICS PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ModelHeadMetricsPartialRelations = {
+  model?: ModelPartialWithRelations;
+};
+
+export type ModelHeadMetricsPartialWithRelations = z.infer<typeof ModelHeadMetricsPartialSchema> & ModelHeadMetricsPartialRelations
+
+export const ModelHeadMetricsPartialWithRelationsSchema: z.ZodType<ModelHeadMetricsPartialWithRelations> = ModelHeadMetricsPartialSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+})).partial()
+
+export type ModelHeadMetricsWithPartialRelations = z.infer<typeof ModelHeadMetricsSchema> & ModelHeadMetricsPartialRelations
+
+export const ModelHeadMetricsWithPartialRelationsSchema: z.ZodType<ModelHeadMetricsWithPartialRelations> = ModelHeadMetricsSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
 }).partial())
 
 /////////////////////////////////////////
