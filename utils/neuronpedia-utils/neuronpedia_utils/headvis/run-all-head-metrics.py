@@ -1,3 +1,13 @@
+# Based on HeadVis by Luger, Kamath et al (Anthropic 2026)
+# https://transformer-circuits.pub/2026/headvis/index.html
+# https://github.com/anthropics/headvis
+#
+# Usage Example:
+# poetry run python run-all-head-metrics.py \
+#   --dataset-name monology/pile-uncopyrighted \
+#   --n-sequences 16384 \
+#   --batch-size 8
+
 import argparse
 import json
 import os
