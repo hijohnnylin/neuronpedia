@@ -1,0 +1,26 @@
+[project]
+name = "neuronpedia-headvis"
+version = "0.1.0"
+description = "Standalone environment for computing HeadVis attention metrics."
+requires-python = ">=3.10"
+dependencies = [
+    "accelerate>=1.0.0",
+    "datasets>=3.0.0",
+    "protobuf>=5.0.0",
+    "sentencepiece>=0.2.0",
+    "torch>=2.8.0",
+    "tqdm>=4.66.0",
+    "transformers>=4.50.0",
+    "zstandard>=0.23.0",
+]
+
+[tool.uv]
+package = false
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }

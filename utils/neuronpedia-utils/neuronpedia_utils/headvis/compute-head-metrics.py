@@ -10,11 +10,12 @@
 # --batch-size 16
 
 import argparse
-import gc
 import json
 import math
 import os
 import re
+import shutil
+import tempfile
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -52,6 +53,8 @@ class HeadMetricsConfig:
     trust_remote_code: bool
     min_free_vram_gb: float
     streaming: bool
+    model_cache_dir: str
+    delete_model_cache: bool
     revision: str | None
     dataset_revision: str | None
     created_at: str
@@ -136,6 +139,19 @@ def parse_args() -> argparse.Namespace:
         help="Disable Hugging Face dataset streaming.",
     )
     parser.add_argument(
+        "--hf-cache-dir",
+        default=None,
+        help=(
+            "Directory for Hugging Face model and tokenizer downloads. By default, "
+            "uses a temporary directory that is deleted when the run finishes."
+        ),
+    )
+    parser.add_argument(
+        "--keep-hf-cache",
+        action="store_true",
+        help="Keep the temporary Hugging Face cache directory after the run.",
+    )
+    parser.add_argument(
         "--revision", default=None, help="Optional model revision to load."
     )
     parser.add_argument(
@@ -173,6 +189,15 @@ def resolve_dtype(dtype_arg: str) -> torch.dtype | str:
     }[dtype_arg]
 
 
+def get_model_config_value(model: AutoModelForCausalLM, field_name: str) -> Any:
+    for config in (model.config, getattr(model.config, "text_config", None)):
+        if config is not None and hasattr(config, field_name):
+            return getattr(config, field_name)
+    raise AttributeError(
+        f"Could not find {field_name!r} on model config or nested text_config."
+    )
+
+
 def warn_if_low_vram(device: torch.device, min_free_vram_gb: float) -> None:
     if device.type != "cuda":
         print("WARNING: CUDA is not available or not selected; this will be very slow.")
@@ -188,6 +213,41 @@ def warn_if_low_vram(device: torch.device, min_free_vram_gb: float) -> None:
             f"{min_free_vram_gb:.1f} GB. This may OOM; lower --seq-len or use a "
             "smaller model."
         )
+
+
+def prepare_model_cache(args: argparse.Namespace) -> tuple[str, bool]:
+    if args.hf_cache_dir is not None:
+        cache_dir = os.path.abspath(os.path.expanduser(args.hf_cache_dir))
+        os.makedirs(cache_dir, exist_ok=True)
+        print(f"Using Hugging Face model cache directory: {cache_dir}")
+        return cache_dir, False
+
+    cache_dir = tempfile.mkdtemp(prefix="headvis-model-cache-")
+    if args.keep_hf_cache:
+        print(f"Using temporary Hugging Face model cache directory: {cache_dir}")
+        print("Keeping temporary Hugging Face model cache after this run.")
+        return cache_dir, False
+
+    print(f"Using temporary Hugging Face model cache directory: {cache_dir}")
+    print("Temporary Hugging Face model cache will be deleted after this run.")
+    return cache_dir, True
+
+
+def configure_model_cache_environment(cache_dir: str) -> dict[str, str | None]:
+    cache_env_vars = ("HF_HOME", "HF_HUB_CACHE", "HF_XET_CACHE")
+    previous_values = {name: os.environ.get(name) for name in cache_env_vars}
+    os.environ["HF_HOME"] = cache_dir
+    os.environ["HF_HUB_CACHE"] = os.path.join(cache_dir, "hub")
+    os.environ["HF_XET_CACHE"] = os.path.join(cache_dir, "xet")
+    return previous_values
+
+
+def restore_cache_environment(previous_values: dict[str, str | None]) -> None:
+    for name, value in previous_values.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
 
 
 def iter_texts(dataset: Iterable[dict[str, Any]], text_field: str) -> Iterable[str]:
@@ -234,7 +294,7 @@ def compute_attention_metrics_for_batch(
     attention_position_count: torch.Tensor,
     induction_count: torch.Tensor,
 ) -> tuple[int, int]:
-    with torch.no_grad():
+    with torch.inference_mode():
         output = model(
             input_ids,
             attention_mask=attention_mask,
@@ -249,79 +309,84 @@ def compute_attention_metrics_for_batch(
             "--attn-implementation eager."
         )
 
-    sequence_lengths = attention_mask.sum(dim=1).tolist()
-    valid_sequences = 0
-    total_prev_positions = 0
+    sequence_lengths = attention_mask.sum(dim=1)
+    valid_sequence_mask = sequence_lengths >= 2
+    valid_sequences = int(valid_sequence_mask.sum().item())
+    if valid_sequences == 0:
+        del output, attentions
+        return 0, 0
 
-    for batch_idx, sequence_length in enumerate(sequence_lengths):
-        sequence_length = int(sequence_length)
-        if sequence_length < 2:
+    total_attention_positions = sequence_lengths[valid_sequence_mask].sum()
+    total_prev_positions = int((sequence_lengths[valid_sequence_mask] - 1).sum().item())
+    attention_position_count += total_attention_positions
+    induction_count += total_attention_positions
+
+    _, sequence_length = attention_mask.shape
+    positions = torch.arange(sequence_length, device=input_ids.device)
+    query_mask = (
+        (positions[None, :] < sequence_lengths[:, None])
+        & valid_sequence_mask[:, None]
+    )
+    pair_mask = query_mask[:, :, None] & query_mask[:, None, :]
+    prev_position_mask = positions[1:][None, :] < sequence_lengths[:, None]
+    qk_distance = (positions[:, None] - positions[None, :]).abs().float()
+    qk_distance_squared = qk_distance.square()
+
+    for layer_idx, attention in enumerate(attentions):
+        layer_attention_float = attention.float()
+        self_attention_sum[layer_idx] += (
+            attention.diagonal(dim1=-2, dim2=-1)
+            .float()
+            .masked_fill(~query_mask[:, None, :], 0.0)
+            .sum(dim=(0, 2))
+        )
+        prev_token_sum[layer_idx] += (
+            attention.diagonal(offset=-1, dim1=-2, dim2=-1)
+            .float()
+            .masked_fill(~prev_position_mask[:, None, :], 0.0)
+            .sum(dim=(0, 2))
+        )
+        pattern_entropy_sum[layer_idx] += (
+            -(
+                layer_attention_float
+                * torch.log(layer_attention_float.clamp_min(torch.finfo(torch.float32).tiny))
+            )
+            .masked_fill(~pair_mask[:, None, :, :], 0.0)
+            .sum(dim=(0, 2, 3))
+        )
+        qk_distance_sum[layer_idx] += (
+            layer_attention_float
+            .masked_fill(~pair_mask[:, None, :, :], 0.0)
+            .mul(qk_distance)
+            .sum(dim=(0, 2, 3))
+        )
+        qk_distance_squared_sum[layer_idx] += (
+            layer_attention_float
+            .masked_fill(~pair_mask[:, None, :, :], 0.0)
+            .mul(qk_distance_squared)
+            .sum(dim=(0, 2, 3))
+        )
+
+    sequence_lengths_list = sequence_lengths.tolist()
+    for batch_idx, item_sequence_length in enumerate(sequence_lengths_list):
+        item_sequence_length = int(item_sequence_length)
+        if item_sequence_length < 2:
             continue
 
-        valid_sequences += 1
-        total_prev_positions += sequence_length - 1
-        tokens = input_ids[batch_idx, :sequence_length]
-        previous_positions = torch.arange(
-            0, sequence_length - 1, device=input_ids.device, dtype=torch.long
-        )
-        current_positions = torch.arange(
-            1, sequence_length, device=input_ids.device, dtype=torch.long
-        )
-        positions = torch.arange(sequence_length, device=input_ids.device)
-        qk_distance = (positions[:, None] - positions[None, :]).abs().float()
-        qk_distance_squared = qk_distance.square()
+        tokens = input_ids[batch_idx, :item_sequence_length]
         induction_queries, induction_shifted_keys = build_induction_indices(tokens)
+        if induction_queries.numel() == 0:
+            continue
 
         for layer_idx, attention in enumerate(attentions):
-            layer_attention = attention[batch_idx, :, :sequence_length, :sequence_length]
-            layer_attention_float = layer_attention.float()
-            self_attention_sum[layer_idx] += (
-                layer_attention[:, positions, positions]
+            layer_attention = attention[
+                batch_idx, :, :item_sequence_length, :item_sequence_length
+            ]
+            induction_sum[layer_idx] += (
+                layer_attention[:, induction_queries, induction_shifted_keys]
                 .sum(dim=-1)
-                .detach()
                 .float()
-                .cpu()
             )
-            prev_token_sum[layer_idx] += (
-                layer_attention[:, current_positions, previous_positions]
-                .sum(dim=-1)
-                .detach()
-                .float()
-                .cpu()
-            )
-            pattern_entropy_sum[layer_idx] += (
-                -(
-                    layer_attention_float
-                    * torch.log(layer_attention_float.clamp_min(torch.finfo(torch.float32).tiny))
-                )
-                .sum(dim=-1)
-                .sum(dim=-1)
-                .detach()
-                .cpu()
-            )
-            qk_distance_sum[layer_idx] += (
-                (layer_attention_float * qk_distance)
-                .sum(dim=(-1, -2))
-                .detach()
-                .cpu()
-            )
-            qk_distance_squared_sum[layer_idx] += (
-                (layer_attention_float * qk_distance_squared)
-                .sum(dim=(-1, -2))
-                .detach()
-                .cpu()
-            )
-
-            if induction_queries.numel() > 0:
-                induction_sum[layer_idx] += (
-                    layer_attention[:, induction_queries, induction_shifted_keys]
-                    .sum(dim=-1)
-                    .detach()
-                    .float()
-                    .cpu()
-                )
-            attention_position_count[layer_idx] += sequence_length
-            induction_count[layer_idx] += sequence_length
 
     del output, attentions
     return valid_sequences, total_prev_positions
@@ -340,7 +405,13 @@ def load_text_dataset(args: argparse.Namespace) -> Iterable[dict[str, Any]]:
     return load_dataset(**dataset_kwargs)
 
 
-def build_config(args: argparse.Namespace, device: torch.device, output_file: str) -> HeadMetricsConfig:
+def build_config(
+    args: argparse.Namespace,
+    device: torch.device,
+    output_file: str,
+    model_cache_dir: str,
+    delete_model_cache: bool,
+) -> HeadMetricsConfig:
     return HeadMetricsConfig(
         model_name=args.model_name,
         dataset_name=args.dataset_name,
@@ -358,6 +429,8 @@ def build_config(args: argparse.Namespace, device: torch.device, output_file: st
         trust_remote_code=args.trust_remote_code,
         min_free_vram_gb=args.min_free_vram_gb,
         streaming=not args.no_streaming,
+        model_cache_dir=model_cache_dir,
+        delete_model_cache=delete_model_cache,
         revision=args.revision,
         dataset_revision=args.dataset_revision,
         created_at=datetime.now(timezone.utc).isoformat(),
@@ -384,8 +457,9 @@ def print_top_heads(metric_name: str, scores: torch.Tensor, top_k: int = 3) -> N
         )
 
 
-def main() -> None:
-    args = parse_args()
+def run_head_metrics(
+    args: argparse.Namespace, model_cache_dir: str, delete_model_cache: bool
+) -> None:
     device = resolve_device(args.device)
     warn_if_low_vram(device, args.min_free_vram_gb)
 
@@ -403,35 +477,50 @@ def main() -> None:
         "attn_implementation": args.attn_implementation,
         "torch_dtype": torch_dtype,
         "trust_remote_code": args.trust_remote_code,
+        "cache_dir": os.path.join(model_cache_dir, "hub"),
     }
     if args.revision is not None:
         model_kwargs["revision"] = args.revision
 
-    tokenizer_kwargs: dict[str, Any] = {"trust_remote_code": args.trust_remote_code}
+    tokenizer_kwargs: dict[str, Any] = {
+        "trust_remote_code": args.trust_remote_code,
+        "cache_dir": os.path.join(model_cache_dir, "hub"),
+    }
     if args.revision is not None:
         tokenizer_kwargs["revision"] = args.revision
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name, **tokenizer_kwargs)
+    previous_cache_environment = configure_model_cache_environment(model_cache_dir)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name, **tokenizer_kwargs)
+        model = AutoModelForCausalLM.from_pretrained(args.model_name, **model_kwargs)
+    finally:
+        restore_cache_environment(previous_cache_environment)
+
     tokenizer.padding_side = "right"
     if tokenizer.pad_token is None and tokenizer.eos_token is not None:
         tokenizer.pad_token = tokenizer.eos_token
-    model = AutoModelForCausalLM.from_pretrained(args.model_name, **model_kwargs)
-    if model.config.pad_token_id is None:
+    if tokenizer.pad_token_id is None:
+        raise RuntimeError(
+            "Tokenizer does not define a pad token or eos token. Set a pad token "
+            "before running with padded batches."
+        )
+    if getattr(model.config, "pad_token_id", None) is None:
         model.config.pad_token_id = tokenizer.pad_token_id
     model.to(device)
     model.eval()
 
-    n_layers = model.config.num_hidden_layers
-    n_heads = model.config.num_attention_heads
-    self_attention_sum = torch.zeros(n_layers, n_heads, dtype=torch.float32)
-    prev_token_sum = torch.zeros(n_layers, n_heads, dtype=torch.float32)
-    pattern_entropy_sum = torch.zeros(n_layers, n_heads, dtype=torch.float32)
-    qk_distance_sum = torch.zeros(n_layers, n_heads, dtype=torch.float32)
-    qk_distance_squared_sum = torch.zeros(n_layers, n_heads, dtype=torch.float32)
-    induction_sum = torch.zeros(n_layers, n_heads, dtype=torch.float32)
-    attention_position_count = torch.zeros(n_layers, 1, dtype=torch.float32)
-    prev_token_count = torch.zeros(n_layers, 1, dtype=torch.float32)
-    induction_count = torch.zeros(n_layers, 1, dtype=torch.float32)
+    n_layers = get_model_config_value(model, "num_hidden_layers")
+    n_heads = get_model_config_value(model, "num_attention_heads")
+    accumulator_kwargs = {"device": device, "dtype": torch.float32}
+    self_attention_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
+    prev_token_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
+    pattern_entropy_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
+    qk_distance_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
+    qk_distance_squared_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
+    induction_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
+    attention_position_count = torch.zeros(n_layers, 1, **accumulator_kwargs)
+    prev_token_count = torch.zeros(n_layers, 1, **accumulator_kwargs)
+    induction_count = torch.zeros(n_layers, 1, **accumulator_kwargs)
 
     dataset = load_text_dataset(args)
     text_iter = iter_texts(dataset, args.dataset_text_field)
@@ -489,9 +578,6 @@ def main() -> None:
                 print(f"Processed {processed_sequences}/{args.n_sequences} sequences")
 
             del tokenized, input_ids, attention_mask
-            if device.type == "cuda":
-                torch.cuda.empty_cache()
-            gc.collect()
     finally:
         if progress is not None:
             progress.close()
@@ -508,7 +594,9 @@ def main() -> None:
     qk_distance_variance = qk_distance_second_moment - qk_distance.square()
     induction_score = nan_if_zero_divide(induction_sum, induction_count)
 
-    config = asdict(build_config(args, device, output_file))
+    config = asdict(
+        build_config(args, device, output_file, model_cache_dir, delete_model_cache)
+    )
     config["actual_sequences_processed"] = processed_sequences
     config["num_hidden_layers"] = n_layers
     config["num_attention_heads"] = n_heads
@@ -539,6 +627,17 @@ def main() -> None:
         print_top_heads("qk_distance", qk_distance)
         print_top_heads("qk_distance_variance", qk_distance_variance)
         print_top_heads("induction_score", induction_score)
+
+
+def main() -> None:
+    args = parse_args()
+    model_cache_dir, delete_model_cache = prepare_model_cache(args)
+    try:
+        run_head_metrics(args, model_cache_dir, delete_model_cache)
+    finally:
+        if delete_model_cache:
+            print(f"Deleting temporary Hugging Face model cache: {model_cache_dir}")
+            shutil.rmtree(model_cache_dir, ignore_errors=True)
  
 
 if __name__ == "__main__":

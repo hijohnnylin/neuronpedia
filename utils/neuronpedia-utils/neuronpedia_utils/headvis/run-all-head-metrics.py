@@ -134,6 +134,8 @@ def main() -> None:
             str(args.batch_size),
             "--output-dir",
             str(output_dir),
+            "--hf-cache-dir",
+            "/tmp/headvis-hf-cache",
         ]
 
         print(f"{prefix}: running")
