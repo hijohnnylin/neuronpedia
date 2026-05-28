@@ -16,6 +16,7 @@ dependencies = [
     "tqdm>=4.66.0",
     "transformers>=4.50.0",
     "zstandard>=0.23.0",
+    "orjson>=3.11.9",
 ]
 
 [tool.uv]

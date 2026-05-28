@@ -2,6 +2,9 @@ import argparse
 import json
 import math
 import os
+import random
+import string
+import time
 from dataclasses import astuple
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,7 +12,6 @@ from typing import Any
 
 import dotenv
 import psycopg2
-from cuid2 import Cuid
 from model_head_metrics import ModelHeadMetrics
 from psycopg2.extras import Json, execute_values
 
@@ -28,7 +30,31 @@ POSTGRES_PLACEHOLDERS = {
     "port": "TODO_DATABASE_PORT",
 }
 
-CUID_GENERATOR: Cuid = Cuid(length=25)
+class _FastCuid:
+    """Drop-in replacement for cuid2.Cuid that's ~100x faster.
+
+    Real cuid2 uses SHA-3-512 hashing per ID, which dominates CPU time during
+    bulk imports (tens of thousands of rows per run). This produces IDs with
+    the same surface format (lowercase alphanumeric, starting with a letter)
+    using random.choices. At length 25 we have ~124 bits of entropy, so
+    collisions are astronomically unlikely for our import scale.
+    """
+
+    _FIRST = string.ascii_lowercase
+    _REST = string.ascii_lowercase + string.digits
+
+    def __init__(self, length: int = 24) -> None:
+        if length < 2:
+            raise ValueError("length must be >= 2")
+        self._rest_len = length - 1
+
+    def generate(self) -> str:
+        return random.choice(self._FIRST) + "".join(
+            random.choices(self._REST, k=self._rest_len)
+        )
+
+
+CUID_GENERATOR = _FastCuid(length=25)
 
 CONFIG_KEYS = (
     "model_name",
@@ -80,7 +106,11 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Load HeadVis-style attention head metrics into Postgres. Walks "
             "<exports-dir>/<np_model_id>/headvis/<dataset>/ for each run "
-            "written by compute-head-metrics.py and upserts ModelHeadMetrics."
+            "written by compute-head-metrics.py and inserts ModelHeadMetrics. "
+            "Skips with a warning any (modelId, datasetName, nSequences, "
+            "seqLen, dtype, attnImplementation, layer, headIndex) row that "
+            "already exists. Streams head files into the DB in batches and "
+            "commits per run dir."
         )
     )
     parser.add_argument(
@@ -96,7 +126,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-size",
         type=int,
         default=DEFAULT_BATCH_SIZE,
-        help="Number of rows to upsert per database batch.",
+        help="Number of rows to insert per database batch.",
     )
     parser.add_argument(
         "--dry-run",
@@ -123,9 +153,22 @@ def create_connection():
     )
 
 
-def load_json(path: Path) -> Any:
-    with open(path) as f:
-        return json.load(f)
+try:
+    import orjson  # type: ignore[import-not-found]
+
+    def load_json(path: Path) -> Any:
+        with open(path, "rb") as f:
+            return orjson.loads(f.read())
+except ImportError:
+
+    def load_json(path: Path) -> Any:
+        with open(path, "rb") as f:
+            return json.loads(f.read())
+
+
+def _log(message: str) -> None:
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] {message}", flush=True)
 
 
 def discover_run_dirs(exports_dir: Path) -> list[Path]:
@@ -133,6 +176,7 @@ def discover_run_dirs(exports_dir: Path) -> list[Path]:
     if not exports_dir.is_dir():
         raise ValueError(f"Exports directory does not exist: {exports_dir}")
 
+    _log(f"Scanning exports directory: {exports_dir}")
     run_dirs: list[Path] = []
     for np_id_dir in sorted(exports_dir.iterdir()):
         if not np_id_dir.is_dir():
@@ -154,6 +198,7 @@ def discover_run_dirs(exports_dir: Path) -> list[Path]:
             f"No HeadVis run directories found under {exports_dir}. "
             "Expected <exports-dir>/<np_id>/headvis/<dataset>/."
         )
+    _log(f"Discovered {len(run_dirs)} run director{'y' if len(run_dirs) == 1 else 'ies'}.")
     return run_dirs
 
 
@@ -204,73 +249,49 @@ def _resolve_np_model_id(run_dir: Path, config: dict[str, Any]) -> str:
     return run_dir.parent.parent.name
 
 
-def build_rows_from_run_dir(run_dir: Path) -> list[ModelHeadMetrics]:
+def _read_run_config(run_dir: Path) -> tuple[dict[str, Any], str]:
+    """Parse config.json for a run dir and resolve the np_model_id."""
     config_raw = load_json(run_dir / "config.json")
     if not isinstance(config_raw, dict):
         raise ValueError(f"{run_dir / 'config.json'} must contain a JSON object.")
     config = _normalize_pipeline_config(config_raw)
-
-    scatter_rows = load_json(run_dir / "scatter_data.json")
-    if not isinstance(scatter_rows, list):
-        raise ValueError(
-            f"{run_dir / 'scatter_data.json'} must contain a JSON list of head rows."
-        )
-
     for key in CONFIG_KEYS:
         require_config(config, key)
-
-    hf_model_name = str(config["model_name"])
     np_model_id = _resolve_np_model_id(run_dir, config)
-    now = datetime.now(timezone.utc)
+    return config, np_model_id
 
-    rows: list[ModelHeadMetrics] = []
-    for entry in scatter_rows:
-        if not isinstance(entry, dict):
-            raise ValueError(
-                f"{run_dir / 'scatter_data.json'} rows must be JSON objects."
-            )
-        if "layer" not in entry or "head" not in entry:
-            raise ValueError(
-                f"{run_dir / 'scatter_data.json'} row missing 'layer' or 'head': {entry}"
-            )
-        layer_index = int(entry["layer"])
-        head_index = int(entry["head"])
 
-        head_json = _read_head_json(run_dir, layer_index, head_index)
-        qk_hist = head_json.get("qk_distance_histogram") if head_json else None
-        top_q = head_json.get("top_query_tokens") if head_json else None
-        top_k = head_json.get("top_key_tokens") if head_json else None
-        activation_hist = head_json.get("histogram") if head_json else None
-        statistics = head_json.get("statistics") if head_json else None
+def _existing_layer_head_pairs(
+    cur,
+    np_model_id: str,
+    config: dict[str, Any],
+) -> set[tuple[int, int]]:
+    """Return the set of (layer, headIndex) pairs already in ModelHeadMetrics
+    for this (modelId, datasetName, nSequences, seqLen, dtype, attnImplementation).
 
-        rows.append(
-            ModelHeadMetrics(
-                id=CUID_GENERATOR.generate(),
-                modelId=np_model_id,
-                layer=layer_index,
-                headIndex=head_index,
-                modelName=hf_model_name,
-                datasetName=str(config["dataset_name"]),
-                nSequences=int(config["n_sequences"]),
-                seqLen=int(config["seq_len"]),
-                dtype=str(config["dtype"]),
-                attnImplementation=str(config["attn_implementation"]),
-                selfAttentionScore=finite_float_or_none(entry.get("self_attention_score")),
-                prevTokenScore=finite_float_or_none(entry.get("prev_token_score")),
-                patternEntropy=finite_float_or_none(entry.get("pattern_entropy")),
-                qkDistance=finite_float_or_none(entry.get("qk_distance")),
-                qkDistanceVariance=finite_float_or_none(entry.get("qk_distance_variance")),
-                inductionScore=finite_float_or_none(entry.get("induction_score")),
-                qkDistanceHistogram=qk_hist,
-                topQueryTokens=top_q,
-                topKeyTokens=top_k,
-                activationHistogram=activation_hist,
-                headStatistics=statistics,
-                createdAt=now,
-                updatedAt=now,
-            )
-        )
-    return rows
+    The table's unique constraint extends this with (layer, headIndex), so any
+    pair returned here would conflict on insert and must be skipped.
+    """
+    cur.execute(
+        """
+        SELECT "layer", "headIndex" FROM "ModelHeadMetrics"
+        WHERE "modelId" = %s
+          AND "datasetName" = %s
+          AND "nSequences" = %s
+          AND "seqLen" = %s
+          AND "dtype" = %s
+          AND "attnImplementation" = %s
+        """,
+        (
+            np_model_id,
+            str(config["dataset_name"]),
+            int(config["n_sequences"]),
+            int(config["seq_len"]),
+            str(config["dtype"]),
+            str(config["attn_implementation"]),
+        ),
+    )
+    return {(int(layer), int(head)) for layer, head in cur.fetchall()}
 
 
 def _row_to_pg_tuple(row: ModelHeadMetrics) -> tuple[Any, ...]:
@@ -292,31 +313,14 @@ def _row_to_pg_tuple(row: ModelHeadMetrics) -> tuple[Any, ...]:
     )
 
 
-def upsert_rows(rows: list[ModelHeadMetrics], batch_size: int) -> None:
-    if not rows:
-        print("No rows to import.")
-        return
+def _insert_query() -> str:
+    """INSERT with ON CONFLICT DO NOTHING as a safety net.
 
+    The precheck against the unique key already filters out (layer, head)
+    pairs that exist, so DO NOTHING only fires under unusual races.
+    """
     quoted_columns = ", ".join(f'"{column}"' for column in COLUMNS)
-    update_columns = (
-        "modelName",
-        "selfAttentionScore",
-        "prevTokenScore",
-        "patternEntropy",
-        "qkDistance",
-        "qkDistanceVariance",
-        "inductionScore",
-        "qkDistanceHistogram",
-        "topQueryTokens",
-        "topKeyTokens",
-        "activationHistogram",
-        "headStatistics",
-        "updatedAt",
-    )
-    update_assignments = ", ".join(
-        f'"{column}" = EXCLUDED."{column}"' for column in update_columns
-    )
-    query = f"""
+    return f"""
         INSERT INTO "ModelHeadMetrics" ({quoted_columns})
         VALUES %s
         ON CONFLICT (
@@ -329,55 +333,306 @@ def upsert_rows(rows: list[ModelHeadMetrics], batch_size: int) -> None:
             "layer",
             "headIndex"
         )
-        DO UPDATE SET {update_assignments}
+        DO NOTHING
     """
 
-    conn = create_connection()
-    try:
-        with conn.cursor() as cur:
-            for start in range(0, len(rows), batch_size):
-                batch = rows[start : start + batch_size]
-                execute_values(cur, query, [_row_to_pg_tuple(row) for row in batch])
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+
+def _stream_insert_run(
+    cur,
+    query: str,
+    run_dir: Path,
+    config: dict[str, Any],
+    np_model_id: str,
+    existing_pairs: set[tuple[int, int]],
+    batch_size: int,
+    dry_run: bool,
+) -> tuple[int, list[tuple[int, int]]]:
+    """Stream rows for one run dir into the DB in batches.
+
+    For each (layer, head) entry in scatter_data.json: if it's in
+    `existing_pairs` skip it (and record the skip), otherwise read the
+    head JSON, build a ModelHeadMetrics row, append to a buffer of size
+    `batch_size`, flush whenever full, then drop the batch.
+
+    Returns (inserted_count, skipped_layer_head_pairs).
+    """
+    scatter_rows = load_json(run_dir / "scatter_data.json")
+    if not isinstance(scatter_rows, list):
+        raise ValueError(
+            f"{run_dir / 'scatter_data.json'} must contain a JSON list of head rows."
+        )
+
+    hf_model_name = str(config["model_name"])
+    cfg_dataset_name = str(config["dataset_name"])
+    cfg_n_sequences = int(config["n_sequences"])
+    cfg_seq_len = int(config["seq_len"])
+    cfg_dtype = str(config["dtype"])
+    cfg_attn_implementation = str(config["attn_implementation"])
+    now = datetime.now(timezone.utc)
+
+    total_entries = len(scatter_rows)
+    if total_entries:
+        _log(
+            f"  Streaming {total_entries} scatter entr{'y' if total_entries == 1 else 'ies'} "
+            f"from {run_dir.name}/ ..."
+        )
+    progress_step = max(1, total_entries // 10) if total_entries else 1
+
+    inserted = 0
+    skipped: list[tuple[int, int]] = []
+    buffer: list[ModelHeadMetrics] = []
+    generate = CUID_GENERATOR.generate
+
+    def _flush_full_batches() -> None:
+        nonlocal inserted
+        while len(buffer) >= batch_size:
+            batch = buffer[:batch_size]
+            if not dry_run:
+                execute_values(cur, query, [_row_to_pg_tuple(r) for r in batch])
+            del buffer[:batch_size]
+            inserted += len(batch)
+            _log(
+                f"    {'Would insert' if dry_run else 'Inserted'} "
+                f"batch of {len(batch)} (run total so far: {inserted})."
+            )
+
+    for idx, entry in enumerate(scatter_rows, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"{run_dir / 'scatter_data.json'} rows must be JSON objects."
+            )
+        if "layer" not in entry or "head" not in entry:
+            raise ValueError(
+                f"{run_dir / 'scatter_data.json'} row missing 'layer' or 'head': {entry}"
+            )
+        layer_index = int(entry["layer"])
+        head_index = int(entry["head"])
+
+        if (layer_index, head_index) in existing_pairs:
+            skipped.append((layer_index, head_index))
+        else:
+            head_json = _read_head_json(run_dir, layer_index, head_index)
+            qk_hist = head_json.get("qk_distance_histogram") if head_json else None
+            top_q = head_json.get("top_query_tokens") if head_json else None
+            top_k = head_json.get("top_key_tokens") if head_json else None
+            activation_hist = head_json.get("histogram") if head_json else None
+            statistics = head_json.get("statistics") if head_json else None
+
+            buffer.append(
+                ModelHeadMetrics(
+                    id=generate(),
+                    modelId=np_model_id,
+                    layer=layer_index,
+                    headIndex=head_index,
+                    modelName=hf_model_name,
+                    datasetName=cfg_dataset_name,
+                    nSequences=cfg_n_sequences,
+                    seqLen=cfg_seq_len,
+                    dtype=cfg_dtype,
+                    attnImplementation=cfg_attn_implementation,
+                    selfAttentionScore=finite_float_or_none(entry.get("self_attention_score")),
+                    prevTokenScore=finite_float_or_none(entry.get("prev_token_score")),
+                    patternEntropy=finite_float_or_none(entry.get("pattern_entropy")),
+                    qkDistance=finite_float_or_none(entry.get("qk_distance")),
+                    qkDistanceVariance=finite_float_or_none(entry.get("qk_distance_variance")),
+                    inductionScore=finite_float_or_none(entry.get("induction_score")),
+                    qkDistanceHistogram=qk_hist,
+                    topQueryTokens=top_q,
+                    topKeyTokens=top_k,
+                    activationHistogram=activation_hist,
+                    headStatistics=statistics,
+                    createdAt=now,
+                    updatedAt=now,
+                )
+            )
+            _flush_full_batches()
+
+        if total_entries and (idx % progress_step == 0 or idx == total_entries):
+            _log(
+                f"    ...processed {idx}/{total_entries} entries "
+                f"(buffered={len(buffer)}, inserted so far={inserted}, "
+                f"skipped so far={len(skipped)})."
+            )
+
+    if buffer:
+        if not dry_run:
+            execute_values(cur, query, [_row_to_pg_tuple(r) for r in buffer])
+        inserted += len(buffer)
+        _log(
+            f"    {'Would insert' if dry_run else 'Inserted'} "
+            f"final batch of {len(buffer)} (run total: {inserted})."
+        )
+        buffer.clear()
+
+    return inserted, skipped
+
+
+def _format_skipped_warning(
+    run_dir: Path,
+    exports_dir: Path,
+    skipped: list[tuple[int, int]],
+) -> str:
+    sample = ", ".join(f"L{layer}H{head}" for layer, head in skipped[:10])
+    suffix = "" if len(skipped) <= 10 else f", ... (+{len(skipped) - 10} more)"
+    return (
+        f"In {run_dir.relative_to(exports_dir)}: skipped {len(skipped)} "
+        f"(layer, head) row(s) that already existed in ModelHeadMetrics "
+        f"[{sample}{suffix}]."
+    )
+
+
+def _print_warning_summary(warnings: list[str]) -> None:
+    if not warnings:
+        return
+    print("")
+    print(f"Summary: {len(warnings)} run(s) had pre-existing rows that were skipped:")
+    for warning in warnings:
+        print(f"  - {warning}")
 
 
 def main() -> None:
+    overall_start = time.monotonic()
     args = parse_args()
     exports_dir = Path(args.exports_dir).expanduser().resolve()
+    _log(
+        f"Starting load-head-metrics (dry_run={args.dry_run}, "
+        f"batch_size={args.batch_size})."
+    )
     run_dirs = discover_run_dirs(exports_dir)
 
-    rows: list[ModelHeadMetrics] = []
-    for run_dir in run_dirs:
-        dir_rows = build_rows_from_run_dir(run_dir)
-        rows.extend(dir_rows)
+    _log(
+        "Reading run configs and querying existing (layer, head) rows in the "
+        "database (no head JSON files read yet)..."
+    )
+    plans: list[tuple[Path, dict[str, Any], str, set[tuple[int, int]]]] = []
+    conn = create_connection()
+    try:
+        with conn.cursor() as cur:
+            for index, run_dir in enumerate(run_dirs, start=1):
+                _log(
+                    f"  [{index}/{len(run_dirs)}] Checking "
+                    f"{run_dir.relative_to(exports_dir)} ..."
+                )
+                config, np_model_id = _read_run_config(run_dir)
+                existing = _existing_layer_head_pairs(cur, np_model_id, config)
+                if existing:
+                    _log(
+                        f"  [{index}/{len(run_dirs)}] {len(existing)} existing "
+                        "(layer, head) row(s) found; those will be skipped."
+                    )
+                else:
+                    _log(
+                        f"  [{index}/{len(run_dirs)}] No existing rows; "
+                        "queued for streaming insert."
+                    )
+                plans.append((run_dir, config, np_model_id, existing))
+    finally:
+        conn.close()
 
-        if dir_rows:
-            first_row = dir_rows[0]
-            print(
-                "Prepared "
-                f"{len(dir_rows)} rows from {run_dir.relative_to(exports_dir)} for "
-                f"modelId={first_row.modelId}, modelName={first_row.modelName}, "
-                f"datasetName={first_row.datasetName}."
-            )
-        else:
-            print(f"Prepared 0 rows from {run_dir.relative_to(exports_dir)}.")
+    _log(f"Pre-check complete for {len(plans)} run(s).")
 
-    if rows:
-        print(f"Prepared {len(rows)} total rows from {len(run_dirs)} run directories.")
-    else:
-        print(f"Prepared 0 total rows from {len(run_dirs)} run directories.")
+    query = _insert_query()
+    grand_inserted = 0
+    grand_skipped = 0
+    skip_warnings: list[str] = []
 
     if args.dry_run:
-        print("Dry run complete; no database writes performed.")
+        _log("Dry run: streaming through scatter entries without writing to DB...")
+        for run_index, (run_dir, config, np_model_id, existing_pairs) in enumerate(plans, start=1):
+            run_start = time.monotonic()
+            _log(
+                f"[{run_index}/{len(plans)}] Validating "
+                f"{run_dir.relative_to(exports_dir)} "
+                f"(modelId={np_model_id}, dataset={config['dataset_name']})..."
+            )
+            inserted, skipped = _stream_insert_run(
+                cur=None,
+                query=query,
+                run_dir=run_dir,
+                config=config,
+                np_model_id=np_model_id,
+                existing_pairs=existing_pairs,
+                batch_size=args.batch_size,
+                dry_run=True,
+            )
+            grand_inserted += inserted
+            grand_skipped += len(skipped)
+            if skipped:
+                warning = _format_skipped_warning(run_dir, exports_dir, skipped)
+                _log(f"  WARNING: {warning}")
+                skip_warnings.append(warning)
+            _log(
+                f"[{run_index}/{len(plans)}] Would insert {inserted} row(s), "
+                f"skip {len(skipped)} ({time.monotonic() - run_start:.2f}s). "
+                f"Running totals: inserted={grand_inserted}, skipped={grand_skipped}."
+            )
+        _log(
+            f"Dry run complete in {time.monotonic() - overall_start:.2f}s; "
+            f"would insert {grand_inserted} row(s), skip {grand_skipped} "
+            f"existing row(s) across {len(plans)} run directories."
+        )
+        _print_warning_summary(skip_warnings)
         return
 
-    upsert_rows(rows, args.batch_size)
-    print(f"Imported {len(rows)} model head metric rows from {len(run_dirs)} run directories.")
+    _log(
+        f"Streaming inserts for {len(plans)} run dir(s) "
+        f"(batch_size={args.batch_size}, commit per run dir)..."
+    )
+    conn = create_connection()
+    try:
+        with conn.cursor() as cur:
+            for run_index, (run_dir, config, np_model_id, existing_pairs) in enumerate(plans, start=1):
+                run_start = time.monotonic()
+                _log(
+                    f"[{run_index}/{len(plans)}] Processing "
+                    f"{run_dir.relative_to(exports_dir)} "
+                    f"(modelId={np_model_id}, dataset={config['dataset_name']})..."
+                )
+                try:
+                    inserted, skipped = _stream_insert_run(
+                        cur=cur,
+                        query=query,
+                        run_dir=run_dir,
+                        config=config,
+                        np_model_id=np_model_id,
+                        existing_pairs=existing_pairs,
+                        batch_size=args.batch_size,
+                        dry_run=False,
+                    )
+                except Exception:
+                    _log(
+                        f"[{run_index}/{len(plans)}] Error mid-stream; "
+                        "rolling back this run dir and aborting."
+                    )
+                    conn.rollback()
+                    raise
+
+                if skipped:
+                    warning = _format_skipped_warning(run_dir, exports_dir, skipped)
+                    _log(f"  WARNING: {warning}")
+                    skip_warnings.append(warning)
+
+                _log(
+                    f"[{run_index}/{len(plans)}] Committing {inserted} row(s) "
+                    f"for {run_dir.relative_to(exports_dir)}..."
+                )
+                conn.commit()
+                grand_inserted += inserted
+                grand_skipped += len(skipped)
+                _log(
+                    f"[{run_index}/{len(plans)}] Done in "
+                    f"{time.monotonic() - run_start:.2f}s. "
+                    f"Cumulative: inserted={grand_inserted}, skipped={grand_skipped}."
+                )
+    finally:
+        conn.close()
+
+    _log(
+        f"Imported {grand_inserted} ModelHeadMetrics row(s), skipped "
+        f"{grand_skipped} existing row(s) from {len(plans)} run directories "
+        f"in {time.monotonic() - overall_start:.2f}s."
+    )
+    _print_warning_summary(skip_warnings)
 
 
 if __name__ == "__main__":

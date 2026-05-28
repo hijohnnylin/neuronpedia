@@ -1,7 +1,10 @@
 import argparse
 import json
 import os
+import random
 import re
+import string
+import time
 from dataclasses import astuple
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,7 +12,6 @@ from typing import Any
 
 import dotenv
 import psycopg2
-from cuid2 import Cuid
 from model_head_sequence import ModelHeadSequence
 from psycopg2.extras import execute_values
 
@@ -28,7 +30,32 @@ POSTGRES_PLACEHOLDERS = {
     "port": "TODO_DATABASE_PORT",
 }
 
-CUID_GENERATOR: Cuid = Cuid(length=25)
+class _FastCuid:
+    """Drop-in replacement for cuid2.Cuid that's ~100x faster.
+
+    Real cuid2 uses SHA-3-512 hashing per ID, which dominates CPU time during
+    bulk imports (one ID per sequence row, often tens of thousands per run).
+    This produces IDs with the same surface format (lowercase alphanumeric,
+    starting with a letter) using random.choices. At length 25 we have ~124
+    bits of entropy, so collisions are astronomically unlikely for our
+    import scale.
+    """
+
+    _FIRST = string.ascii_lowercase
+    _REST = string.ascii_lowercase + string.digits
+
+    def __init__(self, length: int = 24) -> None:
+        if length < 2:
+            raise ValueError("length must be >= 2")
+        self._rest_len = length - 1
+
+    def generate(self) -> str:
+        return random.choice(self._FIRST) + "".join(
+            random.choices(self._REST, k=self._rest_len)
+        )
+
+
+CUID_GENERATOR = _FastCuid(length=25)
 
 CONFIG_KEYS = (
     "model_name",
@@ -67,8 +94,9 @@ def parse_args() -> argparse.Namespace:
         description=(
             "Load HeadVis-style sampled sequences into Postgres. Walks "
             "<exports-dir>/<np_model_id>/headvis/<dataset>/heads/L*H*.json "
-            "and inserts ModelHeadSequence rows. Errors if any rows already "
-            "exist for a (model, dataset, run-config, layer, head) combination."
+            "and inserts ModelHeadSequence rows. Skips with a warning any "
+            "(model, dataset, run-config, layer, head) combination that "
+            "already has rows; a summary of skipped runs is printed at the end."
         )
     )
     parser.add_argument(
@@ -111,15 +139,29 @@ def create_connection():
     )
 
 
-def load_json(path: Path) -> Any:
-    with open(path) as f:
-        return json.load(f)
+try:
+    import orjson  # type: ignore[import-not-found]
+
+    def load_json(path: Path) -> Any:
+        with open(path, "rb") as f:
+            return orjson.loads(f.read())
+except ImportError:
+
+    def load_json(path: Path) -> Any:
+        with open(path, "rb") as f:
+            return json.loads(f.read())
+
+
+def _log(message: str) -> None:
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] {message}", flush=True)
 
 
 def discover_run_dirs(exports_dir: Path) -> list[Path]:
     if not exports_dir.is_dir():
         raise ValueError(f"Exports directory does not exist: {exports_dir}")
 
+    _log(f"Scanning exports directory: {exports_dir}")
     run_dirs: list[Path] = []
     for np_id_dir in sorted(exports_dir.iterdir()):
         if not np_id_dir.is_dir():
@@ -142,6 +184,7 @@ def discover_run_dirs(exports_dir: Path) -> list[Path]:
             f"No HeadVis run directories found under {exports_dir}. "
             "Expected <exports-dir>/<np_id>/headvis/<dataset>/."
         )
+    _log(f"Discovered {len(run_dirs)} run director{'y' if len(run_dirs) == 1 else 'ies'}.")
     return run_dirs
 
 
@@ -183,7 +226,12 @@ def _iter_head_files(run_dir: Path) -> list[tuple[int, int, Path]]:
 
 
 def _build_rows_for_head(
-    config: dict[str, Any],
+    cfg_model_name: str,
+    cfg_dataset_name: str,
+    cfg_n_sequences: int,
+    cfg_seq_len: int,
+    cfg_dtype: str,
+    cfg_attn_implementation: str,
     np_model_id: str,
     layer: int,
     head: int,
@@ -195,6 +243,7 @@ def _build_rows_for_head(
         return []
 
     rows: list[ModelHeadSequence] = []
+    generate = CUID_GENERATOR.generate
     for seq in sequences:
         if not isinstance(seq, dict):
             continue
@@ -215,20 +264,20 @@ def _build_rows_for_head(
 
         rows.append(
             ModelHeadSequence(
-                id=CUID_GENERATOR.generate(),
+                id=generate(),
                 modelId=np_model_id,
                 layer=layer,
                 headIndex=head,
-                modelName=str(config["model_name"]),
-                datasetName=str(config["dataset_name"]),
-                nSequences=int(config["n_sequences"]),
-                seqLen=int(config["seq_len"]),
-                dtype=str(config["dtype"]),
-                attnImplementation=str(config["attn_implementation"]),
+                modelName=cfg_model_name,
+                datasetName=cfg_dataset_name,
+                nSequences=cfg_n_sequences,
+                seqLen=cfg_seq_len,
+                dtype=cfg_dtype,
+                attnImplementation=cfg_attn_implementation,
                 interval=int(seq.get("interval", 0)),
-                tokens=[str(token) for token in tokens],
-                attentionIndices=[int(idx) for idx in attention_indices],
-                attentionValues=[float(value) for value in attention_values],
+                tokens=tokens,
+                attentionIndices=attention_indices,
+                attentionValues=attention_values,
                 maxActivation=float(seq.get("max_activation", 0.0)),
                 createdAt=now,
                 updatedAt=now,
@@ -237,27 +286,16 @@ def _build_rows_for_head(
     return rows
 
 
-def build_rows_from_run_dir(run_dir: Path) -> tuple[dict[str, Any], str, list[ModelHeadSequence]]:
+def _read_run_config(run_dir: Path) -> tuple[dict[str, Any], str]:
+    """Parse config.json for a run dir and resolve the np_model_id."""
     config_raw = load_json(run_dir / "config.json")
     if not isinstance(config_raw, dict):
         raise ValueError(f"{run_dir / 'config.json'} must contain a JSON object.")
     config = _normalize_pipeline_config(config_raw)
-
     for key in CONFIG_KEYS:
         require_config(config, key)
-
     np_model_id = _resolve_np_model_id(run_dir, config)
-    now = datetime.now(timezone.utc)
-
-    rows: list[ModelHeadSequence] = []
-    for layer, head, path in _iter_head_files(run_dir):
-        payload = load_json(path)
-        if not isinstance(payload, dict):
-            raise ValueError(f"{path} must contain a JSON object.")
-        rows.extend(
-            _build_rows_for_head(config, np_model_id, layer, head, payload, now)
-        )
-    return config, np_model_id, rows
+    return config, np_model_id
 
 
 def precheck_no_existing_rows(
@@ -289,81 +327,247 @@ def precheck_no_existing_rows(
     return int(count)
 
 
-def insert_rows(rows: list[ModelHeadSequence], batch_size: int) -> None:
-    if not rows:
-        print("No rows to insert.")
-        return
-
+def _insert_query() -> str:
     quoted_columns = ", ".join(f'"{column}"' for column in COLUMNS)
-    query = f'INSERT INTO "ModelHeadSequence" ({quoted_columns}) VALUES %s'
+    return f'INSERT INTO "ModelHeadSequence" ({quoted_columns}) VALUES %s'
 
-    conn = create_connection()
-    try:
-        with conn.cursor() as cur:
-            for start in range(0, len(rows), batch_size):
-                batch = rows[start : start + batch_size]
+
+def _stream_insert_run(
+    cur,
+    query: str,
+    run_dir: Path,
+    config: dict[str, Any],
+    np_model_id: str,
+    batch_size: int,
+    dry_run: bool,
+) -> int:
+    """Stream rows for one run dir into the DB in batches.
+
+    Reads head files one at a time, accumulates rows in a buffer of
+    `batch_size`, flushes to the DB whenever full, then drops the batch.
+    Returns the number of rows inserted (or that would be inserted, when
+    `dry_run` is True).
+    """
+    cfg_model_name = str(config["model_name"])
+    cfg_dataset_name = str(config["dataset_name"])
+    cfg_n_sequences = int(config["n_sequences"])
+    cfg_seq_len = int(config["seq_len"])
+    cfg_dtype = str(config["dtype"])
+    cfg_attn_implementation = str(config["attn_implementation"])
+    now = datetime.now(timezone.utc)
+
+    head_files = _iter_head_files(run_dir)
+    total_heads = len(head_files)
+    if total_heads:
+        _log(
+            f"  Streaming {total_heads} head JSON file(s) from "
+            f"{(run_dir / 'heads').name}/ ..."
+        )
+    progress_step = max(1, total_heads // 10) if total_heads else 1
+
+    inserted = 0
+    buffer: list[ModelHeadSequence] = []
+
+    def _flush_full_batches() -> None:
+        nonlocal inserted
+        while len(buffer) >= batch_size:
+            batch = buffer[:batch_size]
+            if not dry_run:
                 execute_values(cur, query, [astuple(row) for row in batch])
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+            del buffer[:batch_size]
+            inserted += len(batch)
+            _log(
+                f"    {'Would insert' if dry_run else 'Inserted'} "
+                f"batch of {len(batch)} (run total so far: {inserted})."
+            )
+
+    for idx, (layer, head, path) in enumerate(head_files, start=1):
+        payload = load_json(path)
+        if not isinstance(payload, dict):
+            raise ValueError(f"{path} must contain a JSON object.")
+        buffer.extend(
+            _build_rows_for_head(
+                cfg_model_name,
+                cfg_dataset_name,
+                cfg_n_sequences,
+                cfg_seq_len,
+                cfg_dtype,
+                cfg_attn_implementation,
+                np_model_id,
+                layer,
+                head,
+                payload,
+                now,
+            )
+        )
+        _flush_full_batches()
+
+        if total_heads and (idx % progress_step == 0 or idx == total_heads):
+            _log(
+                f"    ...read {idx}/{total_heads} head files "
+                f"(buffered={len(buffer)}, inserted so far={inserted})."
+            )
+
+    if buffer:
+        if not dry_run:
+            execute_values(cur, query, [astuple(row) for row in buffer])
+        inserted += len(buffer)
+        _log(
+            f"    {'Would insert' if dry_run else 'Inserted'} "
+            f"final batch of {len(buffer)} (run total: {inserted})."
+        )
+        buffer.clear()
+
+    return inserted
 
 
 def main() -> None:
+    overall_start = time.monotonic()
     args = parse_args()
     exports_dir = Path(args.exports_dir).expanduser().resolve()
+    _log(
+        f"Starting load-head-sequences (dry_run={args.dry_run}, "
+        f"batch_size={args.batch_size})."
+    )
     run_dirs = discover_run_dirs(exports_dir)
 
-    runs: list[tuple[Path, dict[str, Any], str, list[ModelHeadSequence]]] = []
-    total_rows = 0
-    for run_dir in run_dirs:
-        config, np_model_id, rows = build_rows_from_run_dir(run_dir)
-        runs.append((run_dir, config, np_model_id, rows))
-        total_rows += len(rows)
-        print(
-            f"Prepared {len(rows)} sequence rows from "
-            f"{run_dir.relative_to(exports_dir)} "
-            f"(modelId={np_model_id}, dataset={config['dataset_name']})."
-        )
-
-    print(f"Prepared {total_rows} total sequence rows from {len(run_dirs)} runs.")
-
-    if total_rows == 0:
-        print("Nothing to import.")
-        return
-
+    _log(
+        "Reading run configs and pre-checking for existing rows in the "
+        "database (no head JSON files read yet)..."
+    )
+    warnings: list[str] = []
+    runs_to_import: list[tuple[Path, dict[str, Any], str]] = []
     conn = create_connection()
     try:
         with conn.cursor() as cur:
-            for run_dir, config, np_model_id, _rows in runs:
+            for index, run_dir in enumerate(run_dirs, start=1):
+                _log(
+                    f"  [{index}/{len(run_dirs)}] Checking "
+                    f"{run_dir.relative_to(exports_dir)} ..."
+                )
+                config, np_model_id = _read_run_config(run_dir)
                 existing = precheck_no_existing_rows(cur, np_model_id, config)
                 if existing > 0:
-                    raise RuntimeError(
-                        f"Refusing to import {run_dir.relative_to(exports_dir)}: "
+                    warning = (
+                        f"Skipping {run_dir.relative_to(exports_dir)}: "
                         f"{existing} ModelHeadSequence rows already exist for "
                         f"modelId={np_model_id}, datasetName={config['dataset_name']}, "
                         f"nSequences={config['n_sequences']}, seqLen={config['seq_len']}, "
-                        f"dtype={config['dtype']}, attnImplementation={config['attn_implementation']}. "
-                        "Delete those rows first or skip this run."
+                        f"dtype={config['dtype']}, attnImplementation={config['attn_implementation']}."
                     )
+                    _log(f"  WARNING: {warning}")
+                    warnings.append(warning)
+                    continue
+                _log(f"  [{index}/{len(run_dirs)}] OK; queued for streaming insert.")
+                runs_to_import.append((run_dir, config, np_model_id))
     finally:
         conn.close()
 
-    if args.dry_run:
-        print("Dry run complete; no database writes performed.")
+    _log(
+        f"Pre-check complete: {len(runs_to_import)} run(s) to import, "
+        f"{len(warnings)} skipped."
+    )
+
+    if not runs_to_import:
+        _log("No runs to import.")
+        _print_warning_summary(warnings)
         return
 
-    all_rows: list[ModelHeadSequence] = []
-    for _run_dir, _config, _np, rows in runs:
-        all_rows.extend(rows)
+    query = _insert_query()
+    grand_total = 0
 
-    insert_rows(all_rows, args.batch_size)
-    print(
-        f"Imported {len(all_rows)} ModelHeadSequence rows from "
-        f"{len(runs)} run directories."
+    if args.dry_run:
+        _log("Dry run: streaming through head files without writing to DB...")
+        for run_index, (run_dir, config, np_model_id) in enumerate(runs_to_import, start=1):
+            run_start = time.monotonic()
+            _log(
+                f"[{run_index}/{len(runs_to_import)}] Validating "
+                f"{run_dir.relative_to(exports_dir)} "
+                f"(modelId={np_model_id}, dataset={config['dataset_name']})..."
+            )
+            inserted = _stream_insert_run(
+                cur=None,
+                query=query,
+                run_dir=run_dir,
+                config=config,
+                np_model_id=np_model_id,
+                batch_size=args.batch_size,
+                dry_run=True,
+            )
+            grand_total += inserted
+            _log(
+                f"[{run_index}/{len(runs_to_import)}] Would insert {inserted} rows "
+                f"({time.monotonic() - run_start:.2f}s). Running total: {grand_total}."
+            )
+        _log(
+            f"Dry run complete in {time.monotonic() - overall_start:.2f}s; "
+            f"would have inserted {grand_total} ModelHeadSequence rows from "
+            f"{len(runs_to_import)} run directories."
+        )
+        _print_warning_summary(warnings)
+        return
+
+    _log(
+        f"Streaming inserts for {len(runs_to_import)} run dir(s) "
+        f"(batch_size={args.batch_size}, commit per run dir)..."
     )
+    conn = create_connection()
+    try:
+        with conn.cursor() as cur:
+            for run_index, (run_dir, config, np_model_id) in enumerate(runs_to_import, start=1):
+                run_start = time.monotonic()
+                _log(
+                    f"[{run_index}/{len(runs_to_import)}] Processing "
+                    f"{run_dir.relative_to(exports_dir)} "
+                    f"(modelId={np_model_id}, dataset={config['dataset_name']})..."
+                )
+                try:
+                    inserted = _stream_insert_run(
+                        cur=cur,
+                        query=query,
+                        run_dir=run_dir,
+                        config=config,
+                        np_model_id=np_model_id,
+                        batch_size=args.batch_size,
+                        dry_run=False,
+                    )
+                except Exception:
+                    _log(
+                        f"[{run_index}/{len(runs_to_import)}] Error mid-stream; "
+                        "rolling back this run dir and aborting."
+                    )
+                    conn.rollback()
+                    raise
+                _log(
+                    f"[{run_index}/{len(runs_to_import)}] Committing "
+                    f"{inserted} row(s) for "
+                    f"{run_dir.relative_to(exports_dir)}..."
+                )
+                conn.commit()
+                grand_total += inserted
+                _log(
+                    f"[{run_index}/{len(runs_to_import)}] Done in "
+                    f"{time.monotonic() - run_start:.2f}s. "
+                    f"Cumulative inserted: {grand_total}."
+                )
+    finally:
+        conn.close()
+
+    _log(
+        f"Imported {grand_total} ModelHeadSequence rows from "
+        f"{len(runs_to_import)} run directories in "
+        f"{time.monotonic() - overall_start:.2f}s."
+    )
+    _print_warning_summary(warnings)
+
+
+def _print_warning_summary(warnings: list[str]) -> None:
+    if not warnings:
+        return
+    print("")
+    print(f"Summary: skipped {len(warnings)} run(s) due to pre-existing rows:")
+    for warning in warnings:
+        print(f"  - {warning}")
 
 
 if __name__ == "__main__":
