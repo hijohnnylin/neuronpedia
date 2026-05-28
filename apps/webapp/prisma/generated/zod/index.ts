@@ -78,7 +78,9 @@ export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier','toke
 
 export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','openRouterId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','defaultGraphSourceSetName','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
 
-export const ModelHeadMetricsScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','selfAttentionScore','prevTokenScore','patternEntropy','qkDistance','qkDistanceVariance','inductionScore','createdAt','updatedAt']);
+export const ModelHeadMetricsScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','selfAttentionScore','prevTokenScore','patternEntropy','qkDistance','qkDistanceVariance','inductionScore','qkDistanceHistogram','topQueryTokens','topKeyTokens','activationHistogram','headStatistics','createdAt','updatedAt']);
+
+export const ModelHeadSequenceScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','interval','tokens','attentionIndices','attentionValues','maxActivation','createdAt','updatedAt']);
 
 export const GraphHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','runpodServerlessUrl','modelId','createdAt','updatedAt']);
 
@@ -1146,6 +1148,7 @@ export type ModelRelations = {
   nlaSources: NlaSourceWithRelations[];
   nlaExplainCaches: NlaExplainCacheWithRelations[];
   headMetrics: ModelHeadMetricsWithRelations[];
+  headSequences: ModelHeadSequenceWithRelations[];
   samples: SampleWithRelations[];
   probes: ProbeWithRelations[];
 };
@@ -1169,6 +1172,7 @@ export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSche
   nlaSources: z.lazy(() => NlaSourceWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCacheWithRelationsSchema).array(),
   headMetrics: z.lazy(() => ModelHeadMetricsWithRelationsSchema).array(),
+  headSequences: z.lazy(() => ModelHeadSequenceWithRelationsSchema).array(),
   samples: z.lazy(() => SampleWithRelationsSchema).array(),
   probes: z.lazy(() => ProbeWithRelationsSchema).array(),
 }))
@@ -1193,6 +1197,7 @@ export type ModelPartialRelations = {
   nlaSources?: NlaSourcePartialWithRelations[];
   nlaExplainCaches?: NlaExplainCachePartialWithRelations[];
   headMetrics?: ModelHeadMetricsPartialWithRelations[];
+  headSequences?: ModelHeadSequencePartialWithRelations[];
   samples?: SamplePartialWithRelations[];
   probes?: ProbePartialWithRelations[];
 };
@@ -1216,6 +1221,7 @@ export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelation
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
   headMetrics: z.lazy(() => ModelHeadMetricsPartialWithRelationsSchema).array(),
+  headSequences: z.lazy(() => ModelHeadSequencePartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
 })).partial()
@@ -1239,6 +1245,7 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
   headMetrics: z.lazy(() => ModelHeadMetricsPartialWithRelationsSchema).array(),
+  headSequences: z.lazy(() => ModelHeadSequencePartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
 }).partial())
@@ -1264,6 +1271,11 @@ export const ModelHeadMetricsSchema = z.object({
   qkDistance: z.number().nullable(),
   qkDistanceVariance: z.number().nullable(),
   inductionScore: z.number().nullable(),
+  qkDistanceHistogram: NullableJsonValue.optional(),
+  topQueryTokens: NullableJsonValue.optional(),
+  topKeyTokens: NullableJsonValue.optional(),
+  activationHistogram: NullableJsonValue.optional(),
+  headStatistics: NullableJsonValue.optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })
@@ -1285,7 +1297,13 @@ export type ModelHeadMetricsRelations = {
   model: ModelWithRelations;
 };
 
-export type ModelHeadMetricsWithRelations = z.infer<typeof ModelHeadMetricsSchema> & ModelHeadMetricsRelations
+export type ModelHeadMetricsWithRelations = Omit<z.infer<typeof ModelHeadMetricsSchema>, "qkDistanceHistogram" | "topQueryTokens" | "topKeyTokens" | "activationHistogram" | "headStatistics"> & {
+  qkDistanceHistogram?: NullableJsonInput;
+  topQueryTokens?: NullableJsonInput;
+  topKeyTokens?: NullableJsonInput;
+  activationHistogram?: NullableJsonInput;
+  headStatistics?: NullableJsonInput;
+} & ModelHeadMetricsRelations
 
 export const ModelHeadMetricsWithRelationsSchema: z.ZodType<ModelHeadMetricsWithRelations> = ModelHeadMetricsSchema.merge(z.object({
   model: z.lazy(() => ModelWithRelationsSchema),
@@ -1298,15 +1316,93 @@ export type ModelHeadMetricsPartialRelations = {
   model?: ModelPartialWithRelations;
 };
 
-export type ModelHeadMetricsPartialWithRelations = z.infer<typeof ModelHeadMetricsPartialSchema> & ModelHeadMetricsPartialRelations
+export type ModelHeadMetricsPartialWithRelations = Omit<z.infer<typeof ModelHeadMetricsPartialSchema>, "qkDistanceHistogram" | "topQueryTokens" | "topKeyTokens" | "activationHistogram" | "headStatistics"> & {
+  qkDistanceHistogram?: NullableJsonInput;
+  topQueryTokens?: NullableJsonInput;
+  topKeyTokens?: NullableJsonInput;
+  activationHistogram?: NullableJsonInput;
+  headStatistics?: NullableJsonInput;
+} & ModelHeadMetricsPartialRelations
 
 export const ModelHeadMetricsPartialWithRelationsSchema: z.ZodType<ModelHeadMetricsPartialWithRelations> = ModelHeadMetricsPartialSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
 })).partial()
 
-export type ModelHeadMetricsWithPartialRelations = z.infer<typeof ModelHeadMetricsSchema> & ModelHeadMetricsPartialRelations
+export type ModelHeadMetricsWithPartialRelations = Omit<z.infer<typeof ModelHeadMetricsSchema>, "qkDistanceHistogram" | "topQueryTokens" | "topKeyTokens" | "activationHistogram" | "headStatistics"> & {
+  qkDistanceHistogram?: NullableJsonInput;
+  topQueryTokens?: NullableJsonInput;
+  topKeyTokens?: NullableJsonInput;
+  activationHistogram?: NullableJsonInput;
+  headStatistics?: NullableJsonInput;
+} & ModelHeadMetricsPartialRelations
 
 export const ModelHeadMetricsWithPartialRelationsSchema: z.ZodType<ModelHeadMetricsWithPartialRelations> = ModelHeadMetricsSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+}).partial())
+
+/////////////////////////////////////////
+// MODEL HEAD SEQUENCE SCHEMA
+/////////////////////////////////////////
+
+export const ModelHeadSequenceSchema = z.object({
+  id: z.string().cuid(),
+  modelId: z.string(),
+  layer: z.number().int(),
+  headIndex: z.number().int(),
+  modelName: z.string(),
+  datasetName: z.string(),
+  nSequences: z.number().int(),
+  seqLen: z.number().int(),
+  dtype: z.string(),
+  attnImplementation: z.string(),
+  interval: z.number().int(),
+  tokens: z.string().array(),
+  attentionIndices: z.number().int().array(),
+  attentionValues: z.number().array(),
+  maxActivation: z.number(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type ModelHeadSequence = z.infer<typeof ModelHeadSequenceSchema>
+
+/////////////////////////////////////////
+// MODEL HEAD SEQUENCE PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const ModelHeadSequencePartialSchema = ModelHeadSequenceSchema.partial()
+
+export type ModelHeadSequencePartial = z.infer<typeof ModelHeadSequencePartialSchema>
+
+// MODEL HEAD SEQUENCE RELATION SCHEMA
+//------------------------------------------------------
+
+export type ModelHeadSequenceRelations = {
+  model: ModelWithRelations;
+};
+
+export type ModelHeadSequenceWithRelations = z.infer<typeof ModelHeadSequenceSchema> & ModelHeadSequenceRelations
+
+export const ModelHeadSequenceWithRelationsSchema: z.ZodType<ModelHeadSequenceWithRelations> = ModelHeadSequenceSchema.merge(z.object({
+  model: z.lazy(() => ModelWithRelationsSchema),
+}))
+
+// MODEL HEAD SEQUENCE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type ModelHeadSequencePartialRelations = {
+  model?: ModelPartialWithRelations;
+};
+
+export type ModelHeadSequencePartialWithRelations = z.infer<typeof ModelHeadSequencePartialSchema> & ModelHeadSequencePartialRelations
+
+export const ModelHeadSequencePartialWithRelationsSchema: z.ZodType<ModelHeadSequencePartialWithRelations> = ModelHeadSequencePartialSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+})).partial()
+
+export type ModelHeadSequenceWithPartialRelations = z.infer<typeof ModelHeadSequenceSchema> & ModelHeadSequencePartialRelations
+
+export const ModelHeadSequenceWithPartialRelationsSchema: z.ZodType<ModelHeadSequenceWithPartialRelations> = ModelHeadSequenceSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
 }).partial())
 

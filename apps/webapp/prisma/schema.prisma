@@ -322,6 +322,7 @@ model Model {
   nlaSources           NlaSource[]
   nlaExplainCaches     NlaExplainCache[]
   headMetrics          ModelHeadMetrics[]
+  headSequences        ModelHeadSequence[]
 
   samples Sample[]
   probes  Probe[]
@@ -356,11 +357,47 @@ model ModelHeadMetrics {
   qkDistanceVariance Float?
   inductionScore     Float?
 
+  qkDistanceHistogram Json?
+  topQueryTokens      Json?
+  topKeyTokens        Json?
+  activationHistogram Json?
+  headStatistics      Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([modelId, datasetName, nSequences, seqLen, dtype, attnImplementation, layer, headIndex])
   @@index([modelId])
+}
+
+model ModelHeadSequence {
+  id String @id @default(cuid())
+
+  modelId String
+  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  layer     Int
+  headIndex Int
+
+  modelName          String
+  datasetName        String
+  nSequences         Int
+  seqLen             Int
+  dtype              String
+  attnImplementation String
+
+  interval         Int
+  tokens           String[]
+  attentionIndices Int[]
+  attentionValues  Float[]
+  maxActivation    Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modelId, layer, headIndex])
+  @@index([modelId])
+  @@index([modelId, datasetName, nSequences, seqLen, dtype, attnImplementation, layer, headIndex], name: "ModelHeadSequence_runConfigKey_idx")
 }
 
 model GraphHostSource {
