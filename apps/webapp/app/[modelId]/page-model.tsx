@@ -3,6 +3,7 @@ import ModelsDropdown from '@/components/nav/models-dropdown';
 import BrowserPane from '@/components/panes/browser-pane/browser-pane';
 import GraphModelPane from '@/components/panes/graph-model-pane';
 import JumpToPane from '@/components/panes/jump-to-pane';
+import ModelHeadMetricsPane from '@/components/panes/model-head-metrics-pane';
 import ModelReleases from '@/components/panes/model-releases-pane';
 import SearchExplanationsPane from '@/components/panes/search-explanations-pane';
 import SearchInferenceModelPane from '@/components/panes/search-inference-model-pane';
@@ -15,13 +16,29 @@ import { ModelWithPartialRelations } from '@/prisma/generated/zod';
 import { Visibility } from '@prisma/client';
 
 export default async function PageModel({ model }: { model: ModelWithPartialRelations }) {
-  // prisma find graphMetadatas for this model
-  const graphMetadatas = await prisma.graphMetadata.findMany({
-    where: {
-      modelId: model.id,
-      isFeatured: true,
-    },
-  });
+  const [graphMetadatas, modelHeadMetrics] = await Promise.all([
+    prisma.graphMetadata.findMany({
+      where: {
+        modelId: model.id,
+        isFeatured: true,
+      },
+    }),
+    prisma.modelHeadMetrics.findMany({
+      where: {
+        modelId: model.id,
+      },
+      select: {
+        layer: true,
+        headIndex: true,
+        inductionScore: true,
+        prevTokenScore: true,
+        patternEntropy: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    }),
+  ]);
 
   const firstSourceSet = getFirstSourceSetForModel(model, Visibility.PUBLIC, false, false);
   const firstSource = getFirstSourceForModel(model, Visibility.PUBLIC, false, false);
@@ -56,14 +73,13 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
         </div>
       </div>
 
-      <div className="mt-6 w-full max-w-screen-lg">
-        <JumpToPane
-          defaultModelId={model.id}
-          defaultSourceSetName={firstSourceSet?.name || ''}
-          vertical
-          filterToFeaturedReleases={false}
-        />
-      </div>
+      {modelHeadMetrics.length > 0 && (
+        <div className="mt-6 hidden w-full max-w-screen-lg sm:block">
+          <div className="flex w-full flex-col items-center justify-center">
+            <ModelHeadMetricsPane modelId={model.id} metrics={modelHeadMetrics} />
+          </div>
+        </div>
+      )}
 
       {graphMetadatas.length > 0 && (
         <div className="mt-6 w-full max-w-screen-lg">
@@ -71,7 +87,13 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
         </div>
       )}
 
-      <div className="mt-6 w-full max-w-screen-lg">
+      <div className="mt-6 flex w-full max-w-screen-lg flex-col items-start justify-center gap-x-3 gap-y-5 sm:flex-row">
+        <JumpToPane
+          defaultModelId={model.id}
+          defaultSourceSetName={firstSourceSet?.name || ''}
+          vertical
+          filterToFeaturedReleases={false}
+        />
         <SearchExplanationsPane
           initialModelId={model.id}
           initialSourceSetName={model.sourceSets && model.sourceSets.length > 0 ? model.sourceSets[0].name : ''}

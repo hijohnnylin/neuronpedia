@@ -284,6 +284,13 @@ export default function ActivationItem({
               const tokenWithReplacedAnomalies = replaceHtmlAnomalies(token);
               const tokenEndsWithSpace = tokenWithReplacedAnomalies.endsWith(' ');
               const tokenStartsWithSpace = tokenWithReplacedAnomalies.startsWith(' ');
+              // When the token is purely whitespace, swap each whitespace char with a
+              // non-breaking space so the span keeps a normal character line-height
+              // (otherwise the background gradient ends up shorter than neighboring tokens).
+              const displayContent =
+                tokenWithReplacedAnomalies.length > 0 && tokenWithReplacedAnomalies.trim() === ''
+                  ? tokenWithReplacedAnomalies.replace(/\s/g, '\u00A0')
+                  : tokenWithReplacedAnomalies;
               if (tokenIsInRangeOfAnchorToken(tokenIndex, dfaMaxIndex)) {
                 return (
                   <span key={tokenIndex}>
@@ -321,7 +328,7 @@ export default function ActivationItem({
                                   ),
                             }}
                           >
-                            {tokenWithReplacedAnomalies}
+                            {displayContent}
                           </span>
                         </Tooltip.Trigger>
                         <ActivationItemTokenTooltip
@@ -351,6 +358,13 @@ export default function ActivationItem({
             const tokenWithReplacedAnomalies = replaceHtmlAnomalies(token);
             const tokenEndsWithSpace = tokenWithReplacedAnomalies.endsWith(' ');
             const tokenStartsWithSpace = tokenWithReplacedAnomalies.startsWith(' ');
+            // When the token is purely whitespace, swap each whitespace char with a
+            // non-breaking space so the span keeps a normal character line-height
+            // (otherwise the background gradient ends up shorter than neighboring tokens).
+            const displayContent =
+              tokenWithReplacedAnomalies.length > 0 && tokenWithReplacedAnomalies.trim() === ''
+                ? tokenWithReplacedAnomalies.replace(/\s/g, '\u00A0')
+                : tokenWithReplacedAnomalies;
             if (
               effectiveDfa && dfaSplit
                 ? tokenIsInRangeOfAnchorToken(tokenIndex, anchorTokenIndex)
@@ -441,7 +455,7 @@ export default function ActivationItem({
                             }
                           }}
                         >
-                          {tokenWithReplacedAnomalies}
+                          {displayContent}
                         </span>
                       </Tooltip.Trigger>
                       <ActivationItemTokenTooltip
