@@ -11,14 +11,13 @@ import dotenv
 import psycopg2
 from cuid2 import Cuid
 from model_head_metrics import ModelHeadMetrics
-from psycopg2.extras import execute_values
+from psycopg2.extras import Json, execute_values
 
 dotenv.load_dotenv(".env.default")
 dotenv.load_dotenv()
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_MODEL_MAP_PATH = SCRIPT_DIR / "np_model_to_hf.json"
-DEFAULT_METRICS_DIR = SCRIPT_DIR / "head-metrics"
+DEFAULT_EXPORTS_DIR = SCRIPT_DIR.parent / "exports"
 DEFAULT_BATCH_SIZE = 1000
 
 POSTGRES_PLACEHOLDERS = {
@@ -66,6 +65,11 @@ COLUMNS = (
     "qkDistance",
     "qkDistanceVariance",
     "inductionScore",
+    "qkDistanceHistogram",
+    "topQueryTokens",
+    "topKeyTokens",
+    "activationHistogram",
+    "headStatistics",
     "createdAt",
     "updatedAt",
 )
@@ -73,18 +77,20 @@ COLUMNS = (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Load HeadVis-style attention head metrics JSON into Postgres."
+        description=(
+            "Load HeadVis-style attention head metrics into Postgres. Walks "
+            "<exports-dir>/<np_model_id>/headvis/<dataset>/ for each run "
+            "written by compute-head-metrics.py and upserts ModelHeadMetrics."
+        )
     )
     parser.add_argument(
-        "metrics_dir",
+        "exports_dir",
         nargs="?",
-        default=str(DEFAULT_METRICS_DIR),
-        help="Directory containing JSON files written by compute-head-metrics.py.",
-    )
-    parser.add_argument(
-        "--model-map",
-        default=str(DEFAULT_MODEL_MAP_PATH),
-        help="Path to np_model_to_hf.json.",
+        default=str(DEFAULT_EXPORTS_DIR),
+        help=(
+            "Root exports directory containing <np_model_id>/headvis/<dataset> "
+            "trees written by compute-head-metrics.py."
+        ),
     )
     parser.add_argument(
         "--batch-size",
@@ -122,35 +128,33 @@ def load_json(path: Path) -> Any:
         return json.load(f)
 
 
-def discover_metrics_files(metrics_dir: Path) -> list[Path]:
-    if not metrics_dir.is_dir():
-        raise ValueError(f"Metrics directory does not exist: {metrics_dir}")
+def discover_run_dirs(exports_dir: Path) -> list[Path]:
+    """Find <exports_dir>/<np_id>/headvis/<dataset> trees with config + scatter_data."""
+    if not exports_dir.is_dir():
+        raise ValueError(f"Exports directory does not exist: {exports_dir}")
 
-    metrics_files = sorted(metrics_dir.glob("*.json"))
-    if not metrics_files:
-        raise ValueError(f"No metrics JSON files found in {metrics_dir}")
-    return metrics_files
+    run_dirs: list[Path] = []
+    for np_id_dir in sorted(exports_dir.iterdir()):
+        if not np_id_dir.is_dir():
+            continue
+        headvis_dir = np_id_dir / "headvis"
+        if not headvis_dir.is_dir():
+            continue
+        for dataset_dir in sorted(headvis_dir.iterdir()):
+            if not dataset_dir.is_dir():
+                continue
+            if not (dataset_dir / "config.json").is_file():
+                continue
+            if not (dataset_dir / "scatter_data.json").is_file():
+                continue
+            run_dirs.append(dataset_dir)
 
-
-def resolve_model_id(hf_model_name: str, model_map_path: Path) -> str:
-    model_map = load_json(model_map_path)
-    if not isinstance(model_map, dict):
-        raise ValueError(f"{model_map_path} must contain a JSON object.")
-
-    matches = [
-        np_model_id
-        for np_model_id, mapped_hf_model_name in model_map.items()
-        if mapped_hf_model_name == hf_model_name
-    ]
-    if not matches:
+    if not run_dirs:
         raise ValueError(
-            f"Could not find Hugging Face model '{hf_model_name}' in {model_map_path} values."
+            f"No HeadVis run directories found under {exports_dir}. "
+            "Expected <exports-dir>/<np_id>/headvis/<dataset>/."
         )
-    if len(matches) > 1:
-        raise ValueError(
-            f"Found multiple Neuronpedia model ids for Hugging Face model '{hf_model_name}': {matches}"
-        )
-    return matches[0]
+    return run_dirs
 
 
 def require_config(config: dict[str, Any], key: str) -> Any:
@@ -169,95 +173,123 @@ def finite_float_or_none(value: Any) -> float | None:
     return number
 
 
-def validate_metric_matrix(metric_name: str, value: Any) -> list[list[Any]]:
-    if not isinstance(value, list) or not all(isinstance(row, list) for row in value):
-        raise ValueError(f"metrics.{metric_name} must be a 2D array.")
+def _normalize_pipeline_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Flatten the run config so DB import works regardless of where keys live."""
+    pipeline = config.get("pipeline_config")
+    if isinstance(pipeline, dict):
+        merged: dict[str, Any] = dict(pipeline)
+        for key, value in config.items():
+            if key == "pipeline_config":
+                continue
+            merged.setdefault(key, value)
+        return merged
+    return dict(config)
 
-    expected_heads = len(value[0]) if value else 0
-    for layer_index, row in enumerate(value):
-        if len(row) != expected_heads:
-            raise ValueError(
-                f"metrics.{metric_name}[{layer_index}] has {len(row)} heads, "
-                f"expected {expected_heads}."
-            )
-    return value
+
+def _read_head_json(run_dir: Path, layer: int, head: int) -> dict[str, Any] | None:
+    head_path = run_dir / "heads" / f"L{layer}H{head}.json"
+    if not head_path.is_file():
+        return None
+    payload = load_json(head_path)
+    if not isinstance(payload, dict):
+        raise ValueError(f"{head_path} must contain a JSON object.")
+    return payload
 
 
-def build_rows(
-    metrics_payload: dict[str, Any], model_map_path: Path
-) -> list[ModelHeadMetrics]:
-    config = metrics_payload.get("config")
-    metrics = metrics_payload.get("metrics")
-    if not isinstance(config, dict):
-        raise ValueError("Metrics file must contain a config object.")
-    if not isinstance(metrics, dict):
-        raise ValueError("Metrics file must contain a metrics object.")
+def _resolve_np_model_id(run_dir: Path, config: dict[str, Any]) -> str:
+    """The directory name two levels up is the np_model_id by construction."""
+    explicit = config.get("np_model_id")
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    return run_dir.parent.parent.name
+
+
+def build_rows_from_run_dir(run_dir: Path) -> list[ModelHeadMetrics]:
+    config_raw = load_json(run_dir / "config.json")
+    if not isinstance(config_raw, dict):
+        raise ValueError(f"{run_dir / 'config.json'} must contain a JSON object.")
+    config = _normalize_pipeline_config(config_raw)
+
+    scatter_rows = load_json(run_dir / "scatter_data.json")
+    if not isinstance(scatter_rows, list):
+        raise ValueError(
+            f"{run_dir / 'scatter_data.json'} must contain a JSON list of head rows."
+        )
 
     for key in CONFIG_KEYS:
         require_config(config, key)
 
-    metric_matrices = {
-        metric_name: validate_metric_matrix(metric_name, metrics.get(metric_name))
-        for metric_name in METRIC_KEYS
-    }
-
-    first_metric = metric_matrices[METRIC_KEYS[0]]
-    n_layers = len(first_metric)
-    n_heads = len(first_metric[0]) if first_metric else 0
-    for metric_name, matrix in metric_matrices.items():
-        if len(matrix) != n_layers:
-            raise ValueError(
-                f"metrics.{metric_name} has {len(matrix)} layers, expected {n_layers}."
-            )
-        for layer_index, row in enumerate(matrix):
-            if len(row) != n_heads:
-                raise ValueError(
-                    f"metrics.{metric_name}[{layer_index}] has {len(row)} heads, "
-                    f"expected {n_heads}."
-                )
-
     hf_model_name = str(config["model_name"])
-    model_id = resolve_model_id(hf_model_name, model_map_path)
+    np_model_id = _resolve_np_model_id(run_dir, config)
     now = datetime.now(timezone.utc)
 
     rows: list[ModelHeadMetrics] = []
-    for layer_index in range(n_layers):
-        for head_index in range(n_heads):
-            rows.append(
-                ModelHeadMetrics(
-                    id=CUID_GENERATOR.generate(),
-                    modelId=model_id,
-                    layer=layer_index,
-                    headIndex=head_index,
-                    modelName=hf_model_name,
-                    datasetName=str(config["dataset_name"]),
-                    nSequences=int(config["n_sequences"]),
-                    seqLen=int(config["seq_len"]),
-                    dtype=str(config["dtype"]),
-                    attnImplementation=str(config["attn_implementation"]),
-                    selfAttentionScore=finite_float_or_none(
-                        metric_matrices["self_attention_score"][layer_index][head_index]
-                    ),
-                    prevTokenScore=finite_float_or_none(
-                        metric_matrices["prev_token_score"][layer_index][head_index]
-                    ),
-                    patternEntropy=finite_float_or_none(
-                        metric_matrices["pattern_entropy"][layer_index][head_index]
-                    ),
-                    qkDistance=finite_float_or_none(
-                        metric_matrices["qk_distance"][layer_index][head_index]
-                    ),
-                    qkDistanceVariance=finite_float_or_none(
-                        metric_matrices["qk_distance_variance"][layer_index][head_index]
-                    ),
-                    inductionScore=finite_float_or_none(
-                        metric_matrices["induction_score"][layer_index][head_index]
-                    ),
-                    createdAt=now,
-                    updatedAt=now,
-                )
+    for entry in scatter_rows:
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"{run_dir / 'scatter_data.json'} rows must be JSON objects."
             )
+        if "layer" not in entry or "head" not in entry:
+            raise ValueError(
+                f"{run_dir / 'scatter_data.json'} row missing 'layer' or 'head': {entry}"
+            )
+        layer_index = int(entry["layer"])
+        head_index = int(entry["head"])
+
+        head_json = _read_head_json(run_dir, layer_index, head_index)
+        qk_hist = head_json.get("qk_distance_histogram") if head_json else None
+        top_q = head_json.get("top_query_tokens") if head_json else None
+        top_k = head_json.get("top_key_tokens") if head_json else None
+        activation_hist = head_json.get("histogram") if head_json else None
+        statistics = head_json.get("statistics") if head_json else None
+
+        rows.append(
+            ModelHeadMetrics(
+                id=CUID_GENERATOR.generate(),
+                modelId=np_model_id,
+                layer=layer_index,
+                headIndex=head_index,
+                modelName=hf_model_name,
+                datasetName=str(config["dataset_name"]),
+                nSequences=int(config["n_sequences"]),
+                seqLen=int(config["seq_len"]),
+                dtype=str(config["dtype"]),
+                attnImplementation=str(config["attn_implementation"]),
+                selfAttentionScore=finite_float_or_none(entry.get("self_attention_score")),
+                prevTokenScore=finite_float_or_none(entry.get("prev_token_score")),
+                patternEntropy=finite_float_or_none(entry.get("pattern_entropy")),
+                qkDistance=finite_float_or_none(entry.get("qk_distance")),
+                qkDistanceVariance=finite_float_or_none(entry.get("qk_distance_variance")),
+                inductionScore=finite_float_or_none(entry.get("induction_score")),
+                qkDistanceHistogram=qk_hist,
+                topQueryTokens=top_q,
+                topKeyTokens=top_k,
+                activationHistogram=activation_hist,
+                headStatistics=statistics,
+                createdAt=now,
+                updatedAt=now,
+            )
+        )
     return rows
+
+
+def _row_to_pg_tuple(row: ModelHeadMetrics) -> tuple[Any, ...]:
+    """Convert a dataclass row into the tuple shape expected by execute_values.
+
+    Json columns are wrapped in psycopg2's Json adapter so dicts/lists serialize.
+    """
+    raw = astuple(row)
+    json_indices = {COLUMNS.index(name) for name in (
+        "qkDistanceHistogram",
+        "topQueryTokens",
+        "topKeyTokens",
+        "activationHistogram",
+        "headStatistics",
+    )}
+    return tuple(
+        Json(value) if i in json_indices and value is not None else value
+        for i, value in enumerate(raw)
+    )
 
 
 def upsert_rows(rows: list[ModelHeadMetrics], batch_size: int) -> None:
@@ -274,6 +306,11 @@ def upsert_rows(rows: list[ModelHeadMetrics], batch_size: int) -> None:
         "qkDistance",
         "qkDistanceVariance",
         "inductionScore",
+        "qkDistanceHistogram",
+        "topQueryTokens",
+        "topKeyTokens",
+        "activationHistogram",
+        "headStatistics",
         "updatedAt",
     )
     update_assignments = ", ".join(
@@ -300,7 +337,7 @@ def upsert_rows(rows: list[ModelHeadMetrics], batch_size: int) -> None:
         with conn.cursor() as cur:
             for start in range(0, len(rows), batch_size):
                 batch = rows[start : start + batch_size]
-                execute_values(cur, query, [astuple(row) for row in batch])
+                execute_values(cur, query, [_row_to_pg_tuple(row) for row in batch])
         conn.commit()
     except Exception:
         conn.rollback()
@@ -311,38 +348,36 @@ def upsert_rows(rows: list[ModelHeadMetrics], batch_size: int) -> None:
 
 def main() -> None:
     args = parse_args()
-    metrics_dir = Path(args.metrics_dir).expanduser().resolve()
-    model_map_path = Path(args.model_map).expanduser().resolve()
-    metrics_files = discover_metrics_files(metrics_dir)
+    exports_dir = Path(args.exports_dir).expanduser().resolve()
+    run_dirs = discover_run_dirs(exports_dir)
 
     rows: list[ModelHeadMetrics] = []
-    for metrics_file in metrics_files:
-        metrics_payload = load_json(metrics_file)
-        file_rows = build_rows(metrics_payload, model_map_path)
-        rows.extend(file_rows)
+    for run_dir in run_dirs:
+        dir_rows = build_rows_from_run_dir(run_dir)
+        rows.extend(dir_rows)
 
-        if file_rows:
-            first_row = file_rows[0]
+        if dir_rows:
+            first_row = dir_rows[0]
             print(
                 "Prepared "
-                f"{len(file_rows)} rows from {metrics_file.name} for "
+                f"{len(dir_rows)} rows from {run_dir.relative_to(exports_dir)} for "
                 f"modelId={first_row.modelId}, modelName={first_row.modelName}, "
                 f"datasetName={first_row.datasetName}."
             )
         else:
-            print(f"Prepared 0 rows from {metrics_file.name}.")
+            print(f"Prepared 0 rows from {run_dir.relative_to(exports_dir)}.")
 
     if rows:
-        print(f"Prepared {len(rows)} total rows from {len(metrics_files)} metrics files.")
+        print(f"Prepared {len(rows)} total rows from {len(run_dirs)} run directories.")
     else:
-        print(f"Prepared 0 total rows from {len(metrics_files)} metrics files.")
+        print(f"Prepared 0 total rows from {len(run_dirs)} run directories.")
 
     if args.dry_run:
         print("Dry run complete; no database writes performed.")
         return
 
     upsert_rows(rows, args.batch_size)
-    print(f"Imported {len(rows)} model head metric rows from {len(metrics_files)} metrics files.")
+    print(f"Imported {len(rows)} model head metric rows from {len(run_dirs)} run directories.")
 
 
 if __name__ == "__main__":
