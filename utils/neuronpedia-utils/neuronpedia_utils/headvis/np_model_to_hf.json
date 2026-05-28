@@ -28,6 +28,8 @@
   "qwen3-4b": "Qwen/Qwen3-4B",
   "qwen3-8b": "Qwen/Qwen3-8B",
   "qwen3.5-0.8b": "Qwen/Qwen3.5-0.8B",
+  "qwen3.5-2b-pt": "Qwen/Qwen3.5-2B-Base",
+  "qwen3.5-9b-pt": "Qwen/Qwen3.5-9B-Base",
   "qwen3.5-27b": "Qwen/Qwen3.5-27B",
   "llama3.1-8b": "meta-llama/Llama-3.1-8B",
   "llama3.1-8b-it": "meta-llama/Llama-3.1-8B-Instruct",

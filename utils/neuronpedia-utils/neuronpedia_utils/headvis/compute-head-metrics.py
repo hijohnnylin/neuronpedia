@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover - tqdm is optional for ad-hoc utility ru
 
 DEFAULT_OUTPUT_DIR = "head-metrics"
 DEFAULT_MIN_FREE_VRAM_GB = 12.0
+DEFAULT_INDUCTION_ATTENTION_THRESHOLD = 0.01
 
 
 @dataclass
@@ -50,6 +51,7 @@ class HeadMetricsConfig:
     device: str
     dtype: str
     attn_implementation: str
+    induction_attention_threshold: float
     trust_remote_code: bool
     min_free_vram_gb: float
     streaming: bool
@@ -91,7 +93,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--seq-len",
         type=int,
-        default=1024,
+        default=512,
         help="Maximum tokenized sequence length.",
     )
     parser.add_argument(
@@ -121,6 +123,15 @@ def parse_args() -> argparse.Namespace:
         "--attn-implementation",
         default="eager",
         help="Transformers attention implementation. Use eager to return weights.",
+    )
+    parser.add_argument(
+        "--induction-attention-threshold",
+        type=float,
+        default=DEFAULT_INDUCTION_ATTENTION_THRESHOLD,
+        help=(
+            "Zero induction attention values below this threshold before summing. "
+            "Use 0 to disable thresholding."
+        ),
     )
     parser.add_argument(
         "--trust-remote-code",
@@ -257,27 +268,35 @@ def iter_texts(dataset: Iterable[dict[str, Any]], text_field: str) -> Iterable[s
             yield text
 
 
-def build_induction_indices(tokens: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+def build_induction_indices(
+    tokens: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, int]:
     token_positions: dict[int, list[int]] = defaultdict(list)
     query_indices: list[int] = []
     shifted_key_indices: list[int] = []
+    repeated_query_positions = 0
 
     for query_position, token_id in enumerate(tokens.tolist()):
         previous_positions = token_positions[token_id]
+        has_prior_repeat = False
         for previous_position in previous_positions:
             shifted_key_position = previous_position + 1
             if shifted_key_position < len(tokens):
                 query_indices.append(query_position)
                 shifted_key_indices.append(shifted_key_position)
+                has_prior_repeat = True
+        if has_prior_repeat:
+            repeated_query_positions += 1
         previous_positions.append(query_position)
 
     if not query_indices:
         empty = torch.empty(0, dtype=torch.long, device=tokens.device)
-        return empty, empty
+        return empty, empty, repeated_query_positions
 
     return (
         torch.tensor(query_indices, dtype=torch.long, device=tokens.device),
         torch.tensor(shifted_key_indices, dtype=torch.long, device=tokens.device),
+        repeated_query_positions,
     )
 
 
@@ -293,6 +312,7 @@ def compute_attention_metrics_for_batch(
     induction_sum: torch.Tensor,
     attention_position_count: torch.Tensor,
     induction_count: torch.Tensor,
+    induction_attention_threshold: float,
 ) -> tuple[int, int]:
     with torch.inference_mode():
         output = model(
@@ -319,7 +339,6 @@ def compute_attention_metrics_for_batch(
     total_attention_positions = sequence_lengths[valid_sequence_mask].sum()
     total_prev_positions = int((sequence_lengths[valid_sequence_mask] - 1).sum().item())
     attention_position_count += total_attention_positions
-    induction_count += total_attention_positions
 
     _, sequence_length = attention_mask.shape
     positions = torch.arange(sequence_length, device=input_ids.device)
@@ -374,7 +393,12 @@ def compute_attention_metrics_for_batch(
             continue
 
         tokens = input_ids[batch_idx, :item_sequence_length]
-        induction_queries, induction_shifted_keys = build_induction_indices(tokens)
+        (
+            induction_queries,
+            induction_shifted_keys,
+            repeated_query_positions,
+        ) = build_induction_indices(tokens)
+        induction_count += repeated_query_positions
         if induction_queries.numel() == 0:
             continue
 
@@ -382,10 +406,15 @@ def compute_attention_metrics_for_batch(
             layer_attention = attention[
                 batch_idx, :, :item_sequence_length, :item_sequence_length
             ]
+            induction_attention = layer_attention[
+                :, induction_queries, induction_shifted_keys
+            ]
+            if induction_attention_threshold > 0:
+                induction_attention = induction_attention.masked_fill(
+                    induction_attention < induction_attention_threshold, 0.0
+                )
             induction_sum[layer_idx] += (
-                layer_attention[:, induction_queries, induction_shifted_keys]
-                .sum(dim=-1)
-                .float()
+                induction_attention.sum(dim=-1).float()
             )
 
     del output, attentions
@@ -426,6 +455,7 @@ def build_config(
         device=str(device),
         dtype=args.dtype,
         attn_implementation=args.attn_implementation,
+        induction_attention_threshold=args.induction_attention_threshold,
         trust_remote_code=args.trust_remote_code,
         min_free_vram_gb=args.min_free_vram_gb,
         streaming=not args.no_streaming,
@@ -568,6 +598,7 @@ def run_head_metrics(
                 induction_sum,
                 attention_position_count,
                 induction_count,
+                args.induction_attention_threshold,
             )
             prev_token_count += prev_positions_count
             processed_sequences += valid_sequences
