@@ -23,7 +23,7 @@ export default function TabProblems({ tabUpdater }: { tabUpdater: (tab: string) 
             {`you'd like to try your hand at solving one of them, consider the following starting points.`} Once{' '}
             {`you're ready to share or collaborate, join us in the `} Open Source Mechanistic Interpretability{' '}
             <a
-              href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3m2fulfeu-0LnVnF8yCrKJYQvWLuCQaQ"
+              href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3z9o0hxjl-MDX9pbATO2qESOazNDLpdQ"
               target="_blank"
               rel="noreferrer"
               className="text-gBlue"

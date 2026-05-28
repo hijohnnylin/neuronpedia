@@ -935,7 +935,7 @@ export default async function Page() {
             <div className="text-2xl font-black text-slate-700">Get Involved</div>
             <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-base font-medium leading-snug text-amber-100 sm:mt-3 sm:gap-x-3 sm:gap-y-3">
               <a
-                href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3m2fulfeu-0LnVnF8yCrKJYQvWLuCQaQ"
+                href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3z9o0hxjl-MDX9pbATO2qESOazNDLpdQ"
                 target="_blank"
                 rel="noreferrer"
                 className=""
