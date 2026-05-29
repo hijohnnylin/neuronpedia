@@ -518,61 +518,8 @@ export default function ModelHeadMetricsPane({
         <div className="flex w-full flex-1 flex-col gap-2">
           <div className="mb-0 flex flex-1 flex-row gap-x-3 gap-y-1.5">
             <div className="mt-1 flex flex-1 flex-col">
-              <div className="flex h-56 w-full flex-row items-center justify-center gap-x-3 px-0 pt-0">
-                <div className="flex h-full flex-1 flex-col border-r border-slate-100 px-3 py-2">
-                  <div className="mb-2 text-xs font-bold text-slate-400">Select Head Manually</div>
-                  <div className="flex min-h-0 w-full flex-1 flex-row gap-x-2 px-2">
-                    <div className="flex h-full min-h-0 flex-1 flex-col">
-                      <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">Layer</div>
-                      <div
-                        ref={layerScrollRef}
-                        className="flex min-h-0 w-full flex-1 flex-row flex-wrap content-start gap-0 overflow-y-auto overscroll-contain"
-                      >
-                        {layerOptions.map((layer) => {
-                          const isSelected = selectedHead?.layer === layer;
-                          return (
-                            <button
-                              key={layer}
-                              type="button"
-                              data-layer={layer}
-                              onClick={() => selectLayer(layer)}
-                              className={`flex h-5 w-5 min-w-5 items-center justify-center rounded border text-[9px] font-bold text-sky-800 outline-none transition-colors hover:bg-sky-50 hover:text-sky-600 focus-visible:outline focus-visible:outline-1 focus-visible:outline-sky-600 ${
-                                isSelected ? 'border-sky-600 bg-sky-100' : 'border-slate-200 bg-white text-slate-400'
-                              }`}
-                            >
-                              {layer}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="flex h-full min-h-0 flex-1 flex-col">
-                      <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">Head Index</div>
-                      <div
-                        ref={headScrollRef}
-                        className="flex min-h-0 w-full flex-1 flex-row flex-wrap content-start gap-0 overflow-y-auto overscroll-contain"
-                      >
-                        {headIndexOptions.map((headIndex) => {
-                          const isSelected = selectedHead?.headIndex === headIndex;
-                          return (
-                            <button
-                              key={headIndex}
-                              type="button"
-                              data-head={headIndex}
-                              onClick={() => selectHeadIndex(headIndex)}
-                              className={`flex h-5 w-5 min-w-5 items-center justify-center rounded border text-[9px] font-bold text-sky-800 outline-none transition-colors hover:bg-sky-50 hover:text-sky-600 focus-visible:outline focus-visible:outline-1 focus-visible:outline-sky-600 ${
-                                isSelected ? 'border-sky-600 bg-sky-100' : 'border-slate-200 bg-white text-slate-400'
-                              }`}
-                            >
-                              {headIndex}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex h-full flex-1 flex-col items-start justify-start rounded-xl px-3 py-2">
+              <div className="flex h-[240px] w-full flex-row items-center justify-center gap-x-3 px-0 pt-0">
+                <div className="flex h-full flex-1 flex-col items-start justify-start rounded-xl border-r border-slate-100 px-3 py-2">
                   <div className="mb-2 text-xs font-bold text-slate-400">Find Head By Metric</div>
                   <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
                     Metric & Number of Heads
@@ -619,67 +566,68 @@ export default function ModelHeadMetricsPane({
                   <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
                     Click head to select
                   </div>
-                  <div className="flex min-h-0 w-full flex-1 flex-col items-start justify-start gap-y-0.5 overflow-y-auto overscroll-contain">
-                    {displayRows.map((displayRow) => {
-                      if (displayRow.type === 'collapsed') {
-                        return <></>;
-                      }
+                  <div className="flex min-h-0 w-full flex-1 flex-col pl-2 pr-2">
+                    <div className="forceShowScrollBar flex min-h-0 w-full flex-1 flex-col items-start justify-start gap-y-0.5 overflow-y-auto overscroll-contain rounded-md bg-slate-50 py-1">
+                      {displayRows.map((displayRow) => {
+                        if (displayRow.type === 'collapsed') {
+                          return <></>;
+                        }
 
-                      const topHeads = topHeadsByLayer.get(displayRow.layer) ?? [];
-                      const currentMetricOption = METRIC_OPTIONS.find((opt) => opt.key === selectedMetric);
-                      return (
-                        <div key={displayRow.layer} className="flex w-full flex-row items-start gap-1">
-                          <div className="flex h-5 w-16 min-w-16 items-center justify-start pl-2.5 font-mono text-[9.5px] font-bold uppercase text-slate-400">
-                            Layer {displayRow.layer}
-                          </div>
-                          <div className="flex flex-1 flex-row flex-wrap gap-0.5">
-                            {topHeads.map((headIndex) => {
-                              const cellKey = `${displayRow.layer}:${headIndex}`;
-                              const row = metricByLayerAndHead.get(cellKey);
-                              const value = row?.[selectedMetric] ?? null;
-                              const renderMetricValue = (metricKey: MetricKey) => {
-                                const metricValue = row?.[metricKey];
-                                const rankInfo = ranksByMetric.get(metricKey)?.get(cellKey);
-                                if (metricValue == null || !Number.isFinite(metricValue) || !rankInfo) {
-                                  return formatTooltipValue(metricValue);
-                                }
-                                return `${formatTooltipValue(metricValue)} (${rankInfo.rank} of ${rankInfo.total})`;
-                              };
-
-                              const isSelectedHead =
-                                selectedHead?.layer === displayRow.layer && selectedHead?.headIndex === headIndex;
-                              return (
-                                <CustomTooltip
-                                  key={`${displayRow.layer}-${headIndex}`}
-                                  side="top"
-                                  minMargin
-                                  trigger={
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedHead({ layer: displayRow.layer, headIndex });
-                                      }}
-                                      className={`flex h-[22px] w-[68px] items-center justify-center rounded border-[1.5px] px-1 text-center font-mono text-[9.5px] font-bold uppercase text-sky-800 outline-none ${
-                                        isSelectedHead ? 'border-sky-800' : 'border-white'
-                                      } hover:border-sky-600 focus-visible:border-sky-600`}
-                                      style={{ backgroundColor: getCellBackground(value, min, max) }}
-                                    >
-                                      Head {headIndex}
-                                    </button>
+                        const topHeads = topHeadsByLayer.get(displayRow.layer) ?? [];
+                        const currentMetricOption = METRIC_OPTIONS.find((opt) => opt.key === selectedMetric);
+                        return (
+                          <div key={displayRow.layer} className="flex w-full flex-row items-start gap-1">
+                            <div className="flex h-5 w-16 min-w-16 items-center justify-start pl-2.5 font-mono text-[9.5px] font-bold uppercase text-slate-400">
+                              Layer {displayRow.layer}
+                            </div>
+                            <div className="flex flex-1 flex-row flex-wrap gap-0.5">
+                              {topHeads.map((headIndex) => {
+                                const cellKey = `${displayRow.layer}:${headIndex}`;
+                                const row = metricByLayerAndHead.get(cellKey);
+                                const value = row?.[selectedMetric] ?? null;
+                                const renderMetricValue = (metricKey: MetricKey) => {
+                                  const metricValue = row?.[metricKey];
+                                  const rankInfo = ranksByMetric.get(metricKey)?.get(cellKey);
+                                  if (metricValue == null || !Number.isFinite(metricValue) || !rankInfo) {
+                                    return formatTooltipValue(metricValue);
                                   }
-                                >
-                                  <div className="flex min-w-[200px] flex-col gap-y-1 text-[11px]">
-                                    <div className="flex w-full flex-row justify-between">
-                                      <div className="font-mono text-slate-600">
-                                        Layer {displayRow.layer} - Head {headIndex}
-                                      </div>
-                                    </div>
+                                  return `${formatTooltipValue(metricValue)} (${rankInfo.rank} of ${rankInfo.total})`;
+                                };
 
-                                    <div className="mb-0 mt-0 flex flex-row items-center justify-between gap-x-4 font-semibold text-sky-700">
-                                      <span>{currentMetricOption?.label}</span>
-                                      <span className="font-mono">{renderMetricValue(selectedMetric)}</span>
-                                    </div>
-                                    {/* {otherMetricOptions.map((opt) => (
+                                const isSelectedHead =
+                                  selectedHead?.layer === displayRow.layer && selectedHead?.headIndex === headIndex;
+                                return (
+                                  <CustomTooltip
+                                    key={`${displayRow.layer}-${headIndex}`}
+                                    side="top"
+                                    minMargin
+                                    trigger={
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedHead({ layer: displayRow.layer, headIndex });
+                                        }}
+                                        className={`flex h-[22px] w-[68px] items-center justify-center rounded border-[1.5px] px-1 text-center font-mono text-[9.5px] font-bold uppercase text-sky-800 outline-none ${
+                                          isSelectedHead ? 'border-sky-800' : 'border-slate-50'
+                                        } hover:border-sky-600 focus-visible:border-sky-600`}
+                                        style={{ backgroundColor: getCellBackground(value, min, max) }}
+                                      >
+                                        Head {headIndex}
+                                      </button>
+                                    }
+                                  >
+                                    <div className="flex min-w-[200px] flex-col gap-y-1 text-[11px]">
+                                      <div className="flex w-full flex-row justify-between">
+                                        <div className="font-mono text-slate-600">
+                                          Layer {displayRow.layer} - Head {headIndex}
+                                        </div>
+                                      </div>
+
+                                      <div className="mb-0 mt-0 flex flex-row items-center justify-between gap-x-4 font-semibold text-sky-700">
+                                        <span>{currentMetricOption?.label}</span>
+                                        <span className="font-mono">{renderMetricValue(selectedMetric)}</span>
+                                      </div>
+                                      {/* {otherMetricOptions.map((opt) => (
                                       <div
                                         key={opt.key}
                                         className="flex flex-row items-center justify-between gap-x-4 text-slate-500"
@@ -688,14 +636,72 @@ export default function ModelHeadMetricsPane({
                                         <span className="font-mono">{renderMetricValue(opt.key)}</span>
                                       </div>
                                     ))} */}
-                                  </div>
-                                </CustomTooltip>
-                              );
-                            })}
+                                    </div>
+                                  </CustomTooltip>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex h-full flex-1 flex-col px-3 py-2">
+                  <div className="mb-2 text-xs font-bold text-slate-400">Select Head Manually</div>
+                  <div className="flex min-h-0 w-full flex-1 flex-row gap-x-1 px-0 pr-5">
+                    <div className="flex h-full min-h-0 flex-1 flex-col">
+                      <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">Layer</div>
+                      <div
+                        ref={layerScrollRef}
+                        className="flex min-h-0 w-full flex-1 flex-row flex-wrap content-start gap-0 overflow-y-auto overscroll-contain"
+                      >
+                        {layerOptions.map((layer) => {
+                          const isSelected = selectedHead?.layer === layer;
+                          return (
+                            <button
+                              key={layer}
+                              type="button"
+                              data-layer={layer}
+                              onClick={() => selectLayer(layer)}
+                              className={`flex h-5 w-5 min-w-5 items-center justify-center text-[9px] font-bold outline-none transition-colors first:rounded-tl last:rounded-br focus-visible:outline focus-visible:outline-1 focus-visible:outline-sky-600 ${
+                                isSelected
+                                  ? 'bg-sky-300 text-sky-800 hover:bg-sky-400 hover:text-sky-900'
+                                  : 'border-slate-200 bg-slate-100 text-slate-400 hover:bg-sky-200 hover:text-sky-600'
+                              }`}
+                            >
+                              {layer}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex h-full min-h-0 flex-1 flex-col">
+                      <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">Head Index</div>
+                      <div
+                        ref={headScrollRef}
+                        className="flex min-h-0 w-full flex-1 flex-row flex-wrap content-start gap-0 overflow-y-auto overscroll-contain"
+                      >
+                        {headIndexOptions.map((headIndex) => {
+                          const isSelected = selectedHead?.headIndex === headIndex;
+                          return (
+                            <button
+                              key={headIndex}
+                              type="button"
+                              data-head={headIndex}
+                              onClick={() => selectHeadIndex(headIndex)}
+                              className={`flex h-5 w-5 min-w-5 items-center justify-center text-[9px] font-bold outline-none transition-colors first:rounded-tl last:rounded-br focus-visible:outline focus-visible:outline-1 focus-visible:outline-sky-600 ${
+                                isSelected
+                                  ? 'bg-sky-300 text-sky-800 hover:bg-sky-400 hover:text-sky-800'
+                                  : 'border-slate-200 bg-slate-100 text-slate-400 hover:bg-sky-200 hover:text-sky-600'
+                              }`}
+                            >
+                              {headIndex}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -705,9 +711,9 @@ export default function ModelHeadMetricsPane({
             <div className="absolute left-0 top-3 h-[1px] w-full bg-slate-100"></div>
 
             {selectedHead && (
-              <div className="z-10 flex flex-row items-center justify-center rounded border border-slate-300 bg-slate-100 px-0 py-0 text-[10px] font-semibold leading-none text-slate-500">
-                <div className="border-r border-slate-300 px-4 py-1.5 font-mono">{modelId}</div>
-                <div className="border-r border-slate-300 px-4 py-1.5">Layer {selectedHead?.layer} </div>
+              <div className="z-10 flex flex-row items-center justify-center rounded border border-slate-100 bg-slate-100 px-0 py-0 text-[10px] font-semibold leading-none text-slate-500">
+                <div className="border-r border-slate-200 px-4 py-1.5 font-mono">{modelId}</div>
+                <div className="border-r border-slate-200 px-4 py-1.5">Layer {selectedHead?.layer} </div>
                 <div className="px-4 py-1.5">Head {selectedHead?.headIndex}</div>
               </div>
             )}
