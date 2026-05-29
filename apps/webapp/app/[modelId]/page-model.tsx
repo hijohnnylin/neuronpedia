@@ -64,8 +64,20 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
             {model.visibility !== Visibility.PUBLIC && (
               <div className="pb-1">{getVisibilityBadge(model.visibility)}</div>
             )}
-            <div className="text-3xl font-bold text-slate-900">{model.id}</div>
-            <div className="mt-2 text-sm font-normal text-slate-500">{model.owner}</div>
+            <div className="text-lg font-bold text-slate-900 sm:text-3xl">{model.id}</div>
+            <div className="text-sm font-normal text-slate-500 sm:mt-2">{model.owner}</div>
+          </div>
+          <div className="flex flex-row justify-end gap-x-3">
+            <JumpToPane
+              defaultModelId={model.id}
+              defaultSourceSetName={firstSourceSet?.name || ''}
+              defaultSourceId={firstSource?.id || ''}
+              vertical
+              filterToFeaturedReleases={false}
+              showRandomFeature={false}
+              showTitleAndCard={false}
+              showModel={false}
+            />
           </div>
         </div>
       </div>
@@ -91,12 +103,6 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
       )}
 
       <div className="mt-6 flex w-full max-w-screen-lg flex-col items-start justify-center gap-x-3 gap-y-5 sm:flex-row">
-        <JumpToPane
-          defaultModelId={model.id}
-          defaultSourceSetName={firstSourceSet?.name || ''}
-          vertical
-          filterToFeaturedReleases={false}
-        />
         <SearchExplanationsPane
           initialModelId={model.id}
           initialSourceSetName={model.sourceSets && model.sourceSets.length > 0 ? model.sourceSets[0].name : ''}
