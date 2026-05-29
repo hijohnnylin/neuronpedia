@@ -4,6 +4,7 @@ import CustomTooltip from '@/components/custom-tooltip';
 import { HeadSequenceData } from '@/components/head-activation-item';
 import HeadActivationsList from '@/components/head-activations-list';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
+import { LoadingSquare } from '@/components/svg/loading-square';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import * as RadixSlider from '@radix-ui/react-slider';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -21,12 +22,19 @@ const Plot = dynamic(
 type Histogram = { bin_edges: number[]; bin_values: number[] };
 type TopToken = { token: string; weight: number };
 
+// Lightweight per-head metrics loaded up front for every head on model load.
 type ModelHeadMetricsRow = {
   layer: number;
   headIndex: number;
   inductionScore: number | null;
   prevTokenScore: number | null;
   patternEntropy: number | null;
+};
+
+// Heavy per-head detail fetched on demand when a head is selected.
+type ModelHeadDetail = {
+  layer: number;
+  headIndex: number;
   selfAttentionScore?: number | null;
   qkDistance?: number | null;
   qkDistanceVariance?: number | null;
@@ -154,6 +162,10 @@ export default function ModelHeadMetricsPane({
   const [isLoadingSequences, setIsLoadingSequences] = useState(false);
   const [sequencesError, setSequencesError] = useState<string | null>(null);
   const sequencesRequestId = useRef(0);
+  const [headDetail, setHeadDetail] = useState<ModelHeadDetail | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const detailRequestId = useRef(0);
   const layerScrollRef = useRef<HTMLDivElement>(null);
   const headScrollRef = useRef<HTMLDivElement>(null);
 
@@ -193,6 +205,49 @@ export default function ModelHeadMetricsPane({
         setSequences([]);
         setSequencesError(error?.message || 'Failed to load sequences');
         setIsLoadingSequences(false);
+      });
+    return () => {
+      controller.abort();
+    };
+  }, [modelId, selectedHead]);
+
+  useEffect(() => {
+    if (!selectedHead) {
+      setHeadDetail(null);
+      setDetailError(null);
+      setIsLoadingDetail(false);
+      return;
+    }
+    const requestId = detailRequestId.current + 1;
+    detailRequestId.current = requestId;
+    const controller = new AbortController();
+    setHeadDetail(null);
+    setIsLoadingDetail(true);
+    setDetailError(null);
+    fetch('/api/model/head-metrics/get', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modelId, layer: selectedHead.layer, headIndex: selectedHead.headIndex }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorBody = await res.json().catch(() => null);
+          throw new Error(errorBody?.error || `Failed to load head metrics (${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data: ModelHeadDetail) => {
+        if (requestId !== detailRequestId.current) return;
+        setHeadDetail(data ?? null);
+        setIsLoadingDetail(false);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        if (requestId !== detailRequestId.current) return;
+        setHeadDetail(null);
+        setDetailError(error?.message || 'Failed to load head metrics');
+        setIsLoadingDetail(false);
       });
     return () => {
       controller.abort();
@@ -319,7 +374,7 @@ export default function ModelHeadMetricsPane({
   }, [selectedHead]);
 
   const selectedHistogram = useMemo(() => {
-    const parsed = parseHistogram(selectedHeadRow?.activationHistogram);
+    const parsed = parseHistogram(headDetail?.activationHistogram);
     if (!parsed) {
       return null;
     }
@@ -329,10 +384,10 @@ export default function ModelHeadMetricsPane({
       return (lo + hi) / 2;
     });
     return { centers, binEdges: parsed.bin_edges, binValues: parsed.bin_values };
-  }, [selectedHeadRow]);
+  }, [headDetail]);
 
   const qkDistanceHistogram = useMemo(() => {
-    const parsed = parseHistogram(selectedHeadRow?.qkDistanceHistogram);
+    const parsed = parseHistogram(headDetail?.qkDistanceHistogram);
     if (!parsed) {
       return null;
     }
@@ -349,10 +404,10 @@ export default function ModelHeadMetricsPane({
     // as an evenly-spaced category label instead of a numeric axis.
     const labels = binValues.map((_, i) => `${parsed.bin_edges[i]}`);
     return { labels, binEdges: parsed.bin_edges, binValues };
-  }, [selectedHeadRow]);
+  }, [headDetail]);
 
-  const topQueryTokens = useMemo(() => parseTopTokens(selectedHeadRow?.topQueryTokens, 8), [selectedHeadRow]);
-  const topKeyTokens = useMemo(() => parseTopTokens(selectedHeadRow?.topKeyTokens, 8), [selectedHeadRow]);
+  const topQueryTokens = useMemo(() => parseTopTokens(headDetail?.topQueryTokens, 8), [headDetail]);
+  const topKeyTokens = useMemo(() => parseTopTokens(headDetail?.topKeyTokens, 8), [headDetail]);
 
   const updateShowTopN = (nextValue: number) => {
     setShowTopN(Math.max(1, Math.min(maxHeads, nextValue)));
@@ -572,7 +627,6 @@ export default function ModelHeadMetricsPane({
 
                       const topHeads = topHeadsByLayer.get(displayRow.layer) ?? [];
                       const currentMetricOption = METRIC_OPTIONS.find((opt) => opt.key === selectedMetric);
-                      const otherMetricOptions = METRIC_OPTIONS.filter((opt) => opt.key !== selectedMetric);
                       return (
                         <div key={displayRow.layer} className="flex w-full flex-row items-start gap-1">
                           <div className="flex h-5 w-16 min-w-16 items-center justify-start pl-2.5 font-mono text-[9.5px] font-bold uppercase text-slate-400">
@@ -621,11 +675,11 @@ export default function ModelHeadMetricsPane({
                                       </div>
                                     </div>
 
-                                    <div className="mb-1 mt-1 flex flex-row items-center justify-between gap-x-4 rounded-md border border-sky-600 px-2 py-1 font-semibold text-sky-700">
+                                    <div className="mb-0 mt-0 flex flex-row items-center justify-between gap-x-4 font-semibold text-sky-700">
                                       <span>{currentMetricOption?.label}</span>
                                       <span className="font-mono">{renderMetricValue(selectedMetric)}</span>
                                     </div>
-                                    {otherMetricOptions.map((opt) => (
+                                    {/* {otherMetricOptions.map((opt) => (
                                       <div
                                         key={opt.key}
                                         className="flex flex-row items-center justify-between gap-x-4 text-slate-500"
@@ -633,7 +687,7 @@ export default function ModelHeadMetricsPane({
                                         <span>{opt.label}</span>
                                         <span className="font-mono">{renderMetricValue(opt.key)}</span>
                                       </div>
-                                    ))}
+                                    ))} */}
                                   </div>
                                 </CustomTooltip>
                               );
@@ -685,7 +739,7 @@ export default function ModelHeadMetricsPane({
                         >
                           <span>{opt.label}</span>
                           <span className="font-mono text-slate-700">
-                            {formatTooltipValue(selectedHeadRow[opt.key as ExtraMetricKey])}
+                            {isLoadingDetail ? '…' : formatTooltipValue(headDetail?.[opt.key as ExtraMetricKey])}
                           </span>
                         </div>
                       ))}
@@ -751,10 +805,14 @@ export default function ModelHeadMetricsPane({
                           scrollZoom: false,
                         }}
                       />
+                    ) : isLoadingDetail ? (
+                      <div className="flex h-[60px] w-full items-center justify-center text-center">
+                        <LoadingSquare size={20} className="text-sky-700" />
+                      </div>
                     ) : (
                       <div className="flex h-[130px] w-full items-center justify-center text-center">
                         <p className="text-[11px] font-medium text-slate-400">
-                          No activation histogram available for this head.
+                          {detailError || 'No activation histogram available for this head.'}
                         </p>
                       </div>
                     )}
@@ -808,80 +866,92 @@ export default function ModelHeadMetricsPane({
                           scrollZoom: false,
                         }}
                       />
+                    ) : isLoadingDetail ? (
+                      <div className="flex h-[60px] w-full items-center justify-center text-center">
+                        <LoadingSquare size={20} className="text-sky-700" />
+                      </div>
                     ) : (
                       <div className="flex h-[100px] w-full items-center justify-center text-center">
                         <p className="text-[11px] font-medium text-slate-400">
-                          No Q-K distance distribution available for this head.
+                          {detailError || 'No Q-K distance distribution available for this head.'}
                         </p>
                       </div>
                     )}
                   </>
                 ) : (
                   <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-                    <p className="text-xs font-bold text-slate-300">Q-K Distance Distribution & Top Tokens</p>
+                    <p className="text-xs font-bold text-slate-300">Q-K Distance Distribution</p>
                   </div>
                 )}
               </div>
               <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
-                <div className="flex flex-row gap-x-3">
-                  {topQueryTokens.length > 0 ? (
-                    <div className="flex flex-1 basis-0 flex-col">
-                      <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
-                        Top Query Tokens
+                {selectedHead && isLoadingDetail ? (
+                  <div className="flex h-24 w-full items-center justify-center px-4 text-center">
+                    <LoadingSquare size={20} className="text-sky-700" />
+                  </div>
+                ) : (
+                  <div className="flex flex-row gap-x-3">
+                    {topQueryTokens.length > 0 ? (
+                      <div className="flex flex-1 basis-0 flex-col">
+                        <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                          Top Query Tokens
+                        </div>
+                        {topQueryTokens.length > 0 ? (
+                          topQueryTokens.map((entry, i) => (
+                            <div
+                              key={`query-${i}`}
+                              className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
+                            >
+                              <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
+                                {formatTokenLabel(entry.token)}
+                              </span>
+                              <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-1 text-center text-[10px] text-slate-400">—</div>
+                        )}
                       </div>
-                      {topQueryTokens.length > 0 ? (
-                        topQueryTokens.map((entry, i) => (
-                          <div
-                            key={`query-${i}`}
-                            className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
-                          >
-                            <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
-                              {formatTokenLabel(entry.token)}
-                            </span>
-                            <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-1 text-center text-[10px] text-slate-400">—</div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-                      <p className="text-xs font-bold text-slate-300">Top Query Tokens</p>
-                    </div>
-                  )}
-                  {topKeyTokens.length > 0 ? (
-                    <div className="flex flex-1 basis-0 flex-col">
-                      <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
-                        Top Key Tokens
+                    ) : (
+                      <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                        <p className="text-xs font-bold text-slate-300">Top Query Tokens</p>
                       </div>
-                      {topKeyTokens.length > 0 ? (
-                        topKeyTokens.map((entry, i) => (
-                          <div
-                            key={`key-${i}`}
-                            className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
-                          >
-                            <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
-                              {formatTokenLabel(entry.token)}
-                            </span>
-                            <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="px-1 text-center text-[10px] text-slate-400">—</div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-                      <p className="text-xs font-bold text-slate-300">Top Key Tokens</p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                    {topKeyTokens.length > 0 ? (
+                      <div className="flex flex-1 basis-0 flex-col">
+                        <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                          Top Key Tokens
+                        </div>
+                        {topKeyTokens.length > 0 ? (
+                          topKeyTokens.map((entry, i) => (
+                            <div
+                              key={`key-${i}`}
+                              className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
+                            >
+                              <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
+                                {formatTokenLabel(entry.token)}
+                              </span>
+                              <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-1 text-center text-[10px] text-slate-400">—</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                        <p className="text-xs font-bold text-slate-300">Top Key Tokens</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-        <div className="mt-4 flex min-w-0 flex-1 flex-col overflow-hidden rounded border border-slate-200 bg-white">
+        <div
+          className={`mt-4 flex min-w-0 flex-1 flex-col overflow-hidden rounded border-slate-200 bg-white ${selectedHead ? 'border' : 'border-none'}`}
+        >
           {selectedHead ? (
             <HeadActivationsList
               sequences={sequences}
@@ -893,7 +963,7 @@ export default function ModelHeadMetricsPane({
             />
           ) : (
             <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-              <p className="text-xs font-medium text-slate-400">Click a head to view its top activating sequences.</p>
+              <p className="text-xs font-bold text-slate-300">Top Activating Sequences</p>
             </div>
           )}
         </div>

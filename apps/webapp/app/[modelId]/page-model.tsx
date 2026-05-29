@@ -27,19 +27,15 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
       where: {
         modelId: model.id,
       },
+      // Only the lightweight, always-displayed metrics are loaded up front. The heavy
+      // per-head detail (histograms, top tokens, extra scalars) is fetched on click via
+      // /api/model/head-metrics/get to keep model page loads fast for large models.
       select: {
         layer: true,
         headIndex: true,
         inductionScore: true,
         prevTokenScore: true,
         patternEntropy: true,
-        selfAttentionScore: true,
-        qkDistance: true,
-        qkDistanceVariance: true,
-        activationHistogram: true,
-        qkDistanceHistogram: true,
-        topQueryTokens: true,
-        topKeyTokens: true,
       },
       orderBy: {
         updatedAt: 'desc',
