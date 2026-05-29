@@ -254,7 +254,7 @@ export default function HeadActivationItem({
   const tokensHiddenBelow = showExpandIndicator ? sequence.tokens.length - 1 - lastShownIndex : 0;
   const hasHiddenAbove = tokensHiddenAbove > 0;
   const hasHiddenBelow = tokensHiddenBelow > 0;
-  const expandIndicatorClassName = `my-0.5 select-none py-0.5 px-1.5 rounded font-sans text-[10px] font-medium max-w-fit ${
+  const expandIndicatorClassName = `my-0.5 select-none py-1.5 px-1.5 rounded font-sans text-[10px] font-medium ${
     isItemHovered ? 'bg-sky-100 text-sky-700' : 'text-slate-400 bg-slate-50'
   }`;
 
@@ -278,16 +278,18 @@ export default function HeadActivationItem({
         }}
       >
         {showExpandIndicator && isItemHovered && (hasHiddenAbove || hasHiddenBelow) && (
-          <div className="absolute -top-1 flex w-full items-center justify-center py-0.5">
+          <div className="absolute top-0.5 flex w-full items-center justify-center py-0.5">
             <span className="rounded bg-sky-100 px-2 py-1 font-sans text-[9px] font-medium uppercase text-sky-600">
               Click to Show All Tokens
             </span>
           </div>
         )}
-        {hasHiddenAbove && (
+        {hasHiddenAbove ? (
           <div className={expandIndicatorClassName}>
             {tokensHiddenAbove} Token{tokensHiddenAbove === 1 ? '' : 's'} Before
           </div>
+        ) : (
+          <div className="h-3 w-full" />
         )}
         {sequence.tokens.map((token, tokenIndex) => {
           if (!shouldShowToken(tokenIndex)) {

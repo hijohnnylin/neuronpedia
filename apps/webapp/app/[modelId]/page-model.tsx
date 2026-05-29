@@ -33,6 +33,13 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
         inductionScore: true,
         prevTokenScore: true,
         patternEntropy: true,
+        selfAttentionScore: true,
+        qkDistance: true,
+        qkDistanceVariance: true,
+        activationHistogram: true,
+        qkDistanceHistogram: true,
+        topQueryTokens: true,
+        topKeyTokens: true,
       },
       orderBy: {
         updatedAt: 'desc',

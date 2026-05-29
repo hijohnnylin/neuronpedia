@@ -3,6 +3,7 @@
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useEffect, useMemo, useState } from 'react';
 import HeadActivationItem, { HeadSequenceData } from './head-activation-item';
+import { LoadingSquare } from './svg/loading-square';
 
 export const ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS = [
   { text: 'Short', size: 12 },
@@ -93,7 +94,7 @@ export default function HeadActivationsList({
   const ATTENTION_ORANGE_RGB = '251, 146, 60';
 
   return (
-    <div className="flex max-h-[500px] w-full flex-col overflow-y-auto">
+    <div className="flex max-h-[600px] w-full flex-col overflow-y-auto overscroll-contain">
       {hasLayerHead && (
         <div className="sticky top-0 z-10 flex flex-row items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 pt-1.5 text-[11px] font-medium text-slate-600">
           <div className="flex flex-col">
@@ -151,7 +152,8 @@ export default function HeadActivationsList({
         </div>
       )}
       {isLoading ? (
-        <div className="flex h-48 w-full items-center justify-center">
+        <div className="flex h-48 w-full flex-col items-center justify-center gap-y-2">
+          <LoadingSquare size={24} className="text-sky-700" />
           <h1 className="text-sm font-medium text-slate-400">Loading sequences…</h1>
         </div>
       ) : errorMessage ? (

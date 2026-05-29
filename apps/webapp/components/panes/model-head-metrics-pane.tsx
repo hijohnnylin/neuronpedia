@@ -8,7 +8,19 @@ import { Label } from '@/components/shadcn/label';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import * as RadixSlider from '@radix-ui/react-slider';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
+import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import createPlotlyComponent from 'react-plotly.js/factory';
+
+const Plot = dynamic(
+  () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
+  {
+    ssr: false,
+  },
+);
+
+type Histogram = { bin_edges: number[]; bin_values: number[] };
+type TopToken = { token: string; weight: number };
 
 type ModelHeadMetricsRow = {
   layer: number;
@@ -16,6 +28,13 @@ type ModelHeadMetricsRow = {
   inductionScore: number | null;
   prevTokenScore: number | null;
   patternEntropy: number | null;
+  selfAttentionScore?: number | null;
+  qkDistance?: number | null;
+  qkDistanceVariance?: number | null;
+  activationHistogram?: unknown;
+  qkDistanceHistogram?: unknown;
+  topQueryTokens?: unknown;
+  topKeyTokens?: unknown;
 };
 
 const METRIC_OPTIONS = [
@@ -34,6 +53,16 @@ const METRIC_OPTIONS = [
 ] as const;
 
 type MetricKey = (typeof METRIC_OPTIONS)[number]['key'];
+
+// Extra metrics shown alongside the selected head's distribution (not filterable).
+const EXTRA_METRIC_OPTIONS = [
+  { key: 'selfAttentionScore', label: 'Self Attention Score' },
+  { key: 'qkDistance', label: 'Q-K Distance' },
+  { key: 'qkDistanceVariance', label: 'Q-K Distance Variance' },
+] as const;
+
+type ExtraMetricKey = (typeof EXTRA_METRIC_OPTIONS)[number]['key'];
+
 type LayerDisplayRow = { type: 'layer'; layer: number } | { type: 'collapsed'; startLayer: number; endLayer: number };
 
 function getCellBackground(value: number | null | undefined, min: number, max: number) {
@@ -53,6 +82,47 @@ function formatTooltipValue(value: number | null | undefined) {
     return '—';
   }
   return value.toFixed(3);
+}
+
+function parseHistogram(raw: unknown): Histogram | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const binEdges = (raw as { bin_edges?: unknown }).bin_edges;
+  const binValues = (raw as { bin_values?: unknown }).bin_values;
+  if (
+    !Array.isArray(binEdges) ||
+    !Array.isArray(binValues) ||
+    binValues.length === 0 ||
+    binEdges.length < binValues.length + 1
+  ) {
+    return null;
+  }
+  return { bin_edges: binEdges as number[], bin_values: binValues as number[] };
+}
+
+function parseTopTokens(raw: unknown, limit: number): TopToken[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .filter(
+      (entry): entry is TopToken =>
+        !!entry &&
+        typeof entry === 'object' &&
+        typeof (entry as TopToken).token === 'string' &&
+        Number.isFinite((entry as TopToken).weight),
+    )
+    .slice(0, limit);
+}
+
+// Renders whitespace-only tokens with a visible placeholder so chips keep height.
+function formatTokenLabel(token: string) {
+  const escaped = token.replaceAll('\n', '\\n');
+  if (escaped.length > 0 && escaped.trim() === '') {
+    return escaped.replace(/\s/g, '\u00A0');
+  }
+  return escaped;
 }
 
 export default function ModelHeadMetricsPane({
@@ -195,6 +265,37 @@ export default function ModelHeadMetricsPane({
     };
   }, [forceShownLayers, metrics, selectedMetric, showTopN]);
 
+  const selectedHeadRow = selectedHead
+    ? (metricByLayerAndHead.get(`${selectedHead.layer}:${selectedHead.headIndex}`) ?? null)
+    : null;
+
+  const selectedHistogram = useMemo(() => {
+    const parsed = parseHistogram(selectedHeadRow?.activationHistogram);
+    if (!parsed) {
+      return null;
+    }
+    const centers = parsed.bin_values.map((_, i) => {
+      const lo = parsed.bin_edges[i] ?? 0;
+      const hi = parsed.bin_edges[i + 1] ?? lo;
+      return (lo + hi) / 2;
+    });
+    return { centers, binEdges: parsed.bin_edges, binValues: parsed.bin_values };
+  }, [selectedHeadRow]);
+
+  const qkDistanceHistogram = useMemo(() => {
+    const parsed = parseHistogram(selectedHeadRow?.qkDistanceHistogram);
+    if (!parsed) {
+      return null;
+    }
+    // QK distance bins are log-scaled (0,1,2,4,8,...), so use the bin's lower edge
+    // as an evenly-spaced category label instead of a numeric axis.
+    const labels = parsed.bin_values.map((_, i) => `${parsed.bin_edges[i]}`);
+    return { labels, binEdges: parsed.bin_edges, binValues: parsed.bin_values };
+  }, [selectedHeadRow]);
+
+  const topQueryTokens = useMemo(() => parseTopTokens(selectedHeadRow?.topQueryTokens, 5), [selectedHeadRow]);
+  const topKeyTokens = useMemo(() => parseTopTokens(selectedHeadRow?.topKeyTokens, 5), [selectedHeadRow]);
+
   const updateShowTopN = (nextValue: number) => {
     setShowTopN(Math.max(1, Math.min(maxHeads, nextValue)));
     setForceShownLayers(new Set());
@@ -241,7 +342,7 @@ export default function ModelHeadMetricsPane({
           >
             <div className="flex flex-col">
               <p>
-                The attention visualizer is based on (
+                The attention visualizer is based on
                 <a
                   href="https://transformer-circuits.pub/2026/headvis/index.html"
                   target="_blank"
@@ -250,7 +351,7 @@ export default function ModelHeadMetricsPane({
                 >
                   HeadVis
                 </a>
-                ), an interactive tool for investigating attention heads in a model.
+                , an interactive tool for investigating attention heads in a model.
               </p>
               <p className="mt-1.5">
                 Raw model metrics and attention sequences are available in our{' '}
@@ -331,7 +432,7 @@ export default function ModelHeadMetricsPane({
               <div className="flex flex-1 flex-row items-center rounded px-2 py-0.5">
                 <Label
                   htmlFor="showTopN"
-                  className="mr-2.5 min-w-[72px] max-w-[72px] whitespace-nowrap text-center text-[9px] leading-[10px] text-slate-500"
+                  className="mr-2.5 min-w-[72px] max-w-[72px] whitespace-nowrap text-center text-[9px] leading-[10px] text-slate-400"
                 >
                   {showTopN} Top Head{showTopN === 1 ? '' : 's'}
                 </Label>
@@ -354,86 +455,288 @@ export default function ModelHeadMetricsPane({
             </div>
           </div>
           <div className="flex w-full flex-col items-stretch gap-x-1">
-            <div className="mb-1 mt-1.5 text-[9px] font-medium uppercase text-slate-400">2 - Select a Head</div>
-            <div className="flex w-full flex-col items-start justify-center gap-1">
-              {/* Data rows */}
-              {displayRows.map((displayRow) => {
-                if (displayRow.type === 'collapsed') {
-                  return <></>;
-                }
+            <div className="mb-1 mt-1.5 text-[9px] font-medium uppercase text-slate-400">
+              2 - Select an Attention Head
+            </div>
+            <div className="flex w-full flex-row items-stretch gap-3">
+              <div className="flex flex-1 basis-0 flex-col items-start justify-start gap-1">
+                {displayRows.map((displayRow) => {
+                  if (displayRow.type === 'collapsed') {
+                    return <></>;
+                  }
 
-                const topHeads = topHeadsByLayer.get(displayRow.layer) ?? [];
-                const currentMetricOption = METRIC_OPTIONS.find((opt) => opt.key === selectedMetric);
-                const otherMetricOptions = METRIC_OPTIONS.filter((opt) => opt.key !== selectedMetric);
-                return (
-                  <div key={displayRow.layer} className="flex w-full flex-row items-start gap-1">
-                    <div className="flex h-5 w-16 min-w-16 items-center justify-start pl-2.5 font-mono text-[9.5px] font-bold uppercase text-sky-700">
-                      Layer {displayRow.layer}
-                    </div>
-                    <div className="flex flex-1 flex-row flex-wrap gap-1.5">
-                      {topHeads.map((headIndex) => {
-                        const cellKey = `${displayRow.layer}:${headIndex}`;
-                        const row = metricByLayerAndHead.get(cellKey);
-                        const value = row?.[selectedMetric] ?? null;
-                        const renderMetricValue = (metricKey: MetricKey) => {
-                          const metricValue = row?.[metricKey];
-                          const rankInfo = ranksByMetric.get(metricKey)?.get(cellKey);
-                          if (metricValue == null || !Number.isFinite(metricValue) || !rankInfo) {
-                            return formatTooltipValue(metricValue);
-                          }
-                          return `${formatTooltipValue(metricValue)} (${rankInfo.rank} of ${rankInfo.total})`;
-                        };
-
-                        const isSelectedHead =
-                          selectedHead?.layer === displayRow.layer && selectedHead?.headIndex === headIndex;
-                        return (
-                          <CustomTooltip
-                            key={`${displayRow.layer}-${headIndex}`}
-                            side="top"
-                            minMargin
-                            trigger={
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedHead({ layer: displayRow.layer, headIndex });
-                                }}
-                                className={`flex h-5 w-[68px] items-center justify-center rounded px-1 text-center font-mono text-[9.5px] font-bold uppercase text-sky-800 outline-none hover:outline hover:outline-2 hover:outline-sky-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600 ${
-                                  isSelectedHead ? 'outline outline-2 outline-sky-600' : ''
-                                }`}
-                                style={{ backgroundColor: getCellBackground(value, min, max) }}
-                              >
-                                Head {headIndex}
-                              </button>
+                  const topHeads = topHeadsByLayer.get(displayRow.layer) ?? [];
+                  const currentMetricOption = METRIC_OPTIONS.find((opt) => opt.key === selectedMetric);
+                  const otherMetricOptions = METRIC_OPTIONS.filter((opt) => opt.key !== selectedMetric);
+                  return (
+                    <div key={displayRow.layer} className="flex w-full flex-row items-start gap-1">
+                      <div className="flex h-5 w-16 min-w-16 items-center justify-start pl-2.5 font-mono text-[9.5px] font-bold uppercase text-sky-700">
+                        Layer {displayRow.layer}
+                      </div>
+                      <div className="flex flex-1 flex-row flex-wrap gap-1.5">
+                        {topHeads.map((headIndex) => {
+                          const cellKey = `${displayRow.layer}:${headIndex}`;
+                          const row = metricByLayerAndHead.get(cellKey);
+                          const value = row?.[selectedMetric] ?? null;
+                          const renderMetricValue = (metricKey: MetricKey) => {
+                            const metricValue = row?.[metricKey];
+                            const rankInfo = ranksByMetric.get(metricKey)?.get(cellKey);
+                            if (metricValue == null || !Number.isFinite(metricValue) || !rankInfo) {
+                              return formatTooltipValue(metricValue);
                             }
-                          >
-                            <div className="flex min-w-[200px] flex-col gap-y-1 text-[11px]">
-                              <div className="flex w-full flex-row justify-between">
-                                <div className="font-mono text-slate-600">
-                                  Layer {displayRow.layer} - Head {headIndex}
-                                </div>
-                              </div>
+                            return `${formatTooltipValue(metricValue)} (${rankInfo.rank} of ${rankInfo.total})`;
+                          };
 
-                              <div className="mb-1 mt-1 flex flex-row items-center justify-between gap-x-4 rounded-md border border-sky-600 px-2 py-1 font-semibold text-sky-700">
-                                <span>{currentMetricOption?.label}</span>
-                                <span className="font-mono">{renderMetricValue(selectedMetric)}</span>
-                              </div>
-                              {otherMetricOptions.map((opt) => (
-                                <div
-                                  key={opt.key}
-                                  className="flex flex-row items-center justify-between gap-x-4 text-slate-500"
+                          const isSelectedHead =
+                            selectedHead?.layer === displayRow.layer && selectedHead?.headIndex === headIndex;
+                          return (
+                            <CustomTooltip
+                              key={`${displayRow.layer}-${headIndex}`}
+                              side="top"
+                              minMargin
+                              trigger={
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedHead({ layer: displayRow.layer, headIndex });
+                                  }}
+                                  className={`flex h-5 w-[68px] items-center justify-center rounded px-1 text-center font-mono text-[9.5px] font-bold uppercase text-sky-800 outline-none hover:outline hover:outline-2 hover:outline-sky-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600 ${
+                                    isSelectedHead ? 'outline outline-2 outline-sky-600' : ''
+                                  }`}
+                                  style={{ backgroundColor: getCellBackground(value, min, max) }}
                                 >
-                                  <span>{opt.label}</span>
-                                  <span className="font-mono">{renderMetricValue(opt.key)}</span>
+                                  Head {headIndex}
+                                </button>
+                              }
+                            >
+                              <div className="flex min-w-[200px] flex-col gap-y-1 text-[11px]">
+                                <div className="flex w-full flex-row justify-between">
+                                  <div className="font-mono text-slate-600">
+                                    Layer {displayRow.layer} - Head {headIndex}
+                                  </div>
                                 </div>
-                              ))}
-                            </div>
-                          </CustomTooltip>
-                        );
-                      })}
+
+                                <div className="mb-1 mt-1 flex flex-row items-center justify-between gap-x-4 rounded-md border border-sky-600 px-2 py-1 font-semibold text-sky-700">
+                                  <span>{currentMetricOption?.label}</span>
+                                  <span className="font-mono">{renderMetricValue(selectedMetric)}</span>
+                                </div>
+                                {otherMetricOptions.map((opt) => (
+                                  <div
+                                    key={opt.key}
+                                    className="flex flex-row items-center justify-between gap-x-4 text-slate-500"
+                                  >
+                                    <span>{opt.label}</span>
+                                    <span className="font-mono">{renderMetricValue(opt.key)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </CustomTooltip>
+                          );
+                        })}
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
+                {selectedHead && selectedHeadRow ? (
+                  <>
+                    <div className="mb-1 flex flex-row items-center justify-center gap-x-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                      Max Activation Distribution
+                    </div>
+                    {selectedHistogram ? (
+                      <Plot
+                        className="w-full"
+                        useResizeHandler
+                        data={[
+                          {
+                            x: selectedHistogram.centers,
+                            y: selectedHistogram.binValues,
+                            type: 'bar',
+                            marker: { color: 'rgba(249, 115, 22, 0.85)' },
+                            hovertemplate: selectedHistogram.centers.map((_, i) => {
+                              const lo = selectedHistogram.binEdges[i];
+                              const hi = selectedHistogram.binEdges[i + 1];
+                              const count = selectedHistogram.binValues[i];
+                              return `<b>Activation Range (x)</b>: ${lo?.toFixed(2)} – ${hi?.toFixed(2)}<br><b># Sequences (y)</b>: ${count.toLocaleString()}<extra></extra>`;
+                            }),
+                          },
+                        ]}
+                        layout={{
+                          height: 80,
+                          xaxis: {
+                            showgrid: false,
+                            zeroline: false,
+                            fixedrange: true,
+                            tickfont: { size: 9 },
+                          },
+                          yaxis: {
+                            showgrid: false,
+                            zeroline: false,
+                            showticklabels: false,
+                            fixedrange: true,
+                          },
+                          barmode: 'relative',
+                          bargap: 0.05,
+                          showlegend: false,
+                          margin: { l: 6, r: 6, b: 18, t: 2, pad: 2 },
+                          paper_bgcolor: 'rgba(0,0,0,0)',
+                          plot_bgcolor: 'rgba(0,0,0,0)',
+                        }}
+                        config={{
+                          responsive: true,
+                          displayModeBar: false,
+                          editable: false,
+                          scrollZoom: false,
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-[130px] w-full items-center justify-center text-center">
+                        <p className="text-[11px] font-medium text-slate-400">
+                          No activation histogram available for this head.
+                        </p>
+                      </div>
+                    )}
+                    <div className="mt-2 flex flex-col gap-y-1 border-t border-slate-100 pt-2">
+                      {METRIC_OPTIONS.map((opt) => (
+                        <div
+                          key={opt.key}
+                          className="flex flex-row items-center justify-between gap-x-4 px-1 text-[10px] text-slate-500"
+                        >
+                          <span>{opt.label}</span>
+                          <span className="font-mono text-slate-700">
+                            {formatTooltipValue(selectedHeadRow[opt.key])}
+                          </span>
+                        </div>
+                      ))}
+                      {EXTRA_METRIC_OPTIONS.map((opt) => (
+                        <div
+                          key={opt.key}
+                          className="flex flex-row items-center justify-between gap-x-4 px-1 text-[10px] text-slate-500"
+                        >
+                          <span>{opt.label}</span>
+                          <span className="font-mono text-slate-700">
+                            {formatTooltipValue(selectedHeadRow[opt.key as ExtraMetricKey])}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                    <p className="text-xs font-bold text-slate-300">Activation Distribution & Metrics</p>
                   </div>
-                );
-              })}
+                )}
+              </div>
+              <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
+                {selectedHead && selectedHeadRow ? (
+                  <>
+                    <div className="mb-1 flex flex-row items-center justify-center gap-x-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                      Q-K Distance Distribution
+                    </div>
+                    {qkDistanceHistogram ? (
+                      <Plot
+                        className="w-full"
+                        useResizeHandler
+                        data={[
+                          {
+                            x: qkDistanceHistogram.labels,
+                            y: qkDistanceHistogram.binValues,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            line: { color: 'rgba(14, 165, 233, 0.9)', width: 2 },
+                            marker: { color: 'rgba(14, 165, 233, 0.9)', size: 4 },
+                            hovertemplate: qkDistanceHistogram.binValues.map((_, i) => {
+                              const lo = qkDistanceHistogram.binEdges[i];
+                              const hi = qkDistanceHistogram.binEdges[i + 1];
+                              const weight = qkDistanceHistogram.binValues[i];
+                              return `<b>|q − k| Range (x)</b>: ${lo} – ${hi}<br><b>Attention Mass (y)</b>: ${weight.toLocaleString()}<extra></extra>`;
+                            }),
+                          },
+                        ]}
+                        layout={{
+                          height: 80,
+                          xaxis: {
+                            type: 'category',
+                            showgrid: false,
+                            zeroline: false,
+                            fixedrange: true,
+                            tickfont: { size: 9 },
+                          },
+                          yaxis: {
+                            showgrid: false,
+                            zeroline: false,
+                            showticklabels: false,
+                            fixedrange: true,
+                          },
+                          showlegend: false,
+                          margin: { l: 6, r: 6, b: 18, t: 2, pad: 2 },
+                          paper_bgcolor: 'rgba(0,0,0,0)',
+                          plot_bgcolor: 'rgba(0,0,0,0)',
+                        }}
+                        config={{
+                          responsive: true,
+                          displayModeBar: false,
+                          editable: false,
+                          scrollZoom: false,
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-[100px] w-full items-center justify-center text-center">
+                        <p className="text-[11px] font-medium text-slate-400">
+                          No Q-K distance distribution available for this head.
+                        </p>
+                      </div>
+                    )}
+                    <div className="mt-2 flex flex-row gap-x-3 border-t border-slate-100 pt-2">
+                      <div className="flex flex-1 basis-0 flex-col">
+                        <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
+                          Top Query Tokens
+                        </div>
+                        {topQueryTokens.length > 0 ? (
+                          topQueryTokens.map((entry, i) => (
+                            <div
+                              key={`query-${i}`}
+                              className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
+                            >
+                              <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
+                                {formatTokenLabel(entry.token)}
+                              </span>
+                              <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-1 text-center text-[10px] text-slate-400">—</div>
+                        )}
+                      </div>
+                      <div className="flex flex-1 basis-0 flex-col">
+                        <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
+                          Top Key Tokens
+                        </div>
+                        {topKeyTokens.length > 0 ? (
+                          topKeyTokens.map((entry, i) => (
+                            <div
+                              key={`key-${i}`}
+                              className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
+                            >
+                              <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
+                                {formatTokenLabel(entry.token)}
+                              </span>
+                              <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-1 text-center text-[10px] text-slate-400">—</div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                    <p className="text-xs font-bold text-slate-300">Q-K Distance Distribution & Top Tokens</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
