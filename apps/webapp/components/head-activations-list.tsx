@@ -7,7 +7,7 @@ import { LoadingSquare } from './svg/loading-square';
 
 export const ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS = [
   { text: 'Short', size: 12 },
-  { text: 'Snippet', size: 32 },
+  { text: 'Snippet', size: 64 },
   { text: 'Full', size: 512 },
   // { text: "Max", size: 100000 },
 ];
@@ -98,12 +98,13 @@ export default function HeadActivationsList({
       {hasLayerHead && (
         <div className="sticky top-0 z-10 flex flex-row items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 pt-1.5 text-[11px] font-medium text-slate-600">
           <div className="flex flex-col">
-            <div className="flex flex-row items-center gap-x-2 font-bold">
+            {/* <div className="flex flex-row items-center gap-x-2 font-bold">
               <span className="rounded px-0 font-mono text-[10px] uppercase text-sky-700">Layer {layer}</span> -
               <span className="rounded px-0 font-mono text-[10px] uppercase text-sky-700">Head {headIndex}</span>
-            </div>
+            </div> */}
             <div className="text-[9px] font-medium uppercase text-slate-400">
-              Sequences by <span className="rounded bg-emerald-300 px-1 text-slate-600">Max Attention</span>. Hover for{' '}
+              Top Sequences by <span className="rounded bg-orange-300 px-1 text-slate-600">Max Attention</span>. Hover
+              for{' '}
               <span
                 className="inline-block rounded bg-origin-border px-1 font-mono font-bold text-slate-700"
                 style={{
@@ -169,7 +170,7 @@ export default function HeadActivationsList({
           {filteredSequences.map((sequence, idx) => (
             <div
               key={`sequence-${sequence.id}`}
-              className={`relative border-slate-100 px-3 py-1 sm:px-5 [&:not(:last-child)]:border-b ${
+              className={`relative border-slate-100 px-3 py-1 sm:px-4 [&:not(:last-child)]:border-b ${
                 selectedRange > 0 ? 'sm:py-2.5' : ''
               }`}
             >

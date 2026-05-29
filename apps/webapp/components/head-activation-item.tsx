@@ -26,7 +26,6 @@ const REGULAR_TOKEN_CLASSNAME = 'border-2 border-transparent hover:bg-slate-200'
 const HOVERED_QUERY_TOKEN_CLASSNAME = 'border-2 border-orange-400';
 
 const ATTENTION_ORANGE_RGB = '251, 146, 60'; // orange-400
-const ATTENTION_GREEN_RGB = '52, 211, 153'; // emerald-400
 
 // Logarithmic opacity ramp used for token backgrounds. Mirrors the curve in
 // `makeActivationBackgroundColorWithDFA` so cells visually match the rest of
@@ -254,8 +253,8 @@ export default function HeadActivationItem({
   const tokensHiddenBelow = showExpandIndicator ? sequence.tokens.length - 1 - lastShownIndex : 0;
   const hasHiddenAbove = tokensHiddenAbove > 0;
   const hasHiddenBelow = tokensHiddenBelow > 0;
-  const expandIndicatorClassName = `my-0.5 select-none py-1.5 px-1.5 rounded font-sans text-[10px] font-medium ${
-    isItemHovered ? 'bg-sky-100 text-sky-700' : 'text-slate-400 bg-slate-50'
+  const expandIndicatorClassName = `my-0.5 select-none py-1 px-1 rounded font-sans text-[10px] font-medium ${
+    isItemHovered ? 'bg-sky-100 text-sky-700' : 'text-slate-400'
   }`;
 
   return (
@@ -278,7 +277,7 @@ export default function HeadActivationItem({
         }}
       >
         {showExpandIndicator && isItemHovered && (hasHiddenAbove || hasHiddenBelow) && (
-          <div className="absolute top-0.5 flex w-full items-center justify-center py-0.5">
+          <div className="absolute top-0 flex w-full items-center justify-center py-0.5">
             <span className="rounded bg-sky-100 px-2 py-1 font-sans text-[9px] font-medium uppercase text-sky-600">
               Click to Show All Tokens
             </span>
@@ -325,7 +324,7 @@ export default function HeadActivationItem({
             tokenBackgroundImage = makeActivationBackgroundColorWithDFA(
               overallMaxActivationValueInList || sequence.maxActivation || 1,
               attnValue,
-              ATTENTION_GREEN_RGB,
+              ATTENTION_ORANGE_RGB,
             );
           }
           return (
