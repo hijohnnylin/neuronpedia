@@ -5,6 +5,7 @@ import { GraphModalProvider } from '@/components/provider/graph-modal-provider';
 import { useGraphContext } from '@/components/provider/graph-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 import GraphFeatureDetail from './feature-detail';
 import GenerateGraphModal from './generate-graph-modal';
 import GraphToolbar from './graph-toolbar';
@@ -24,10 +25,34 @@ export default function GraphWrapper({ hasSlug, showGenerateModal }: { hasSlug: 
 
   const searchParams = useSearchParams();
   const isEmbed = searchParams.get('embed') === 'true';
+
+  // When embedded, anchor the height to the iframe's actual box (100%) rather than viewport units (100vh).
+  // Inside an iframe with a fixed pixel height, 100vh is unreliable on mobile browsers (e.g. iOS Safari) and
+  // causes the percentage-based layout below to collapse ("everything scrunched at top"). Forcing the document
+  // to fill 100% of the iframe makes the layout resolve correctly across platforms.
+  useEffect(() => {
+    if (!isEmbed) return undefined;
+    const html = document.documentElement;
+    const { body } = document;
+    const prev = {
+      htmlHeight: html.style.height,
+      bodyHeight: body.style.height,
+      bodyMinHeight: body.style.minHeight,
+    };
+    html.style.height = '100%';
+    body.style.height = '100%';
+    body.style.minHeight = '100%';
+    return () => {
+      html.style.height = prev.htmlHeight;
+      body.style.height = prev.bodyHeight;
+      body.style.minHeight = prev.bodyMinHeight;
+    };
+  }, [isEmbed]);
+
   return (
     <GraphModalProvider>
       <div
-        className={`${isEmbed ? 'h-screen max-h-screen min-h-screen' : 'h-[calc(100vh_-_75px)] max-h-[calc(100vh_-_75px)] min-h-[calc(100vh_-_75px)]'} flex w-full flex-col justify-center px-1 text-slate-700 sm:px-4`}
+        className={`${isEmbed ? 'h-full max-h-full min-h-full' : 'h-[calc(100vh_-_75px)] max-h-[calc(100vh_-_75px)] min-h-[calc(100vh_-_75px)]'} flex w-full flex-col justify-center px-1 text-slate-700 sm:px-4`}
       >
         <div className="flex w-full flex-1 flex-col items-center justify-center overflow-hidden">
           {/* <div>{JSON.stringify(visState)}</div> */}
