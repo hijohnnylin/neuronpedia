@@ -8,7 +8,9 @@ import { notFound, redirect } from 'next/navigation';
 import PageSource from './page-source';
 import PageSourceSet from './page-sourceset';
 
-export async function generateMetadata(props: { params: Promise<{ modelId: string; layer: string }> }): Promise<Metadata> {
+export async function generateMetadata(props: {
+  params: Promise<{ modelId: string; layer: string }>;
+}): Promise<Metadata> {
   const params = await props.params;
   let title = `${params.modelId.toUpperCase()} · ${params.layer.toUpperCase()}`;
   let description = '';
@@ -23,7 +25,7 @@ export async function generateMetadata(props: { params: Promise<{ modelId: strin
     const sourceSetFromSource = await getSourceSet(params.modelId, source);
     if (sourceSetFromSource) {
       title = `${params.modelId.toUpperCase()} · ${params.layer.toUpperCase()}`;
-      description = `Layer ${layer} in SAE Set ${source.toUpperCase()} by ${sourceSetFromSource?.creatorName}`;
+      description = `Layer ${layer} in Source Set ${source.toUpperCase()} by ${sourceSetFromSource?.creatorName}`;
     } else {
       // neither source nor sourceset
       title = '';
@@ -42,12 +44,10 @@ export async function generateMetadata(props: { params: Promise<{ modelId: strin
   };
 }
 
-export default async function Page(
-  props: {
-    params: Promise<{ modelId: string; layer: string }>;
-    searchParams: Promise<{ simMatrix?: string; simMatrixDemo?: string }>;
-  }
-) {
+export default async function Page(props: {
+  params: Promise<{ modelId: string; layer: string }>;
+  searchParams: Promise<{ simMatrix?: string; simMatrixDemo?: string }>;
+}) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links

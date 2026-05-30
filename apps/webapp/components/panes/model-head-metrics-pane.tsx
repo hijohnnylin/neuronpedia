@@ -1,14 +1,17 @@
 'use client';
 
 import CustomTooltip from '@/components/custom-tooltip';
+import FeatureSelector from '@/components/feature-selector/feature-selector';
 import { HeadSequenceData } from '@/components/head-activation-item';
 import HeadActivationsList from '@/components/head-activations-list';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
 import { LoadingSquare } from '@/components/svg/loading-square';
+import { useRouter } from '@bprogress/next';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import * as RadixSlider from '@radix-ui/react-slider';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
@@ -150,14 +153,28 @@ function formatTokenLabel(token: string) {
 export default function ModelHeadMetricsPane({
   modelId,
   metrics,
+  showCard = true,
+  initialLayer,
+  initialHeadIndex,
 }: {
   modelId: string;
   metrics: ModelHeadMetricsRow[];
+  // When false, renders just the card body content without the surrounding Card/CardHeader wrapper.
+  showCard?: boolean;
+  initialLayer?: number;
+  initialHeadIndex?: number;
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedMetric, setSelectedMetric] = useState<MetricKey>('inductionScore');
   const [showTopN, setShowTopN] = useState(8);
   const [forceShownLayers, setForceShownLayers] = useState<Set<number>>(new Set());
-  const [selectedHead, setSelectedHead] = useState<{ layer: number; headIndex: number } | null>(null);
+  // On the head page (showCard=false), the in-pane head finder is hidden behind a toggle. Its
+  // open state is mirrored in the `headFinder` query param so it persists across navigation.
+  const [headFinderOpen, setHeadFinderOpen] = useState(searchParams.get('headFinder') === 'true');
+  const [selectedHead, setSelectedHead] = useState<{ layer: number; headIndex: number } | null>(
+    initialLayer != null && initialHeadIndex != null ? { layer: initialLayer, headIndex: initialHeadIndex } : null,
+  );
   const [sequences, setSequences] = useState<HeadSequenceData[]>([]);
   const [isLoadingSequences, setIsLoadingSequences] = useState(false);
   const [sequencesError, setSequencesError] = useState<string | null>(null);
@@ -373,6 +390,37 @@ export default function ModelHeadMetricsPane({
     scrollContainerToChild(headScrollRef.current, headCell ?? null);
   }, [selectedHead]);
 
+  // On the standalone head page (showCard=false), navigate to the selected head's page so the
+  // URL reflects the current selection (shareable/bookmarkable, back/forward works). The
+  // `headFinder` param is carried along so the finder stays open across navigations.
+  useEffect(() => {
+    if (showCard || !selectedHead || typeof window === 'undefined') {
+      return;
+    }
+    const basePath = `/${modelId}/head/${selectedHead.layer}/${selectedHead.headIndex}`;
+    if (window.location.pathname !== basePath) {
+      router.push(`${basePath}${headFinderOpen ? '?headFinder=true' : ''}`);
+    }
+  }, [showCard, modelId, selectedHead, headFinderOpen, router]);
+
+  // Toggle the in-pane head finder, keeping the `headFinder` query param in sync (without a
+  // navigation) so a refresh or subsequent navigation preserves the open/closed state.
+  const toggleHeadFinder = () => {
+    setHeadFinderOpen((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (next) {
+          url.searchParams.set('headFinder', 'true');
+        } else {
+          url.searchParams.delete('headFinder');
+        }
+        window.history.replaceState(window.history.state, '', url.toString());
+      }
+      return next;
+    });
+  };
+
   const selectedHistogram = useMemo(() => {
     const parsed = parseHistogram(headDetail?.activationHistogram);
     if (!parsed) {
@@ -433,93 +481,112 @@ export default function ModelHeadMetricsPane({
     return Math.max(1, Math.min(maxHeads, Math.round(exact / 4) * 4));
   };
 
-  return (
-    <Card className="w-full bg-white">
-      <CardHeader className="pb-3">
-        <div className="flex flex-row items-end justify-between gap-x-2 gap-y-1">
-          <CardTitle>Attention Visualizer</CardTitle>
-          <CustomTooltip
-            trigger={
-              <div className="flex flex-row items-center gap-x-1 text-xs font-medium text-slate-400">
-                <a
-                  href="https://transformer-circuits.pub/2026/headvis/index.html"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sky-700 hover:underline"
-                >
-                  HeadVis
-                </a>{' '}
-                (Luger, Kamath et al.) <QuestionMarkCircledIcon className="h-4 w-4" />
-              </div>
-            }
-          >
-            <div className="flex flex-col">
-              <p>
-                The attention visualizer is based on
-                <a
-                  href="https://transformer-circuits.pub/2026/headvis/index.html"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sky-700 hover:underline"
-                >
-                  HeadVis
-                </a>
-                , an interactive tool for investigating attention heads in a model.
-              </p>
-              <p className="mt-1.5">
-                Raw model metrics and attention sequences are available in our{' '}
-                <a
-                  href="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sky-700 hover:underline"
-                >
-                  exports
-                </a>{' '}
-                under the model&apos;s <code>headvis</code> folder.
-              </p>
-              <ul className="mt-1.5 list-inside list-disc text-[11px] font-normal text-slate-600">
-                <li>
-                  <a
-                    href="https://transformer-circuits.pub/2026/headvis/index.html"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sky-700 hover:underline"
-                  >
-                    Paper
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://github.com/anthropics/headvis"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sky-700 hover:underline"
-                  >
-                    Reference Spec
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://transformer-circuits.pub/2026/headvis/gemma3/index.html"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sky-700 hover:underline"
-                  >
-                    Reference Demo
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </CustomTooltip>
+  const cardHeader = (
+    <div className="flex flex-row items-end justify-between gap-x-2 gap-y-1">
+      <CardTitle>Attention Visualizer</CardTitle>
+      <CustomTooltip
+        trigger={
+          <div className="flex flex-row items-center gap-x-1 text-xs font-medium text-slate-400">
+            <a
+              href="https://transformer-circuits.pub/2026/headvis/index.html"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sky-700 hover:underline"
+            >
+              HeadVis
+            </a>{' '}
+            (Luger, Kamath et al.) <QuestionMarkCircledIcon className="h-4 w-4" />
+          </div>
+        }
+      >
+        <div className="flex flex-col">
+          <p>
+            The attention visualizer is based on
+            <a
+              href="https://transformer-circuits.pub/2026/headvis/index.html"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sky-700 hover:underline"
+            >
+              HeadVis
+            </a>
+            , an interactive tool for investigating attention heads in a model.
+          </p>
+          <p className="mt-1.5">
+            Raw model metrics and attention sequences are available in our{' '}
+            <a
+              href="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sky-700 hover:underline"
+            >
+              exports
+            </a>{' '}
+            under the model&apos;s <code>headvis</code> folder.
+          </p>
+          <ul className="mt-1.5 list-inside list-disc text-[11px] font-normal text-slate-600">
+            <li>
+              <a
+                href="https://transformer-circuits.pub/2026/headvis/index.html"
+                target="_blank"
+                rel="noreferrer"
+                className="text-sky-700 hover:underline"
+              >
+                Paper
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://github.com/anthropics/headvis"
+                target="_blank"
+                rel="noreferrer"
+                className="text-sky-700 hover:underline"
+              >
+                Reference Spec
+              </a>
+            </li>
+            <li>
+              <a
+                href="https://transformer-circuits.pub/2026/headvis/gemma3/index.html"
+                target="_blank"
+                rel="noreferrer"
+                className="text-sky-700 hover:underline"
+              >
+                Reference Demo
+              </a>
+            </li>
+          </ul>
         </div>
-      </CardHeader>
-      <CardContent className="flex w-full flex-col gap-x-2 gap-y-0 overflow-x-auto">
-        <div className="flex w-full flex-1 flex-col gap-2">
-          <div className="mb-0 flex flex-1 flex-row gap-x-3 gap-y-1.5">
+      </CustomTooltip>
+    </div>
+  );
+
+  const cardContent = (
+    <CardContent className="flex w-full flex-col gap-x-2 gap-y-0 overflow-x-auto">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-2">
+        {!showCard && (
+          <div className="flex w-full flex-row items-center justify-center py-1">
+            <FeatureSelector
+              defaultModelId={modelId}
+              includeHeads
+              numHeadLayers={layerOptions.length}
+              numHeadIndexes={headIndexOptions.length}
+              defaultHeadLayer={initialLayer}
+              defaultIndex={initialHeadIndex?.toString()}
+              openInNewTab={false}
+              showHeadFinderToggle
+              headFinderActive={headFinderOpen}
+              onHeadFinderToggle={toggleHeadFinder}
+            />
+          </div>
+        )}
+        {(showCard || headFinderOpen) && (
+          <div
+            className={`flex flex-1 flex-row gap-x-3 gap-y-1.5 ${showCard ? '' : 'mb-2 max-w-screen-lg rounded-xl border bg-white px-5 py-2 shadow-sm'}`}
+          >
             <div className="mt-1 flex flex-1 flex-col">
               <div className="flex h-[240px] w-full flex-row items-center justify-center gap-x-3 px-0 pt-0">
-                <div className="flex h-full flex-1 flex-col items-start justify-start rounded-xl border-r border-slate-100 px-3 py-2">
+                <div className="flex h-full flex-1 flex-col items-start justify-start border-r border-slate-100 px-3 py-2">
                   <div className="mb-2 text-xs font-bold text-slate-400">Find Head By Metric</div>
                   <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
                     Metric & Number of Heads
@@ -707,6 +774,8 @@ export default function ModelHeadMetricsPane({
               </div>
             </div>
           </div>
+        )}
+        {showCard && (
           <div className="relative flex w-full flex-row items-center justify-center">
             <div className="absolute left-0 top-3 h-[1px] w-full bg-slate-100"></div>
 
@@ -718,245 +787,245 @@ export default function ModelHeadMetricsPane({
               </div>
             )}
           </div>
-          <div className="mt-1 flex w-full flex-col items-stretch gap-x-1">
-            <div className="flex w-full flex-row items-stretch gap-3">
-              <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
-                {selectedHead && selectedHeadRow ? (
-                  <>
-                    <div className="mb-0 text-center text-[10px] font-medium uppercase text-slate-400">
-                      Head Metrics
-                    </div>
-                    <div className="flex flex-col gap-y-1 divide-y divide-slate-100">
-                      {METRIC_OPTIONS.map((opt) => (
-                        <div
-                          key={opt.key}
-                          className="flex flex-row items-center justify-between gap-x-4 px-1 pt-1 text-[10px] text-slate-500"
-                        >
-                          <span>{opt.label}</span>
-                          <span className="font-mono text-slate-700">
-                            {formatTooltipValue(selectedHeadRow[opt.key])}
-                          </span>
-                        </div>
-                      ))}
-                      {EXTRA_METRIC_OPTIONS.map((opt) => (
-                        <div
-                          key={opt.key}
-                          className="flex flex-row items-center justify-between gap-x-4 px-1 pt-1 text-[10px] text-slate-500"
-                        >
-                          <span>{opt.label}</span>
-                          <span className="font-mono text-slate-700">
-                            {isLoadingDetail ? '…' : formatTooltipValue(headDetail?.[opt.key as ExtraMetricKey])}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-                    <p className="text-xs font-bold text-slate-300">Activation Distribution & Metrics</p>
+        )}
+      </div>
+      <div className={`flex w-full ${showCard ? 'flex-col' : 'flex-col gap-x-3 gap-y-3 sm:flex-row'}`}>
+        <div
+          className={`mt-1.5 flex flex-col items-stretch gap-x-1 ${showCard ? 'w-full' : 'w-full rounded-xl border bg-white px-5 py-2 sm:w-1/4'}`}
+        >
+          <div className={`flex w-full items-stretch gap-3 ${showCard ? 'flex-row' : 'flex-col gap-y-7 py-2'}`}>
+            <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
+              {selectedHead && selectedHeadRow ? (
+                <>
+                  <div className="mb-0 text-center text-[10px] font-medium uppercase text-slate-400">Head Metrics</div>
+                  <div className="flex flex-col gap-y-1 divide-y divide-slate-100">
+                    {METRIC_OPTIONS.map((opt) => (
+                      <div
+                        key={opt.key}
+                        className="flex flex-row items-center justify-between gap-x-4 px-1 pt-1 text-[10px] text-slate-500"
+                      >
+                        <span>{opt.label}</span>
+                        <span className="font-mono text-slate-700">{formatTooltipValue(selectedHeadRow[opt.key])}</span>
+                      </div>
+                    ))}
+                    {EXTRA_METRIC_OPTIONS.map((opt) => (
+                      <div
+                        key={opt.key}
+                        className="flex flex-row items-center justify-between gap-x-4 px-1 pt-1 text-[10px] text-slate-500"
+                      >
+                        <span>{opt.label}</span>
+                        <span className="font-mono text-slate-700">
+                          {isLoadingDetail ? '…' : formatTooltipValue(headDetail?.[opt.key as ExtraMetricKey])}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-              <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
-                {selectedHead && selectedHeadRow ? (
-                  <>
-                    <div className="mb-1 flex flex-row items-center justify-center gap-x-1 text-center text-[10px] font-medium uppercase text-slate-400">
-                      Max Activation Distribution
+                </>
+              ) : (
+                <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                  <p className="text-xs font-bold text-slate-300">Activation Distribution & Metrics</p>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
+              {selectedHead && selectedHeadRow ? (
+                <>
+                  <div className="mb-1 flex flex-row items-center justify-center gap-x-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                    Max Activation Distribution
+                  </div>
+                  {selectedHistogram ? (
+                    <Plot
+                      className="w-full"
+                      useResizeHandler
+                      data={[
+                        {
+                          x: selectedHistogram.centers,
+                          y: selectedHistogram.binValues,
+                          type: 'bar',
+                          marker: { color: 'rgba(249, 115, 22, 0.85)' },
+                          hovertemplate: selectedHistogram.centers.map((_, i) => {
+                            const lo = selectedHistogram.binEdges[i];
+                            const hi = selectedHistogram.binEdges[i + 1];
+                            const count = selectedHistogram.binValues[i];
+                            return `<b>Activation Range (x)</b>: ${lo?.toFixed(2)} – ${hi?.toFixed(2)}<br><b># Sequences (y)</b>: ${count.toLocaleString()}<extra></extra>`;
+                          }),
+                        },
+                      ]}
+                      layout={{
+                        height: 60,
+                        xaxis: {
+                          showgrid: false,
+                          zeroline: false,
+                          fixedrange: true,
+                          tickfont: { size: 9, color: 'lightgrey' },
+                        },
+                        yaxis: {
+                          showgrid: false,
+                          zeroline: true,
+                          zerolinecolor: 'lightgrey',
+                          zerolinewidth: 1,
+                          showticklabels: false,
+                          fixedrange: true,
+                        },
+                        barmode: 'relative',
+                        bargap: 0.05,
+                        showlegend: false,
+                        margin: { l: 16, r: 16, b: 18, t: 2, pad: 2 },
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                      }}
+                      config={{
+                        responsive: true,
+                        displayModeBar: false,
+                        editable: false,
+                        scrollZoom: false,
+                      }}
+                    />
+                  ) : isLoadingDetail ? (
+                    <div className="flex h-[60px] w-full items-center justify-center text-center">
+                      <LoadingSquare size={20} className="text-sky-700" />
                     </div>
-                    {selectedHistogram ? (
-                      <Plot
-                        className="w-full"
-                        useResizeHandler
-                        data={[
-                          {
-                            x: selectedHistogram.centers,
-                            y: selectedHistogram.binValues,
-                            type: 'bar',
-                            marker: { color: 'rgba(249, 115, 22, 0.85)' },
-                            hovertemplate: selectedHistogram.centers.map((_, i) => {
-                              const lo = selectedHistogram.binEdges[i];
-                              const hi = selectedHistogram.binEdges[i + 1];
-                              const count = selectedHistogram.binValues[i];
-                              return `<b>Activation Range (x)</b>: ${lo?.toFixed(2)} – ${hi?.toFixed(2)}<br><b># Sequences (y)</b>: ${count.toLocaleString()}<extra></extra>`;
-                            }),
-                          },
-                        ]}
-                        layout={{
-                          height: 60,
-                          xaxis: {
-                            showgrid: false,
-                            zeroline: false,
-                            fixedrange: true,
-                            tickfont: { size: 9, color: 'lightgrey' },
-                          },
-                          yaxis: {
-                            showgrid: false,
-                            zeroline: true,
-                            zerolinecolor: 'lightgrey',
-                            zerolinewidth: 1,
-                            showticklabels: false,
-                            fixedrange: true,
-                          },
-                          barmode: 'relative',
-                          bargap: 0.05,
-                          showlegend: false,
-                          margin: { l: 16, r: 16, b: 18, t: 2, pad: 2 },
-                          paper_bgcolor: 'rgba(0,0,0,0)',
-                          plot_bgcolor: 'rgba(0,0,0,0)',
-                        }}
-                        config={{
-                          responsive: true,
-                          displayModeBar: false,
-                          editable: false,
-                          scrollZoom: false,
-                        }}
-                      />
-                    ) : isLoadingDetail ? (
-                      <div className="flex h-[60px] w-full items-center justify-center text-center">
-                        <LoadingSquare size={20} className="text-sky-700" />
-                      </div>
-                    ) : (
-                      <div className="flex h-[130px] w-full items-center justify-center text-center">
-                        <p className="text-[11px] font-medium text-slate-400">
-                          {detailError || 'No activation histogram available for this head.'}
-                        </p>
-                      </div>
-                    )}
-                    <div className="mb-1 mt-1.5 flex flex-row items-center justify-center gap-x-1 text-center text-[10px] font-medium uppercase text-slate-400">
-                      Q-K Distance Distribution
+                  ) : (
+                    <div className="flex h-[130px] w-full items-center justify-center text-center">
+                      <p className="text-[11px] font-medium text-slate-400">
+                        {detailError || 'No activation histogram available for this head.'}
+                      </p>
                     </div>
-                    {qkDistanceHistogram ? (
-                      <Plot
-                        className="w-full"
-                        useResizeHandler
-                        data={[
-                          {
-                            x: qkDistanceHistogram.labels,
-                            y: qkDistanceHistogram.binValues,
-                            type: 'scatter',
-                            mode: 'lines+markers',
-                            line: { color: 'rgba(14, 165, 233, 0.9)', width: 2 },
-                            marker: { color: 'rgba(14, 165, 233, 0.9)', size: 4 },
-                            hovertemplate: qkDistanceHistogram.binValues.map((_, i) => {
-                              const lo = qkDistanceHistogram.binEdges[i];
-                              const hi = qkDistanceHistogram.binEdges[i + 1];
-                              const weight = qkDistanceHistogram.binValues[i];
-                              return `<b>|q − k| Range (x)</b>: ${lo} – ${hi}<br><b>Attention Mass (y)</b>: ${weight.toLocaleString()}<extra></extra>`;
-                            }),
-                          },
-                        ]}
-                        layout={{
-                          height: 60,
-                          xaxis: {
-                            type: 'category',
-                            showgrid: false,
-                            zeroline: false,
-                            fixedrange: true,
-                            tickfont: { size: 9, color: 'lightgrey' },
-                          },
-                          yaxis: {
-                            showgrid: false,
-                            zeroline: false,
-                            showticklabels: false,
-                            fixedrange: true,
-                          },
-                          showlegend: false,
-                          margin: { l: 0, r: 0, b: 18, t: 2, pad: 2 },
-                          paper_bgcolor: 'rgba(0,0,0,0)',
-                          plot_bgcolor: 'rgba(0,0,0,0)',
-                        }}
-                        config={{
-                          responsive: true,
-                          displayModeBar: false,
-                          editable: false,
-                          scrollZoom: false,
-                        }}
-                      />
-                    ) : isLoadingDetail ? (
-                      <div className="flex h-[60px] w-full items-center justify-center text-center">
-                        <LoadingSquare size={20} className="text-sky-700" />
-                      </div>
-                    ) : (
-                      <div className="flex h-[100px] w-full items-center justify-center text-center">
-                        <p className="text-[11px] font-medium text-slate-400">
-                          {detailError || 'No Q-K distance distribution available for this head.'}
-                        </p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-                    <p className="text-xs font-bold text-slate-300">Q-K Distance Distribution</p>
+                  )}
+                  <div className="mb-1 mt-1.5 flex flex-row items-center justify-center gap-x-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                    Q-K Distance Distribution
                   </div>
-                )}
-              </div>
-              <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
-                {selectedHead && isLoadingDetail ? (
-                  <div className="flex h-24 w-full items-center justify-center px-4 text-center">
-                    <LoadingSquare size={20} className="text-sky-700" />
-                  </div>
-                ) : (
-                  <div className="flex flex-row gap-x-3">
-                    {topQueryTokens.length > 0 ? (
-                      <div className="flex flex-1 basis-0 flex-col">
-                        <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
-                          Top Query Tokens
-                        </div>
-                        {topQueryTokens.length > 0 ? (
-                          topQueryTokens.map((entry, i) => (
-                            <div
-                              key={`query-${i}`}
-                              className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
-                            >
-                              <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
-                                {formatTokenLabel(entry.token)}
-                              </span>
-                              <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="px-1 text-center text-[10px] text-slate-400">—</div>
-                        )}
+                  {qkDistanceHistogram ? (
+                    <Plot
+                      className="w-full"
+                      useResizeHandler
+                      data={[
+                        {
+                          x: qkDistanceHistogram.labels,
+                          y: qkDistanceHistogram.binValues,
+                          type: 'scatter',
+                          mode: 'lines+markers',
+                          line: { color: 'rgba(14, 165, 233, 0.9)', width: 2 },
+                          marker: { color: 'rgba(14, 165, 233, 0.9)', size: 4 },
+                          hovertemplate: qkDistanceHistogram.binValues.map((_, i) => {
+                            const lo = qkDistanceHistogram.binEdges[i];
+                            const hi = qkDistanceHistogram.binEdges[i + 1];
+                            const weight = qkDistanceHistogram.binValues[i];
+                            return `<b>|q − k| Range (x)</b>: ${lo} – ${hi}<br><b>Attention Mass (y)</b>: ${weight.toLocaleString()}<extra></extra>`;
+                          }),
+                        },
+                      ]}
+                      layout={{
+                        height: 60,
+                        xaxis: {
+                          type: 'category',
+                          showgrid: false,
+                          zeroline: false,
+                          fixedrange: true,
+                          tickfont: { size: 9, color: 'lightgrey' },
+                        },
+                        yaxis: {
+                          showgrid: false,
+                          zeroline: false,
+                          showticklabels: false,
+                          fixedrange: true,
+                        },
+                        showlegend: false,
+                        margin: { l: 0, r: 0, b: 18, t: 2, pad: 2 },
+                        paper_bgcolor: 'rgba(0,0,0,0)',
+                        plot_bgcolor: 'rgba(0,0,0,0)',
+                      }}
+                      config={{
+                        responsive: true,
+                        displayModeBar: false,
+                        editable: false,
+                        scrollZoom: false,
+                      }}
+                    />
+                  ) : isLoadingDetail ? (
+                    <div className="flex h-[60px] w-full items-center justify-center text-center">
+                      <LoadingSquare size={20} className="text-sky-700" />
+                    </div>
+                  ) : (
+                    <div className="flex h-[100px] w-full items-center justify-center text-center">
+                      <p className="text-[11px] font-medium text-slate-400">
+                        {detailError || 'No Q-K distance distribution available for this head.'}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                  <p className="text-xs font-bold text-slate-300">Q-K Distance Distribution</p>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
+              {selectedHead && isLoadingDetail ? (
+                <div className="flex h-24 w-full items-center justify-center px-4 text-center">
+                  <LoadingSquare size={20} className="text-sky-700" />
+                </div>
+              ) : (
+                <div className="flex flex-row gap-x-3">
+                  {topQueryTokens.length > 0 ? (
+                    <div className="flex flex-1 basis-0 flex-col">
+                      <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                        Top Query Tokens
                       </div>
-                    ) : (
-                      <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-                        <p className="text-xs font-bold text-slate-300">Top Query Tokens</p>
+                      {topQueryTokens.length > 0 ? (
+                        topQueryTokens.map((entry, i) => (
+                          <div
+                            key={`query-${i}`}
+                            className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
+                          >
+                            <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
+                              {formatTokenLabel(entry.token)}
+                            </span>
+                            <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-1 text-center text-[10px] text-slate-400">—</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                      <p className="text-xs font-bold text-slate-300">Top Query Tokens</p>
+                    </div>
+                  )}
+                  {topKeyTokens.length > 0 ? (
+                    <div className="flex flex-1 basis-0 flex-col">
+                      <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
+                        Top Key Tokens
                       </div>
-                    )}
-                    {topKeyTokens.length > 0 ? (
-                      <div className="flex flex-1 basis-0 flex-col">
-                        <div className="mb-1 text-center text-[10px] font-medium uppercase text-slate-400">
-                          Top Key Tokens
-                        </div>
-                        {topKeyTokens.length > 0 ? (
-                          topKeyTokens.map((entry, i) => (
-                            <div
-                              key={`key-${i}`}
-                              className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
-                            >
-                              <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
-                                {formatTokenLabel(entry.token)}
-                              </span>
-                              <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="px-1 text-center text-[10px] text-slate-400">—</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
-                        <p className="text-xs font-bold text-slate-300">Top Key Tokens</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      {topKeyTokens.length > 0 ? (
+                        topKeyTokens.map((entry, i) => (
+                          <div
+                            key={`key-${i}`}
+                            className="flex flex-row items-center justify-between gap-x-2 px-1 py-0.5 text-[9px]"
+                          >
+                            <span className="max-w-[70%] truncate rounded bg-slate-100 px-1 font-mono text-slate-700">
+                              {formatTokenLabel(entry.token)}
+                            </span>
+                            <span className="font-mono text-slate-500">{entry.weight.toFixed(2)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-1 text-center text-[10px] text-slate-400">—</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">
+                      <p className="text-xs font-bold text-slate-300">Top Key Tokens</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
         <div
-          className={`mt-4 flex min-w-0 flex-1 flex-col overflow-hidden rounded border-slate-200 bg-white ${selectedHead ? 'border' : 'border-none'}`}
+          className={`flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border-slate-200 bg-white ${showCard ? 'mt-4' : 'mt-1.5 w-full sm:w-3/4'} ${selectedHead ? 'border' : 'border-none'}`}
         >
           {selectedHead ? (
             <HeadActivationsList
@@ -973,7 +1042,18 @@ export default function ModelHeadMetricsPane({
             </div>
           )}
         </div>
-      </CardContent>
+      </div>
+    </CardContent>
+  );
+
+  if (!showCard) {
+    return cardContent;
+  }
+
+  return (
+    <Card className="w-full bg-white">
+      <CardHeader className="pb-3">{cardHeader}</CardHeader>
+      {cardContent}
     </Card>
   );
 }
