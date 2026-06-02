@@ -98,8 +98,12 @@ export default function HeadActivationItem({
   //  3. incomingByKey: for each key k, list of { index: q, value } pairs
   //     (sorted by value desc). Used in the per-token tooltip.
   const { denseAttentionValues, outgoingByQuery, incomingByKey } = useMemo(() => {
-    const seqLen = sequence.seqLen || sequence.tokens.length;
+    // `attentionIndices` were encoded as `q * actual_len + k`, where `actual_len`
+    // is the number of decoded tokens for this sequence. Always decode with
+    // `tokens.length` (which equals that stride) rather than `seqLen`, since the
+    // stored `seqLen` may be the run-level max length, which would mis-decode q/k.
     const tokenLen = sequence.tokens.length;
+    const seqLen = tokenLen;
     const dense = new Array(tokenLen).fill(0);
     const outgoing = new Map<number, Array<{ index: number; value: number }>>();
     const incoming = new Map<number, Array<{ index: number; value: number }>>();
@@ -121,7 +125,7 @@ export default function HeadActivationItem({
       incoming.forEach((list) => list.sort((a, b) => b.value - a.value));
     }
     return { denseAttentionValues: dense, outgoingByQuery: outgoing, incomingByKey: incoming };
-  }, [sequence.tokens.length, sequence.attentionIndices, sequence.attentionValues, sequence.seqLen]);
+  }, [sequence.tokens.length, sequence.attentionIndices, sequence.attentionValues]);
 
   const maxActivationTokenIndex = useMemo(() => {
     let maxIdx = 0;

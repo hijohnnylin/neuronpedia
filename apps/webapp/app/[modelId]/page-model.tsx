@@ -36,6 +36,7 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
         inductionScore: true,
         prevTokenScore: true,
         patternEntropy: true,
+        selfAttentionScore: true,
       },
       orderBy: {
         updatedAt: 'desc',

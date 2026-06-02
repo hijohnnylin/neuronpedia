@@ -23,6 +23,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         inductionScore: true,
         prevTokenScore: true,
         patternEntropy: true,
+        selfAttentionScore: true,
       },
       orderBy: {
         updatedAt: 'desc',

@@ -32,6 +32,7 @@ export type ModelHeadMetricsRow = {
   inductionScore: number | null;
   prevTokenScore: number | null;
   patternEntropy: number | null;
+  selfAttentionScore: number | null;
 };
 
 // Heavy per-head detail fetched on demand when a head is selected.
@@ -54,19 +55,20 @@ const METRIC_OPTIONS = [
   },
   {
     key: 'prevTokenScore',
-    label: 'Previous Token Score',
+    label: 'Prev Token Score',
   },
   {
     key: 'patternEntropy',
-    label: 'Attention Entropy',
+    label: 'Attn Entropy',
   },
+  { key: 'selfAttentionScore', label: 'Self Attn' },
 ] as const;
 
 type MetricKey = (typeof METRIC_OPTIONS)[number]['key'];
 
 // Extra metrics shown alongside the selected head's distribution (not filterable).
 const EXTRA_METRIC_OPTIONS = [
-  { key: 'selfAttentionScore', label: 'Self Attention Score' },
+  // { key: 'selfAttentionScore', label: 'Self Attention Score' },
   { key: 'qkDistance', label: 'Q-K Distance' },
   { key: 'qkDistanceVariance', label: 'Q-K Distance Variance' },
 ] as const;
@@ -687,7 +689,14 @@ export default function ModelHeadMetricsPane({
             <div className="mt-1 flex flex-1 flex-col">
               <div className="flex h-[240px] w-full flex-row items-center justify-center gap-x-3 px-0 pt-0">
                 <div className="flex h-full flex-1 flex-col items-start justify-start border-r border-slate-100 px-3 py-2">
-                  <div className="mb-2 text-xs font-bold text-slate-400">Find Head By Metric</div>
+                  <div className="mb-2 text-xs font-bold text-slate-400">
+                    Find Head By Metric{' '}
+                    <CustomTooltip trigger={<QuestionMarkCircledIcon className="h-3 w-3" />}>
+                      <div>
+                        <p></p>
+                      </div>
+                    </CustomTooltip>
+                  </div>
                   <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
                     Metric & Number of Heads
                   </div>

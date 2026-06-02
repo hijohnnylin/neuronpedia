@@ -46,6 +46,7 @@ export default async function Page(props: { params: Promise<PageParams> }) {
       inductionScore: true,
       prevTokenScore: true,
       patternEntropy: true,
+      selfAttentionScore: true,
     },
     orderBy: {
       updatedAt: 'desc',
