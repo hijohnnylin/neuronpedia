@@ -68,7 +68,7 @@ export default function HeadActivationItem({
   enableExpanding = true,
   overrideTextSize = 'text-xs',
   overrideLeading = 'leading-none sm:leading-none ',
-  overrideTextColor = 'text-slate-600',
+  overrideTextColor = 'text-slate-700',
   className,
   showRawTokens = true,
 }: {
