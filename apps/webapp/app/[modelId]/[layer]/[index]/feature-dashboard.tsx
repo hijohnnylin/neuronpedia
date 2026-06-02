@@ -7,7 +7,6 @@ import FeatureSelector from '@/components/feature-selector/feature-selector';
 import FeatureStats from '@/components/feature-stats';
 import CommentsPane from '@/components/panes/comments-pane';
 import ConnectedNeuronsPane from '@/components/panes/connected-neurons-pane';
-import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
 import CosSimPane from '@/components/panes/cossim-pane';
 import EmbedsPane from '@/components/panes/embeds-pane';
 import ExplanationsPane from '@/components/panes/explanations-pane';
@@ -16,6 +15,7 @@ import SaeLensConfigPane from '@/components/panes/saelens-config-pane';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
 import VectorItem from '@/components/vector-item';
+import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
 import { neuronHasVectorInDatabase, shouldHideBreadcrumbsAndSelectorForNeuronVector } from '@/lib/utils/neuron-vector';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { Download } from 'lucide-react';
@@ -180,6 +180,7 @@ export default function FeatureDashboard({
                   getSourceSetNameFromSource(pathname.split('/')[2] || '') ||
                   NEURONS_SOURCESET
                 }
+                includeHeads={true}
                 defaultSource={currentNeuron?.layer || pathname.split('/')[2]}
                 defaultIndex={currentNeuron?.index || pathname.split('/')[3]}
                 openInNewTab={false}

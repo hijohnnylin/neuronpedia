@@ -67,7 +67,7 @@ export default function HeadActivationItem({
   showLineBreaks = false,
   enableExpanding = true,
   overrideTextSize = 'text-xs',
-  overrideLeading = 'leading-none sm:leading-tight',
+  overrideLeading = 'leading-none sm:leading-none ',
   overrideTextColor = 'text-slate-600',
   className,
   showRawTokens = true,
@@ -288,7 +288,7 @@ export default function HeadActivationItem({
             {tokensHiddenAbove} Token{tokensHiddenAbove === 1 ? '' : 's'} Before
           </div>
         ) : (
-          <div className="h-3 w-full" />
+          <div className="h-5 w-full" />
         )}
         {sequence.tokens.map((token, tokenIndex) => {
           if (!shouldShowToken(tokenIndex)) {
@@ -333,7 +333,7 @@ export default function HeadActivationItem({
                 <Tooltip.Root disableHoverableContent>
                   <Tooltip.Trigger asChild>
                     <span
-                      className={`inline-block cursor-default whitespace-nowrap bg-origin-border font-mono ${
+                      className={`inline-block cursor-default whitespace-nowrap bg-origin-border py-0.5 font-mono ${
                         isHoveredQuery ? HOVERED_QUERY_TOKEN_CLASSNAME : REGULAR_TOKEN_CLASSNAME
                       } ${tokenEndsWithSpace ? 'pr-1' : ''} ${tokenStartsWithSpace ? 'pl-1' : ''} ${
                         !showRawTokens && tokenIsRoleToken(tokenIndex) ? '-ml-2 mr-1 mt-1 rounded bg-slate-300' : ''

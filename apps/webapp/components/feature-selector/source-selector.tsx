@@ -8,6 +8,7 @@ import {
   NEURONS_SOURCESET,
 } from '@/lib/utils/source';
 import { SourceReleaseWithPartialRelations } from '@/prisma/generated/zod';
+import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -17,6 +18,9 @@ import { useGlobalContext } from '../provider/global-provider';
 // Sentinel name for the manually-injected "Attention Heads" pseudo-release that is always
 // pinned to the top of the release list when `includeHeads` is enabled.
 const ATTENTION_HEADS_RELEASE = '__attention_heads__';
+
+// Models that have no attention head data, so the "Attention Heads" release/source is hidden for them.
+const MODELS_WITHOUT_HEAD_DATA = ['circuitgpt-python', 'deepseek-r1-llama-8b'];
 
 export default function SourceSelector({
   modelId,
@@ -51,6 +55,7 @@ export default function SourceSelector({
   headLayerChangedCallback?: (layer: number) => void;
 }) {
   const isMount = useIsMount();
+  const router = useRouter();
   const { getSourceSetsForModelId, releases, getSourceSet, getReleaseForSourceSet } = useGlobalContext();
 
   function getFirstSourceSetForModelId() {
@@ -196,55 +201,81 @@ export default function SourceSelector({
             <DropdownMenu.Label className="sticky top-0 cursor-default border-b border-slate-100 bg-white py-1.5 text-center text-[10px] uppercase text-slate-400">
               Release
             </DropdownMenu.Label>
-            {includeHeads && (
-              <DropdownMenu.Sub open={releaseOpen === ATTENTION_HEADS_RELEASE}>
-                <DropdownMenu.SubTrigger
+            {includeHeads &&
+              !MODELS_WITHOUT_HEAD_DATA.includes(modelId) &&
+              (numHeadLayers === 0 ? (
+                // No per-layer metrics available yet: make the row a direct link into the head finder.
+                <button
+                  type="button"
                   onMouseEnter={() => {
+                    // Collapse any previously hovered release submenu when hovering this item.
                     setReleaseOpen(ATTENTION_HEADS_RELEASE);
                   }}
-                  className="group flex w-full max-w-[340px] flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b border-b-slate-100 bg-white px-3 py-3 text-xs font-medium hover:bg-sky-100 hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    router.push(`/${modelId}/head/0/0?headFinder=true`);
+                  }}
+                  className="group flex w-full max-w-[340px] flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b border-b-slate-100 bg-white px-3 py-3 text-xs font-medium hover:bg-amber-100 hover:text-amber-600 focus:outline-none"
                 >
                   <div className="flex w-full flex-col items-start justify-center gap-y-1.5 leading-tight">
-                    <div className="flex w-full flex-row items-center justify-between gap-x-5 text-[10.5px] leading-none text-sky-700/70 group-hover:text-sky-700 group-data-[state=open]:text-sky-700">
+                    <div className="flex w-full flex-row items-center justify-between gap-x-5 text-[10.5px] leading-none text-amber-700/70 group-hover:text-amber-700">
                       <div className="whitespace-pre font-mono font-bold uppercase">Attention Heads</div>
-                      <div className="font-medium text-slate-400">HeadVis - Luger, Kamath</div>
+                      <div className="font-medium text-slate-400">Luger, Kamath, et al.</div>
                     </div>
-                    {/* <div className="font-sans text-[12px] font-semibold capitalize text-slate-500 group-hover:text-slate-600 group-data-[state=open]:text-slate-600">
-                      Attention Heads
-                    </div> */}
+                    <div className="font-sans text-[12px] font-semibold capitalize text-slate-500 group-hover:text-slate-600">
+                      HeadVis - Browse & Investigate Attention Heads
+                    </div>
                   </div>
-                  <ChevronRightIcon className="-mr-2 ml-0 w-3 leading-none text-slate-400 group-hover:text-slate-600 group-data-[state=open]:text-slate-600" />
-                </DropdownMenu.SubTrigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.SubContent
-                    sideOffset={1}
-                    className="forceShowScrollBar z-40 max-h-[340px] w-full min-w-[160px] cursor-pointer divide-y divide-slate-100 overflow-y-scroll rounded bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] sm:max-h-[500px]"
+                </button>
+              ) : (
+                <DropdownMenu.Sub open={releaseOpen === ATTENTION_HEADS_RELEASE}>
+                  <DropdownMenu.SubTrigger
+                    onMouseEnter={() => {
+                      setReleaseOpen(ATTENTION_HEADS_RELEASE);
+                    }}
+                    className="group flex w-full max-w-[340px] flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b border-b-slate-100 bg-white px-3 py-3 text-xs font-medium hover:bg-sky-100 hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600"
                   >
-                    <DropdownMenu.Label className="sticky top-0 cursor-default border-b border-slate-100 bg-white py-1.5 text-center text-[10px] uppercase text-slate-400">
-                      Attention At Layer
-                    </DropdownMenu.Label>
-                    {Array.from({ length: numHeadLayers }, (_, i) => i).map((layer) => (
-                      <button
-                        key={layer}
-                        type="button"
-                        onClick={() => {
-                          setReleaseOpen(ATTENTION_HEADS_RELEASE);
-                          headLayerChangedCallback?.(layer);
-                          setDropdownOpen(false);
-                        }}
-                        className={`${
-                          selectedHeadLayer === layer
-                            ? 'bg-sky-200 text-sky-700'
-                            : 'bg-white text-sky-700/70 hover:bg-sky-100'
-                        } flex w-full flex-1 cursor-pointer items-center justify-center px-3 py-2.5 font-mono text-[12px] font-bold uppercase hover:text-sky-700 focus:outline-none`}
-                      >
-                        Layer {layer}
-                      </button>
-                    ))}
-                  </DropdownMenu.SubContent>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Sub>
-            )}
+                    <div className="flex w-full flex-col items-start justify-center gap-y-1.5 leading-tight">
+                      <div className="flex w-full flex-row items-center justify-between gap-x-5 text-[10.5px] leading-none text-sky-700/70 group-hover:text-sky-700 group-data-[state=open]:text-sky-700">
+                        <div className="whitespace-pre font-mono font-bold uppercase">Attention Heads</div>
+                        <div className="font-medium text-slate-400">Luger, Kamath, et al.</div>
+                      </div>
+                      <div className="font-sans text-[12px] font-semibold capitalize text-slate-500 group-hover:text-slate-600 group-data-[state=open]:text-slate-600">
+                        HeadVis - Browse & Investigate Attention Heads
+                      </div>
+                    </div>
+                    <ChevronRightIcon className="-mr-2 ml-0 w-3 leading-none text-slate-400 group-hover:text-slate-600 group-data-[state=open]:text-slate-600" />
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.SubContent
+                      sideOffset={1}
+                      className="forceShowScrollBar z-40 max-h-[340px] w-full min-w-[160px] cursor-pointer divide-y divide-slate-100 overflow-y-scroll rounded bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] sm:max-h-[500px]"
+                    >
+                      <DropdownMenu.Label className="sticky top-0 cursor-default border-b border-slate-100 bg-white py-1.5 text-center text-[10px] uppercase text-slate-400">
+                        Attention At Layer
+                      </DropdownMenu.Label>
+                      {Array.from({ length: numHeadLayers }, (_, i) => i).map((layer) => (
+                        <button
+                          key={layer}
+                          type="button"
+                          onClick={() => {
+                            setReleaseOpen(ATTENTION_HEADS_RELEASE);
+                            headLayerChangedCallback?.(layer);
+                            setDropdownOpen(false);
+                          }}
+                          className={`${
+                            selectedHeadLayer === layer
+                              ? 'bg-sky-200 text-sky-700'
+                              : 'bg-white text-sky-700/70 hover:bg-sky-100'
+                          } flex w-full flex-1 cursor-pointer items-center justify-center px-3 py-2.5 font-mono text-[12px] font-bold uppercase hover:text-sky-700 focus:outline-none`}
+                        >
+                          Layer {layer}
+                        </button>
+                      ))}
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Sub>
+              ))}
             {releases
               .filter((r) => r.sourceSets?.some((ss) => ss.modelId === modelId))
               .filter((r) => (filterToRelease ? r.name === filterToRelease : true))

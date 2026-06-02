@@ -1,12 +1,9 @@
-import BreadcrumbsComponent from '@/components/breadcrumbs-component';
-import ModelsDropdown from '@/components/nav/models-dropdown';
-import ModelHeadMetricsPane from '@/components/panes/model-head-metrics-pane';
-import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
 import { prisma } from '@/lib/db';
 import { getModelByIdWithSourceSets } from '@/lib/db/model';
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import HeadPageContent from './head-page-content';
 
 type PageParams = { modelId: string; layerNum: string; headIndex: string };
 
@@ -60,37 +57,12 @@ export default async function Page(props: { params: Promise<PageParams> }) {
   }
 
   return (
-    <div className="flex w-full flex-col items-center pb-10">
-      <BreadcrumbsComponent
-        crumbsArray={[
-          <BreadcrumbPage key={0}>
-            <ModelsDropdown isInBreadcrumb />
-          </BreadcrumbPage>,
-          <BreadcrumbLink href={`/${model.id}`} key={1}>
-            {model.displayName}
-          </BreadcrumbLink>,
-          <BreadcrumbLink href={`/${model.id}/head`} key={2}>
-            Attention Heads - HeadVis
-          </BreadcrumbLink>,
-          <BreadcrumbLink href={`/${model.id}/head/${layer}`} key={3}>
-            Layer {layer}
-          </BreadcrumbLink>,
-          <BreadcrumbLink href={`/${model.id}/head/${layer}/${headIndex}`} key={4}>
-            Head {headIndex}
-          </BreadcrumbLink>,
-        ]}
-      />
-      <div className="mt-2 w-full">
-        <div className="flex w-full flex-col items-center justify-center">
-          <ModelHeadMetricsPane
-            modelId={model.id}
-            metrics={modelHeadMetrics}
-            showCard={false}
-            initialLayer={layer}
-            initialHeadIndex={headIndex}
-          />
-        </div>
-      </div>
-    </div>
+    <HeadPageContent
+      modelId={model.id}
+      modelDisplayName={model.displayName ?? model.id}
+      initialLayer={layer}
+      initialHeadIndex={headIndex}
+      metrics={modelHeadMetrics}
+    />
   );
 }

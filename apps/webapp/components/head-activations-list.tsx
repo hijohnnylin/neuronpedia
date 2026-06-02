@@ -23,6 +23,7 @@ export default function HeadActivationsList({
   defaultRange = 1,
   defaultShowLineBreaks = true,
   defaultShowRawTokens = true,
+  unbounded = false,
 }: {
   sequences: HeadSequenceData[];
   modelId?: string;
@@ -34,6 +35,8 @@ export default function HeadActivationsList({
   defaultRange?: number;
   defaultShowLineBreaks?: boolean;
   defaultShowRawTokens?: boolean;
+  // When true, the list grows to its full height (no internal scroll) and lets the page scroll.
+  unbounded?: boolean;
 }) {
   const [selectedRange, setSelectedRange] = useState(defaultRange);
   const [showLineBreaks, setShowLineBreaks] = useState(defaultShowLineBreaks);
@@ -94,9 +97,11 @@ export default function HeadActivationsList({
   const ATTENTION_ORANGE_RGB = '251, 146, 60';
 
   return (
-    <div className="flex max-h-[600px] w-full flex-col overflow-y-auto overscroll-contain">
+    <div className={`flex w-full flex-col ${unbounded ? '' : 'max-h-[600px] overflow-y-auto overscroll-contain'}`}>
       {hasLayerHead && (
-        <div className="sticky top-0 z-10 flex flex-row items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 pt-1.5 text-[11px] font-medium text-slate-600">
+        <div
+          className={`${unbounded ? '' : 'sticky top-0'} z-10 flex flex-row items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 pt-1.5 text-[11px] font-medium text-slate-600`}
+        >
           <div className="flex flex-col">
             {/* <div className="flex flex-row items-center gap-x-2 font-bold">
               <span className="rounded px-0 font-mono text-[10px] uppercase text-sky-700">Layer {layer}</span> -
@@ -170,7 +175,7 @@ export default function HeadActivationsList({
           {filteredSequences.map((sequence, idx) => (
             <div
               key={`sequence-${sequence.id}`}
-              className={`relative border-slate-100 px-3 py-1 sm:px-4 [&:not(:last-child)]:border-b ${
+              className={`relative border-slate-200 px-3 py-1 sm:px-4 [&:not(:last-child)]:border-b ${
                 selectedRange > 0 ? 'sm:py-2.5' : ''
               }`}
             >
@@ -184,7 +189,7 @@ export default function HeadActivationsList({
                     showLineBreaks={showLineBreaks}
                     showRawTokens={showRawTokens}
                     overallMaxActivationValueInList={overallMaxActivation}
-                    overrideTextSize="text-[9.5px] sm:text-[10px]"
+                    overrideTextSize="text-[9.5px] sm:text-[11px]"
                   />
                 </div>
               </div>

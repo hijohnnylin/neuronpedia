@@ -37,7 +37,15 @@ function HeadIndexDropdown({
         >
           <div className="flex flex-1 flex-col items-center justify-center">
             <div className="flex flex-row items-center justify-center gap-x-0.5 text-[11px] leading-none text-sky-700 sm:text-xs">
-              HEAD {selectedIndex && selectedIndex.length > 0 ? selectedIndex : '0'}
+              {selectedIndex && selectedIndex.length > 0 ? (
+                `HEAD ${selectedIndex}`
+              ) : (
+                <div className="font-sans text-[11px] leading-[1.2] text-slate-400">
+                  Choose
+                  <br />
+                  Head
+                </div>
+              )}
             </div>
             {/* <div className="mt-0.5 text-center font-mono text-[8px] font-medium leading-none text-slate-400">HEAD</div> */}
           </div>
@@ -100,6 +108,7 @@ export default function FeatureSelector({
   showHeadFinderToggle = false,
   headFinderActive = false,
   onHeadFinderToggle,
+  onModelChange,
 }: {
   defaultModelId?: string;
   defaultSourceSet?: string;
@@ -126,6 +135,8 @@ export default function FeatureSelector({
   showHeadFinderToggle?: boolean;
   headFinderActive?: boolean;
   onHeadFinderToggle?: () => void;
+  // Notified whenever the selected model changes, so callers can reload model-scoped data.
+  onModelChange?: (modelId: string) => void;
 }) {
   const { getSourceSetsForModelId, getFirstSourceForSourceSet, globalModels, getDefaultModel } = useGlobalContext();
   const [modelId, setModelId] = useState(defaultModelId || getDefaultModel()?.id || DEFAULT_MODELID);
@@ -147,6 +158,7 @@ export default function FeatureSelector({
   const modelIdChanged = (newModelId: string) => {
     setModelId(newModelId);
     setHeadLayer(undefined);
+    onModelChange?.(newModelId);
     const newSourceSet = getSourceSetsForModelId(newModelId, filterToPublic)?.[0].name;
     setSourceSet(newSourceSet);
     setSource(getFirstSourceForSourceSet(newModelId, newSourceSet));
@@ -159,6 +171,8 @@ export default function FeatureSelector({
 
   const headLayerChanged = (newHeadLayer: number) => {
     setHeadLayer(newHeadLayer);
+    // Switching layers clears the head selection so the user explicitly picks a head for it.
+    setIndex(undefined);
   };
 
   useEffect(() => {
@@ -171,6 +185,19 @@ export default function FeatureSelector({
       }
     }
   }, [source]);
+
+  // Stay in sync when the controlling head selection changes from the parent (e.g. the head page
+  // updates the selected head client-side without remounting this component), so the selector
+  // reflects the current head.
+  useEffect(() => {
+    setHeadLayer(defaultHeadLayer);
+  }, [defaultHeadLayer]);
+
+  useEffect(() => {
+    if (defaultIndex !== undefined) {
+      setIndex(defaultIndex);
+    }
+  }, [defaultIndex]);
 
   return (
     <div className="flex flex-col items-start justify-start">
