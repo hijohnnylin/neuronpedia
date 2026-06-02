@@ -163,6 +163,7 @@ export default function NavBarButtons() {
                 defaultModelId={jumpToModelModelId}
                 defaultSourceSet={getSourceSetNameFromSource(defaultSource)}
                 defaultIndex="0"
+                includeHeads={true}
                 filterToPublic
                 modelOnSeparateRow
                 callback={() => {

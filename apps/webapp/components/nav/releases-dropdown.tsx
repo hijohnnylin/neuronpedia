@@ -15,6 +15,8 @@ export const featuredStarReleases = [
   'circuit-tracer',
   'llama-scope-2',
   'gemma-scope-2',
+  'headvis',
+  'nla',
 ];
 export const betaReleases = ['sparse-circuits'];
 

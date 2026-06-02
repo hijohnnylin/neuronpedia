@@ -57,6 +57,7 @@ export default function JumpToSAE({
         <SourceSelector
           modelId={jumpToSAEModelId}
           defaultSource={jumpToSAELayer}
+          includeHeads={true}
           sourceChangedCallback={setJumpToSAELayer}
           filterToRelease={filterToRelease}
           filterToFeaturedReleases={filterToFeaturedReleases}
