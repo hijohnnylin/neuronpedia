@@ -7,7 +7,7 @@
     "dev:localhost": "env-cmd -f .env.localhost --use-shell \"prisma generate && next dev --turbopack\"",
     "dev:remote": "env-cmd -f .env.remote --use-shell \"prisma generate && next dev --turbopack\"",
     "dev:prod": "env-cmd -f .env.prod --use-shell \"prisma generate && next dev --turbopack\"",
-    "build": "prisma generate && prisma db push && next build",
+    "build": "prisma generate && prisma db push --accept-data-loss && next build",
     "build:localhost": "env-cmd -f .env.localhost next build",
     "build:remote": "env-cmd -f .env.remote next build",
     "build:prod": "env-cmd -f .env.prod next build",

@@ -11,7 +11,6 @@ class ModelHeadSequence:
     modelName: str
     datasetName: str
     nSequences: int
-    seqLen: int
     dtype: str
     attnImplementation: str
     interval: int

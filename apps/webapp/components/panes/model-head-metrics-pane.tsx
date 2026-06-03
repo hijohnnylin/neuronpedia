@@ -59,9 +59,9 @@ const METRIC_OPTIONS = [
   },
   {
     key: 'patternEntropy',
-    label: 'Attn Entropy',
+    label: 'Attention Entropy',
   },
-  { key: 'selfAttentionScore', label: 'Self Attn' },
+  { key: 'selfAttentionScore', label: 'Self Attention' },
 ] as const;
 
 type MetricKey = (typeof METRIC_OPTIONS)[number]['key'];
@@ -688,7 +688,7 @@ export default function ModelHeadMetricsPane({
             )}
             <div className="mt-1 flex flex-1 flex-col">
               <div className="flex h-[240px] w-full flex-row items-center justify-center gap-x-3 px-0 pt-0">
-                <div className="flex h-full flex-1 flex-col items-start justify-start border-r border-slate-100 px-3 py-2">
+                <div className="flex h-full min-w-0 flex-1 flex-col items-start justify-start border-r border-slate-100 px-3 py-2">
                   <div className="mb-2 text-xs font-bold text-slate-400">
                     Find Head By Metric{' '}
                     <CustomTooltip trigger={<QuestionMarkCircledIcon className="h-3 w-3" />}>
@@ -715,7 +715,7 @@ export default function ModelHeadMetricsPane({
                           key={option.key}
                           value={option.key}
                           aria-label={option.label}
-                          className="flex h-7 flex-1 items-center justify-center rounded px-0 text-[10px] font-medium leading-none text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 data-[state=on]:bg-slate-200 data-[state=on]:text-slate-600 sm:rounded-md sm:text-[10px]"
+                          className="flex h-7 flex-1 items-center justify-center rounded px-0 text-[10px] font-medium leading-none text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 data-[state=on]:bg-slate-300 data-[state=on]:text-slate-600 sm:rounded-md sm:text-[10px]"
                         >
                           {option.label}
                         </ToggleGroup.Item>
@@ -756,7 +756,7 @@ export default function ModelHeadMetricsPane({
                             <div className="flex h-5 w-16 min-w-16 items-center justify-start pl-2.5 font-mono text-[9.5px] font-bold uppercase text-slate-400">
                               Layer {displayRow.layer}
                             </div>
-                            <div className="flex flex-1 flex-row flex-wrap gap-0.5">
+                            <div className="flex min-w-0 flex-1 flex-row flex-wrap gap-0.5">
                               {topHeads.map((headIndex) => {
                                 const cellKey = `${displayRow.layer}:${headIndex}`;
                                 const row = metricByLayerAndHead.get(cellKey);
@@ -823,7 +823,7 @@ export default function ModelHeadMetricsPane({
                     </div>
                   </div>
                 </div>
-                <div className="flex h-full flex-1 flex-col px-3 py-2">
+                <div className="flex h-full min-w-0 flex-1 flex-col px-3 py-2">
                   <div className="mb-2 text-xs font-bold text-slate-400">Select Head Manually</div>
                   <div className="flex min-h-0 w-full flex-1 flex-row gap-x-1 px-0 pr-5">
                     <div className="flex h-full min-h-0 flex-1 flex-col">

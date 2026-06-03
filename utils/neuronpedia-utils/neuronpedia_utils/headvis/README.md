@@ -206,17 +206,14 @@ rows already exist for a given run, so duplicates can't sneak in.
 - `interval Int`, `maxActivation Float`.
 - `tokens String[]`, `attentionIndices Int[]`, `attentionValues Float[]`
   as native Postgres arrays.
-- Indexes: `(modelId, layer, headIndex)`, `(modelId)`, and
-  `(modelId, datasetName, nSequences, seqLen, dtype, attnImplementation,
-  layer, headIndex)` (the run-config index, used to make the safety
-  pre-check cheap).
+- Indexes: `(modelId, layer, headIndex)`, `(modelId)`, and the safety
+  pre-check index `(modelId, datasetName, nSequences, dtype,
+  attnImplementation)`.
 
 The flat-COO encoding follows the on-disk format: `idx = q * seq_len + k`
-where `seq_len` is the **per-sequence** length (the number of entries in
-`tokens`). Don't confuse with the run-level `seqLen` (truncation cap).
-
-The frontend `seqLen` per record can be reconstructed at read time as
-`tokens.length`; we don't store it as a separate column.
+where `seq_len` is the per-sequence length (the number of entries in
+`tokens`). We don't store `seq_len` as a column; the frontend decodes
+`q`/`k` using `tokens.length`, which is exactly that stride.
 
 ## Import head-level metrics into Postgres
 
@@ -252,9 +249,11 @@ INSERTs one row per sampled sequence into `ModelHeadSequence`.
 There's no UPSERT and no unique constraint. Before any inserts the
 loader runs a pre-check per run: if `ModelHeadSequence` already has any
 rows matching the run's
-`(modelId, datasetName, nSequences, seqLen, dtype, attnImplementation)`,
+`(modelId, datasetName, nSequences, dtype, attnImplementation)`,
 the import aborts with an error pointing you at the affected run
-directory. To re-import, delete those rows first.
+directory. (`seqLen` is not part of this key; `ModelHeadSequence` doesn't
+store it — per-sequence length is just `len(tokens)`.) To re-import,
+delete those rows first.
 
 ## Hardware notes
 

@@ -74,7 +74,6 @@ COLUMNS = (
     "modelName",
     "datasetName",
     "nSequences",
-    "seqLen",
     "dtype",
     "attnImplementation",
     "interval",
@@ -229,7 +228,6 @@ def _build_rows_for_head(
     cfg_model_name: str,
     cfg_dataset_name: str,
     cfg_n_sequences: int,
-    cfg_seq_len: int,
     cfg_dtype: str,
     cfg_attn_implementation: str,
     np_model_id: str,
@@ -271,7 +269,6 @@ def _build_rows_for_head(
                 modelName=cfg_model_name,
                 datasetName=cfg_dataset_name,
                 nSequences=cfg_n_sequences,
-                seqLen=cfg_seq_len,
                 dtype=cfg_dtype,
                 attnImplementation=cfg_attn_implementation,
                 interval=int(seq.get("interval", 0)),
@@ -303,14 +300,18 @@ def precheck_no_existing_rows(
     np_model_id: str,
     config: dict[str, Any],
 ) -> int:
-    """Return the count of pre-existing rows for this (model, dataset, run-config)."""
+    """Return the count of pre-existing rows for this (model, dataset, run-config).
+
+    `ModelHeadSequence` no longer stores `seqLen` (the per-sequence length is
+    just `len(tokens)`), so the run-identity key here is the remaining run-config
+    fields, which still uniquely identify a run.
+    """
     cur.execute(
         """
         SELECT COUNT(*) FROM "ModelHeadSequence"
         WHERE "modelId" = %s
           AND "datasetName" = %s
           AND "nSequences" = %s
-          AND "seqLen" = %s
           AND "dtype" = %s
           AND "attnImplementation" = %s
         """,
@@ -318,7 +319,6 @@ def precheck_no_existing_rows(
             np_model_id,
             str(config["dataset_name"]),
             int(config["n_sequences"]),
-            int(config["seq_len"]),
             str(config["dtype"]),
             str(config["attn_implementation"]),
         ),
@@ -351,7 +351,6 @@ def _stream_insert_run(
     cfg_model_name = str(config["model_name"])
     cfg_dataset_name = str(config["dataset_name"])
     cfg_n_sequences = int(config["n_sequences"])
-    cfg_seq_len = int(config["seq_len"])
     cfg_dtype = str(config["dtype"])
     cfg_attn_implementation = str(config["attn_implementation"])
     now = datetime.now(timezone.utc)
@@ -390,7 +389,6 @@ def _stream_insert_run(
                 cfg_model_name,
                 cfg_dataset_name,
                 cfg_n_sequences,
-                cfg_seq_len,
                 cfg_dtype,
                 cfg_attn_implementation,
                 np_model_id,
@@ -452,7 +450,7 @@ def main() -> None:
                         f"Skipping {run_dir.relative_to(exports_dir)}: "
                         f"{existing} ModelHeadSequence rows already exist for "
                         f"modelId={np_model_id}, datasetName={config['dataset_name']}, "
-                        f"nSequences={config['n_sequences']}, seqLen={config['seq_len']}, "
+                        f"nSequences={config['n_sequences']}, "
                         f"dtype={config['dtype']}, attnImplementation={config['attn_implementation']}."
                     )
                     _log(f"  WARNING: {warning}")

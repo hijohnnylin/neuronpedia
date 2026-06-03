@@ -80,7 +80,7 @@ export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displ
 
 export const ModelHeadMetricsScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','selfAttentionScore','prevTokenScore','patternEntropy','qkDistance','qkDistanceVariance','inductionScore','qkDistanceHistogram','topQueryTokens','topKeyTokens','activationHistogram','headStatistics','createdAt','updatedAt']);
 
-export const ModelHeadSequenceScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','interval','tokens','attentionIndices','attentionValues','maxActivation','createdAt','updatedAt']);
+export const ModelHeadSequenceScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','dtype','attnImplementation','interval','tokens','attentionIndices','attentionValues','maxActivation','createdAt','updatedAt']);
 
 export const GraphHostSourceScalarFieldEnumSchema = z.enum(['id','name','hostUrl','runpodServerlessUrl','modelId','createdAt','updatedAt']);
 
@@ -1352,7 +1352,6 @@ export const ModelHeadSequenceSchema = z.object({
   modelName: z.string(),
   datasetName: z.string(),
   nSequences: z.number().int(),
-  seqLen: z.number().int(),
   dtype: z.string(),
   attnImplementation: z.string(),
   interval: z.number().int(),

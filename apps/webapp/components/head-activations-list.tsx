@@ -41,6 +41,7 @@ export default function HeadActivationsList({
   const [selectedRange, setSelectedRange] = useState(defaultRange);
   const [showLineBreaks, setShowLineBreaks] = useState(defaultShowLineBreaks);
   const [showRawTokens, setShowRawTokens] = useState(defaultShowRawTokens);
+  const [maxAttentionMode, setMaxAttentionMode] = useState<'all' | 'keys' | 'queries'>('all');
 
   // Discover the intervals present in the data, sorted highest-first.
   // The first (highest) interval is labeled "Top"; the rest use their numeric value.
@@ -107,54 +108,99 @@ export default function HeadActivationsList({
               <span className="rounded px-0 font-mono text-[10px] uppercase text-sky-700">Layer {layer}</span> -
               <span className="rounded px-0 font-mono text-[10px] uppercase text-sky-700">Head {headIndex}</span>
             </div> */}
-            <div className="text-[9px] font-medium uppercase text-slate-400">
-              Top Sequences by <span className="rounded bg-orange-300 px-1 text-slate-600">Max Attention</span>. Hover
-              for{' '}
-              <span
-                className="inline-block rounded bg-origin-border px-1 font-mono font-bold text-slate-700"
-                style={{
-                  backgroundImage: `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, 0.7) 50%, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%)`,
-                }}
-              >
-                Keys
-              </span>{' '}
-              and{' '}
-              <span
-                className="inline-block rounded bg-origin-border px-1 font-mono font-bold text-slate-700"
-                style={{
-                  backgroundImage: `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%, rgba(${ATTENTION_ORANGE_RGB}, 0.7) 50%)`,
-                }}
-              >
-                Queries
+            <div className="text-[9px] font-medium uppercase text-slate-500">
+              Top Sequences by <span className="rounded bg-orange-300 px-1 text-slate-600">Max Attention</span>
+              <span className="hidden sm:inline">
+                . Hover for{' '}
+                <span
+                  className="inline-block rounded bg-origin-border px-1 font-mono font-bold text-slate-700"
+                  style={{
+                    backgroundImage: `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, 0.7) 50%, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%)`,
+                  }}
+                >
+                  Keys
+                </span>{' '}
+                and{' '}
+                <span
+                  className="inline-block rounded bg-origin-border px-1 font-mono font-bold text-slate-700"
+                  style={{
+                    backgroundImage: `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%, rgba(${ATTENTION_ORANGE_RGB}, 0.7) 50%)`,
+                  }}
+                >
+                  Queries
+                </span>
+                .
               </span>
-              .
             </div>
           </div>
-          {intervals.length > 0 && (
-            <div className="flex flex-row items-center gap-x-2">
-              <div className="mr-0 text-[9px] font-medium uppercase text-slate-400">Interval</div>
+          <div className="flex flex-row items-center gap-x-4">
+            <div className="hidden flex-row items-center gap-x-2 sm:flex">
+              <div className="mr-0 text-[9px] font-medium uppercase text-slate-400">Max Attention</div>
               <ToggleGroup.Root
                 className="inline-flex overflow-hidden rounded border bg-white"
                 type="single"
-                value={selectedInterval !== null ? selectedInterval.toString() : ''}
+                value={maxAttentionMode}
                 onValueChange={(value) => {
-                  if (value) setSelectedInterval(Number(value));
+                  if (value) setMaxAttentionMode(value as 'all' | 'keys' | 'queries');
                 }}
-                aria-label="Filter by interval"
+                aria-label="Max attention display mode"
               >
-                {intervals.map((interval) => (
+                {(
+                  [
+                    { value: 'all', label: 'All', bg: `rgba(${ATTENTION_ORANGE_RGB}, 0.7)` },
+                    {
+                      value: 'keys',
+                      label: 'Keys',
+                      bg: `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, 0.7) 50%, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%)`,
+                    },
+                    {
+                      value: 'queries',
+                      label: 'Queries',
+                      bg: `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%, rgba(${ATTENTION_ORANGE_RGB}, 0.7) 50%)`,
+                    },
+                  ] as const
+                ).map((item) => (
                   <ToggleGroup.Item
-                    key={interval}
-                    value={interval.toString()}
-                    aria-label={interval === maxInterval ? 'Top' : `Interval ${interval}`}
-                    className="items-center rounded px-2 py-0.5 text-[10px] font-medium text-slate-400 transition-all hover:bg-slate-100 data-[state=on]:bg-slate-200 data-[state=on]:text-slate-600"
+                    key={item.value}
+                    value={item.value}
+                    aria-label={item.label}
+                    className="flex items-center gap-x-1 rounded px-2 py-0.5 text-[10px] font-medium text-slate-400 transition-all hover:bg-slate-100 data-[state=on]:bg-slate-200 data-[state=on]:text-slate-600"
                   >
-                    {interval === maxInterval ? 'Top' : interval}
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-sm border border-slate-200 bg-origin-border"
+                      style={item.value === 'all' ? { backgroundColor: item.bg } : { backgroundImage: item.bg }}
+                    />
+                    {item.label}
                   </ToggleGroup.Item>
                 ))}
               </ToggleGroup.Root>
             </div>
-          )}
+            {intervals.length > 0 && (
+              <div className="flex flex-row items-center gap-x-2">
+                <div className="mr-0 text-[9px] font-medium uppercase text-slate-400">Interval</div>
+                <ToggleGroup.Root
+                  className="inline-flex overflow-hidden rounded border bg-white"
+                  type="single"
+                  value={selectedInterval !== null ? selectedInterval.toString() : ''}
+                  onValueChange={(value) => {
+                    if (value) setSelectedInterval(Number(value));
+                  }}
+                  aria-label="Filter by interval"
+                >
+                  {intervals.map((interval) => (
+                    <ToggleGroup.Item
+                      key={interval}
+                      value={interval.toString()}
+                      aria-label={interval === maxInterval ? 'Top' : `Interval ${interval}`}
+                      className="items-center rounded px-2 py-0.5 text-[10px] font-medium text-slate-400 transition-all hover:bg-slate-100 data-[state=on]:bg-slate-200 data-[state=on]:text-slate-600"
+                    >
+                      {interval === maxInterval ? 'Top' : interval}
+                    </ToggleGroup.Item>
+                  ))}
+                </ToggleGroup.Root>
+              </div>
+            )}
+          </div>
         </div>
       )}
       {isLoading ? (
@@ -190,6 +236,7 @@ export default function HeadActivationsList({
                     showRawTokens={showRawTokens}
                     overallMaxActivationValueInList={overallMaxActivation}
                     overrideTextSize="text-[9.5px] sm:text-[11px]"
+                    maxAttentionMode={maxAttentionMode}
                   />
                 </div>
               </div>

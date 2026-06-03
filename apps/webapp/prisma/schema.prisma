@@ -382,7 +382,6 @@ model ModelHeadSequence {
   modelName          String
   datasetName        String
   nSequences         Int
-  seqLen             Int
   dtype              String
   attnImplementation String
 
@@ -397,7 +396,7 @@ model ModelHeadSequence {
 
   @@index([modelId, layer, headIndex])
   @@index([modelId])
-  @@index([modelId, datasetName, nSequences, seqLen, dtype, attnImplementation, layer, headIndex], name: "ModelHeadSequence_runConfigKey_idx")
+  @@index([modelId, datasetName, nSequences, dtype, attnImplementation], name: "ModelHeadSequence_runConfigKey_idx")
 }
 
 model GraphHostSource {

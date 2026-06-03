@@ -7,15 +7,14 @@ import {
   replaceHtmlAnomalies,
 } from '@/lib/utils/activations';
 import { cn } from '@/lib/utils/ui';
-import * as Tooltip from '@radix-ui/react-tooltip';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export type HeadSequenceData = {
   id: string;
   layer: number;
   headIndex: number;
   interval: number;
-  seqLen: number;
   tokens: string[];
   attentionIndices: number[];
   attentionValues: number[];
@@ -71,6 +70,7 @@ export default function HeadActivationItem({
   overrideTextColor = 'text-slate-700',
   className,
   showRawTokens = true,
+  maxAttentionMode = 'all',
 }: {
   sequence: HeadSequenceData;
   modelId?: string;
@@ -83,13 +83,15 @@ export default function HeadActivationItem({
   overrideTextColor?: string;
   className?: string;
   showRawTokens?: boolean;
+  maxAttentionMode?: 'all' | 'keys' | 'queries';
 }) {
   const [currentRange, setCurrentRange] = useState(tokensToDisplayAroundMaxActToken);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isItemHovered, setIsItemHovered] = useState(false);
 
   // `attentionIndices` are flat COO indices in a seqLen x seqLen attention matrix
-  // (idx = q * seqLen + k). We compute three things in one pass:
+  // (idx = q * seqLen + k, where seqLen is this sequence's token count). We
+  // compute three things in one pass:
   //  1. denseAttentionValues: per-token (per-key) max attention (column-max),
   //     skipping row 0 and column 0 (the BOS/position-0 attention sink).
   //     Matches headvis's getColMax behavior.
@@ -97,14 +99,16 @@ export default function HeadActivationItem({
   //     (sorted by value desc). Used to highlight where a hovered query attends.
   //  3. incomingByKey: for each key k, list of { index: q, value } pairs
   //     (sorted by value desc). Used in the per-token tooltip.
-  const { denseAttentionValues, outgoingByQuery, incomingByKey } = useMemo(() => {
+  const { denseAttentionValues, queryMaxValues, outgoingByQuery, incomingByKey } = useMemo(() => {
     // `attentionIndices` were encoded as `q * actual_len + k`, where `actual_len`
-    // is the number of decoded tokens for this sequence. Always decode with
-    // `tokens.length` (which equals that stride) rather than `seqLen`, since the
-    // stored `seqLen` may be the run-level max length, which would mis-decode q/k.
+    // is the number of decoded tokens for this sequence, so `tokens.length` is
+    // exactly the decode stride.
     const tokenLen = sequence.tokens.length;
     const seqLen = tokenLen;
+    // Per-key column max (max attention each token receives as a key).
     const dense = new Array(tokenLen).fill(0);
+    // Per-query row max (max attention each token emits as a query).
+    const queryMax = new Array(tokenLen).fill(0);
     const outgoing = new Map<number, Array<{ index: number; value: number }>>();
     const incoming = new Map<number, Array<{ index: number; value: number }>>();
     if (seqLen > 0) {
@@ -116,6 +120,7 @@ export default function HeadActivationItem({
         const k = flatIdx % seqLen;
         if (q === 0 || k === 0) continue;
         if (k >= 0 && k < tokenLen && val > dense[k]) dense[k] = val;
+        if (q >= 0 && q < tokenLen && val > queryMax[q]) queryMax[q] = val;
         if (!outgoing.has(q)) outgoing.set(q, []);
         outgoing.get(q)!.push({ index: k, value: val });
         if (!incoming.has(k)) incoming.set(k, []);
@@ -124,8 +129,31 @@ export default function HeadActivationItem({
       outgoing.forEach((list) => list.sort((a, b) => b.value - a.value));
       incoming.forEach((list) => list.sort((a, b) => b.value - a.value));
     }
-    return { denseAttentionValues: dense, outgoingByQuery: outgoing, incomingByKey: incoming };
+    return {
+      denseAttentionValues: dense,
+      queryMaxValues: queryMax,
+      outgoingByQuery: outgoing,
+      incomingByKey: incoming,
+    };
   }, [sequence.tokens.length, sequence.attentionIndices, sequence.attentionValues]);
+
+  // Separate normalization maxes so the Keys/Queries views shade each token
+  // relative to the strongest key (column max) or query (row max) respectively.
+  const keyMaxOverall = useMemo(() => {
+    let max = 0;
+    for (let i = 0; i < denseAttentionValues.length; i += 1) {
+      if (denseAttentionValues[i] > max) max = denseAttentionValues[i];
+    }
+    return max;
+  }, [denseAttentionValues]);
+
+  const queryMaxOverall = useMemo(() => {
+    let max = 0;
+    for (let i = 0; i < queryMaxValues.length; i += 1) {
+      if (queryMaxValues[i] > max) max = queryMaxValues[i];
+    }
+    return max;
+  }, [queryMaxValues]);
 
   const maxActivationTokenIndex = useMemo(() => {
     let maxIdx = 0;
@@ -140,6 +168,21 @@ export default function HeadActivationItem({
   }, [denseAttentionValues]);
 
   const [hoveredTokenIndex, setHoveredTokenIndex] = useState<number | null>(null);
+
+  // The popup is anchored above the sequence row and centered. We render it in a
+  // portal with fixed positioning (measured from the row) so it isn't clipped by
+  // the list's scroll container when hovering tokens in the top-most sequence.
+  const sequenceRef = useRef<HTMLDivElement>(null);
+  const [popupPos, setPopupPos] = useState<{ left: number; top: number } | null>(null);
+
+  // Per-token DOM refs (only populated for tokens currently rendered/in view) so
+  // we can draw connector lines from the hovered token to its key/query tokens.
+  const tokenRefs = useRef<Map<number, HTMLSpanElement>>(new Map());
+  const [attentionLines, setAttentionLines] = useState<
+    Array<{ x1: number; y1: number; x2: number; y2: number; color: string }>
+  >([]);
+
+  const SLATE_RGB = '100, 116, 139'; // slate-500
 
   // When the user hovers a token, treat it as the QUERY and show where it
   // attends (outgoing). For each candidate key tokenIndex, look up the
@@ -184,6 +227,74 @@ export default function HeadActivationItem({
     });
     return max;
   }, [hoveredIncoming]);
+
+  useEffect(() => {
+    if (hoveredTokenIndex === null) {
+      setPopupPos(null);
+      setAttentionLines([]);
+      return undefined;
+    }
+    const update = () => {
+      const el = sequenceRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        setPopupPos({ left: rect.left, top: rect.top });
+      }
+      const hoveredEl = tokenRefs.current.get(hoveredTokenIndex);
+      if (!hoveredEl) {
+        setAttentionLines([]);
+        return;
+      }
+      const hr = hoveredEl.getBoundingClientRect();
+      const hx = hr.left + hr.width / 2;
+      const hy = hr.top + hr.height / 2;
+      const hw = hr.width / 2;
+      const hh = hr.height / 2;
+      // Returns the point on a box's boundary (centered at cx,cy with half-extents
+      // halfW,halfH) along the ray heading toward (towardX, towardY). Used to clip
+      // each line so it starts/ends at the token boxes rather than overlapping them.
+      const boxEdge = (cx: number, cy: number, halfW: number, halfH: number, towardX: number, towardY: number) => {
+        const dx = towardX - cx;
+        const dy = towardY - cy;
+        if (dx === 0 && dy === 0) return { x: cx, y: cy };
+        const tX = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
+        const tY = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
+        const t = Math.min(tX, tY, 1);
+        return { x: cx + dx * t, y: cy + dy * t };
+      };
+      const lines: Array<{ x1: number; y1: number; x2: number; y2: number; color: string }> = [];
+      const addLine = (idx: number, value: number, max: number, rgb: string) => {
+        if (idx === hoveredTokenIndex) return;
+        const target = tokenRefs.current.get(idx);
+        if (!target) return; // token not in view (snippet collapsed) -> skip
+        const r = target.getBoundingClientRect();
+        const tx = r.left + r.width / 2;
+        const ty = r.top + r.height / 2;
+        const opacity = tokenGradientOpacity(value, max);
+        const start = boxEdge(hx, hy, hw, hh, tx, ty);
+        const end = boxEdge(tx, ty, r.width / 2, r.height / 2, hx, hy);
+        lines.push({
+          x1: start.x,
+          y1: start.y,
+          x2: end.x,
+          y2: end.y,
+          color: `rgba(${rgb}, ${Math.min(0.6 * opacity, 0.3).toFixed(3)})`,
+        });
+      };
+      // Keys (tokens the hovered token attends to) -> light orange line.
+      hoveredOutgoing.forEach((value, idx) => addLine(idx, value, hoveredOutgoingMax, ATTENTION_ORANGE_RGB));
+      // Queries (tokens that attend to the hovered token) -> light slate line.
+      hoveredIncoming.forEach((value, idx) => addLine(idx, value, hoveredIncomingMax, SLATE_RGB));
+      setAttentionLines(lines);
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [hoveredTokenIndex, hoveredOutgoing, hoveredIncoming, hoveredOutgoingMax, hoveredIncomingMax, currentRange]);
 
   const hasImStartToken = sequence.tokens.some((t) => t === '<|im_start|>');
 
@@ -271,6 +382,7 @@ export default function HeadActivationItem({
       onMouseLeave={() => setIsItemHovered(false)}
     >
       <div
+        ref={sequenceRef}
         className={`relative flex-1 ${!showRawTokens ? 'sm:ml-2.5' : ''} ${overrideLeading} ${
           showExpandIndicator ? 'cursor-pointer' : ''
         }`}
@@ -280,6 +392,117 @@ export default function HeadActivationItem({
           }
         }}
       >
+        {hoveredTokenIndex !== null &&
+          attentionLines.length > 0 &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <svg className="pointer-events-none fixed inset-0 z-[55] h-screen w-screen" aria-hidden>
+              {attentionLines.map((l, i) => (
+                <line
+                  key={`line-${i}`}
+                  x1={l.x1}
+                  y1={l.y1}
+                  x2={l.x2}
+                  y2={l.y2}
+                  stroke={l.color}
+                  strokeWidth={1.5}
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>,
+            document.body,
+          )}
+        {hoveredTokenIndex !== null &&
+          popupPos !== null &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            (() => {
+              const hToken = sequence.tokens[hoveredTokenIndex];
+              const hAttn = Math.max(
+                denseAttentionValues[hoveredTokenIndex] ?? 0,
+                queryMaxValues[hoveredTokenIndex] ?? 0,
+              );
+              const hOutgoing = outgoingByQuery.get(hoveredTokenIndex) || [];
+              const hIncoming = incomingByKey.get(hoveredTokenIndex) || [];
+              return (
+                <div
+                  className="pointer-events-none fixed z-[60] flex justify-start"
+                  style={{
+                    left: popupPos.left,
+                    top: popupPos.top,
+                    transform: 'translate(0, calc(-100% - 4px))',
+                  }}
+                >
+                  <div className="flex w-max max-w-[360px] flex-col items-center gap-y-1.5 rounded-lg border bg-white/95 px-3 py-2 text-center text-[11px] font-semibold text-slate-700 shadow backdrop-blur-[1px]">
+                    <div className="whitespace-pre-wrap rounded bg-slate-300 px-1 font-mono">
+                      {formatChipToken(hToken)}
+                    </div>
+                    <div className="font-base flex flex-row gap-x-2 font-normal leading-none">
+                      <div>Max Attention</div>
+                      <div className="font-mono">{hAttn.toFixed(ACTIVATION_PRECISION)}</div>
+                    </div>
+                    <div className="flex flex-row gap-x-3 border-t border-t-slate-200 pt-2">
+                      {hOutgoing.length > 0 && (
+                        <div className="font-base flex w-full flex-col gap-y-1 text-[11px] font-normal leading-tight">
+                          <div className="whitespace-nowrap font-semibold">Attends To (Keys)</div>
+                          {hOutgoing.slice(0, 5).map((item, i) => {
+                            const itemTopOp = tokenGradientOpacity(
+                              hoveredOutgoing.get(item.index) || 0,
+                              hoveredOutgoingMax,
+                            );
+                            const itemBottomOp = tokenGradientOpacity(
+                              hoveredIncoming.get(item.index) || 0,
+                              hoveredIncomingMax,
+                            );
+                            const itemBg = `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, ${itemTopOp}) 50%, rgba(${ATTENTION_ORANGE_RGB}, ${itemBottomOp}) 50%)`;
+                            return (
+                              <div className="flex flex-row items-center justify-center gap-x-1" key={`out-${i}`}>
+                                <div
+                                  className="rounded border border-slate-200 bg-origin-border px-1 font-mono font-bold"
+                                  style={{ backgroundImage: itemBg }}
+                                >
+                                  {formatChipToken(sequence.tokens[item.index])}
+                                </div>
+                                <div className="font-mono">+{item.value.toFixed(ACTIVATION_PRECISION)}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {hIncoming.length > 0 && (
+                        <div className="font-base flex w-full flex-col gap-y-1 text-[11px] font-normal leading-tight">
+                          <div className="whitespace-nowrap font-semibold">Attended By (Queries)</div>
+                          {hIncoming.slice(0, 5).map((item, i) => {
+                            const itemTopOp = tokenGradientOpacity(
+                              hoveredOutgoing.get(item.index) || 0,
+                              hoveredOutgoingMax,
+                            );
+                            const itemBottomOp = tokenGradientOpacity(
+                              hoveredIncoming.get(item.index) || 0,
+                              hoveredIncomingMax,
+                            );
+                            const itemBg = `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, ${itemTopOp}) 50%, rgba(${ATTENTION_ORANGE_RGB}, ${itemBottomOp}) 50%)`;
+                            return (
+                              <div className="flex flex-row items-center justify-center gap-x-1" key={`in-${i}`}>
+                                <div
+                                  className="rounded border border-slate-200 bg-origin-border px-1 font-mono font-bold"
+                                  style={{ backgroundImage: itemBg }}
+                                >
+                                  {formatChipToken(sequence.tokens[item.index])}
+                                </div>
+                                <div className="font-mono">+{item.value.toFixed(ACTIVATION_PRECISION)}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })(),
+            document.body,
+          )}
         {showExpandIndicator && isItemHovered && (hasHiddenAbove || hasHiddenBelow) && (
           <div className="absolute top-0 flex w-full items-center justify-center py-0.5">
             <span className="rounded bg-sky-100 px-2 py-1 font-sans text-[9px] font-medium uppercase text-sky-600">
@@ -309,8 +532,9 @@ export default function HeadActivationItem({
               ? tokenWithReplacedAnomalies.replace(/\s/g, '\u00A0')
               : tokenWithReplacedAnomalies;
           const attnValue = denseAttentionValues[tokenIndex] ?? 0;
-          const outgoingList = outgoingByQuery.get(tokenIndex) || [];
-          const incomingList = incomingByKey.get(tokenIndex) || [];
+          // "All" mode considers the token's strongest involvement in either
+          // direction: as a key (column max) or as a query (row max).
+          const combinedValue = Math.max(attnValue, queryMaxValues[tokenIndex] ?? 0);
           const isHoveredQuery = hoveredTokenIndex === tokenIndex;
           const isHovering = hoveredTokenIndex !== null;
           // While hovering: top half encodes outgoing attention FROM the hovered
@@ -324,113 +548,48 @@ export default function HeadActivationItem({
             const topColor = `rgba(${ATTENTION_ORANGE_RGB}, ${topOpacity})`;
             const bottomColor = `rgba(${ATTENTION_ORANGE_RGB}, ${bottomOpacity})`;
             tokenBackgroundImage = `linear-gradient(to bottom, ${topColor} 50%, ${bottomColor} 50%)`;
+          } else if (maxAttentionMode === 'keys') {
+            const op = tokenGradientOpacity(attnValue, keyMaxOverall);
+            const color = `rgba(${ATTENTION_ORANGE_RGB}, ${op})`;
+            tokenBackgroundImage = `linear-gradient(to bottom, ${color} 50%, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%)`;
+          } else if (maxAttentionMode === 'queries') {
+            const op = tokenGradientOpacity(queryMaxValues[tokenIndex] ?? 0, queryMaxOverall);
+            const color = `rgba(${ATTENTION_ORANGE_RGB}, ${op})`;
+            tokenBackgroundImage = `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, 0) 50%, ${color} 50%)`;
           } else {
             tokenBackgroundImage = makeActivationBackgroundColorWithDFA(
               overallMaxActivationValueInList || sequence.maxActivation || 1,
-              attnValue,
+              combinedValue,
               ATTENTION_ORANGE_RGB,
             );
           }
           return (
             <span key={tokenIndex}>
-              <Tooltip.Provider skipDelayDuration={0} delayDuration={0}>
-                <Tooltip.Root disableHoverableContent>
-                  <Tooltip.Trigger asChild>
-                    <span
-                      className={`inline-block cursor-default whitespace-nowrap bg-origin-border py-0.5 font-mono ${
-                        isHoveredQuery ? HOVERED_QUERY_TOKEN_CLASSNAME : REGULAR_TOKEN_CLASSNAME
-                      } ${tokenEndsWithSpace ? 'pr-1' : ''} ${tokenStartsWithSpace ? 'pl-1' : ''} ${
-                        !showRawTokens && tokenIsRoleToken(tokenIndex) ? '-ml-2 mr-1 mt-1 rounded bg-slate-300' : ''
-                      } ${
-                        !showRawTokens && prevTokenIsChannelToken(tokenIndex) ? 'mt-1 rounded bg-slate-200' : ''
-                      } ${overrideTextColor} ${overrideTextSize}`}
-                      style={{
-                        backgroundImage: tokenBackgroundImage,
-                      }}
-                      onMouseEnter={() => setHoveredTokenIndex(tokenIndex)}
-                      onMouseLeave={() => {
-                        setHoveredTokenIndex((current) => (current === tokenIndex ? null : current));
-                      }}
-                    >
-                      {displayContent}
-                    </span>
-                  </Tooltip.Trigger>
-                  <Tooltip.Portal>
-                    <Tooltip.Content
-                      className="z-50 flex w-full max-w-[360px] flex-col items-center gap-y-1.5 rounded border bg-white/85 px-3 py-2 text-center text-[11px] font-semibold text-slate-700 shadow backdrop-blur-[1px]"
-                      sideOffset={3}
-                      side="bottom"
-                    >
-                      <div className="whitespace-pre-wrap rounded bg-slate-300 px-1 font-mono">
-                        {formatChipToken(token)}
-                      </div>
-                      <div className="font-base flex flex-row gap-x-2 font-normal leading-none">
-                        <div>Max Attention</div>
-                        <div className="font-mono">{attnValue.toFixed(ACTIVATION_PRECISION)}</div>
-                      </div>
-                      <div className="flex flex-row gap-x-3 border-t border-t-slate-200 pt-2">
-                        {outgoingList.length > 0 && (
-                          <div className="font-base flex w-full flex-col gap-y-1 text-[11px] font-normal leading-tight">
-                            <div className="whitespace-nowrap font-semibold">Attends To (Keys)</div>
-                            {outgoingList.slice(0, 5).map((item, i) => {
-                              const itemTopOp = tokenGradientOpacity(
-                                hoveredOutgoing.get(item.index) || 0,
-                                hoveredOutgoingMax,
-                              );
-                              const itemBottomOp = tokenGradientOpacity(
-                                hoveredIncoming.get(item.index) || 0,
-                                hoveredIncomingMax,
-                              );
-                              const itemBg = `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, ${itemTopOp}) 50%, rgba(${ATTENTION_ORANGE_RGB}, ${itemBottomOp}) 50%)`;
-                              return (
-                                <div className="flex flex-row items-center justify-center gap-x-1" key={`out-${i}`}>
-                                  <div
-                                    className="rounded border border-slate-200 bg-origin-border px-1 font-mono font-bold"
-                                    style={{ backgroundImage: itemBg }}
-                                  >
-                                    {formatChipToken(sequence.tokens[item.index])}
-                                  </div>
-                                  <div className="font-mono">+{item.value.toFixed(ACTIVATION_PRECISION)}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {incomingList.length > 0 && (
-                          <div className="font-base flex w-full flex-col gap-y-1 text-[11px] font-normal leading-tight">
-                            <div className="whitespace-nowrap font-semibold">Attended By (Queries)</div>
-                            {incomingList.slice(0, 5).map((item, i) => {
-                              const itemTopOp = tokenGradientOpacity(
-                                hoveredOutgoing.get(item.index) || 0,
-                                hoveredOutgoingMax,
-                              );
-                              const itemBottomOp = tokenGradientOpacity(
-                                hoveredIncoming.get(item.index) || 0,
-                                hoveredIncomingMax,
-                              );
-                              const itemBg = `linear-gradient(to bottom, rgba(${ATTENTION_ORANGE_RGB}, ${itemTopOp}) 50%, rgba(${ATTENTION_ORANGE_RGB}, ${itemBottomOp}) 50%)`;
-                              return (
-                                <div className="flex flex-row items-center justify-center gap-x-1" key={`in-${i}`}>
-                                  <div
-                                    className="rounded border border-slate-200 bg-origin-border px-1 font-mono font-bold"
-                                    style={{ backgroundImage: itemBg }}
-                                  >
-                                    {formatChipToken(sequence.tokens[item.index])}
-                                  </div>
-                                  <div className="font-mono">+{item.value.toFixed(ACTIVATION_PRECISION)}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </Tooltip.Content>
-                  </Tooltip.Portal>
-                </Tooltip.Root>
-                {((!showRawTokens && nextTokenIsMessageEndOrChannelToken(tokenIndex)) ||
-                  ((token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
-                    showLineBreaks)) && <br />}
-              </Tooltip.Provider>
+              <span
+                ref={(el) => {
+                  if (el) tokenRefs.current.set(tokenIndex, el);
+                  else tokenRefs.current.delete(tokenIndex);
+                }}
+                className={`inline-block cursor-default whitespace-nowrap bg-origin-border py-0.5 font-mono ${
+                  isHoveredQuery ? HOVERED_QUERY_TOKEN_CLASSNAME : REGULAR_TOKEN_CLASSNAME
+                } ${tokenEndsWithSpace ? 'pr-1' : ''} ${tokenStartsWithSpace ? 'pl-1' : ''} ${
+                  !showRawTokens && tokenIsRoleToken(tokenIndex) ? '-ml-2 mr-1 mt-1 rounded bg-slate-300' : ''
+                } ${
+                  !showRawTokens && prevTokenIsChannelToken(tokenIndex) ? 'mt-1 rounded bg-slate-200' : ''
+                } ${overrideTextColor} ${overrideTextSize}`}
+                style={{
+                  backgroundImage: tokenBackgroundImage,
+                }}
+                onMouseEnter={() => setHoveredTokenIndex(tokenIndex)}
+                onMouseLeave={() => {
+                  setHoveredTokenIndex((current) => (current === tokenIndex ? null : current));
+                }}
+              >
+                {displayContent}
+              </span>
+              {((!showRawTokens && nextTokenIsMessageEndOrChannelToken(tokenIndex)) ||
+                ((token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
+                  showLineBreaks)) && <br />}
             </span>
           );
         })}

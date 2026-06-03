@@ -28,7 +28,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         layer: true,
         headIndex: true,
         interval: true,
-        seqLen: true,
         tokens: true,
         attentionIndices: true,
         attentionValues: true,
