@@ -128,6 +128,91 @@ function parseHistogram(raw: unknown): Histogram | null {
   return { bin_edges: binEdges as number[], bin_values: binValues as number[] };
 }
 
+export function getHeadMetricsTooltip(showFirstParagraph = true) {
+  return (
+    <div className="flex flex-col gap-y-2">
+      {showFirstParagraph && (
+        <p>
+          Models have many layers, each with many heads. Find Head By Metric finds the top heads in a model by a given
+          metric, which are often associated with important heads. Click to select a metric, and adjust the slider to
+          change the top N heads to display.
+        </p>
+      )}
+      <ul className="mb-1 ml-4 list-outside list-disc text-[11px] font-normal text-slate-600">
+        <li>
+          <strong>Induction Score</strong> - An induction head lets the model &quot;induce&quot; (repeat) previously
+          seen tokens. For example, if the model saw &quot;Jane Smith said, my name is Jane...&quot;, the induction head
+          causes the model to complete the next token with &quot;Smith&quot;, in the pattern AB -&gt; A...B. The
+          <strong>induction score</strong> is the average of the attention from second-A positions back to first-B
+          positions across many sequences. A high induction score indicates a head is likely an induction head.
+        </li>
+        <li>
+          <strong>Previous Token Score</strong> - This measures how reliably a head&apos;s attention concentrates on
+          position-1 (one position back) across the dataset. A high previous token score indicates a head is likely a
+          previous-token head.
+        </li>
+        <li>
+          <strong>Pattern Entropy</strong> - This measures how concentrated the attention of a head. Low entropy =
+          sharp, high = diffuse/sink-like.
+        </li>
+        <li>
+          <strong>Self-Attention Score</strong> - This measures how much attention a head directs to itself. A high
+          self-attention score indicates a head is likely a self-attention head.
+        </li>
+      </ul>
+
+      <p>
+        The implementations are based on{' '}
+        <a
+          href="https://transformer-circuits.pub/2026/headvis/index.html"
+          target="_blank"
+          rel="noreferrer"
+          className="font-bold text-sky-700 hover:underline"
+        >
+          HeadVis
+        </a>{' '}
+        by Luger, Kamath et al (Anthropic 2026).
+      </p>
+      <p>
+        For the specifications of how these are calculated, check out the{' '}
+        <a
+          href="https://github.com/anthropics/headvis/blob/304acba075bee56b80f8bc60e18896c8d597b4cd/data_pipeline.py#L59-L81"
+          target="_blank"
+          rel="noreferrer"
+          className="font-bold text-sky-700 hover:underline"
+        >
+          HeadVis repository
+        </a>
+        .
+      </p>
+      <p>
+        For our specific implementation for Neuronpedia, check out our{' '}
+        <a
+          href="https://github.com/neuronpedia/neuronpedia/blob/main/utils/neuronpedia-utils/neuronpedia_utils/headvis/compute-head-metrics.py"
+          target="_blank"
+          rel="noreferrer"
+          className="font-bold text-sky-700 hover:underline"
+        >
+          generation script
+        </a>
+        .
+      </p>
+      <p>
+        All data is downloadable from our{' '}
+        <a
+          href="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/"
+          target="_blank"
+          rel="noreferrer"
+          className="font-bold text-sky-700 hover:underline"
+        >
+          exports bucket
+        </a>{' '}
+        under the model name, under the &quot;HeadVis&quot; folder.
+      </p>
+    </div>
+  );
+}
+
 function parseTopTokens(raw: unknown, limit: number): TopToken[] {
   if (!Array.isArray(raw)) {
     return [];
@@ -691,10 +776,8 @@ export default function ModelHeadMetricsPane({
                 <div className="flex h-full min-w-0 flex-1 flex-col items-start justify-start border-r border-slate-100 px-3 py-2">
                   <div className="mb-2 text-xs font-bold text-slate-400">
                     Find Head By Metric{' '}
-                    <CustomTooltip trigger={<QuestionMarkCircledIcon className="h-3 w-3" />}>
-                      <div>
-                        <p></p>
-                      </div>
+                    <CustomTooltip side="right" wide trigger={<QuestionMarkCircledIcon className="h-3 w-3" />}>
+                      {getHeadMetricsTooltip(true)}
                     </CustomTooltip>
                   </div>
                   <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
@@ -912,8 +995,15 @@ export default function ModelHeadMetricsPane({
               <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
                 {selectedHead && selectedHeadRow ? (
                   <>
-                    <div className="mb-0 text-center text-[10px] font-medium uppercase text-slate-400">
+                    <div className="mb-0 flex flex-row items-center justify-center text-center text-[10px] font-medium uppercase text-slate-400">
                       Head Metrics
+                      <CustomTooltip
+                        side="right"
+                        wide
+                        trigger={<QuestionMarkCircledIcon className="-mt-0.5 ml-1 h-3 w-3" />}
+                      >
+                        {getHeadMetricsTooltip(false)}
+                      </CustomTooltip>
                     </div>
                     <div className="flex flex-col gap-y-1 divide-y divide-slate-100">
                       {METRIC_OPTIONS.map((opt) => (
