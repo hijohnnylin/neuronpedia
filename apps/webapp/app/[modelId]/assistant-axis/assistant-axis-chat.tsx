@@ -432,7 +432,7 @@ export default function AssistantAxisChat({
   }
 
   return (
-    <div className="relative flex h-[calc(100dvh)] w-full min-w-0 flex-col items-center text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh-180px)] sm:min-h-[calc(100dvh-180px)]">
+    <div className="relative flex h-[calc(100dvh)] w-full min-w-0 flex-col items-center text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh-75px)] sm:min-h-[calc(100dvh-75px)]">
       <AssistantAxisWelcomeModal onLoadDemo={loadSavedSteerOutput} onFreeChat={reset} initialSavedId={initialSavedId} />
 
       {/* Share Modal */}
@@ -740,7 +740,7 @@ export default function AssistantAxisChat({
         {/* PersonaChart in the middle */}
         <div
           ref={chartContainerRef}
-          className="absolute left-0 top-0 order-1 h-full max-w-[120px] flex-1 flex-col overflow-hidden bg-white px-0 pb-40 sm:relative sm:order-2 sm:max-w-[300px]"
+          className="absolute left-0 top-0 order-1 h-full max-w-[120px] flex-1 flex-col overflow-hidden bg-white px-0 pb-40 sm:relative sm:order-2 sm:max-h-[calc(100dvh-180px)] sm:min-h-[calc(100dvh-180px)] sm:max-w-[300px]"
         >
           <div className="relative flex flex-col items-center justify-center gap-y-2">
             <div className="left-0 top-0 hidden w-full items-center justify-center px-2 pt-0 sm:absolute sm:flex sm:pt-[48px]">
