@@ -5,9 +5,10 @@ services:
     environment:
       - RELOAD=${RELOAD:-0}
       - MODEL_ID=${MODEL_ID:-google/gemma-2-2b}
-    command: >    
+      - TRANSCODER_SET=${TRANSCODER_SET:-gemma}
+    command: >
       sh -c "if [ \"$$RELOAD\" = \"1\" ]; then
-        python start.py --model_id \"$$MODEL_ID\" --reload;
+        python start.py --model_id \"$$MODEL_ID\" --transcoder_set \"$$TRANSCODER_SET\" --reload;
       else
-        python start.py --model_id \"$$MODEL_ID\";
+        python start.py --model_id \"$$MODEL_ID\" --transcoder_set \"$$TRANSCODER_SET\";
       fi"
