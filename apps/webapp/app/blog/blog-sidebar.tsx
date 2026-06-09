@@ -14,7 +14,7 @@ export default function BlogSidebar() {
         />
       </a>
       <div className="flex w-full flex-col">
-        <div className="mb-1.5 flex flex-col items-center justify-center pb-0 sm:mb-5 sm:border-b sm:pb-5">
+        <div className="mb-1.5 flex flex-col items-center justify-center pb-0">
           <a href="/blog">
             <h1 className="whitespace-pre text-sm font-bold hover:underline sm:pb-1.5 sm:text-[18px]">
               The Residual Stream
@@ -31,7 +31,7 @@ export default function BlogSidebar() {
             />
           </a>
         </div>
-        <div className="hidden flex-col items-center justify-center pb-3 sm:flex">
+        <div className="hidden flex-col items-center justify-center pb-3">
           <h1 className="whitespace-pre text-sm font-bold sm:pb-1.5 sm:text-[18px]">
             The Babble{' '}
             <a

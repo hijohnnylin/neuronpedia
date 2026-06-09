@@ -60,13 +60,13 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
       />
 
       <div className="flex w-full flex-row items-center justify-center border-b border-slate-200 py-6">
-        <div className="flex w-full max-w-screen-lg flex-row items-center justify-between">
-          <div className="flex flex-col items-start">
+        <div className="flex w-full max-w-screen-lg flex-col items-center justify-between gap-y-5 sm:flex-row sm:gap-y-0">
+          <div className="flex flex-col items-center sm:items-start">
             {model.visibility !== Visibility.PUBLIC && (
               <div className="pb-1">{getVisibilityBadge(model.visibility)}</div>
             )}
             <div className="text-lg font-bold text-slate-900 sm:text-3xl">{model.id}</div>
-            <div className="text-sm font-normal text-slate-500 sm:mt-2">{model.owner}</div>
+            <div className="text-xs font-normal text-slate-500 sm:mt-2 sm:text-sm">{model.owner}</div>
           </div>
           <div className="flex flex-row justify-end gap-x-3">
             <JumpToPane
@@ -90,7 +90,7 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
       </div>
 
       {modelHeadMetrics.length > 0 && (
-        <div className="mt-6 hidden w-full max-w-screen-lg sm:block">
+        <div className="mt-6 w-full max-w-screen-lg">
           <div className="flex w-full flex-col items-center justify-center">
             <ModelHeadMetricsPane modelId={model.id} metrics={modelHeadMetrics} />
           </div>

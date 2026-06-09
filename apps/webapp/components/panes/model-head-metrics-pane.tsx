@@ -140,9 +140,9 @@ export function getHeadMetricsTooltip(showFirstParagraph = true) {
       )}
       <ul className="mb-1 ml-4 list-outside list-disc text-[11px] font-normal text-slate-600">
         <li>
-          <strong>Induction Score</strong> - An induction head lets the model &quot;induce&quot; (repeat) previously
-          seen tokens. For example, if the model saw &quot;Jane Smith said, my name is Jane...&quot;, the induction head
-          causes the model to complete the next token with &quot;Smith&quot;, in the pattern AB -&gt; A...B. The
+          <strong>Induction Score</strong> - An induction head lets the model repeat previously seen token patterns. For
+          example, if the model saw &quot;Jane Smith said, my name is Jane...&quot;, the induction head causes the model
+          to complete the next token with &quot;Smith&quot;, in the pattern [A][B] ... [A]-&gt;[B]. The
           <strong>induction score</strong> is the average of the attention from second-A positions back to first-B
           positions across many sequences. A high induction score indicates a head is likely an induction head.
         </li>
@@ -682,7 +682,8 @@ export default function ModelHeadMetricsPane({
             >
               HeadVis
             </a>{' '}
-            (Luger, Kamath et al.) <QuestionMarkCircledIcon className="h-4 w-4" />
+            <span className="hidden text-slate-400 sm:inline">(Luger, Kamath et al.)</span>{' '}
+            <QuestionMarkCircledIcon className="h-4 w-4" />
           </div>
         }
       >
@@ -749,7 +750,7 @@ export default function ModelHeadMetricsPane({
   );
 
   const cardContent = (
-    <CardContent className="flex w-full flex-col gap-x-2 gap-y-0 overflow-x-auto">
+    <CardContent className="flex w-full flex-col gap-x-2 gap-y-0 overflow-x-auto px-2 sm:px-6">
       <div className="flex w-full flex-1 flex-col items-center justify-center gap-2">
         {!showCard && (
           <div className="flex w-full flex-row items-center justify-center py-1">
@@ -800,7 +801,7 @@ export default function ModelHeadMetricsPane({
                   <div className="mb-1 text-center text-[9px] font-medium uppercase text-slate-400">
                     Metric & Number of Heads
                   </div>
-                  <div className="w-full px-2">
+                  <div className="w-full sm:px-2">
                     <ToggleGroup.Root
                       className="inline-flex h-7 w-full rounded bg-slate-100 px-0 py-0 sm:rounded-md"
                       type="single"
@@ -1008,7 +1009,9 @@ export default function ModelHeadMetricsPane({
           <div
             className={`mt-1.5 flex flex-col items-stretch gap-x-1 ${showCard ? 'w-full' : 'w-full rounded-xl border bg-white px-5 py-2 sm:w-1/4'}`}
           >
-            <div className={`flex w-full items-stretch gap-3 ${showCard ? 'flex-row' : 'flex-col gap-y-7 py-2'}`}>
+            <div
+              className={`flex w-full items-stretch gap-3 ${showCard ? 'flex-col gap-y-3 sm:flex-row' : 'flex-col gap-y-7 py-2'}`}
+            >
               <div className="flex flex-1 basis-0 flex-col rounded bg-white p-0 pt-0">
                 {selectedHead && selectedHeadRow ? (
                   <>
@@ -1057,7 +1060,7 @@ export default function ModelHeadMetricsPane({
                 {selectedHead && selectedHeadRow ? (
                   <>
                     <div className="mb-1 flex flex-row items-center justify-center gap-x-1 text-center text-[10px] font-medium uppercase text-slate-400">
-                      Max Activation Distribution
+                      Max Attention Distribution
                     </div>
                     {selectedHistogram ? (
                       <Plot
@@ -1073,7 +1076,7 @@ export default function ModelHeadMetricsPane({
                               const lo = selectedHistogram.binEdges[i];
                               const hi = selectedHistogram.binEdges[i + 1];
                               const count = selectedHistogram.binValues[i];
-                              return `<b>Activation Range (x)</b>: ${lo?.toFixed(2)} – ${hi?.toFixed(2)}<br><b># Sequences (y)</b>: ${count.toLocaleString()}<extra></extra>`;
+                              return `<b>Attention Weight Range (x)</b>: ${lo?.toFixed(2)} – ${hi?.toFixed(2)}<br><b># Sequences (y)</b>: ${count.toLocaleString()}<extra></extra>`;
                             }),
                           },
                         ]}
@@ -1114,7 +1117,7 @@ export default function ModelHeadMetricsPane({
                     ) : (
                       <div className="flex h-[130px] w-full items-center justify-center text-center">
                         <p className="text-[11px] font-medium text-slate-400">
-                          {detailError || 'No activation histogram available for this head.'}
+                          {detailError || 'No attention distribution available for this head.'}
                         </p>
                       </div>
                     )}
