@@ -1,0 +1,197 @@
+---
+title: 'HeadVis, plus NLA Contributions and more SAEs'
+description: 'Explore 36,000+ Attention Heads Across 37 Models'
+date: 2026-6-9
+author: Johnny Lin, David Chanin
+image: ASSET_BASE_URL/blog/headtop.gif
+imagePreview: ASSET_BASE_URL/blog/headtop.gif
+---
+
+<div className="mt-2"></div>
+
+_This post is human-written and not AI generated or edited._
+
+Hey all! We're introducing a new Neuronpedia core feature for exploring attention heads in collaboration with Anthropic, and we also provide a few updates to NLAs and SAEs, as well as a quick poll in the end.
+
+---
+
+## ➡️ [**Try HeadVis**](/qwen3.5-0.8b/head/4/5?headFinder=true) - Qwen 3.5 0.8B
+
+HeadVis ([Luger, Kamath, et al](https://transformer-circuits.pub/2026/headvis/index.html)) is Anthropic's tool for exploring attention heads, and it's now available for 37 models on Neuronpedia, for a total of 36,000+ attention head dashboards.
+
+Let's examine an [induction head](https://www.neuronpedia.org/qwen3.5-0.8b/head/4/5?headFinder=true) (an attention head responsible for repeating previously seen token patterns like [A][B]...[A]->[B]) in [Qwen3.5-0.8B](https://www.neuronpedia.org/qwen3.5-0.8b/head/4/5?headFinder=true):
+
+<img src="ASSET_BASE_URL/blog/headvis.gif" alt="Induction head in Qwen 3.5 0.8B" />
+
+In the sequence above, the species name "Glenea anticepunctata" is repeated multiple times. As we hover over the tokens in its name, the orange lines show the attention head looking back at previous copies of the species name (specifically, the token immediately after the previous instance of the current token) so it knows what to output next. The grey lines show the opposite: where the hovered token is being referenced by a future token.
+
+The rest of the attention dashboard shows other metrics and visualizations such as self attention score, max attenetion distribution, and top query and key tokens.
+
+### Head Finder
+
+This Qwen 3.5 model has 24 layers and 8 heads per layer, for a total of 192 attention heads, so how did we find an induction head? The **Head Finder** (enabled by clicking "Finder" on an attention head dashboard) lets us find top N heads by notable, precomputed metrics. In this case, we filtered by top **induction scores** of all heads - calculated by averaging the induction-pattern attention values across many sequences.
+
+Here's the Head Finder in action:
+
+<img src="ASSET_BASE_URL/blog/finder.gif" alt="Head Finder for Qwen 3.5 0.8B" />
+
+#### Accessing & Sharing Attention Heads
+
+Since HeadVis is a core Neuronpedia integration, there are a few ways to access and share attention head dashboards:
+
+1. **Model Page** - There's now an "Attention Visualizer" panel on all model pages, which contains the whole HeadVis interface and finder. Model pages on Neuronpedia are in the URL format: neuronpedia.org/[modelId], like [neuronpedia.org/qwen3.5-0.8b](https://www.neuronpedia.org/qwen3.5-0.8b).
+2. **Dropdowns** - From any dashboard page or "jump to" panel on Neuronpedia, choose your model and select the "Attention Heads" release.
+3. **Direct Links** - Like feature dashboards, attention heads are directly shareable simply by copying its URL, which is in the format neuronpedia.org/[modelId]/head/[layer]/[head_index], like [neuronpedia.org/qwen3.5-0.8b/head/4/5](https://www.neuronpedia.org/qwen3.5-0.8b/head/4/5). Also like feature dashbarods, you can embed attention heads in an iframe with the embed=true query parameter.
+4. **Exports** - Attention head metrics and sequences based on the HeadVis [specification](https://github.com/anthropics/headvis) are downloadable in our [exports](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/) under [model]/headvis/[dataset_used]. For example, the HeadVis data for Gemma-3-27B-IT is available [here](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/gemma-3-27b-it/headvis/). We used pile-uncopyrighted to generate all HeadVis data.
+
+---
+
+## Natural Language Autoencoders - Community Contributions
+
+#### Explaining Features with Foreign NLAs (Francesco Zaffino)
+
+[Read Post (LessWrong)](https://www.lesswrong.com/posts/AtbZQuAn2iY2jCup2/explaining-sae-features-with-foreign-natural-language) | [Notebook](https://colab.research.google.com/drive/1VM-rDr9MleWzzwiGzr5rAnA8NiR33aKI#scrollTo=Hnf_egPFGrPu)
+
+Contributor Francesco Zaffino previously demoed ([notebook](https://colab.research.google.com/drive/1DYXHO61ns2iDmiySYrp9VRFzYKMYItxI?usp=sharing)) using Gemma's NLA to explain SAE features. His new post extends this experiment in two ways:
+
+- Cross-model NLA AV Explanations: Using one model's NLA to explain a different model's SAE features by first mapping activations from one model to another.
+- Improving NLA SAE Explanations: By making the SAE vector look more like a residual stream activation (via "washout"), the explanations tend to be less influenced by random model quirks.
+
+Check out [the post](https://www.lesswrong.com/posts/AtbZQuAn2iY2jCup2/explaining-sae-features-with-foreign-natural-language) and the associated [notebook](https://colab.research.google.com/drive/1VM-rDr9MleWzzwiGzr5rAnA8NiR33aKI#scrollTo=Hnf_egPFGrPu).
+
+#### NLA for Gemma 4 E2B (Caleb DeLeeuw)
+
+Contributor Caleb DeLeeuw is working on NLAs for Gemma 4 E2B, and has trained a few versions of it. Surprisingly, the NLAs were trained on a 4GB consumer GPU! These NLAs are still a work in progress, but there are two versions for experimentation:
+
+- v0.0.1: Gemma 4 E2B [AV](https://huggingface.co/Solshine/gemma-4-e2b-nla-L23-av-v0_0_1) and [AR](https://huggingface.co/Solshine/gemma-4-e2b-nla-L23-ar-v0_0_1)
+- v0.1: Gemma 4 E2B [AV](https://huggingface.co/Solshine/gemma-4-e2b-nla-L23-av-v0_1_dd-step_250) and [AR](https://huggingface.co/Solshine/gemma-4-e2b-nla-L23-ar-v0_1-paraphrase-invariant)
+
+Example code for running these NLAs is [available here](https://github.com/SolshineCode/nla-gemma-4-e2b/blob/main/examples/round_trip_example.py).
+
+---
+
+## New SAE Wave (David Chanin & Decode)
+
+Combined with the new SAEs from the last newsletter, here are the 14 new SAEs available on Neuronpedia, all with auto-interp explanations and available via our [exports](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/).
+
+<table>
+  <thead>
+    <tr>
+      <th>Model</th>
+      <th>Layer</th>
+      <th>Link</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Gemma 4 31B</td>
+      <td>30</td>
+      <td>
+        <a href="https://www.neuronpedia.org/gemma-4-31b/30-res-matryoshka-131k">30-res-matryoshka-131k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Gemma 4 E2B</td>
+      <td>17</td>
+      <td>
+        <a href="https://www.neuronpedia.org/gemma-4-e2b/17-matryoshka-res-65k">17-matryoshka-res-65k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Gemma 4 E4B</td>
+      <td>21</td>
+      <td>
+        <a href="https://www.neuronpedia.org/gemma-4-e4b/21-matryoshka-res-65k">21-matryoshka-res-65k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Olmo 3 7B</td>
+      <td>16</td>
+      <td>
+        <a href="https://www.neuronpedia.org/olmo-3-1025-7b/16-res-matryoshka-65k">16-res-matryoshka-65k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Olmo 3 32B</td>
+      <td>32</td>
+      <td>
+        <a href="https://www.neuronpedia.org/olmo-3-1125-32b/32-res-batchtopk-131k">32-res-batchtopk-131k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3 1.7B</td>
+      <td>14</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3-1.7b/14-resid-batchtopk-65k__l0-80">14-resid-batchtopk-65k__l0-80</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3 8B</td>
+      <td>18</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3-8b/18-resid-batchtopk-65k__l0-80">18-resid-batchtopk-65k__l0-80</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3 14B</td>
+      <td>20</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3-14b/20-resid-batchtopk-65k__l0-80">20-resid-batchtopk-65k__l0-80</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3 32B</td>
+      <td>32</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3-32b/32-resid-batchtopk-65k">32-resid-batchtopk-65k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3.5 0.8B</td>
+      <td>11</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3.5-0.8b/11-res-matryoshka-65k">11-res-matryoshka-65k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3.5 2B Base</td>
+      <td>11</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3.5-2b-pt/11-qwenscope-res-32k">11-qwenscope-res-32k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3.5 4B</td>
+      <td>15</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3.5-4b/15-res-matryoshka-65k">15-res-matryoshka-65k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3.5 9B Base</td>
+      <td>15</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3.5-9b-pt/15-qwenscope-res-64k">15-qwenscope-res-64k</a>
+      </td>
+    </tr>
+    <tr>
+      <td>Qwen 3.5 27B</td>
+      <td>31</td>
+      <td>
+        <a href="https://www.neuronpedia.org/qwen3.5-27b/31-qwenscope-res-80k">31-qwenscope-res-80k</a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
+## Poll: Which models do you (want to) use for research?
+
+#### ➡️ [**Poll Link**](https://forms.gle/4AKXdPXoR67ejceu8)
+
+Neuronpedia currently runs >20 models for live inference, steering, graph generation, circuit tracing, and now NLAs in the API and on our interface. Which of the models do you care about the most, and which models should we add? Please take a minute toe answer the one question poll so that we can prioritize the models that you care about the most.
+
+---
+
+As always, please [contact us](https://www.neuronpedia.org/contact) with your questions, feedback, and suggestions.
