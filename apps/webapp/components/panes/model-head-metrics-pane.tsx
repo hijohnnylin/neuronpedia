@@ -487,6 +487,15 @@ export default function ModelHeadMetricsPane({
     setSelectedHead((prev) => ({ layer: prev?.layer ?? 0, headIndex }));
   };
 
+  // Switching models on the head page invalidates the current selection: the new model may not
+  // have the same layer/head, and the displayed metrics/sequences belong to the previous model.
+  // Clear the head selection (which clears the metrics, histograms, and sequences via the effects
+  // above) so we never show stale, model-mismatched data.
+  const handleModelChange = (newModelId: string) => {
+    setFinderModelId(newModelId);
+    setSelectedHead(null);
+  };
+
   // Keep the manual Layer/Head grids scrolled so the active selection is visible,
   // without scrolling the page/card (e.g. when selecting via Find a Head by Score).
   useEffect(() => {
@@ -574,22 +583,29 @@ export default function ModelHeadMetricsPane({
     };
   }, [finderModelId, modelId, metrics]);
 
-  // Toggle the in-pane head finder, keeping the `headFinder` query param in sync (without a
-  // navigation) so a refresh or subsequent navigation preserves the open/closed state.
-  const toggleHeadFinder = () => {
-    setHeadFinderOpen((prev) => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        const url = new URL(window.location.href);
-        if (next) {
-          url.searchParams.set('headFinder', 'true');
-        } else {
-          url.searchParams.delete('headFinder');
-        }
-        window.history.replaceState(window.history.state, '', url.toString());
+  // Set the in-pane head finder open state, keeping the `headFinder` query param in sync (without
+  // a navigation) so a refresh or subsequent navigation preserves the open/closed state.
+  const applyHeadFinderOpen = (next: boolean) => {
+    setHeadFinderOpen(next);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (next) {
+        url.searchParams.set('headFinder', 'true');
+      } else {
+        url.searchParams.delete('headFinder');
       }
-      return next;
-    });
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
+  };
+
+  const toggleHeadFinder = () => applyHeadFinderOpen(!headFinderOpen);
+
+  // Called when the selector leaves attention-head mode (a non-head release/source is picked).
+  // The head finder is head-specific, so dismiss it.
+  const handleExitHeadMode = () => {
+    if (headFinderOpen) {
+      applyHeadFinderOpen(false);
+    }
   };
 
   const selectedHistogram = useMemo(() => {
@@ -742,13 +758,14 @@ export default function ModelHeadMetricsPane({
               includeHeads
               numHeadLayers={layerOptions.length}
               numHeadIndexes={headIndexOptions.length}
-              defaultHeadLayer={selectedHead?.layer ?? initialLayer}
-              defaultIndex={(selectedHead?.headIndex ?? initialHeadIndex)?.toString()}
+              defaultHeadLayer={selectedHead?.layer}
+              defaultIndex={selectedHead?.headIndex?.toString()}
               openInNewTab={false}
               showHeadFinderToggle
               headFinderActive={headFinderOpen}
               onHeadFinderToggle={toggleHeadFinder}
-              onModelChange={setFinderModelId}
+              onModelChange={handleModelChange}
+              onExitHeadMode={handleExitHeadMode}
             />
           </div>
         )}

@@ -79,10 +79,17 @@ export default function ModelSelector({
                   return true;
                 })
                 .sort((a, b) => {
-                  if (a && b) {
-                    return a.localeCompare(b);
+                  if (!a || !b) {
+                    return 0;
                   }
-                  return 0;
+                  // Pin "circuitgpt-python" to the bottom; everything else stays alphabetical.
+                  if (a === 'circuitgpt-python') {
+                    return 1;
+                  }
+                  if (b === 'circuitgpt-python') {
+                    return -1;
+                  }
+                  return a.localeCompare(b);
                 })
                 .map((mId) => (
                   <Select.Item

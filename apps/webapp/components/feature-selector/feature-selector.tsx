@@ -109,6 +109,7 @@ export default function FeatureSelector({
   headFinderActive = false,
   onHeadFinderToggle,
   onModelChange,
+  onExitHeadMode,
 }: {
   defaultModelId?: string;
   defaultSourceSet?: string;
@@ -137,6 +138,8 @@ export default function FeatureSelector({
   onHeadFinderToggle?: () => void;
   // Notified whenever the selected model changes, so callers can reload model-scoped data.
   onModelChange?: (modelId: string) => void;
+  // Notified when the selector leaves attention-head mode (a non-head release/source is picked).
+  onExitHeadMode?: () => void;
 }) {
   const { getSourceSetsForModelId, getFirstSourceForSourceSet, globalModels, getDefaultModel } = useGlobalContext();
   const [modelId, setModelId] = useState(defaultModelId || getDefaultModel()?.id || DEFAULT_MODELID);
@@ -157,6 +160,14 @@ export default function FeatureSelector({
 
   const modelIdChanged = (newModelId: string) => {
     setModelId(newModelId);
+    // When already in attention-head mode (the head page), stay in head mode for the new model at
+    // layer 0 with no head selected — instead of dropping into the new model's first SAE release.
+    if (includeHeads && headLayer !== undefined) {
+      setHeadLayer(0);
+      setIndex(undefined);
+      onModelChange?.(newModelId);
+      return;
+    }
     setHeadLayer(undefined);
     onModelChange?.(newModelId);
     const newSourceSet = getSourceSetsForModelId(newModelId, filterToPublic)?.[0].name;
@@ -167,6 +178,8 @@ export default function FeatureSelector({
   const layerChanged = (newLayer: string) => {
     setHeadLayer(undefined);
     setSource(newLayer);
+    // Selecting a regular (non-head) source/SAE leaves attention-head mode.
+    onExitHeadMode?.();
   };
 
   const headLayerChanged = (newHeadLayer: number) => {
@@ -188,9 +201,13 @@ export default function FeatureSelector({
 
   // Stay in sync when the controlling head selection changes from the parent (e.g. the head page
   // updates the selected head client-side without remounting this component), so the selector
-  // reflects the current head.
+  // reflects the current head. Ignore an undefined value: the parent clears its selection on a
+  // model switch (so it can clear stale metrics), but we keep the selector in head mode at the
+  // layer set by `modelIdChanged`.
   useEffect(() => {
-    setHeadLayer(defaultHeadLayer);
+    if (defaultHeadLayer !== undefined) {
+      setHeadLayer(defaultHeadLayer);
+    }
   }, [defaultHeadLayer]);
 
   useEffect(() => {

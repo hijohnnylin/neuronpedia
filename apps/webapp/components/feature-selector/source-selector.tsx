@@ -105,6 +105,9 @@ export default function SourceSelector({
 
   useEffect(() => {
     if (modelId && !isMount) {
+      // In attention-head mode, switching models keeps us on the head page (the parent pins us to
+      // layer 0), so we must not auto-select an SAE source — that would drop us out of head mode.
+      const inHeadMode = includeHeads && selectedHeadLayer !== undefined;
       // update the sourceSet, release, and layer
       let sourceSets = getSourceSetsForModelId(modelId);
       sourceSets = sourceSets
@@ -130,7 +133,7 @@ export default function SourceSelector({
             sources: ss.sources?.filter((s) => s.visibility === 'PUBLIC'),
           }));
         }
-        if (sourceSets[0].sources && sourceSets[0].sources.length > 0 && sourceSets[0].sources[0].id) {
+        if (!inHeadMode && sourceSets[0].sources && sourceSets[0].sources.length > 0 && sourceSets[0].sources[0].id) {
           sourceChangedCallback?.(
             sourceSets[0].sources.sort((a, b) => {
               if (a.id && b.id) {
@@ -140,7 +143,7 @@ export default function SourceSelector({
             })[0].id || '',
           );
         }
-      } else {
+      } else if (!inHeadMode) {
         sourceChangedCallback?.('');
       }
     }
