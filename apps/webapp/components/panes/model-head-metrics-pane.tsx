@@ -772,8 +772,8 @@ export default function ModelHeadMetricsPane({
               </div>
             )}
             <div className="mt-1 flex flex-1 flex-col">
-              <div className="flex h-[240px] w-full flex-row items-center justify-center gap-x-3 px-0 pt-0">
-                <div className="flex h-full min-w-0 flex-1 flex-col items-start justify-start border-r border-slate-100 px-3 py-2">
+              <div className="flex w-full flex-col items-center justify-center gap-x-3 px-0 pt-0 sm:h-[240px] sm:flex-row">
+                <div className="mb-2 flex h-full w-full min-w-0 flex-1 flex-col items-start justify-start border-b border-slate-200 px-3 py-2 pb-4 sm:mb-0 sm:border-b-0 sm:border-r sm:pb-2">
                   <div className="mb-2 text-xs font-bold text-slate-400">
                     Find Head By Metric{' '}
                     <CustomTooltip side="right" wide trigger={<QuestionMarkCircledIcon className="h-3 w-3" />}>
