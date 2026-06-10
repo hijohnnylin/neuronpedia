@@ -1,4 +1,5 @@
 import { getBlogDateString, getPostBySlug, PostMetaData } from '@/app/blog/blog-util';
+import HomeNewsletterSignup from '@/app/home/home-newsletter-signup';
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import { BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
@@ -72,6 +73,9 @@ export default async function Page(props: Props) {
           </BreadcrumbLink>,
         ]}
       />
+      <div className="-mb-4 mt-4 flex w-full max-w-screen-sm justify-center px-2 sm:px-0">
+        <HomeNewsletterSignup />
+      </div>
       <div className="flex w-full max-w-screen-lg flex-col items-center justify-start px-2 pt-4 text-slate-800 sm:flex-row sm:items-start sm:justify-center sm:gap-x-7 sm:px-0">
         <div className="sm:sticky sm:left-0 sm:top-[100px]">
           <BlogSidebar />
