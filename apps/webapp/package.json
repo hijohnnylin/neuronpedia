@@ -183,7 +183,7 @@
     "@types/seedrandom": "^3.0.7",
     "@types/underscore": "^1.11.15",
     "@types/validator": "^13.11.1",
-    "@vitejs/plugin-react": "^4.0.0",
+    "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^4.0.0",
     "autoprefixer": "^10.4.14",
     "concurrently": "^7.6.0",
