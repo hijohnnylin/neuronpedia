@@ -4,6 +4,10 @@
 - [what this is](#what-this-is)
 - [simple non-docker setup](#simple-non-docker-setup)
 - [Documentation / Usage (Swagger)](#documentation--usage-swagger)
+- [usage examples](#usage-examples)
+  - [generate an explanation](#generate-an-explanation)
+  - [score an explanation with embeddings](#score-an-explanation-with-embeddings)
+  - [score an explanation with fuzz detection](#score-an-explanation-with-fuzz-detection)
 - [some docker commands for reference](#some-docker-commands-for-reference)
 - [Testing, Linting, and Formatting](#testing-linting-and-formatting)
 
@@ -43,6 +47,86 @@ Notes/Caveats:
 
 - You will need to set the YOUR_OPENROUTER_KEY in your test requests.
 - If you set a SECRET (not set by default) in your `.env` file, you'll need to add a `x-secret-key` header.
+
+## usage examples
+
+All endpoints are documented under `schemas/openapi/autointerp-server.yaml`. The examples below assume the server is running on port 5003. If you configured `SECRET` in `.env`, add `-H "x-secret-key: <secret>"` to each request.
+
+### generate an explanation
+
+Use `/v1/explain/default` to generate an explanation for a set of activation records. Replace `YOUR_OPENROUTER_KEY` with your OpenRouter API key.
+
+```bash
+curl -X POST http://127.0.0.1:5003/v1/explain/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "openrouter_key": "YOUR_OPENROUTER_KEY",
+    "model": "openai/gpt-4o-mini",
+    "activations": [
+      {
+        "tokens": ["The", " cat", " sat", " quietly"],
+        "values": [0.1, 1.8, 0.4, 0.2]
+      },
+      {
+        "tokens": ["A", " kitten", " chased", " yarn"],
+        "values": [0.0, 2.1, 0.3, 0.9]
+      }
+    ]
+  }'
+```
+
+The response includes an `explanation` string for the behavior shown in the activation examples.
+
+### score an explanation with embeddings
+
+Use `/v1/score/embedding` to compare an explanation against activation examples with the embedding scorer.
+
+```bash
+curl -X POST http://127.0.0.1:5003/v1/score/embedding \
+  -H "Content-Type: application/json" \
+  -d '{
+    "explanation": "This feature activates on references to cats and feline behavior.",
+    "activations": [
+      {
+        "tokens": ["The", " cat", " sat"],
+        "values": [0.1, 1.8, 0.4]
+      },
+      {
+        "tokens": ["A", " kitten", " purred"],
+        "values": [0.0, 2.1, 0.6]
+      }
+    ]
+  }'
+```
+
+The response includes a `score` between 0 and 1 and a `breakdown` of the scorer output.
+
+### score an explanation with fuzz detection
+
+Use `/v1/score/fuzz-detection` to ask a model to classify whether examples match an explanation. The `type` field can be `FUZZ` or `DETECTION`.
+
+```bash
+curl -X POST http://127.0.0.1:5003/v1/score/fuzz-detection \
+  -H "Content-Type: application/json" \
+  -d '{
+    "openrouter_key": "YOUR_OPENROUTER_KEY",
+    "model": "openai/gpt-4o-mini",
+    "type": "DETECTION",
+    "explanation": "This feature activates on references to cats and feline behavior.",
+    "activations": [
+      {
+        "tokens": ["The", " cat", " sat"],
+        "values": [0.1, 1.8, 0.4]
+      },
+      {
+        "tokens": ["The", " car", " stopped"],
+        "values": [0.2, 0.1, 0.0]
+      }
+    ]
+  }'
+```
+
+The response includes a `score` and per-example classification details in `breakdown`.
 
 ## some docker commands for reference
 
