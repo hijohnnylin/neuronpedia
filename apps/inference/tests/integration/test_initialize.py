@@ -2,7 +2,7 @@ import torch
 
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model
-from tests.conftest import TEST_PROMPT
+from tests.conftest import SAE_SELECTED_SOURCES, TEST_PROMPT
 
 
 def test_initialize(initialize_models: None):  # noqa: ARG001
@@ -16,8 +16,12 @@ def test_initialize(initialize_models: None):  # noqa: ARG001
     # Check that the SAE is loaded
     sae_manager = SAEManager.get_instance()
     assert sae_manager is not None
-    assert "7-res-jb" in sae_manager.sae_data
-    sae = sae_manager.sae_data["7-res-jb"]["sae"]
+    expected_sae_source = SAE_SELECTED_SOURCES[0]
+    assert expected_sae_source in sae_manager.sae_data, (
+        f"Expected SAE source '{expected_sae_source}' not found in loaded SAEs. "
+        f"Loaded SAEs: {list(sae_manager.sae_data.keys())}"
+    )
+    sae = sae_manager.sae_data[expected_sae_source]["sae"]
     assert sae is not None
 
     # Test a simple forward pass
