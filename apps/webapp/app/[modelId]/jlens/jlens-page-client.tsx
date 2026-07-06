@@ -21,6 +21,12 @@ import { JLENS_TOUR_GUIDE_BUTTON_ELEMENT_ID, JLENS_TOUR_SEEN_KEY } from './jlens
 import { JlensTourStepContext } from './jlens-tour-context';
 import { JLENS_BLOG_URL, JLENS_CONTACT_EMAIL, JLENS_GITHUB_URL, JLENS_HF_URL, JLENS_PAPER_URL } from './jlens-urls';
 
+// Failsafe for the navigation loading gate: if a `router.push` transition never
+// settles (App Router state desync) and the URL never lands on the requested
+// target, drop the skeleton after this long so the UI can't stay stuck. Long
+// enough not to trip on genuinely slow navigations.
+const NAV_WATCHDOG_MS = 5000;
+
 // A loaded share (resolved server-side from `?shareId=`). The heavy run data
 // lives at `url` (gzipped S3 blob, fetched client-side); the rest is UI state.
 export interface JlensShareData {
@@ -105,13 +111,49 @@ export default function JlensPageClient({
   // fires). Driving `router.push` through a transition lets us show the loading
   // skeleton the instant a demo/free-chat button is clicked, rather than only
   // once the server responds and `JlensShareView` mounts.
-  const [navPending, startNavTransition] = useTransition();
+  //
+  // We gate the skeleton on our own `pendingNavHref` rather than the
+  // transition's `isPending`: the App Router's internal state can desync (e.g.
+  // after the client-side `window.history` updates below), and an occasional
+  // `router.push` then leaves the transition pending forever — which would
+  // strand the skeleton on both panels until another navigation. Tracking the
+  // requested href ourselves lets us clear the gate as soon as the URL reflects
+  // the target (normal case), with a watchdog timeout as a last resort.
+  const [, startNavTransition] = useTransition();
+  const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
   const navigate = useCallback(
     (href: string) => {
+      setPendingNavHref(href);
       startNavTransition(() => router.push(href));
     },
     [router],
   );
+
+  // Clear the navigation gate once the URL actually reflects the requested
+  // target. Falls back to a watchdog so a transition that never settles can't
+  // leave the loading skeleton up indefinitely.
+  useEffect(() => {
+    if (!pendingNavHref) return undefined;
+    let targetModelId: string | null = null;
+    let targetShareId: string | null = null;
+    try {
+      const url = new URL(pendingNavHref, window.location.origin);
+      targetModelId = url.pathname.split('/').filter(Boolean)[0] ?? null;
+      targetShareId = url.searchParams.get('shareId');
+    } catch {
+      // Malformed href — drop the gate rather than risk stranding it.
+      setPendingNavHref(null);
+      return undefined;
+    }
+    const landed =
+      (targetModelId == null || targetModelId === modelId) && (targetShareId ?? null) === (urlShareId ?? null);
+    if (landed) {
+      setPendingNavHref(null);
+      return undefined;
+    }
+    const timeout = setTimeout(() => setPendingNavHref(null), NAV_WATCHDOG_MS);
+    return () => clearTimeout(timeout);
+  }, [pendingNavHref, modelId, urlShareId]);
 
   useEffect(() => {
     setActiveModelId(modelId);
@@ -293,7 +335,7 @@ export default function JlensPageClient({
               </div>
             </div>
             <div className="mx-auto flex h-full min-h-0 w-full max-w-screen-xl flex-1 flex-col sm:py-3">
-              {navPending ? (
+              {pendingNavHref ? (
                 <JlensLoadingSkeleton />
               ) : share ? (
                 <JlensShareView
