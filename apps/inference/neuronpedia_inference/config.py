@@ -38,7 +38,7 @@ class Config:
         exclude_sae: list[str] | None = None,
         model_from_pretrained_kwargs: str = "{}",
         max_loaded_saes: int = 100,
-        steer_special_token_ids: list[int] | None = None,
+        steer_special_token_ids: list[int] | set[int] | None = None,
         nnsight: bool = False,
         chatspace: bool = False,
     ):
@@ -97,7 +97,13 @@ class Config:
         self.steer_special_token_ids = steer_special_token_ids
 
     def get_valid_model_ids(self):
-        return set([sae_set["model"] for sae_set in self.sae_config])
+        valid_model_ids = {sae_set["model"] for sae_set in self.sae_config}
+        valid_model_ids.add(self.model_id)
+        if self.override_model_id:
+            valid_model_ids.add(self.override_model_id)
+        if self.custom_hf_model_id:
+            valid_model_ids.add(self.custom_hf_model_id)
+        return valid_model_ids
 
     def _generate_sae_config(self):
         directory_df = get_saelens_neuronpedia_directory_df()
@@ -164,6 +170,7 @@ def get_saelens_neuronpedia_directory_df():
             "conversion_func",
         ],
         inplace=True,
+        errors="ignore",
     )
     df["neuronpedia_id_list"] = df["neuronpedia_id"].apply(lambda x: list(x.items()))
     df_exploded = df.explode("neuronpedia_id_list")
@@ -171,6 +178,7 @@ def get_saelens_neuronpedia_directory_df():
         df_exploded["neuronpedia_id_list"].tolist(), index=df_exploded.index
     )
     df_exploded = df_exploded.drop(columns=["neuronpedia_id_list"])
+    df_exploded = df_exploded.loc[df_exploded["neuronpedia_id"].notna()]
     df_exploded = df_exploded.reset_index(drop=True)
     df_exploded["neuronpedia_set"] = df_exploded["neuronpedia_id"].apply(
         lambda x: ("-".join(x.split("/")[-1].split("-")[1:]) if x is not None else None)

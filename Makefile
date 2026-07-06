@@ -65,7 +65,10 @@ webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Bui
 		echo "Using custom CA bundle: $(CUSTOM_CA_BUNDLE)"; \
 	fi
 	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) ENV_FILE=../.env.localhost \
-		docker compose -f docker/compose.yaml build webapp db-init postgres
+		docker compose \
+		--env-file .env.localhost \
+		--env-file .env \
+		-f docker/compose.yaml build webapp db-init postgres
 
 webapp-localhost-run: ## Webapp: Localhost Environment - Run (Production Build)
 	@echo "Bringing up the webapp and connecting to the localhost database..."
@@ -129,6 +132,8 @@ inference-localhost-build: ## Inference: Localhost Environment - Build
 	ENV_FILE=../.env.localhost \
 		BUILD_TYPE=$(BUILD_TYPE) \
 		docker compose \
+		--env-file .env.localhost \
+		--env-file .env \
 		-f docker/compose.yaml \
 		$(if $(USE_LOCAL_HF_CACHE),-f docker/compose.hf-cache.yaml,) \
 		build inference

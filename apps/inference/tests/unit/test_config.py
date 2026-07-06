@@ -56,6 +56,37 @@ def test_config_initialization(mock_config: Config):
         "type": "saelens-1",
         "saes": [f"{i}-res-jb" for i in range(13)],
     }
+    assert mock_config.get_valid_model_ids() == {"gpt2-small"}
+
+
+def test_get_valid_model_ids_includes_aliases():
+    with patch.object(Config, "_generate_sae_config") as mock_gen:
+        mock_gen.return_value = [
+            {
+                "model": "google/gemma-3-4b-it",
+                "local": False,
+                "set": "gemmascope-2-transcoder-16k",
+                "type": "saelens-1",
+                "saes": ["23-gemmascope-2-transcoder-16k"],
+            }
+        ]
+
+        config = Config(
+            model_id="gemma-3-4b-it",
+            custom_hf_model_id="google/gemma-3-4b-it",
+            override_model_id="google/gemma-3-4b-it",
+            sae_sets=["gemmascope-2-transcoder-16k"],
+            model_dtype="bfloat16",
+            sae_dtype="bfloat16",
+            secret="test_secret",
+            token_limit=100,
+            device="cuda",
+        )
+
+        assert config.get_valid_model_ids() == {
+            "gemma-3-4b-it",
+            "google/gemma-3-4b-it",
+        }
 
 
 def test_get_saelens_neuronpedia_directory_df():

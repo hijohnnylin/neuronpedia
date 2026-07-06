@@ -6,7 +6,9 @@ ARG UBUNTU_VERSION=22.04
 ARG CUSTOM_CA_BUNDLE
 
 # NON-CUDA base
-FROM python:3.10-slim AS base-nocuda
+FROM python:3.11-slim AS base-nocuda
+ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
+ENV VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH
 
 # Re-declare ARG after FROM (ARGs don't persist across FROM statements)
 ARG CUSTOM_CA_BUNDLE
@@ -31,9 +33,12 @@ ENV SSL_CERT_FILE=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
 ENV REQUESTS_CA_BUNDLE=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
 ENV CURL_CA_BUNDLE=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
 ENV GIT_SSL_CAINFO=${CUSTOM_CA_BUNDLE:+/etc/ssl/certs/ca-certificates.crt}
+RUN python -m venv "$VIRTUAL_ENV" && python -m pip install --upgrade pip
 
 # CUDA base
 FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu${UBUNTU_VERSION} AS base-cuda
+ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
+ENV VIRTUAL_ENV=/opt/venv PATH=/opt/venv/bin:$PATH
 
 # Re-declare ARG after FROM (ARGs don't persist across FROM statements)
 ARG CUSTOM_CA_BUNDLE
@@ -42,7 +47,7 @@ ARG CUSTOM_CA_BUNDLE
 COPY ${CUSTOM_CA_BUNDLE:-.nocustomca} /tmp/ca-bundle-temp
 
 # Install dependencies and set up CA certificates, then download NVIDIA toolkit
-RUN apt-get update && apt-get install -y curl gpg ca-certificates && \
+RUN apt-get update && apt-get install -y curl gpg ca-certificates software-properties-common && \
     if [ -f /tmp/ca-bundle-temp ] && [ "${CUSTOM_CA_BUNDLE}" != ".nocustomca" ]; then \
         mkdir -p /usr/local/share/ca-certificates && \
         mv /tmp/ca-bundle-temp /usr/local/share/ca-certificates/custom-ca.crt && \
@@ -71,11 +76,17 @@ RUN apt-get update && apt-get install -y \
     nvidia-container-toolkit \
     && rm -rf /var/lib/apt/lists/*
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3-pip \
-    python3.10-venv \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+    python3.11 \
+    python3.11-venv \
     && rm -rf /var/lib/apt/lists/* \
-    && ln -s /usr/bin/python3.10 /usr/bin/python
+    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python \
+    && python -m ensurepip --upgrade \
+    && python -m venv "$VIRTUAL_ENV" \
+    && python -m pip install --upgrade pip
 
 # Main build stage
 FROM base-${BUILD_TYPE:-nocuda} AS final
@@ -103,7 +114,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry
-RUN pip install poetry
+RUN python -m pip install poetry
 
 ENV POETRY_VIRTUALENVS_CREATE=false
 RUN poetry config virtualenvs.create false
@@ -116,6 +127,7 @@ RUN if [ -n "${CUSTOM_CA_BUNDLE}" ] && [ "${CUSTOM_CA_BUNDLE}" != ".nocustomca" 
 
 # Copy the client package first
 COPY packages/python/neuronpedia-inference-client /app/packages/python/neuronpedia-inference-client/
+COPY apps/inference/vendor/chatspace /app/apps/inference/vendor/chatspace/
 
 # Copy only poetry files
 COPY apps/inference/pyproject.toml apps/inference/poetry.lock* apps/inference/
