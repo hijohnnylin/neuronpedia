@@ -85,7 +85,7 @@ export default async function Page({
     let descriptionAttribution: string | null = null;
     if (row.description && row.userId !== DEFAULT_CREATOR_USER_ID) {
       const sharerName = row.userId ? row.user?.name : null;
-      descriptionAttribution = sharerName ? `@${sharerName}` : '';
+      descriptionAttribution = sharerName ? `@${sharerName}` : 'Anonymous';
     }
 
     share = {
