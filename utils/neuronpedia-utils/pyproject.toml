@@ -10,12 +10,15 @@ typer = {version = "^0.12.0"}
 sae-dashboard = "^0.6.8"
 cuid2 = "^2.0.0"
 python-dotenv = "^1.0.0"
-psycopg2 = "^2.9.9"
+psycopg = {version = "^3.3.0", extras = ["binary"]}
+pyarrow = "^23.0.0"
+pgpq = "^0.11.0"
 automated-interpretability = "^0.0.23"
 
 openai = "^1.63.2"
 google-genai = "^1.57.0"
 boto3 = "^1.35.0"
+polars = "^1.40.1"
 
 [tool.poetry.group.dev.dependencies]
 line-profiler = "^5.0.0"

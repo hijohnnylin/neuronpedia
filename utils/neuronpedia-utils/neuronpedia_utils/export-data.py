@@ -1,22 +1,23 @@
-# Description: this script dumps the database (all sources/SAEs, models, explanations, activations, features) into ./exports
+# Description: dump the database into ./exports: sources/SAEs, models, explanations, activations, and features.
 # This is useful so that others can import it into their own instance
 # Usage: python export-database.py
 
 # TODO: should NOT re-export if files exist already
 # TODO: should be able to export a single model/source/release
 
-import json
-import os
-from psycopg2.extras import RealDictCursor
-from tqdm import tqdm
+import concurrent.futures
 import datetime
 import gzip
-import dotenv
-import typer
-import psycopg2
-from concurrent.futures import ThreadPoolExecutor
+import json
+import os
 import threading
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+
+import dotenv
+import psycopg
+import typer
+from psycopg.rows import dict_row
+from tqdm import tqdm
 
 dotenv.load_dotenv(".env.default")
 dotenv.load_dotenv()
@@ -43,12 +44,13 @@ if not os.path.exists(OUTPUT_PATH_CONFIG):
 
 # Add function to create new connection
 def create_connection():
-    conn = psycopg2.connect(
+    conn = psycopg.connect(
         dbname=os.getenv("DATABASE_NAME"),
         user=os.getenv("DATABASE_USERNAME"),
         password=os.getenv("DATABASE_PASSWORD"),
         host=os.getenv("DATABASE_HOST"),
         port=os.getenv("DATABASE_PORT"),
+        row_factory=dict_row,
     )
     # Set work_mem for this session
     with conn.cursor() as cur:
@@ -57,13 +59,11 @@ def create_connection():
     return conn
 
 
-def write_batch_to_jsonl(
-    table_name, columns, where_clause, output_file, expected_num_lines=None
-):
+def write_batch_to_jsonl(table_name, columns, where_clause, output_file, expected_num_lines=None):
     # Create new connection instead of getting from pool
     conn = create_connection()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             if columns is not None:
                 column_list = ", ".join(f'"{c}"' for c in columns)
             else:
@@ -114,9 +114,7 @@ def write_batch_to_jsonl(
                     and total_rows < expected_num_lines
                     and total_rows != 1  # empty source
                 ):
-                    raise Exception(
-                        f"Expected {expected_num_lines} lines in {output_file}, but got {total_rows}"
-                    )
+                    raise Exception(f"Expected {expected_num_lines} lines in {output_file}, but got {total_rows}")
     finally:
         conn.close()
 
@@ -141,7 +139,7 @@ def writeRowsToJsonlFile(rows, file):
 def export_model(model_id, source, OUTPUT_PATH_BASE):
     conn = create_connection()
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
         print(f"Exporting model {model_id}")
         cur.execute(
             """
@@ -166,7 +164,7 @@ def export_source(model_id, sourceset_name, source_id, OUTPUT_PATH_BASE):
     conn = create_connection()
     try:
         print(f"Exporting source {source_id} for model {model_id}")
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT * FROM "Source" WHERE "modelId" = %s AND "id" = %s
@@ -205,7 +203,7 @@ def export_release(release_id, source, OUTPUT_PATH_BASE):
     conn = create_connection()
     try:
         print(f"Exporting release {release_id}")
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
         cur.execute(
             """
             SELECT * FROM "SourceRelease" WHERE "name" = %s
@@ -230,7 +228,7 @@ def export_config():
         if not os.path.exists(OUTPUT_PATH_CONFIG):
             os.makedirs(OUTPUT_PATH_CONFIG)
 
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
 
         cur.execute(
             """
@@ -281,9 +279,7 @@ def export_config():
         conn.close()
 
 
-def export_inference_hosts(
-    model_id, source, OUTPUT_PATH_BASE, OVERRIDE_INSTANCE_HOST_URL
-):
+def export_inference_hosts(model_id, source, OUTPUT_PATH_BASE, OVERRIDE_INSTANCE_HOST_URL):
     path = f"{OUTPUT_PATH_BASE}/{source}/inference_hosts_on_source.jsonl"
     inf_source_path = f"{OUTPUT_PATH_BASE}/{source}/inference_hosts.jsonl"
     if os.path.exists(path) and os.path.exists(inf_source_path):
@@ -291,7 +287,7 @@ def export_inference_hosts(
     conn = create_connection()
     try:
         print(f"Exporting inference hosts for model {model_id}")
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
 
         cur.execute(
             """
@@ -330,7 +326,7 @@ def export_inference_hosts(
 def export_features(model_id, source, OUTPUT_PATH_BASE):
     conn = create_connection()
     try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur = conn.cursor()
 
         export_path = f"{OUTPUT_PATH_BASE}/{source}/features"
         if not os.path.exists(export_path):
@@ -352,9 +348,7 @@ def export_features(model_id, source, OUTPUT_PATH_BASE):
             total_count = result["count"]
 
         print(f"Total count: {total_count}")
-        num_batches = (
-            total_count + FEATURES_EXPLANATIONS_BATCH_SIZE - 1
-        ) // FEATURES_EXPLANATIONS_BATCH_SIZE
+        num_batches = (total_count + FEATURES_EXPLANATIONS_BATCH_SIZE - 1) // FEATURES_EXPLANATIONS_BATCH_SIZE
 
         print(f"Number of batches: {num_batches}")
     finally:
@@ -373,6 +367,10 @@ def export_features(model_id, source, OUTPUT_PATH_BASE):
         if os.path.exists(output_file):
             # print(f"{output_file} Skipping batch {batch + 1}/{num_batches} because it already exists")
             continue
+        where_clause = (
+            f"\"modelId\" = '{model_id}' AND \"layer\" = '{source}' "
+            f"ORDER BY index LIMIT {FEATURES_EXPLANATIONS_BATCH_SIZE} OFFSET {offset}"
+        )
         write_batch_to_jsonl(
             "Neuron",
             [
@@ -406,11 +404,9 @@ def export_features(model_id, source, OUTPUT_PATH_BASE):
                 "vectorDefaultSteerStrength",
                 "hasVector",
             ],
-            f"\"modelId\" = '{model_id}' AND \"layer\" = '{source}' ORDER BY index LIMIT {FEATURES_EXPLANATIONS_BATCH_SIZE} OFFSET {offset}",
+            where_clause,
             output_file,
-            expected_num_lines=(
-                FEATURES_EXPLANATIONS_BATCH_SIZE if batch < num_batches - 1 else None
-            ),
+            expected_num_lines=(FEATURES_EXPLANATIONS_BATCH_SIZE if batch < num_batches - 1 else None),
         )
         replace_author_and_creator_with_default_creator_id(output_file)
 
@@ -464,7 +460,7 @@ def export_explanations(model_id, source, OUTPUT_PATH_BASE):
         os.makedirs(export_path)
 
     conn = create_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     # Get total count first
     cur.execute(
@@ -482,9 +478,7 @@ def export_explanations(model_id, source, OUTPUT_PATH_BASE):
         total_count = result["count"]
 
     print(f"Total count: {total_count}")
-    num_batches = (
-        total_count + FEATURES_EXPLANATIONS_BATCH_SIZE - 1
-    ) // FEATURES_EXPLANATIONS_BATCH_SIZE
+    num_batches = (total_count + FEATURES_EXPLANATIONS_BATCH_SIZE - 1) // FEATURES_EXPLANATIONS_BATCH_SIZE
 
     conn.close()
 
@@ -498,6 +492,10 @@ def export_explanations(model_id, source, OUTPUT_PATH_BASE):
         if os.path.exists(output_file):
             # print(f"Skipping batch {batch + 1}/{num_batches} because it already exists")
             continue
+        where_clause = (
+            f"\"modelId\" = '{model_id}' AND \"layer\" = '{source}' "
+            f"ORDER BY index LIMIT {FEATURES_EXPLANATIONS_BATCH_SIZE} OFFSET {offset}"
+        )
         write_batch_to_jsonl(
             "Explanation",
             [
@@ -515,11 +513,9 @@ def export_explanations(model_id, source, OUTPUT_PATH_BASE):
                 "umap_cluster",
                 "umap_log_feature_sparsity",
             ],
-            f"\"modelId\" = '{model_id}' AND \"layer\" = '{source}' ORDER BY index LIMIT {FEATURES_EXPLANATIONS_BATCH_SIZE} OFFSET {offset}",
+            where_clause,
             output_file,
-            expected_num_lines=(
-                FEATURES_EXPLANATIONS_BATCH_SIZE if batch < num_batches - 1 else None
-            ),
+            expected_num_lines=(FEATURES_EXPLANATIONS_BATCH_SIZE if batch < num_batches - 1 else None),
         )
         replace_author_and_creator_with_default_creator_id(output_file)
         print(f"{output_file} Exported batch {batch + 1}/{num_batches}")
@@ -527,7 +523,8 @@ def export_explanations(model_id, source, OUTPUT_PATH_BASE):
 
 def export_activations(model_id, source, OUTPUT_PATH_BASE):
     print(
-        f"\n[Thread {threading.current_thread().name}] Starting export_activations for model {model_id} and source {source}"
+        f"\n[Thread {threading.current_thread().name}] Starting export_activations "
+        f"for model {model_id} and source {source}"
     )
 
     export_path = f"{OUTPUT_PATH_BASE}/{source}/activations"
@@ -535,9 +532,7 @@ def export_activations(model_id, source, OUTPUT_PATH_BASE):
         os.makedirs(export_path)
 
     conn = create_connection()
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-
+    with conn.cursor() as cur:
         cur.execute(
             """
             SELECT COUNT(*)
@@ -553,9 +548,7 @@ def export_activations(model_id, source, OUTPUT_PATH_BASE):
             total_count = result["count"]
 
         print(f"Total count: {total_count}")
-        num_batches = (
-            total_count + ACTIVATIONS_BATCH_SIZE - 1
-        ) // ACTIVATIONS_BATCH_SIZE
+        num_batches = (total_count + ACTIVATIONS_BATCH_SIZE - 1) // ACTIVATIONS_BATCH_SIZE
 
         print(f"Number of batches: {num_batches}")
 
@@ -571,6 +564,11 @@ def export_activations(model_id, source, OUTPUT_PATH_BASE):
         if os.path.exists(output_file):
             # print(f"Skipping batch {batch + 1}/{num_batches} because it already exists")
             continue
+        where_clause = (
+            f"\"modelId\" = '{model_id}' AND \"layer\" = '{source}' AND index IN "
+            f"(SELECT generate_series::text AS text FROM generate_series({offset}, "
+            f"{min(offset + ACTIVATIONS_BATCH_SIZE - 1, total_count - 1)}))"
+        )
         write_batch_to_jsonl(
             "Activation",
             [
@@ -592,11 +590,9 @@ def export_activations(model_id, source, OUTPUT_PATH_BASE):
                 "binMin",
                 "binMax",
             ],
-            f"\"modelId\" = '{model_id}' AND \"layer\" = '{source}' AND index IN (SELECT generate_series::text AS text FROM generate_series({offset}, {min(offset + ACTIVATIONS_BATCH_SIZE - 1, total_count - 1)}))",
+            where_clause,
             output_file,
-            expected_num_lines=(
-                ACTIVATIONS_BATCH_SIZE if batch < num_batches - 1 else None
-            ),
+            expected_num_lines=(ACTIVATIONS_BATCH_SIZE if batch < num_batches - 1 else None),
         )
         filter_author_and_creator_in_activations(output_file)
         print(f"{output_file} Exported batch {batch + 1}/{num_batches}")
@@ -638,9 +634,7 @@ def process_source_sync(release, sourceset, source):
         OVERRIDE_INSTANCE_HOST_URL = ""
         source_id = source["id"]
 
-        print(
-            f"\n[Process {os.getpid()}] Starting export for source {source_id} in model {MODEL_ID}"
-        )
+        print(f"\n[Process {os.getpid()}] Starting export for source {source_id} in model {MODEL_ID}")
 
         OUTPUT_PATH_BASE = f"./exports/{MODEL_ID}"
         os.makedirs(f"{OUTPUT_PATH_BASE}/{source_id}", exist_ok=True)
@@ -733,8 +727,7 @@ def main(
 
     with ThreadPoolExecutor(max_workers=num_parallel_export_jobs) as executor:
         futures = [
-            executor.submit(process_source_sync, release, sourceset, source)
-            for release, sourceset, source in tasks
+            executor.submit(process_source_sync, release, sourceset, source) for release, sourceset, source in tasks
         ]
 
         # Wait for all tasks to complete
