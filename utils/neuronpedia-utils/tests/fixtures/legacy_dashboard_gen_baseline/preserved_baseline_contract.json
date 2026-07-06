@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "source": "Preserved legacy baseline contract for current-code Neuronpedia import tests",
+  "preserved_baseline_lineage": {
+    "saedashboard": "7886eaa",
+    "saelens": "3eea6552",
+    "neuronpedia": "5a33f17"
+  },
+  "comparison_tolerances": {
+    "detached_baseline_vs_current_legacy": {
+      "activation_rows_max_abs_delta": 0,
+      "generation_throughput_relative_tolerance": 0.10,
+      "import_wall_relative_tolerance": 0.15
+    }
+  },
+  "scenarios": {
+    "rte_reduced": {
+      "shape": {
+        "n_features_per_batch": 512,
+        "n_prompts_in_forward_pass": 128,
+        "target_batches": 4
+      },
+      "prompt_contract": {
+        "mode": "legacy_jsonl",
+        "split": "train",
+        "context_size": 319,
+        "required_files": ["train.jsonl", "sae_lens.json"]
+      },
+      "legacy_contract": {
+        "runner_implementation": "legacy_json_cpu",
+        "dashboard_output_format": "legacy_json",
+        "sequence_selection_backend": "legacy_json_cpu",
+        "export_bundle_format": "legacy_jsonl_gzip"
+      },
+      "import_contract": {
+        "import_mode": "jsonl",
+        "prefer_arrow_for_tables": [],
+        "prefer_copy_for_tables": [],
+        "copy_direct_for_tables": []
+      },
+      "preserved_baseline_result": {
+        "avg_batch_seconds": 33.42,
+        "throughput_features_per_min": 919.2,
+        "import_wall_seconds": 48.78,
+        "imported_activation_rows": 65129
+      }
+    },
+    "monology_reduced": {
+      "shape": {
+        "n_features_per_batch": 1024,
+        "n_prompts_in_forward_pass": 256,
+        "target_batches": 4
+      },
+      "prompt_contract": {
+        "mode": "legacy_jsonl",
+        "split": "train",
+        "context_size": 128,
+        "required_files": ["train.jsonl", "sae_lens.json"]
+      },
+      "legacy_contract": {
+        "runner_implementation": "legacy_json_cpu",
+        "dashboard_output_format": "legacy_json",
+        "sequence_selection_backend": "legacy_json_cpu",
+        "export_bundle_format": "legacy_jsonl_gzip"
+      },
+      "import_contract": {
+        "import_mode": "jsonl",
+        "prefer_arrow_for_tables": [],
+        "prefer_copy_for_tables": [],
+        "copy_direct_for_tables": []
+      },
+      "preserved_baseline_result": {
+        "avg_batch_seconds": 45.82,
+        "throughput_features_per_min": 1341.0,
+        "import_wall_seconds": 61.37,
+        "imported_activation_rows": 137331
+      }
+    }
+  }
+}
