@@ -51,7 +51,7 @@ export default function SearchInferenceModelPane({
                 initialModelId={model.id}
                 initialSortIndexes={searchParams?.sortIndexes ? JSON.parse(searchParams.sortIndexes) : []}
                 initialSourceSet={
-                  searchParams?.sourceSet || getFirstSourceSetForModel(model, Visibility.PUBLIC, true, false)?.name
+                  searchParams?.sourceSet || getFirstSourceSetForModel(model, Visibility.PUBLIC, false, false, true)?.name
                 }
                 initialIgnoreBos={searchParams?.ignoreBos !== undefined ? searchParams?.ignoreBos === 'true' : true}
               />

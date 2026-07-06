@@ -1,8 +1,9 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
+import { getGraphFeatureDisplayLocation } from '@/lib/utils/graph-feature-display';
 import { ArrowUpRightFromSquare } from 'lucide-react';
 import { CLTGraph, CLTGraphNode } from './graph-types';
-import { getIndexFromFeatureAndGraph, getLayerFromFeatureAndGraph, graphModelHasNpDashboards } from './utils';
+import { graphModelHasNpDashboards } from './utils';
 
 export default function GraphFeatureLink({
   selectedGraph,
@@ -16,11 +17,14 @@ export default function GraphFeatureLink({
   if (!selectedGraph) {
     return null;
   }
+
   // Bias leaves (and other non-feature source nodes) have no per-feature
   // dashboard or index, so the link would be meaningless.
   if (node.feature_type === 'bias' || node.feature_type === 'unknown') {
     return null;
   }
+
+  const displayLocation = getGraphFeatureDisplayLocation(selectedGraph.metadata.scan, node, selectedGraph);
   return selectedGraph?.metadata.scan && graphModelHasNpDashboards(selectedGraph) && node.featureDetailNP ? (
     <div className="ml-1 flex flex-col gap-x-1 pl-0">
       <Button
@@ -37,8 +41,8 @@ export default function GraphFeatureLink({
       >
         {node.feature_type === 'lorsa' && <div className="rounded bg-slate-300 px-1 leading-normal">LORSA</div>}
         <div className="flex flex-col gap-y-[3px] font-mono font-medium">
-          <div className="">LAYER {getLayerFromFeatureAndGraph(selectedGraph?.metadata.scan, node, selectedGraph)}</div>
-          <div className="">INDEX {getIndexFromFeatureAndGraph(selectedGraph?.metadata.scan, node, selectedGraph)}</div>
+          <div className="">LAYER {displayLocation.layer}</div>
+          <div className="">INDEX {displayLocation.index}</div>
         </div>
         <ArrowUpRightFromSquare className="ml-0.5 h-3 w-3" />
       </Button>

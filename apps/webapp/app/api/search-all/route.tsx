@@ -15,7 +15,12 @@ import {
 } from '@/lib/env';
 import { runInferenceActivationAll } from '@/lib/utils/inference';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
-import { ActivationAllBatchPost200Response, ActivationAllPost200Response } from 'neuronpedia-inference-client';
+import { Prisma } from '@prisma/client';
+import {
+  ActivationAllBatchPost200Response,
+  ActivationAllPost200Response,
+  ResponseError,
+} from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 
 // Hobby plans don't support > 60 seconds
@@ -23,6 +28,82 @@ import { NextResponse } from 'next/server';
 
 const NUMBER_TOP_RESULTS = 50;
 const DEFAULT_DENSITY_THRESHOLD = -1;
+async function getInferenceErrorMessage(error: ResponseError): Promise<string | null> {
+  try {
+    const payload = await error.response.clone().json();
+    if (typeof payload?.error === 'string') {
+      return payload.error;
+    }
+    if (typeof payload?.message === 'string') {
+      return payload.message;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function isResponseError(error: unknown): error is ResponseError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: string }).name === 'ResponseError' &&
+    'response' in error
+  );
+}
+
+async function runInferenceActivationAllWithSortFallback(
+  modelId: string,
+  sourceSetName: string,
+  text: string | string[],
+  numResults: number,
+  selectedLayers: string[],
+  sortIndexes: number[],
+  ignoreBos: boolean,
+  user: RequestOptionalUser['user'],
+): Promise<{
+  result: ActivationAllBatchPost200Response | ActivationAllPost200Response;
+  sortIndexes: number[];
+}> {
+  try {
+    return {
+      result: (await runInferenceActivationAll(
+        modelId,
+        sourceSetName,
+        text,
+        numResults,
+        selectedLayers,
+        sortIndexes,
+        ignoreBos,
+        user,
+      )) as ActivationAllBatchPost200Response | ActivationAllPost200Response,
+      sortIndexes,
+    };
+  } catch (error) {
+    if (!isResponseError(error) || sortIndexes.length === 0 || error.response.status < 500) {
+      throw error;
+    }
+
+    const errorMessage = await getInferenceErrorMessage(error);
+    console.warn('Retrying search-all without stale sort indexes:', sortIndexes, errorMessage);
+
+    return {
+      result: (await runInferenceActivationAll(
+        modelId,
+        sourceSetName,
+        text,
+        numResults,
+        selectedLayers,
+        [],
+        ignoreBos,
+        user,
+      )) as ActivationAllBatchPost200Response | ActivationAllPost200Response,
+      sortIndexes: [],
+    };
+  }
+}
 
 /**
  * @swagger
@@ -133,8 +214,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
   const { modelId } = body;
   const selectedLayers = ((body.selectedLayers || []) as string[]).sort();
-  const sortIndexes = (body.sortIndexes as number[]).sort();
+  const requestedSortIndexes = ((body.sortIndexes || []) as number[]).sort();
   const sourceSetName = body.sourceSet;
+  let effectiveSortIndexes = requestedSortIndexes;
 
   const numResults = body.numResults || NUMBER_TOP_RESULTS;
   if (numResults < 1) {
@@ -155,16 +237,17 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
   // if it's a batch search, we don't need to check savedSearch or fetch the feature
   if (Array.isArray(body.text)) {
-    const resultsBatch = (await runInferenceActivationAll(
+    const { result: batchResult, sortIndexes } = await runInferenceActivationAllWithSortFallback(
       modelId,
       sourceSetName,
       body.text,
       numResults,
       selectedLayers,
-      sortIndexes,
+      requestedSortIndexes,
       body.ignoreBos,
       request.user,
-    )) as ActivationAllBatchPost200Response;
+    );
+    const resultsBatch = batchResult as ActivationAllBatchPost200Response;
 
     const batchResults: InferenceActivationAllResponse[] = [];
     resultsBatch.results.forEach((promptSearchAllResult) => {
@@ -197,7 +280,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         modelId,
         query: body.text,
         selectedLayers,
-        sortByIndexes: sortIndexes,
+        sortByIndexes: requestedSortIndexes,
         sourceSet: sourceSetName,
         ignoreBos: body.ignoreBos,
         numResults,
@@ -275,16 +358,18 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
   } else {
     console.log('no saved search found');
-    const result: ActivationAllPost200Response = (await runInferenceActivationAll(
+    const { result: inferenceResult, sortIndexes } = await runInferenceActivationAllWithSortFallback(
       modelId,
       sourceSetName,
       body.text,
       numResults,
       selectedLayers,
-      sortIndexes,
+      requestedSortIndexes,
       body.ignoreBos,
       request.user,
-    )) as ActivationAllPost200Response;
+    );
+    const result = inferenceResult as ActivationAllPost200Response;
+    effectiveSortIndexes = sortIndexes;
 
     console.log('got activations: ', result.activations.length);
     console.log('got tokens: ', result.tokens.length);
@@ -329,8 +414,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         return;
       }
       if (
-        (sortIndexes.length === 0 && activation.maxValue > 0) ||
-        (sortIndexes.length > 0 && activation.sumValues !== undefined && activation.sumValues > 0)
+        (effectiveSortIndexes.length === 0 && activation.maxValue > 0) ||
+        (effectiveSortIndexes.length > 0 && activation.sumValues !== undefined && activation.sumValues > 0)
       ) {
         searchResults.push({
           modelId,
@@ -353,7 +438,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     result: searchResults,
     counts,
-    sortIndexes,
+    sortIndexes: effectiveSortIndexes,
   };
 
   // if not a cached retrieval, make savedsearch
@@ -428,45 +513,53 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     if (DEMO_MODE) {
       console.log('skipping saved search creation in demo mode');
     } else {
-      const savedSearch = await prisma.savedSearch.create({
-        data: {
-          modelId,
-          query: body.text,
-          selectedLayers,
-          sortByIndexes: sortIndexes,
-
-          tokens,
-
-          userId: userIdForSearch,
-          sourceSet: sourceSetName,
-          ignoreBos: body.ignoreBos,
-          counts: JSON.stringify(counts),
-          numResults,
-          densityThreshold,
-        },
-      });
-
-      console.log('savedSearchCreated');
-
-      // create the connections
-      const toConnectNew: {
-        savedSearchId: string;
-        activationId: string;
-        order: number;
-      }[] = [];
-
-      matchingActIds.forEach((item, i) => {
-        toConnectNew.push({
-          order: i,
-          savedSearchId: savedSearch.id,
-          activationId: item.id,
+      try {
+        // eslint-disable-next-line
+        const savedSearch = await prisma.savedSearch.create({
+          data: {
+            modelId,
+            query: body.text,
+            selectedLayers,
+            sortByIndexes: effectiveSortIndexes,
+            // eslint-disable-next-line
+            tokens,
+            // eslint-disable-next-line
+            userId: userIdForSearch,
+            sourceSet: sourceSetName,
+            ignoreBos: body.ignoreBos,
+            counts: JSON.stringify(counts),
+            numResults,
+            densityThreshold,
+          },
         });
-      });
 
-      await prisma.savedSearchActivation.createMany({
-        data: toConnectNew,
-      });
-      console.log(`connections created: ${toConnectNew.length}`);
+        console.log('savedSearchCreated');
+
+        // create the connections
+        const toConnectNew: {
+          savedSearchId: string;
+          activationId: string;
+          order: number;
+        }[] = [];
+
+        matchingActIds.forEach((item, i) => {
+          toConnectNew.push({
+            order: i,
+            savedSearchId: savedSearch.id,
+            activationId: item.id,
+          });
+        });
+
+        await prisma.savedSearchActivation.createMany({
+          data: toConnectNew,
+        });
+        console.log(`connections created: ${toConnectNew.length}`);
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+          throw error;
+        }
+        console.warn('Skipping duplicate savedSearch cache write for search-all fallback');
+      }
     }
   }
 

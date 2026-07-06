@@ -31,6 +31,14 @@ import ResultItem from './result-item';
 
 const MAX_SEARCH_QUERY_LENGTH_CHARS = 800;
 
+function sortIndexesMatch(left: number[], right: number[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((value, index) => value === right[index]);
+}
+
 export default function InferenceSearcher({
   q,
   initialSelectedLayers = [],
@@ -83,6 +91,10 @@ export default function InferenceSearcher({
   const loadResultsInNewPage = q === undefined;
   // const [showTable, setShowTable] = useState(false);
 
+  function getAvailableLayersForSourceSet(currentModelId: string, currentSourceSet: string) {
+    return getSourcesForSourceSet(currentModelId, currentSourceSet, false, false, false);
+  }
+
   function makeUrl(query: string) {
     return `/${modelId}/?sourceSet=${sourceSet}&selectedLayers=${JSON.stringify(
       selectedLayers,
@@ -91,7 +103,7 @@ export default function InferenceSearcher({
 
   const sourceSetChanged = (newSourceSet: string) => {
     setSourceSet(newSourceSet);
-    setAvailableLayers(getSourcesForSourceSet(modelId, newSourceSet, false, true, false));
+    setAvailableLayers(getAvailableLayersForSourceSet(modelId, newSourceSet));
     setSelectedLayers([]);
     setSearchCounts([]);
   };
@@ -101,12 +113,13 @@ export default function InferenceSearcher({
     const newSourceSet = getFirstSourceSetForModel(
       globalModels[newModelId],
       Visibility.PUBLIC,
-      true,
       false,
+      false,
+      true,
     ) as SourceSetWithPartialRelations;
     if (newSourceSet) {
       setSourceSet(newSourceSet.name);
-      setAvailableLayers(getSourcesForSourceSet(newModelId, newSourceSet.name, false, true, false));
+      setAvailableLayers(getAvailableLayersForSourceSet(newModelId, newSourceSet.name));
     } else {
       setSourceSet(DEFAULT_SOURCESET);
       setAvailableLayers([]);
@@ -120,6 +133,15 @@ export default function InferenceSearcher({
       setNeedsReloadSearch(true);
     }
   }, [selectedLayers, sortIndexes, ignoreBos]);
+
+  useEffect(() => {
+    if (exploreState !== InferenceActivationAllState.LOADED) {
+      return;
+    }
+    setSortIndexes((currentSortIndexes) =>
+      sortIndexesMatch(currentSortIndexes, searchSortIndexes) ? currentSortIndexes : searchSortIndexes,
+    );
+  }, [exploreState, searchSortIndexes]);
 
   function searchClicked() {
     const values = formRef.current?.values;
@@ -159,7 +181,7 @@ export default function InferenceSearcher({
   useEffect(() => {
     if (exploreState === InferenceActivationAllState.LOADED && formRef.current) {
       window.history.pushState({}, '', makeUrl(formRef.current.values.searchQuery));
-      setAvailableLayers(getSourcesForSourceSet(modelId, sourceSet, false, true, false));
+      setAvailableLayers(getAvailableLayersForSourceSet(modelId, sourceSet));
     } else {
       // remove query params
       window.history.pushState({}, '', document.location.toString().split(/[?#]/)[0]);
@@ -171,7 +193,7 @@ export default function InferenceSearcher({
 
   // load initial
   useEffect(() => {
-    setAvailableLayers(getSourcesForSourceSet(modelId, sourceSet, false, true, false));
+    setAvailableLayers(getAvailableLayersForSourceSet(modelId, sourceSet));
   }, []);
 
   return (
@@ -200,7 +222,6 @@ export default function InferenceSearcher({
                 filterToOnlyVisible
                 sourceSetChangedCallback={sourceSetChanged}
                 filterToRelease={filterToRelease}
-                filterToInferenceEnabled
                 filterToAllowInferenceSearch
               />
             )}
@@ -573,7 +594,7 @@ export default function InferenceSearcher({
 
 /* {showTable && (
   <>
-    {getSourcesForSourceSet(modelId, sourceSet, false, true, false).map((layerName, i) => (
+    {getAvailableLayersForSourceSet(modelId, sourceSet).map((layerName, i) => (
       <tr key={i} className="text-center text-xs">
         <td className="flex w-[90px] cursor-pointer flex-row items-center gap-x-1 px-0 pr-1 font-sans text-[11px] font-bold leading-none text-slate-500">
           <Checkbox.Root

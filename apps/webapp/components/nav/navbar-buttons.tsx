@@ -145,7 +145,7 @@ export default function NavBarButtons() {
                   callback={() => {
                     setJumpToOpen(false);
                   }}
-                  release={releases[Math.floor(Math.random() * releases.length)] as SourceReleaseWithPartialRelations}
+                  releases={releases as SourceReleaseWithPartialRelations[]}
                 />
               </div>
             </div>

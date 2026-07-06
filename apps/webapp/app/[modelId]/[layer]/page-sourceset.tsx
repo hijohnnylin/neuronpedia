@@ -1,9 +1,9 @@
 'use client';
 
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
-import BrowserPane from '@/components/panes/browser-pane/browser-pane';
+import BrowserPane from '@/components/panes/browser-pane/browser-pane-lazy';
 import JumpToPane from '@/components/panes/jump-to-pane';
-import SearchExplanationsPane from '@/components/panes/search-explanations-pane';
+import SearchExplanationsPane from '@/components/panes/search-explanations-pane-lazy';
 import SearchInferenceSourcePane from '@/components/panes/search-inference-source-pane';
 import SearchTopkByTokenPane from '@/components/panes/search-topk-by-token-pane';
 import UmapPane from '@/components/panes/umap-pane';
