@@ -31,6 +31,14 @@ import ResultItem from './result-item';
 
 const MAX_SEARCH_QUERY_LENGTH_CHARS = 800;
 
+function sortIndexesMatch(left: number[], right: number[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((value, index) => value === right[index]);
+}
+
 export default function InferenceSearcher({
   q,
   initialSelectedLayers = [],
@@ -74,6 +82,14 @@ export default function InferenceSearcher({
   const router = useRouter();
   const loadResultsInNewPage = q === undefined;
 
+  function getAvailableLayersForSourceSet(currentModelId: string, currentSourceSet: string) {
+    // onlyInferenceEnabled off: a source set can allow inference *search* without every
+    // source in it being individually inference-enabled, and filtering here hid layers the
+    // search would happily have returned. The set-level gate is filterToAllowInferenceSearch
+    // on the selector below.
+    return getSourcesForSourceSet(currentModelId, currentSourceSet, false, false, false);
+  }
+
   function makeUrl(query: string) {
     return `/${modelId}/?sourceSet=${sourceSet}&selectedLayers=${JSON.stringify(
       selectedLayers,
@@ -82,7 +98,7 @@ export default function InferenceSearcher({
 
   const sourceSetChanged = (newSourceSet: string) => {
     setSourceSet(newSourceSet);
-    setAvailableLayers(getSourcesForSourceSet(modelId, newSourceSet, false, true, false));
+    setAvailableLayers(getAvailableLayersForSourceSet(modelId, newSourceSet));
     setSelectedLayers([]);
   };
 
@@ -91,12 +107,15 @@ export default function InferenceSearcher({
     const newSourceSet = getFirstSourceSetForModel(
       globalModels[newModelId],
       Visibility.PUBLIC,
-      true,
       false,
+      false,
+      // onlyInferenceSearchEnabled: this selector drives search, so the default set has to
+      // be one search can actually run against.
+      true,
     ) as SourceSetWithPartialRelations;
     if (newSourceSet) {
       setSourceSet(newSourceSet.name);
-      setAvailableLayers(getSourcesForSourceSet(newModelId, newSourceSet.name, false, true, false));
+      setAvailableLayers(getAvailableLayersForSourceSet(newModelId, newSourceSet.name));
     } else {
       setSourceSet(DEFAULT_SOURCESET);
       setAvailableLayers([]);
@@ -109,6 +128,17 @@ export default function InferenceSearcher({
       setNeedsReloadSearch(true);
     }
   }, [selectedLayers, sortIndexes, ignoreBos]);
+
+  // /api/search-all may drop stale sort indexes and retry without them, and it reports what it
+  // ended up using. Adopt that, or the next search re-sends indexes the server just rejected.
+  useEffect(() => {
+    if (exploreState !== InferenceActivationAllState.LOADED) {
+      return;
+    }
+    setSortIndexes((currentSortIndexes) =>
+      sortIndexesMatch(currentSortIndexes, searchSortIndexes) ? currentSortIndexes : searchSortIndexes,
+    );
+  }, [exploreState, searchSortIndexes]);
 
   function searchClicked() {
     const values = formRef.current?.values;
@@ -148,7 +178,7 @@ export default function InferenceSearcher({
   useEffect(() => {
     if (exploreState === InferenceActivationAllState.LOADED && formRef.current) {
       window.history.pushState({}, '', makeUrl(formRef.current.values.searchQuery));
-      setAvailableLayers(getSourcesForSourceSet(modelId, sourceSet, false, true, false));
+      setAvailableLayers(getAvailableLayersForSourceSet(modelId, sourceSet));
     } else {
       // remove query params
       window.history.pushState({}, '', document.location.toString().split(/[?#]/)[0]);
@@ -160,7 +190,7 @@ export default function InferenceSearcher({
 
   // load initial
   useEffect(() => {
-    setAvailableLayers(getSourcesForSourceSet(modelId, sourceSet, false, true, false));
+    setAvailableLayers(getAvailableLayersForSourceSet(modelId, sourceSet));
   }, []);
 
   return (
@@ -189,7 +219,6 @@ export default function InferenceSearcher({
                 filterToOnlyVisible
                 sourceSetChangedCallback={sourceSetChanged}
                 filterToRelease={filterToRelease}
-                filterToInferenceEnabled
                 filterToAllowInferenceSearch
               />
             )}
