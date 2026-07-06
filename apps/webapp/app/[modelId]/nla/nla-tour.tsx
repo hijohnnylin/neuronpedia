@@ -20,6 +20,7 @@ import {
   NLA_TOUR_MODEL_ID,
 } from './nla-tour-constants';
 import './nla-tour.css';
+import { runWhenIdle } from '@/lib/utils/run-when-idle';
 import { NLA_GITHUB_URL, NLA_PAPER_URL } from './nla-urls';
 
 // Module-scoped cleanup for per-step DOM listeners / observers. There is
@@ -476,7 +477,13 @@ export function useNlaTour(options: NlaTourOptions) {
       },
     });
     driverRef.current = hint;
-    hint.drive();
+    // Defer the drive until the browser is idle so driver.js doesn't mount its
+    // overlay onto <body> while React is still committing the wrap-up navigation
+    // that spawned this hint — that race crashes on mobile (see runWhenIdle).
+    runWhenIdle(() => {
+      if (driverRef.current !== hint) return;
+      hint.drive();
+    });
   }, [navigateToFinishState]);
 
   const startTour = useCallback(() => {
@@ -562,7 +569,16 @@ export function useNlaTour(options: NlaTourOptions) {
     });
     driverRef.current = instance;
     setIsTourActive(true);
-    instance.drive();
+    // Defer the drive until the browser is idle. `drive()` mounts driver.js's
+    // overlay/popover onto `document.body`; running it synchronously here races
+    // React's commit of the soft model-swap (`handleModelChange`) + cache
+    // hydrate (`loadCacheById`) kicked off just above, which crashes on mobile
+    // (see runWhenIdle). Step 1 is a centered popover (no target element), so no
+    // element needs to be awaited first.
+    runWhenIdle(() => {
+      if (driverRef.current !== instance) return;
+      instance.drive();
+    });
   }, [showGuideHighlight, navigateToFinishState]);
 
   return { startTour, isTourActive };

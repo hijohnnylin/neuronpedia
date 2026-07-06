@@ -19,6 +19,7 @@ import {
   JLENS_VERBAL_REPORT_SHARE_ID,
 } from './jlens-tour-constants';
 import './jlens-tour.css';
+import { runWhenIdle } from '@/lib/utils/run-when-idle';
 import { JLENS_BLOG_URL, JLENS_GITHUB_URL, JLENS_HF_URL, JLENS_PAPER_URL } from './jlens-urls';
 
 // Module-scoped cleanup for a per-step DOM listener (the spider step's
@@ -309,7 +310,13 @@ export function useJlensTour(options: JlensTourOptions) {
       },
     });
     driverRef.current = hint;
-    hint.drive();
+    // Same rationale as the main tour: this hint is spawned right after a
+    // navigation to the Verbal Report demo, so defer driver.js's body mutation
+    // until that transition has committed.
+    runWhenIdle(() => {
+      if (driverRef.current !== hint) return;
+      hint.drive();
+    });
   }, []);
 
   const startTour = useCallback(() => {
@@ -410,7 +417,14 @@ export function useJlensTour(options: JlensTourOptions) {
     waitForElement(`#${JLENS_CHAT_ID}`, { excludeEl: staleChat }).then(() => {
       // Bail if this instance was torn down / replaced while we were waiting.
       if (driverRef.current !== instance) return;
-      instance.drive();
+      // Defer the actual drive until the browser is idle. `drive()` mounts
+      // driver.js's overlay/popover onto `document.body`; running it while the
+      // start-of-tour navigation transition is still committing races React's
+      // own body-child reconciliation and crashes on mobile (see `runWhenIdle`).
+      runWhenIdle(() => {
+        if (driverRef.current !== instance) return;
+        instance.drive();
+      });
     });
   }, [showGuideHighlight, goToVerbalReport]);
 
