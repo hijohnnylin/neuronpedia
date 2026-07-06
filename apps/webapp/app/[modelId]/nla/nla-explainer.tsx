@@ -146,7 +146,7 @@ export default function NLAExplainer() {
   // so loading a new demo can't clobber the working edit state.
   const isBusy = isChatStreaming || isLoading || isHydratingDemo || isEditingMessage;
 
-  const startTour = useNlaTour({
+  const { startTour, isTourActive } = useNlaTour({
     selectedModelId,
     handleModelChange,
     loadCacheById,
@@ -168,11 +168,10 @@ export default function NLAExplainer() {
     startTour();
   };
 
-  // Auto-start the tour for first-time visitors. Skipped when the user
-  // is deep-linking to a saved cache (`?id=...`), inside an embed, or
-  // on a small viewport where the spotlight popovers don't fit. On
-  // subsequent visits we just sync `hasSeenTour` from localStorage so
-  // the Guide button can hide its "new" indicator.
+  // Auto-start the tour for first-time visitors, including on mobile.
+  // Skipped when the user is deep-linking to a saved cache (`?id=...`)
+  // or inside an embed. On subsequent visits we just sync `hasSeenTour`
+  // from localStorage so the Guide button can hide its "new" indicator.
   useEffect(() => {
     try {
       const seen = localStorage.getItem(NLA_TOUR_SEEN_KEY) === 'true';
@@ -180,7 +179,6 @@ export default function NLAExplainer() {
       if (seen) return;
       if (isEmbed) return;
       if (initialCacheId) return;
-      if (typeof window !== 'undefined' && window.innerWidth < 640) return;
       markTourSeen();
       startTour();
     } catch (error) {
@@ -448,7 +446,11 @@ export default function NLAExplainer() {
         <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-y-1">
           <div className={`${isEmbed ? 'mt-0' : 'sm:mt-2'} flex min-h-0 min-w-0 flex-1 flex-col gap-y-1`}>
             <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-y-1 sm:flex-row sm:gap-x-5">
-              <div className="flex min-h-0 min-w-0 flex-[0.7] basis-0 flex-col overflow-x-hidden sm:flex-1">
+              <div
+                className={`flex min-h-0 min-w-0 basis-0 flex-col overflow-x-hidden sm:flex-1 ${
+                  isTourActive ? 'flex-[1.5]' : 'flex-[0.7]'
+                }`}
+              >
                 <NLAInputChat />
               </div>
               <div id={NLA_DETAILS_ELEMENT_ID} className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col sm:max-w-sm">

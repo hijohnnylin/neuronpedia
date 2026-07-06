@@ -8,7 +8,7 @@ export const GET = async (
   request: NextRequest,
   props: {
     params: Promise<{ tweet: string }>;
-  }
+  },
 ) => {
   const params = await props.params;
   const tweetId = params.tweet;

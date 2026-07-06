@@ -28,9 +28,9 @@ sae-lens = "^6.30.0"
 fastapi = "^0.115.6"
 uvicorn = "^0.34.0"
 sentry-sdk = {extras = ["fastapi"], version = "^2.20.0"}
-nnsight = ">=0.5.15"
+nnsight = ">=0.6.0"
 hf-transfer = "^0.1.9"
-nnterp = "^1.2.2"
+nnterp = "^1.3.0"
 neuronpedia-inference-client = {path = "../../packages/python/neuronpedia-inference-client"}
 steerllm = {path = "vendor/chatspace/steerllm", develop = true}
 chatspace = {path = "vendor/chatspace", develop = true}

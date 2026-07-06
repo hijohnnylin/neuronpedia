@@ -35,7 +35,7 @@ export default async function Page(props: { params: Promise<{ name: string }> })
               href={explanationType.url}
               target="_blank"
               rel="noreferrer"
-              className="mb-4 ml-5 text-xs font-medium text-sky-800"
+              className="mb-4 ml-5 break-all text-xs font-medium text-sky-800"
             >
               {explanationType.url}
             </a>

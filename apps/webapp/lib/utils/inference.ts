@@ -29,6 +29,8 @@ import {
 } from 'neuronpedia-inference-client';
 import runpodSdk from 'runpod-sdk';
 import {
+  getAllInstanceHostsForModel,
+  getAllServerHostsForModel,
   getOneRandomServerHostForModel,
   getOneRandomServerHostForSource,
   getOneRandomServerHostForSourceSet,
@@ -38,6 +40,7 @@ import {
   LOCALHOST_INFERENCE_HOST,
 } from '../db/inference-host-source';
 import { INFERENCE_RUNPOD_API_KEY, INFERENCE_SERVER_SECRET, USE_LOCALHOST_INFERENCE } from '../env';
+import { LensPromptRequest } from './lens';
 import { NeuronIdentifier } from './neuron-identifier';
 
 // ============================================================================
@@ -935,4 +938,115 @@ export const getVectorFromInstance = async (
       index: parseInt(index, 10),
     },
   });
+};
+
+// Streaming logit/Jacobian lens for a prompt. The lens endpoint is not in the
+// generated inference client yet, so we call it with a raw fetch (like
+// steerCompletion). The endpoint streams NDJSON (one message per line); this
+// returns the raw `fetch` Response so the API route can pipe the body straight
+// through to the browser without buffering the (potentially large) stream.
+//
+// A single inference server processes one request at a time (a global model
+// lock shared across all endpoints, e.g. /steer and /lens), so a server can be
+// busy even when it isn't serving a lens request. To avoid failing when the
+// first-chosen server is busy, we try each known host for the model in random
+// order, asking each to fail fast (`fail_if_busy` -> HTTP 429) if it's already
+// occupied. The first host that accepts the request wins. If every host is
+// busy, we fall back to queueing on one host (waiting for the lock, as before)
+// so the request is still served rather than rejected. We only surface an error
+// when every host hard-fails (connection error / 5xx). Deterministic client
+// errors (4xx other than 429) are returned immediately, since retrying another
+// host wouldn't change the outcome.
+//
+// The caller is responsible for handling a non-ok response (`response.ok`).
+export const lensPromptStream = async (
+  modelId: string,
+  request: Omit<LensPromptRequest, 'model'>,
+  // Tie the upstream request to the caller's abort signal so a client abort
+  // (e.g. the user pressing "Stop") closes the connection to the inference
+  // server, letting it stop generating and release its model lock.
+  signal?: AbortSignal,
+): Promise<Response> => {
+  const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
+
+  // Build the ordered list of candidate hosts to try.
+  let hosts: string[];
+  if (USE_LOCALHOST_INFERENCE) {
+    hosts = [LOCALHOST_INFERENCE_HOST];
+  } else {
+    // Use every instance registered against the model (not just those linked to
+    // a Source via InferenceHostSourceOnSource) so all interchangeable jlens
+    // instances are candidates. Fall back to the source-linked hosts if none.
+    hosts = await getAllInstanceHostsForModel(modelId);
+    if (hosts.length === 0) {
+      hosts = [...new Set(await getAllServerHostsForModel(modelId))];
+    }
+    // Shuffle (Fisher-Yates) so load is spread across hosts rather than always
+    // hammering the first one.
+    for (let i = hosts.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [hosts[i], hosts[j]] = [hosts[j], hosts[i]];
+    }
+  }
+  if (hosts.length === 0) {
+    throw new Error('No server host found');
+  }
+
+  const sendRequest = (host: string, failIfBusy: boolean) =>
+    fetch(`${host}/v1/lens/prompt`, {
+      method: 'POST',
+      cache: 'no-cache',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
+      },
+      body: JSON.stringify({ ...request, model: transformerLensModelId, stream: true, fail_if_busy: failIfBusy }),
+      signal,
+    });
+
+  let lastErrorResponse: Response | null = null;
+  let lastError: unknown = null;
+  let anyBusy = false;
+
+  // Pass 1: try each host, skipping any that report busy (429) or hard-fail
+  // (connection error / 5xx). Return on the first success or deterministic
+  // client error (4xx).
+  for (let i = 0; i < hosts.length; i += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await sendRequest(hosts[i], true);
+      if (response.status === 429) {
+        anyBusy = true;
+        // Free the connection since we're moving on to the next host.
+        void response.body?.cancel();
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+      // Success, or a deterministic client error (4xx) that won't differ across
+      // hosts — return either way. Only 5xx falls through to try another host.
+      if (response.ok || (response.status >= 400 && response.status < 500)) {
+        return response;
+      }
+      void lastErrorResponse?.body?.cancel();
+      lastErrorResponse = response;
+    } catch (error) {
+      // Network/connection error to this host; try the next one.
+      lastError = error;
+    }
+  }
+
+  // Pass 2: every host was busy and/or hard-failed. If at least one was merely
+  // busy, fall back to queueing on the first host (fail_if_busy=false) so the
+  // request is still served (matching the previous single-server behavior of
+  // waiting for the lock) rather than rejected.
+  if (anyBusy) {
+    void lastErrorResponse?.body?.cancel();
+    return sendRequest(hosts[0], false);
+  }
+
+  // Every host hard-failed (no busy responses): surface the last failure.
+  if (lastErrorResponse) {
+    return lastErrorResponse;
+  }
+  throw lastError instanceof Error ? lastError : new Error('All inference servers failed for the lens request');
 };

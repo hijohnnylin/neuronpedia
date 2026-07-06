@@ -118,6 +118,8 @@ model User {
   graphMetadatas               GraphMetadata[]
   graphMetadataDataPutRequests GraphMetadataDataPutRequest[]
   graphMetadataSubgraphs       GraphMetadataSubgraph[]
+  jlensShares                  JlensShare[]
+  jlensSharePutRequests        JlensSharePutRequest[]
 
   samples Sample[]
   probes  Probe[]
@@ -202,6 +204,88 @@ model GraphMetadataDataPutRequest {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress])
+  @@index([userId])
+}
+
+// A shared jlens (Jacobian Lens) chat/completion run. The heavy data (messages,
+// meta, and the full unfiltered per-position token stream) is stored gzipped in
+// S3 at `url`; the small UI-restore state lives in columns here so a shared link
+// can be looked up and rehydrated without parsing the S3 blob.
+model JlensShare {
+  id String @id @default(cuid())
+
+  // 'chat' | 'completion' (matches the export discriminator)
+  kind String
+
+  modelId String
+  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  // Full URL of the gzipped JSON file stored in S3.
+  url String
+
+  description String?
+
+  // Sidebar predicted-token selections: [{ key: string, type: LensType }].
+  lockedTokens Json @default("[]")
+  // Selected chat token positions (indices into the token stream).
+  selectedPositions Int[] @default([])
+  // Active lens mode tab: 'JACOBIAN_LENS' | 'LOGIT_LENS' | 'DIFF'.
+  activeLensModeTab String
+  topN              Int
+  hideNonWordTokens Boolean @default(true)
+  // Run settings, restored on load (the same values the advanced panel + steer
+  // panel control). Defaulted so pre-existing shares migrate cleanly.
+  temperature        Float @default(0)
+  numCompletionTokens Int  @default(256)
+
+  // Optional steered run saved with this share. The heavy steered token stream
+  // + meta live in the S3 blob alongside the main run; these columns hold the
+  // small config used to re-run / re-enter steer mode. Null when the share has
+  // no active steered run.
+  // Exact decoded token string being steered (e.g. " cat").
+  steerToken String?
+  // Lens type of the steered readout: 'JACOBIAN_LENS' | 'LOGIT_LENS'.
+  steerType String?
+  // Model layer numbers the steer was injected at.
+  steerLayers Int[] @default([])
+  // Signed steer strength (negative suppresses the readout).
+  steerStrength Float?
+  // When true, the steer ablates (projects out) the readout direction instead
+  // of additively steering — mutually exclusive with steerStrength.
+  steerAblate Boolean?
+  // Intervention mode: 'steer' (add/suppress) or 'swap' (replace the source
+  // readout with `swapToken`). Null for pre-swap shares.
+  steerMode String?
+  // The target token for a swap (e.g. " Rugby"). Null for plain steers.
+  swapToken String?
+  // Whether the steer/swap intervention was applied to generated tokens too.
+  steerGenerated Boolean?
+
+  numPromptTokens Int?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modelId])
+  @@index([userId])
+}
+
+model JlensSharePutRequest {
+  id String @id @default(cuid())
+
+  ipAddress String
+  filename  String
+  url       String
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -319,6 +403,7 @@ model Model {
   sourceInferenceHosts InferenceHostSource[]
   graphHostSources     GraphHostSource[]
   graphMetadata        GraphMetadata[]
+  jlensShares          JlensShare[]
   nlaSources           NlaSource[]
   nlaExplainCaches     NlaExplainCache[]
   headMetrics          ModelHeadMetrics[]

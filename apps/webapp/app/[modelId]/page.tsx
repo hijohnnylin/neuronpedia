@@ -14,20 +14,18 @@ import GemmaScopeHome from './gemmascope/home';
 import PageModel from './page-model';
 import PageRelease from './page-release';
 
-export async function generateMetadata(
-  props: {
-    params: Promise<{ modelId: string }>;
-    searchParams: Promise<{
-      q?: string;
-      selectedLayers?: string;
-      filter?: string;
-      sortIndex?: string;
-      sortIndexes?: string;
-      sourceSet?: string;
-      ignoreBos?: string;
-    }>;
-  }
-): Promise<Metadata> {
+export async function generateMetadata(props: {
+  params: Promise<{ modelId: string }>;
+  searchParams: Promise<{
+    q?: string;
+    selectedLayers?: string;
+    filter?: string;
+    sortIndex?: string;
+    sortIndexes?: string;
+    sourceSet?: string;
+    ignoreBos?: string;
+  }>;
+}): Promise<Metadata> {
   const searchParams = await props.searchParams;
   const params = await props.params;
   if (params.modelId === 'gemma-scope') {
@@ -84,20 +82,18 @@ export async function generateMetadata(
   };
 }
 
-export default async function Page(
-  props: {
-    params: Promise<{ modelId: string }>;
-    searchParams: Promise<{
-      q?: string;
-      selectedLayers?: string;
-      filter?: string;
-      sortIndex?: string;
-      sortIndexes?: string;
-      sourceSet?: string;
-      ignoreBos?: string;
-    }>;
-  }
-) {
+export default async function Page(props: {
+  params: Promise<{ modelId: string }>;
+  searchParams: Promise<{
+    q?: string;
+    selectedLayers?: string;
+    filter?: string;
+    sortIndex?: string;
+    sortIndexes?: string;
+    sourceSet?: string;
+    ignoreBos?: string;
+  }>;
+}) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   const { modelId } = params;

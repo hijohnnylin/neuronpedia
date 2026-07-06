@@ -504,7 +504,7 @@ export default function NLAInputChat() {
     // gives the larger glyphs room to breathe across wrapped lines.
     const isTourDemo = activeDemoCacheId === NLA_TOUR_LLAMA_LIE_CACHE_ID;
     const nonSmallSizeClass = isTourDemo
-      ? 'px-[0.5px] py-0 text-[14px] sm:text-[18px] leading-relaxed'
+      ? 'px-[0.5px] py-0 text-[12px] sm:text-[18px] leading-relaxed'
       : 'px-[0.5px] py-0 text-[12px] sm:text-[14px] leading-tight';
 
     if (preview) {

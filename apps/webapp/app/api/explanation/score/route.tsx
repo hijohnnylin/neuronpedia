@@ -145,10 +145,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
         },
       });
       if (existingNlaScore) {
-        return NextResponse.json(
-          { message: 'NLA score already exists for this explanation' },
-          { status: 400 },
-        );
+        return NextResponse.json({ message: 'NLA score already exists for this explanation' }, { status: 400 });
       }
       const score = await nlaScorers[explanationScoreType.name](explanation, request.user);
       return NextResponse.json({ score });
@@ -302,9 +299,6 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }
     console.error('/api/explanation/score error:', error);
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : 'Unknown Error' },
-      { status: 500 },
-    );
+    return NextResponse.json({ message: error instanceof Error ? error.message : 'Unknown Error' }, { status: 500 });
   }
 });

@@ -803,7 +803,10 @@ export default function ConnectedNeuronsPane({
           minHeight: `${
             isLoading || !sparsityData
               ? 320
-              : Math.max(320, layerLabelPositions.length > 0 ? layerLabelPositions[layerLabelPositions.length - 1].maxY + 30 : 320)
+              : Math.max(
+                  320,
+                  layerLabelPositions.length > 0 ? layerLabelPositions[layerLabelPositions.length - 1].maxY + 30 : 320,
+                )
           }px`,
         }}
       >

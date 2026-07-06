@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "JlensShare" ADD COLUMN     "numCompletionTokens" INTEGER NOT NULL DEFAULT 256,
+ADD COLUMN     "temperature" DOUBLE PRECISION NOT NULL DEFAULT 0;

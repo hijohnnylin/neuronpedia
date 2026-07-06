@@ -1,5 +1,5 @@
-'use client';;
-import { use } from "react";
+'use client';
+import { use } from 'react';
 
 import { useRouter } from '@bprogress/next';
 

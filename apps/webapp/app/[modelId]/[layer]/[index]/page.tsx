@@ -6,11 +6,9 @@ import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import FeatureDashboard from './feature-dashboard';
 
-export async function generateMetadata(
-  props: {
-    params: Promise<{ modelId: string; layer: string; index: string }>;
-  }
-): Promise<Metadata> {
+export async function generateMetadata(props: {
+  params: Promise<{ modelId: string; layer: string; index: string }>;
+}): Promise<Metadata> {
   const params = await props.params;
   let title = `${params.modelId.toUpperCase()} · ${params.layer.toUpperCase()} · ${params.index.toUpperCase()}`;
   const feat = await neuronExistsAndUserHasAccess(params.modelId, params.layer, params.index);
@@ -28,12 +26,10 @@ export async function generateMetadata(
   };
 }
 
-export default async function Page(
-  props: {
-    params: Promise<{ modelId: string; layer: string; index: string }>;
-    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-  }
-) {
+export default async function Page(props: {
+  params: Promise<{ modelId: string; layer: string; index: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   const embed = searchParams.embed === 'true';

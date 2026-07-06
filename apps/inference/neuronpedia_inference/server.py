@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from nnterp import StandardizedTransformer
+from nnterp.rename_utils import RenameConfig
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
@@ -60,6 +61,13 @@ from neuronpedia_inference.endpoints.activation.topk_by_token import (
 from neuronpedia_inference.endpoints.activation.topk_by_token_batch import (
     router as activation_topk_by_token_batch_router,
 )
+from neuronpedia_inference.endpoints.lens.lens_loader import (
+    load_jacobian_lens_at_startup,
+)
+from neuronpedia_inference.endpoints.lens.prompt import (
+    router as lens_prompt_router,
+)
+from neuronpedia_inference.endpoints.lens.prompt import warmup_lens
 from neuronpedia_inference.endpoints.persona.monitor import (
     router as persona_monitor_router,
 )
@@ -95,6 +103,22 @@ from neuronpedia_inference.utils import checkCudaError
 # llama 3.3 70b awq (quantized) = 1 H200, 0.9
 CHATSPACE_NUM_GPUS = 1
 CHATSPACE_GPU_MEMORY_UTILIZATION = 0.9
+
+
+class TextOnlyAutoModelForCausalLM(AutoModelForCausalLM):
+    """Loads the text-only causal-LM stack of multimodal (image-text-to-text)
+    models such as Qwen3-Next / Qwen3.6.
+
+    nnsight's ``LanguageModel`` refuses to load any model whose config is
+    registered with ``AutoModelForImageTextToText`` and points the user at
+    ``VisionLanguageModel`` instead. That guard is bypassed whenever the
+    ``automodel`` passed to nnsight is not literally ``AutoModelForCausalLM``.
+    These models are *also* registered with ``AutoModelForCausalLM`` (mapping to
+    their text-only ``*ForCausalLM`` class, which ignores the vision weights on
+    load), so this trivial subclass keeps the full causal-LM behaviour while
+    skipping the guard. It behaves identically to ``AutoModelForCausalLM`` for
+    plain text models.
+    """
 
 # Initialize logging at module level
 initialize_logging()
@@ -162,6 +186,7 @@ v1_router.include_router(tokenize_router)
 v1_router.include_router(similarity_matrix_pred_router)
 v1_router.include_router(activation_source_router)
 v1_router.include_router(persona_monitor_router)
+v1_router.include_router(lens_prompt_router)
 app.include_router(v1_router)
 
 
@@ -240,6 +265,7 @@ async def initialize(
             model_dtype=args.model_dtype,
             sae_dtype=args.sae_dtype,
             token_limit=args.token_limit,
+            lens_token_limit=args.lens_token_limit,
             device=args.device,
             override_model_id=args.override_model_id,
             include_sae=args.include_sae,
@@ -283,11 +309,25 @@ async def initialize(
                         i: f"{mem_values[i]}GiB" for i in range(num_gpus)
                     }
                 logger.info("nnsight max_memory: %s", nnsight_kwargs["max_memory"])
+            # Hybrid-attention models (e.g. Qwen3-Next / Qwen3.6) interleave
+            # gated linear-attention layers (module named ``linear_attn``) with
+            # full-attention layers (module named ``self_attn``). nnterp only
+            # looks for ``self_attn`` when standardizing, so the linear-attention
+            # layers fail its renaming check. Tell nnterp to also treat
+            # ``linear_attn`` as the attention module so every layer exposes a
+            # standardized ``self_attn``. This is a no-op for architectures that
+            # don't have a ``linear_attn`` module.
+            rename_config = RenameConfig(attn_name=["self_attn", "linear_attn"])
             try:
                 model = StandardizedTransformer(
                     replace_tlens_model_id_with_hf_model_id(model_to_load),
                     dtype=STR_TO_DTYPE[config.model_dtype],
                     trust_remote_code=True,
+                    rename_config=rename_config,
+                    # Load only the text stack of multimodal models (e.g.
+                    # Qwen3.6) instead of erroring out / pulling in the vision
+                    # tower. No-op for plain text models.
+                    automodel=TextOnlyAutoModelForCausalLM,
                     **nnsight_kwargs,
                 )
             except RecursionError as exc:
@@ -371,12 +411,19 @@ async def initialize(
             config.set_num_layers(model.cfg.n_layers)
 
         if model.tokenizer:
+            # Some tokenizers (e.g. Qwen2Tokenizer) don't expose
+            # `additional_special_tokens_ids` and their base-class `__getattr__`
+            # raises AttributeError instead of returning a default, so access it
+            # defensively.
+            additional_special_token_ids = (
+                getattr(model.tokenizer, "additional_special_tokens_ids", None) or []
+            )
             special_token_ids = set(
                 [
                     model.tokenizer.bos_token_id,  # type: ignore
                     model.tokenizer.eos_token_id,
                 ]
-                + model.tokenizer.additional_special_tokens_ids
+                + list(additional_special_token_ids)
             )
             special_token_ids = {
                 tid
@@ -394,6 +441,17 @@ async def initialize(
         logger.info("Loading SAEs...")
         SAEManager._instance = SAEManager(config.num_layers, args.device)
         SAEManager._instance.load_saes()
+
+        # Load the fitted Jacobian lens (best-effort; never fatal). LOGIT_LENS
+        # requests work regardless; JACOBIAN_LENS requests error if this fails.
+        logger.info("Loading Jacobian lens (if available)...")
+        load_jacobian_lens_at_startup(config, args)
+
+        # If a Jacobian lens loaded, run a 1-token pass through the real lens
+        # code now so nnsight's first-trace initialization happens at startup
+        # (otherwise the first JACOBIAN_LENS request returns uniform logits).
+        logger.info("Warming up lens code path (if Jacobian lens available)...")
+        warmup_lens()
 
         global initialized
         initialized = True

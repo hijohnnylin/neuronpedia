@@ -29,6 +29,7 @@ class Config:
         secret: str | None = None,
         port: int = 5000,
         token_limit: int = 100,
+        lens_token_limit: int = 1024,
         valid_completion_types: list[str] = ["default", "steered"],
         num_layers: int | None = None,
         device: str | None = None,
@@ -49,6 +50,11 @@ class Config:
         self.secret = secret
         self.port = port
         self.token_limit = token_limit
+        # Separate, higher cap that applies ONLY to the lens endpoints
+        # (logit/jacobian lens). Independent of `token_limit` (which governs the
+        # completion/steer/activation/tokenize endpoints) so JLens can allow
+        # longer conversations without changing the other endpoints' limits.
+        self.lens_token_limit = lens_token_limit
         self.valid_completion_types = valid_completion_types
         self.num_layers = num_layers
         self.device = device
@@ -72,6 +78,7 @@ class Config:
             f"  sae_dtype: {self.sae_dtype}\n"
             f"  port: {self.port}\n"
             f"  token_limit: {self.token_limit}\n"
+            f"  lens_token_limit: {self.lens_token_limit}\n"
             f"  device: {self.device}\n"
             f"  sae_sets: {self.sae_sets}\n"
             f"  max_loaded_saes: {self.max_loaded_saes}\n"

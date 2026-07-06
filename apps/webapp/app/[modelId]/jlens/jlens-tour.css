@@ -1,0 +1,248 @@
+/*
+ * JLens tour theme — overrides driver.js's default popover styles.
+ *
+ * Scoped to `.driver-popover.jlens-driver-popover` so it only applies to
+ * tours that opt in via `driver({ popoverClass: 'jlens-driver-popover' })`,
+ * and so the extra class bumps specificity above the defaults shipped
+ * in `driver.js/dist/driver.css` (which use single-class selectors).
+ *
+ * Palette mirrors the rest of the JLens UI: white surface, slate text,
+ * emerald primary actions.
+ */
+
+.driver-popover.jlens-driver-popover {
+  padding: 24px 28px 20px;
+  border-radius: 24px;
+  min-width: 420px;
+  max-width: 420px;
+  color: #334155; /* slate-700 */
+  background-color: #ffffff;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.18),
+    0 2px 6px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25); /* slate-400/25 */
+}
+
+.driver-popover.jlens-driver-popover * {
+  font-family:
+    var(--font-inter),
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Helvetica Neue',
+    sans-serif;
+}
+
+/* Title */
+.driver-popover.jlens-driver-popover .driver-popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0f172a; /* slate-900 */
+  /* Reserve space for the close button. */
+  padding-right: 28px;
+  margin-bottom: 10px;
+}
+
+/* Description */
+.driver-popover.jlens-driver-popover .driver-popover-description {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #475569; /* slate-600 */
+}
+.driver-popover.jlens-driver-popover .driver-popover-description p {
+  margin: 0;
+}
+.driver-popover.jlens-driver-popover .driver-popover-description p + p {
+  margin-top: 8px;
+}
+.driver-popover.jlens-driver-popover .driver-popover-description strong {
+  color: #0f172a; /* slate-900 */
+  font-weight: 600;
+}
+.driver-popover.jlens-driver-popover .driver-popover-description em {
+  color: #334155; /* slate-700 */
+  font-style: italic;
+}
+.driver-popover.jlens-driver-popover .driver-popover-description a {
+  color: #047857; /* emerald-700 */
+  text-decoration: none;
+  border-bottom: 1px solid rgba(4, 120, 87, 0.35);
+}
+.driver-popover.jlens-driver-popover .driver-popover-description a:hover {
+  border-bottom-color: #047857;
+}
+.driver-popover.jlens-driver-popover .driver-popover-description a:focus,
+.driver-popover.jlens-driver-popover .driver-popover-description a:focus-visible {
+  outline: none;
+  box-shadow: none;
+  ring: 0;
+}
+
+/* Close button (X in the corner) */
+.driver-popover.jlens-driver-popover .driver-popover-close-btn {
+  top: 6px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 6px;
+  color: #cbd5e1; /* slate-300 */
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+.driver-popover.jlens-driver-popover .driver-popover-close-btn:hover,
+.driver-popover.jlens-driver-popover .driver-popover-close-btn:focus {
+  color: #cbd5e1; /* slate-600 */
+  background-color: rgba(148, 163, 184, 0); /* slate-400/18 */
+}
+
+/* Footer (progress + nav buttons) */
+.driver-popover.jlens-driver-popover .driver-popover-footer {
+  margin-top: 12px;
+  gap: 12px;
+}
+.driver-popover.jlens-driver-popover .driver-popover-progress-text {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8; /* slate-400 */
+}
+.driver-popover.jlens-driver-popover .driver-popover-navigation-btns {
+  gap: 8px;
+}
+.driver-popover.jlens-driver-popover .driver-popover-navigation-btns button + button {
+  margin-left: 0; /* gap handles spacing now */
+}
+
+/* Buttons */
+.driver-popover.jlens-driver-popover .driver-popover-footer button {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0; /* slate-200 */
+  background-color: #ffffff;
+  color: #475569; /* slate-600 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.driver-popover.jlens-driver-popover .driver-popover-footer button:hover,
+.driver-popover.jlens-driver-popover .driver-popover-footer button:focus {
+  background-color: #f1f5f9; /* slate-100 */
+  border-color: #cbd5e1; /* slate-300 */
+  color: #0f172a; /* slate-900 */
+}
+
+/* Primary (Next / Done) */
+.driver-popover.jlens-driver-popover .driver-popover-next-btn {
+  background-color: #059669; /* emerald-600 */
+  border-color: #059669;
+  color: #ffffff;
+}
+.driver-popover.jlens-driver-popover .driver-popover-next-btn:hover,
+.driver-popover.jlens-driver-popover .driver-popover-next-btn:focus {
+  background-color: #047857; /* emerald-700 */
+  border-color: #047857;
+  color: #ffffff;
+}
+
+/* Disabled state */
+.driver-popover.jlens-driver-popover .driver-popover-footer .driver-popover-btn-disabled {
+  opacity: 0.45;
+}
+
+/* "Skip tour" button — injected on early steps' popover footer (see
+ * `onPopoverRender` in `jlens-tour.tsx`). Specificity must beat the
+ * generic `.driver-popover-footer button` rule above so it doesn't
+ * pick up the emerald primary-button theme: a text/link look reads as a
+ * secondary "out" without competing with the next/done button. */
+.driver-popover.jlens-driver-popover .driver-popover-footer button.jlens-tour-skip-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 0px solid #e2e8f0; /* slate-200 */
+  background-color: #ffffff;
+  color: #94a3b8; /* slate-400 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.driver-popover.jlens-driver-popover .driver-popover-footer button.jlens-tour-skip-btn:hover {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 0px solid #e2e8f0; /* slate-200 */
+  background-color: #f1f5f9; /* slate-100 */
+  color: #94a3b8; /* slate-400 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Arrow — driver.js renders this as a CSS triangle: a 0x0 element
+ * with `border: 5px solid <color>`, where 3 of the 4 sides are set to
+ * `transparent` per `.driver-popover-arrow-side-*`. We must NOT use
+ * shorthand `border-color` here (it would re-color the transparent
+ * sides and turn the triangle back into a square). Override per
+ * matching side so only the visible edge is repainted. */
+.driver-popover.jlens-driver-popover .driver-popover-arrow.driver-popover-arrow-side-left {
+  border-left-color: #ffffff;
+}
+.driver-popover.jlens-driver-popover .driver-popover-arrow.driver-popover-arrow-side-right {
+  border-right-color: #ffffff;
+}
+.driver-popover.jlens-driver-popover .driver-popover-arrow.driver-popover-arrow-side-top {
+  border-top-color: #ffffff;
+}
+.driver-popover.jlens-driver-popover .driver-popover-arrow.driver-popover-arrow-side-bottom {
+  border-bottom-color: #ffffff;
+}
+
+/* Mobile — shrink the popover and its text so the tour copy fits
+ * comfortably on small screens (the desktop sizes overflow / read as
+ * oversized on narrow viewports). */
+@media (max-width: 640px) {
+  .driver-popover.jlens-driver-popover {
+    padding: 16px 18px 14px;
+    border-radius: 18px;
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+  }
+  .driver-popover.jlens-driver-popover .driver-popover-title {
+    font-size: 12.5px;
+    margin-bottom: 8px;
+  }
+  .driver-popover.jlens-driver-popover .driver-popover-description {
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .driver-popover.jlens-driver-popover .driver-popover-description p + p {
+    margin-top: 6px;
+  }
+  .driver-popover.jlens-driver-popover .driver-popover-footer {
+    margin-top: 10px;
+  }
+  .driver-popover.jlens-driver-popover .driver-popover-footer button {
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+  .driver-popover.jlens-driver-popover .driver-popover-footer button.jlens-tour-skip-btn,
+  .driver-popover.jlens-driver-popover .driver-popover-footer button.jlens-tour-skip-btn:hover {
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+}

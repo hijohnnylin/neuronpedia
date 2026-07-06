@@ -60,7 +60,7 @@ export default function HomeNewsletterSignup({ latestPost }: { latestPost?: Late
       {latestPost && (
         <Link
           href={`/blog/${latestPost.slug}`}
-          className="group flex flex-col rounded-lg border border-slate-200 bg-white px-4 py-3 transition-all hover:border-sky-300 hover:bg-sky-50"
+          className="group flex hidden flex-col rounded-lg border border-slate-200 bg-white px-4 py-3 transition-all hover:border-sky-300 hover:bg-sky-50"
         >
           <div className="mb-0.5 flex flex-row items-center justify-start gap-x-2">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-sky-700">Latest Update</div>

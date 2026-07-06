@@ -75,3 +75,6 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+/public/ignore.json
+/public/ignore2.json

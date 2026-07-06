@@ -2,6 +2,7 @@
 
 import ActivationSingleForm from '@/components/activation-single-form';
 import { ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS } from '@/lib/utils/activations';
+import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle } from 'lucide-react';
@@ -9,7 +10,6 @@ import { Activation, ActivationPartialWithRelations, NeuronWithPartialRelations 
 import { useEffect, useState } from 'react';
 import 'react-loading-skeleton/dist/skeleton.css';
 import ActivationItem from './activation-item';
-import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
 import { useGlobalContext } from './provider/global-provider';
 
 export default function ActivationsList({

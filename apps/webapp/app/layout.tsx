@@ -88,7 +88,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en">
       <body
-        className={`flex min-h-screen flex-col bg-slate-50 bg-fixed ${inter.className} ${
+        className={`flex min-h-[100dvh] flex-col bg-slate-50 bg-fixed ${inter.className} ${
           isEmbed ? 'overscroll-auto' : 'overscroll-none'
         }`}
       >
@@ -109,9 +109,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
             <FeatureModal />
             <SimilarityMatrixModal />
-            <main
-              className={`flex w-full flex-1 flex-col items-center gap-0 ${isEmbed ? 'pt-0' : 'pt-12 sm:pt-12'}`}
-            >
+            <main className={`flex w-full flex-1 flex-col items-center gap-0 ${isEmbed ? 'pt-0' : 'pt-12 sm:pt-12'}`}>
               {children}
             </main>
             {!isEmbed && <Footer />}

@@ -66,6 +66,10 @@ export const GraphMetadataScalarFieldEnumSchema = z.enum(['id','modelId','source
 
 export const GraphMetadataDataPutRequestScalarFieldEnumSchema = z.enum(['id','ipAddress','filename','url','userId','createdAt']);
 
+export const JlensShareScalarFieldEnumSchema = z.enum(['id','kind','modelId','url','description','lockedTokens','selectedPositions','activeLensModeTab','topN','hideNonWordTokens','temperature','numCompletionTokens','steerToken','steerType','steerLayers','steerStrength','steerAblate','steerMode','swapToken','steerGenerated','numPromptTokens','userId','createdAt','updatedAt']);
+
+export const JlensSharePutRequestScalarFieldEnumSchema = z.enum(['id','ipAddress','filename','url','userId','createdAt']);
+
 export const ListCommentScalarFieldEnumSchema = z.enum(['id','listId','text','userId','createdAt']);
 
 export const ListScalarFieldEnumSchema = z.enum(['id','name','description','defaultTestText','userId','createdAt','updatedAt']);
@@ -455,6 +459,8 @@ export type UserRelations = {
   graphMetadatas: GraphMetadataWithRelations[];
   graphMetadataDataPutRequests: GraphMetadataDataPutRequestWithRelations[];
   graphMetadataSubgraphs: GraphMetadataSubgraphWithRelations[];
+  jlensShares: JlensShareWithRelations[];
+  jlensSharePutRequests: JlensSharePutRequestWithRelations[];
   samples: SampleWithRelations[];
   probes: ProbeWithRelations[];
   problemNodesCreated: ProblemNodeWithRelations[];
@@ -494,6 +500,8 @@ export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.
   graphMetadatas: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphWithRelationsSchema).array(),
+  jlensShares: z.lazy(() => JlensShareWithRelationsSchema).array(),
+  jlensSharePutRequests: z.lazy(() => JlensSharePutRequestWithRelationsSchema).array(),
   samples: z.lazy(() => SampleWithRelationsSchema).array(),
   probes: z.lazy(() => ProbeWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
@@ -534,6 +542,8 @@ export type UserPartialRelations = {
   graphMetadatas?: GraphMetadataPartialWithRelations[];
   graphMetadataDataPutRequests?: GraphMetadataDataPutRequestPartialWithRelations[];
   graphMetadataSubgraphs?: GraphMetadataSubgraphPartialWithRelations[];
+  jlensShares?: JlensSharePartialWithRelations[];
+  jlensSharePutRequests?: JlensSharePutRequestPartialWithRelations[];
   samples?: SamplePartialWithRelations[];
   probes?: ProbePartialWithRelations[];
   problemNodesCreated?: ProblemNodePartialWithRelations[];
@@ -573,6 +583,8 @@ export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+  jlensShares: z.lazy(() => JlensSharePartialWithRelationsSchema).array(),
+  jlensSharePutRequests: z.lazy(() => JlensSharePutRequestPartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
@@ -612,6 +624,8 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
   graphMetadatas: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
   graphMetadataDataPutRequests: z.lazy(() => GraphMetadataDataPutRequestPartialWithRelationsSchema).array(),
   graphMetadataSubgraphs: z.lazy(() => GraphMetadataSubgraphPartialWithRelationsSchema).array(),
+  jlensShares: z.lazy(() => JlensSharePartialWithRelationsSchema).array(),
+  jlensSharePutRequests: z.lazy(() => JlensSharePutRequestPartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
@@ -817,6 +831,139 @@ export type GraphMetadataDataPutRequestWithPartialRelations = z.infer<typeof Gra
 
 export const GraphMetadataDataPutRequestWithPartialRelationsSchema: z.ZodType<GraphMetadataDataPutRequestWithPartialRelations> = GraphMetadataDataPutRequestSchema.merge(z.object({
   user: z.lazy(() => UserPartialWithRelationsSchema),
+}).partial())
+
+/////////////////////////////////////////
+// JLENS SHARE SCHEMA
+/////////////////////////////////////////
+
+export const JlensShareSchema = z.object({
+  id: z.string().cuid(),
+  kind: z.string(),
+  modelId: z.string(),
+  url: z.string(),
+  description: z.string().nullable(),
+  lockedTokens: InputJsonValue,
+  selectedPositions: z.number().int().array(),
+  activeLensModeTab: z.string(),
+  topN: z.number().int(),
+  hideNonWordTokens: z.boolean(),
+  temperature: z.number(),
+  numCompletionTokens: z.number().int(),
+  steerToken: z.string().nullable(),
+  steerType: z.string().nullable(),
+  steerLayers: z.number().int().array(),
+  steerStrength: z.number().nullable(),
+  steerAblate: z.boolean().nullable(),
+  steerMode: z.string().nullable(),
+  swapToken: z.string().nullable(),
+  steerGenerated: z.boolean().nullable(),
+  numPromptTokens: z.number().int().nullable(),
+  userId: z.string().nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type JlensShare = z.infer<typeof JlensShareSchema>
+
+/////////////////////////////////////////
+// JLENS SHARE PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const JlensSharePartialSchema = JlensShareSchema.partial()
+
+export type JlensSharePartial = z.infer<typeof JlensSharePartialSchema>
+
+// JLENS SHARE RELATION SCHEMA
+//------------------------------------------------------
+
+export type JlensShareRelations = {
+  model: ModelWithRelations;
+  user?: UserWithRelations | null;
+};
+
+export type JlensShareWithRelations = z.infer<typeof JlensShareSchema> & JlensShareRelations
+
+export const JlensShareWithRelationsSchema: z.ZodType<JlensShareWithRelations> = JlensShareSchema.merge(z.object({
+  model: z.lazy(() => ModelWithRelationsSchema),
+  user: z.lazy(() => UserWithRelationsSchema).nullable(),
+}))
+
+// JLENS SHARE PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type JlensSharePartialRelations = {
+  model?: ModelPartialWithRelations;
+  user?: UserPartialWithRelations | null;
+};
+
+export type JlensSharePartialWithRelations = z.infer<typeof JlensSharePartialSchema> & JlensSharePartialRelations
+
+export const JlensSharePartialWithRelationsSchema: z.ZodType<JlensSharePartialWithRelations> = JlensSharePartialSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+})).partial()
+
+export type JlensShareWithPartialRelations = z.infer<typeof JlensShareSchema> & JlensSharePartialRelations
+
+export const JlensShareWithPartialRelationsSchema: z.ZodType<JlensShareWithPartialRelations> = JlensShareSchema.merge(z.object({
+  model: z.lazy(() => ModelPartialWithRelationsSchema),
+  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+}).partial())
+
+/////////////////////////////////////////
+// JLENS SHARE PUT REQUEST SCHEMA
+/////////////////////////////////////////
+
+export const JlensSharePutRequestSchema = z.object({
+  id: z.string().cuid(),
+  ipAddress: z.string(),
+  filename: z.string(),
+  url: z.string(),
+  userId: z.string().nullable(),
+  createdAt: z.coerce.date(),
+})
+
+export type JlensSharePutRequest = z.infer<typeof JlensSharePutRequestSchema>
+
+/////////////////////////////////////////
+// JLENS SHARE PUT REQUEST PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const JlensSharePutRequestPartialSchema = JlensSharePutRequestSchema.partial()
+
+export type JlensSharePutRequestPartial = z.infer<typeof JlensSharePutRequestPartialSchema>
+
+// JLENS SHARE PUT REQUEST RELATION SCHEMA
+//------------------------------------------------------
+
+export type JlensSharePutRequestRelations = {
+  user?: UserWithRelations | null;
+};
+
+export type JlensSharePutRequestWithRelations = z.infer<typeof JlensSharePutRequestSchema> & JlensSharePutRequestRelations
+
+export const JlensSharePutRequestWithRelationsSchema: z.ZodType<JlensSharePutRequestWithRelations> = JlensSharePutRequestSchema.merge(z.object({
+  user: z.lazy(() => UserWithRelationsSchema).nullable(),
+}))
+
+// JLENS SHARE PUT REQUEST PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type JlensSharePutRequestPartialRelations = {
+  user?: UserPartialWithRelations | null;
+};
+
+export type JlensSharePutRequestPartialWithRelations = z.infer<typeof JlensSharePutRequestPartialSchema> & JlensSharePutRequestPartialRelations
+
+export const JlensSharePutRequestPartialWithRelationsSchema: z.ZodType<JlensSharePutRequestPartialWithRelations> = JlensSharePutRequestPartialSchema.merge(z.object({
+  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+})).partial()
+
+export type JlensSharePutRequestWithPartialRelations = z.infer<typeof JlensSharePutRequestSchema> & JlensSharePutRequestPartialRelations
+
+export const JlensSharePutRequestWithPartialRelationsSchema: z.ZodType<JlensSharePutRequestWithPartialRelations> = JlensSharePutRequestSchema.merge(z.object({
+  user: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
 }).partial())
 
 /////////////////////////////////////////
@@ -1145,6 +1292,7 @@ export type ModelRelations = {
   sourceInferenceHosts: InferenceHostSourceWithRelations[];
   graphHostSources: GraphHostSourceWithRelations[];
   graphMetadata: GraphMetadataWithRelations[];
+  jlensShares: JlensShareWithRelations[];
   nlaSources: NlaSourceWithRelations[];
   nlaExplainCaches: NlaExplainCacheWithRelations[];
   headMetrics: ModelHeadMetricsWithRelations[];
@@ -1169,6 +1317,7 @@ export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSche
   sourceInferenceHosts: z.lazy(() => InferenceHostSourceWithRelationsSchema).array(),
   graphHostSources: z.lazy(() => GraphHostSourceWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataWithRelationsSchema).array(),
+  jlensShares: z.lazy(() => JlensShareWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourceWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCacheWithRelationsSchema).array(),
   headMetrics: z.lazy(() => ModelHeadMetricsWithRelationsSchema).array(),
@@ -1194,6 +1343,7 @@ export type ModelPartialRelations = {
   sourceInferenceHosts?: InferenceHostSourcePartialWithRelations[];
   graphHostSources?: GraphHostSourcePartialWithRelations[];
   graphMetadata?: GraphMetadataPartialWithRelations[];
+  jlensShares?: JlensSharePartialWithRelations[];
   nlaSources?: NlaSourcePartialWithRelations[];
   nlaExplainCaches?: NlaExplainCachePartialWithRelations[];
   headMetrics?: ModelHeadMetricsPartialWithRelations[];
@@ -1218,6 +1368,7 @@ export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelation
   sourceInferenceHosts: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema).array(),
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
+  jlensShares: z.lazy(() => JlensSharePartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
   headMetrics: z.lazy(() => ModelHeadMetricsPartialWithRelationsSchema).array(),
@@ -1242,6 +1393,7 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
   sourceInferenceHosts: z.lazy(() => InferenceHostSourcePartialWithRelationsSchema).array(),
   graphHostSources: z.lazy(() => GraphHostSourcePartialWithRelationsSchema).array(),
   graphMetadata: z.lazy(() => GraphMetadataPartialWithRelationsSchema).array(),
+  jlensShares: z.lazy(() => JlensSharePartialWithRelationsSchema).array(),
   nlaSources: z.lazy(() => NlaSourcePartialWithRelationsSchema).array(),
   nlaExplainCaches: z.lazy(() => NlaExplainCachePartialWithRelationsSchema).array(),
   headMetrics: z.lazy(() => ModelHeadMetricsPartialWithRelationsSchema).array(),

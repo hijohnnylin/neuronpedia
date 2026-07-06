@@ -1,6 +1,6 @@
 import { createProblemNode } from '@/lib/db/problem';
-import { detectTypeFromUrl, fetchUrlMetadata } from '@/lib/problem-utils';
 import { normalizeUrl } from '@/lib/problem-url-types';
+import { detectTypeFromUrl, fetchUrlMetadata } from '@/lib/problem-utils';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 

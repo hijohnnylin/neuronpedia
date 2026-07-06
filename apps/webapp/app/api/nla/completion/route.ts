@@ -275,7 +275,7 @@ async function streamOpenRouterCompletion(args: {
  *             properties:
  *               modelId:
  *                 type: string
- *                 description: The Neuronpedia model id (e.g. `gemma-2-9b-it`). Must have an OpenRouter mapping.
+ *                 description: The Neuronpedia model id (e.g. `gemma-3-27b-it`). Must have an OpenRouter mapping.
  *               nlaSourceId:
  *                 type: string
  *                 description: Optional. NLA source id — controls which NLA server tokenizes the full chat. Defaults to a server configured for `modelId`.
@@ -295,10 +295,11 @@ async function streamOpenRouterCompletion(args: {
  *                 type: number
  *                 description: Sampling temperature. Default `0.7`.
  *             example:
- *               modelId: gemma-2-9b-it
+ *               modelId: gemma-3-27b-it   # For the llama model it's modelId: llama3.3-70b-it, nlaSourceId: kitft-l53
+ *               nlaSourceId: kitft-l41
  *               messages:
  *                 - role: user
- *                   content: What is the capital of France?
+ *                   content: What is the capital of Canada?
  *               completion_tokens: 32
  *               temperature: 0.7
  *     responses:
@@ -400,13 +401,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // Mirrors the previous behavior: the chat UI passes `stream: true` plus
   // `messages` and gets SSE prompt/token events. Same provider-routing
   // rules as the non-streaming API path (must have an openRouterId).
-  if (
-    USE_OPENROUTER_FOR_COMPLETION &&
-    effectiveCompletionTokens > 0 &&
-    wantsStream &&
-    hasMessages &&
-    modelId
-  ) {
+  if (USE_OPENROUTER_FOR_COMPLETION && effectiveCompletionTokens > 0 && wantsStream && hasMessages && modelId) {
     const model = await prisma.model.findUnique({ where: { id: modelId } });
     if (!model?.openRouterId) {
       return NextResponse.json({ error: `Model ${modelId} has no openRouterId configured` }, { status: 400 });

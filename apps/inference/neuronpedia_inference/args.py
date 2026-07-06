@@ -19,12 +19,18 @@ def parse_env_and_args():
     args.model_dtype = os.getenv("MODEL_DTYPE", "float32")
     args.sae_dtype = os.getenv("SAE_DTYPE", "float32")
     args.token_limit = int(os.getenv("TOKEN_LIMIT", "200"))
+    # Separate cap for the lens endpoints only (logit/jacobian lens). Defaults to
+    # 1024 and is independent of TOKEN_LIMIT so JLens conversations can be longer
+    # (or shorter) than the limit used by the other endpoints.
+    args.lens_token_limit = int(os.getenv("LENS_TOKEN_LIMIT", "1024"))
     args.device = os.getenv("DEVICE")
     if args.device is None:
-        # set device to mps or cuda if available, otherwise cpu
-        if torch.backends.mps.is_available():
-            args.device = "mps"
-        elif torch.cuda.is_available():
+        # Prefer CUDA. On Macs we deliberately fall back to CPU instead of MPS:
+        # MPS is unsupported by nnsight/nnterp and has correctness gaps for the
+        # large argsort/matmul used by the lens endpoints, so CPU keeps the
+        # server fully testable on a Mac (slow, but correct). Set DEVICE=mps
+        # explicitly to override this.
+        if torch.cuda.is_available():
             args.device = "cuda"
         else:
             args.device = "cpu"
@@ -37,6 +43,26 @@ def parse_env_and_args():
     args.nnsight = os.getenv("NNSIGHT", "").lower() == "true"
     args.nnsight_max_memory = os.getenv("NNSIGHT_MAX_MEMORY")
     args.chatspace = os.getenv("CHATSPACE", "").lower() == "true"
+
+    # Lens endpoints (logit lens / jacobian lens)
+    # Skip loading the fitted Jacobian lens at startup. The server still starts
+    # and LOGIT_LENS requests work; JACOBIAN_LENS requests return an error.
+    args.jlens_skip = os.getenv("JLENS_SKIP", "").lower() == "true"
+    # Optional absolute path to a local directory containing a fitted lens
+    # (e.g. .../<np_model_id>/jlens/Salesforce-wikitext). When set, this is used
+    # instead of downloading from Hugging Face.
+    args.jlens_source = os.getenv("JLENS_SOURCE")
+    # Dataset folder name the lens was fit on (used in the HF path / local path).
+    args.jlens_dataset = os.getenv("JLENS_DATASET", "Salesforce-wikitext")
+    # Hugging Face model repo holding fitted lenses, keyed by neuronpedia model id
+    # under "<np_model_id>/jlens/<dataset>/<slug>_jacobian_lens.pt".
+    args.jlens_hf_repo = os.getenv("JLENS_HF_REPO", "neuronpedia/jacobian-lens")
+    # Optional exact path (within the HF repo) to the lens .pt file. When set, this
+    # is used verbatim instead of deriving it from the model id / dataset.
+    args.jlens_hf_path = os.getenv("JLENS_HF_PATH")
+    # Explicit neuronpedia model id (used to build the HF path). Only needed when
+    # np_model_to_hf.json is not present at the repo root.
+    args.neuronpedia_model_id = os.getenv("NEURONPEDIA_MODEL_ID")
 
     return args
 

@@ -20,7 +20,7 @@ by Luger, Kamath et al (Anthropic 2026).
 | `load-head-sequences.py` | Imports per-head sampled sequences into `ModelHeadSequence`. |
 | `model_head_metrics.py` | Dataclass mirroring `ModelHeadMetrics`. |
 | `model_head_sequence.py` | Dataclass mirroring `ModelHeadSequence`. |
-| `np_model_to_hf.json` | Map from Neuronpedia model id → Hugging Face model name. |
+| `../np_model_to_hf.json` | Map from Neuronpedia model id → Hugging Face model name. Shared with `jlens/` (lives in the parent `neuronpedia_utils/` dir). |
 | `pyproject.toml` / `uv.lock` | Standalone uv environment. |
 
 ## Setup
@@ -100,7 +100,7 @@ Useful knobs:
 | flag | default | what it does |
 |---|---|---|
 | `--exports-dir` | `../exports` | Root exports directory. |
-| `--np-model-map` | `./np_model_to_hf.json` | Path to the NP-id ↔ HF-name map. |
+| `--np-model-map` | `../np_model_to_hf.json` | Path to the NP-id ↔ HF-name map (shared with `jlens/`). |
 | `--n-sequences` | 2000 | Number of valid sequences to process. |
 | `--seq-len` | 512 | Tokenized sequence length (truncated). |
 | `--batch-size` | 4 | Sequences per forward pass. |

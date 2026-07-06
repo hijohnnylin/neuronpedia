@@ -15,6 +15,8 @@
   - [get cosine similarities](#get-cosine-similarities)
   - [steering chat example gemma-2-2b-it (returns dog)](#steering-chat-example-gemma-2-2b-it-returns-dog)
   - [steering example gpt2-small res-jb](#steering-example-gpt2-small-res-jb)
+  - [jacobian lens example gemma-3-4b (base, raw prompt)](#jacobian-lens-example-gemma-3-4b-base-raw-prompt)
+  - [jacobian lens example gemma-3-4b-it (instruct, chat)](#jacobian-lens-example-gemma-3-4b-it-instruct-chat)
 - [Testing, Linting, and Formatting](#testing-linting-and-formatting)
 
 ## what this is
@@ -288,6 +290,88 @@ curl -X POST http://127.0.0.1:5002/v1/steer/completion \
      "seed": 16,
      "steer_method": "SIMPLE_ADDITIVE",
      "normalize_steering": false
+   }'
+```
+
+### jacobian lens example gemma-3-4b (base, raw prompt)
+
+The `/v1/lens/prompt` endpoint returns a position × layer lens "slice" for a
+prompt. `type` is an **array** of one or more of `JACOBIAN_LENS` (uses the fitted
+lens loaded at startup) and `LOGIT_LENS` (no fitted lens needed). Requesting both
+is essentially free — the model runs only once and the residuals are shared — and
+the response returns one entry in `results` per requested type. For a **base**
+model, pass a raw text `prompt`.
+
+Start the server for the base model (`gemma-3-4b` → `google/gemma-3-4b-pt`). The
+fitted Jacobian lens is downloaded from a Hugging Face model repo (default
+`neuronpedia/jacobian-lens`) at startup based on the neuronpedia model id, from
+`<np_model_id>/jlens/<dataset>/<slug>_jacobian_lens.pt` (falling back to
+`<slug>_jacobian_lens_n1000.pt`, then the first `.pt` in that directory).
+
+You can override the lens loading with flags (each has a matching env var):
+
+- `--jlens_hf_repo <repo>` (`JLENS_HF_REPO`): HF model repo to download from.
+- `--jlens_hf_path <path/to/file.pt>` (`JLENS_HF_PATH`): exact path within the
+  repo to the lens `.pt`, used verbatim instead of deriving it.
+- `--jlens_dataset <name>` (`JLENS_DATASET`): dataset folder the lens was fit on
+  (default `Salesforce-wikitext`).
+- `--jlens_source <abs/path>` (`JLENS_SOURCE`): load a local lens directory
+  instead of downloading.
+- `--neuronpedia_model_id <id>` (`NEURONPEDIA_MODEL_ID`): explicit neuronpedia
+  model id, only needed when `np_model_to_hf.json` is not at the repo root.
+- `--jlens_skip` (`JLENS_SKIP`): start without a fitted lens (LOGIT_LENS still
+  works).
+
+```
+poetry run python start.py \
+  --model_id google/gemma-3-4b-pt \
+  --model_dtype bfloat16 \
+  --sae_dtype bfloat16
+```
+
+```bash
+curl -X POST http://127.0.0.1:5002/v1/lens/prompt \
+  -H "Content-Type: application/json" \
+  -d '{
+     "model": "google/gemma-3-4b-pt",
+     "type": ["JACOBIAN_LENS", "LOGIT_LENS"],
+     "prompt": "The Eiffel Tower is located in the city of",
+     "top_n": 10,
+     "layer_stride": 1,
+     "include_final_layer": true
+   }'
+```
+
+The response is shaped `{ "request_info": {...}, "results": [...] }`, with one
+item in `results` for each requested type. Shared context (tokens, vocab
+fragment, params) lives in `request_info`.
+
+### jacobian lens example gemma-3-4b-it (instruct, chat)
+
+For an **instruct** model, pass a `chat` conversation instead of `prompt` (the
+tokenizer's chat template is applied automatically). Here we load the instruct
+model via `--override_model_id`:
+
+```
+poetry run python start.py \
+  --model_id gemma-3-4b \
+  --override_model_id gemma-3-4b-it \
+  --model_dtype bfloat16 \
+  --sae_dtype bfloat16
+```
+
+```bash
+curl -X POST http://127.0.0.1:5002/v1/lens/prompt \
+  -H "Content-Type: application/json" \
+  -d '{
+     "model": "gemma-3-4b-it",
+     "type": ["JACOBIAN_LENS"],
+     "chat": [
+       { "role": "user", "content": "What is the capital of France?" }
+     ],
+     "top_n": 10,
+     "layer_stride": 1,
+     "include_final_layer": true
    }'
 ```
 

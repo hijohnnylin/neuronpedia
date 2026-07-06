@@ -5,10 +5,7 @@
   "printWidth": 120,
   "tabWidth": 2,
   "singleQuote": true,
-  "plugins": [
-    "prettier-plugin-organize-imports",
-    "prettier-plugin-tailwindcss"
-  ],
+  "plugins": ["prettier-plugin-organize-imports", "prettier-plugin-tailwindcss"],
   "overrides": [
     {
       "files": ["*.jsonc", ".eslintrc", "tsconfig*.json"],

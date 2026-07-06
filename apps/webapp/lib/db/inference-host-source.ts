@@ -56,9 +56,42 @@ export const getAllServerHostsForModel = async (
     },
   });
 
+  // if found none from sources, try inferenceHostSource directly
+  if (sources.length === 0) {
+    const inferenceHostSource = await prisma.inferenceHostSource.findFirst({
+      where: {
+        modelId,
+        engine,
+      },
+    });
+    if (inferenceHostSource) {
+      return [inferenceHostSource.hostUrl];
+    }
+  }
+
   // Flatten the array of arrays into a single array of unique host URLs
   const allHosts = sources.flatMap((source) => source.inferenceHosts.map((host) => host.inferenceHost.hostUrl));
   return allHosts;
+};
+
+// Returns every inference instance registered directly against the model
+// (`InferenceHostSource.modelId`), regardless of whether it's been connected to
+// a specific Source via `InferenceHostSourceOnSource`. `getAllServerHostsForModel`
+// only surfaces hosts that have such a join row, so it can miss interchangeable
+// per-model instances (e.g. jlens serves any request from any instance of the
+// model). Deduped by hostUrl.
+export const getAllInstanceHostsForModel = async (
+  modelId: string,
+  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
+) => {
+  const instances = await prisma.inferenceHostSource.findMany({
+    where: {
+      modelId,
+      engine,
+    },
+    select: { hostUrl: true },
+  });
+  return [...new Set(instances.map((instance) => instance.hostUrl))];
 };
 
 export const getOneRandomServerHostForSourceSet = async (

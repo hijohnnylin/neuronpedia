@@ -4,7 +4,7 @@ import InferenceActivationAllProvider from '@/components/provider/inference-acti
 import RandomFeatureLink from '@/components/random-feature-link';
 import { Button } from '@/components/shadcn/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
-import { DEFAULT_MODELID, DEFAULT_SOURCE, DEMO_MODE, IS_LOCALHOST, NEXT_PUBLIC_URL } from '@/lib/env';
+import { ASSET_BASE_URL, DEFAULT_MODELID, DEFAULT_SOURCE, DEMO_MODE, IS_LOCALHOST, NEXT_PUBLIC_URL } from '@/lib/env';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import {
@@ -37,8 +37,11 @@ import Link from 'next/link';
 import FeatureSelector from '../components/feature-selector/feature-selector';
 import InferenceSearcher from '../components/inference-searcher/inference-searcher';
 import { CAP_BLOG_URL, CAP_PAPER_URL } from './[modelId]/assistant-axis/shared';
+import { JLENS_BLOG_URL, JLENS_PAPER_URL } from './[modelId]/jlens/jlens-urls';
 import { NLA_BLOG_URL, NLA_PAPER_URL } from './[modelId]/nla/nla-urls';
 import { getBlogDateString, getPostsMetaData, PostMetaData } from './blog/blog-util';
+import HomeDemoVideo from './home/home-demo-video';
+import HomeJlensWatchIntroButton from './home/home-jlens-watch-intro-button';
 import HomeModels from './home/home-models';
 import HomeNewsletterSignup from './home/home-newsletter-signup';
 import HomeReleases from './home/home-releases';
@@ -107,10 +110,10 @@ export default async function Page() {
 
       <div className="mb-1 mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:flex-row">
         <div className="flex basis-[55%] flex-col items-center justify-center text-center text-sm sm:text-base">
-          <div className="text-lg font-medium text-slate-800 sm:text-[19px]">
+          <div className="text-lg font-medium text-slate-800 sm:text-[16px]">
             Neuronpedia is an{' '}
             <a
-              href="https://github.com/hijohnnylin/neuronpedia#readme"
+              href="https://github.com/hijohnnylin/neuronpedia"
               className="transition-all hover:text-slate-900/70 hover:underline"
               target="_blank"
               rel="noreferrer"
@@ -129,10 +132,10 @@ export default async function Page() {
             </CustomTooltip>{' '}
             platform.
           </div>
-          <div className="mt-0 text-sm font-normal text-slate-600 sm:text-[14px]">
+          <div className="mt-0 text-sm font-normal text-slate-500 sm:text-[14px]">
             Explore, visualize, and steer the internals of AI models.
           </div>
-          <div className="mt-2 flex flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2 sm:flex-row">
+          <div className="mt-2 flex hidden flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2 sm:flex-row">
             <Link href="https://github.com/hijohnnylin/neuronpedia" target="_blank" rel="noreferrer">
               <Button
                 variant="default"
@@ -182,69 +185,57 @@ export default async function Page() {
             </Link>
           </div>
         </div>
-
-        <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
-      <div className="flex w-full flex-col items-center justify-center px-1.5 pb-10 sm:px-0 sm:pb-16">
-        <div className="mt-0 overflow-hidden rounded-[40px] bg-white px-0 pb-0 pt-1 sm:mb-5 sm:mt-4 sm:max-w-screen-xl sm:pb-2">
-          <div
-            className="w-full rounded-full pb-0 pt-1 text-center text-[9px] font-bold uppercase text-[#262625]/40"
+      <div className="flex w-full flex-col items-center justify-center px-1.5 sm:px-0">
+        <div className="mt-0 w-full rounded-b-[40px] rounded-t-[40px] px-0 pb-0 pt-1 sm:mb-9 sm:mt-6 sm:w-auto sm:max-w-screen-xl sm:pb-0 sm:pt-0">
+          {/* <div
+            className="w-full rounded-full pb-0 pt-0 text-center text-[9px] font-bold uppercase text-[#262625]/40"
             title="Fully vetted and stabilized projects and collaborations."
           >
-            Featured Release
-          </div>
-          <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-2 sm:flex-col sm:gap-y-0 sm:px-7 sm:pt-0">
-            <div className="flex w-full flex-row items-center justify-center sm:pb-2 sm:pt-0">
-              <div className="relative z-0 mb-3 mt-0 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:mt-1 sm:h-[240px] sm:min-h-[240px] sm:max-w-[800px] sm:px-0">
-                <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
+            Featured Release - July 2026
+          </div> */}
+          <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-1.5 sm:flex-col sm:gap-y-0 sm:px-0 sm:pt-0">
+            <div className="flex w-full flex-row items-center justify-center sm:pb-0 sm:pt-0">
+              <div className="relative z-0 mb-3 mt-4 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-0 sm:mt-2 sm:h-[300px] sm:min-h-[300px] sm:min-w-[900px] sm:max-w-[900px] sm:px-0">
+                <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-14 gap-y-1 overflow-hidden rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-[0_8px_36px_-8px_#444443b3] sm:flex-row sm:gap-y-0 sm:py-0 sm:pl-16">
+                  {/* <div className="absolute -right-2 -top-0.5" style={{ transform: 'rotate(35deg)' }}>
+                    <span className="bg-amber-300 px-3 py-0.5 pl-4 text-[7px] font-medium leading-none text-slate-800">
+                      FEATURED
+                    </span>
+                  </div> */}
                   <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/20 px-8 py-[6px] text-[11px] font-semibold text-[#262625]/70">
-                    Fraser-Taliente, Kantamneni, Ong et al.
+                    Gurnee et al.
                   </div>
-                  <div className="content">
-                    <div className="mt-4 text-[26px] font-bold leading-tight tracking-tight text-[#bf4d43] sm:mt-3 sm:whitespace-nowrap sm:px-10 sm:text-[32px] sm:leading-normal">
-                      Natural Language Autoencoders
+                  <div className="content order-2 sm:order-1">
+                    <div className="mt-1 text-[26px] font-bold leading-tight tracking-tight text-[#666663] sm:mt-1 sm:mt-4 sm:whitespace-nowrap sm:px-10 sm:text-[32px] sm:leading-normal">
+                      Jacobian Lens
                     </div>
-                    <div className="mt-1 text-sm font-medium leading-none text-[#666663] sm:text-[14px]">
-                      Translate a Model&apos;s Internal Thoughts Into Text
+                    <div className="mt-1.5 text-sm font-medium leading-none text-[#666663] sm:mt-0.5 sm:whitespace-nowrap sm:text-[13.5px]">
+                      Revealing a Global Workspace in Language Models
                     </div>
 
-                    <div className="mt-4 flex flex-col items-center justify-center gap-y-1 sm:mt-6 sm:flex-row sm:gap-x-1.5">
-                      <Link href="/llama3.3-70b-it/nla" className="">
-                        <button
-                          type="button"
-                          className="mb-1 h-16 min-h-16 w-[150px] min-w-[150px] transition-all hover:scale-105 sm:mb-0 sm:w-auto sm:min-w-0"
-                        >
-                          <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-[#CC785C] px-6 py-2 text-black shadow-sm shadow-[#666663]/60">
-                            <MessagesSquare className="h-7 w-7" />
-                            <div className="text-[13.5px] font-semibold leading-snug">
-                              Launch
-                              <br />
-                              Chat
-                            </div>
-                          </div>
-                        </button>
-                      </Link>
+                    <Link href="/qwen3.6-27b/jlens" className="">
+                      <button
+                        type="button"
+                        className="mt-3.5 h-16 min-h-16 w-[190px] min-w-[190px] transition-all sm:mb-0 sm:mb-2.5 sm:w-auto sm:min-w-0"
+                      >
+                        <div className="flex h-14 min-h-14 flex-row items-center justify-center gap-x-2 rounded-xl bg-[#bf4d43] px-6 py-2 text-white shadow-sm shadow-[#666663]/60 transition-all hover:scale-105 hover:bg-[#bf4d43]/90">
+                          <Search className="h-7 w-7" />
+                          <div className="text-base font-bold leading-snug">Launch Lens</div>
+                        </div>
+                      </button>
+                    </Link>
 
-                      <HomeWatchIntroButton />
+                    <div className="mt-2 flex flex-col items-center justify-center gap-y-1 pb-1 sm:mt-2.5 sm:flex-row sm:gap-x-2">
+                      <HomeJlensWatchIntroButton />
 
-                      <Link href={NLA_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
+                      <Link href={JLENS_BLOG_URL} target="_blank" rel="noreferrer noopener" className="">
                         <button
                           type="button"
-                          className="mt-1 h-12 min-h-12 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
+                          className="mt-1 h-11 max-h-11 min-h-11 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
                         >
-                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
-                            <Scroll className="h-5 w-5" />
-                            <div className="text-[12px] font-semibold leading-tight">Read Paper</div>
-                          </div>
-                        </button>
-                      </Link>
-                      <Link href={NLA_BLOG_URL} target="_blank" rel="noreferrer noopener" className="">
-                        <button
-                          type="button"
-                          className="h-14 min-h-14 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:w-auto sm:min-w-0"
-                        >
-                          <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-5">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               fill="none"
@@ -266,11 +257,48 @@ export default async function Page() {
                                 strokeWidth="0.25"
                               />
                             </svg>
-                            <div className="text-[12px] font-semibold leading-tight">Read Post</div>
+                            <div className="text-[12px] font-semibold leading-tight">Blog</div>
                           </div>
                         </button>
                       </Link>
+
+                      <Link href={JLENS_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
+                        <button
+                          type="button"
+                          className="mt-1 h-11 max-h-11 min-h-11 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
+                        >
+                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-5">
+                            <Newspaper className="h-5 w-5" />
+                            <div className="text-[12px] font-semibold leading-tight">Paper</div>
+                          </div>
+                        </button>
+                      </Link>
+                      {/* <Link href={JLENS_GITHUB_URL} target="_blank" rel="noreferrer noopener" className="">
+                        <button
+                          type="button"
+                          className="mt-1 h-11 max-h-11 min-h-11 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
+                        >
+                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                            <CodeXml className="h-5 w-5" />
+                            <div className="text-[12px] font-semibold leading-tight">Code</div>
+                          </div>
+                        </button>
+                      </Link>
+                      <Link href={JLENS_HF_URL} target="_blank" rel="noreferrer noopener" className="">
+                        <button
+                          type="button"
+                          className="mt-1 h-11 max-h-11 min-h-11 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
+                        >
+                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-3">
+                            <Scale className="h-5 w-5" />
+                            <div className="text-[12px] font-semibold leading-tight">Weights</div>
+                          </div>
+                        </button>
+                      </Link> */}
                     </div>
+                  </div>
+                  <div className="order-1 h-full w-full overflow-hidden py-2 sm:order-2">
+                    <HomeDemoVideo src={`${ASSET_BASE_URL}/jlens/homedemo.mp4`} />
                   </div>
                 </div>
               </div>
@@ -278,24 +306,92 @@ export default async function Page() {
           </div>
         </div>
 
-        <div className="flex w-full max-w-screen-xl flex-col gap-x-4 sm:flex-row sm:px-3">
-          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
+        <div className="flex w-full max-w-screen-2xl flex-col items-center justify-center gap-x-3 sm:flex-row sm:px-3">
+          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[320px] sm:max-w-[320px] sm:flex-1 sm:px-0">
+            <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#f3dfe3] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#8f5763]/30 sm:gap-y-0 sm:px-5 sm:py-7">
+              <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#e4c0c7] px-7 py-[6px] text-[11px] font-semibold text-[#8a4a57]">
+                Fraser-Taliente, Kantamneni, Ong et al.
+              </div>
+              <div className="content">
+                <div className="mt-2 text-[22px] font-bold leading-snug sm:mt-5 sm:text-[17px]">
+                  <span className="font-bold text-[#b04a5b]">Natural Language Autoencoders</span>
+                </div>
+                <div className="mt-0.5 text-sm font-medium leading-tight text-[#b04a5b] sm:mt-1 sm:text-[12px]">
+                  Translate a Model&apos;s Internal Thoughts Into Text
+                </div>
+
+                <div className="mt-4 flex flex-col items-center justify-center gap-y-1 sm:mt-5 sm:flex-row sm:gap-x-2.5">
+                  <Link href="/llama3.3-70b-it/nla" className="">
+                    <button type="button" className="h-16 min-h-16 transition-all hover:scale-105 sm:w-auto">
+                      <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-[#b04a5b] px-5 py-2 text-white shadow-sm shadow-[#5f333b]/30">
+                        <MessagesSquare className="h-6 w-6" />
+                        <div className="text-[13.5px] font-semibold leading-snug">
+                          Launch
+                          <br />
+                          Chat
+                        </div>
+                      </div>
+                    </button>
+                  </Link>
+                  <HomeWatchIntroButton />
+                  <Link href={NLA_BLOG_URL} target="_blank" rel="noreferrer noopener" className="">
+                    <button type="button" className="h-14 min-h-14 transition-all hover:scale-105 sm:w-auto">
+                      <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#c46e7c] px-5 py-2 text-white shadow-sm shadow-[#5f333b]/30 sm:px-3">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          id="Anthropic-Icon--Streamline-Svg-Logos"
+                          height="24"
+                          width="24"
+                          className="flex-shrink-0"
+                        >
+                          <desc>Anthropic Icon Streamline Icon: https://streamlinehq.com</desc>
+                          <path
+                            fill="#FFFFFF"
+                            d="m13.788825 3.932 6.43325 16.136075h3.5279L17.316725 3.932H13.788825Z"
+                            strokeWidth="0.25"
+                          />
+                          <path
+                            fill="#FFFFFF"
+                            d="m6.325375 13.682775 2.20125 -5.67065 2.201275 5.67065H6.325375ZM6.68225 3.932 0.25 20.068075h3.596525l1.3155 -3.3886h6.729425l1.315275 3.3886h3.59655L10.371 3.932H6.68225Z"
+                            strokeWidth="0.25"
+                          />
+                        </svg>
+                        <span className="text-[12px] font-semibold leading-tight sm:hidden">Read Post</span>
+                      </div>
+                    </button>
+                  </Link>
+                  <Link href={NLA_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
+                    <button type="button" className="h-12 min-h-12 transition-all hover:scale-105 sm:w-auto">
+                      <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#c46e7c] px-5 py-2 text-white shadow-sm shadow-[#5f333b]/30 sm:px-3">
+                        <Newspaper className="h-5 w-5" />
+                        <span className="text-[12px] font-semibold leading-tight sm:hidden">Read Paper</span>
+                      </div>
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[320px] sm:max-w-[320px] sm:flex-1 sm:px-0">
             <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-amber-600/20 px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#666663]/50 sm:gap-y-0 sm:px-5 sm:py-7">
               <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-amber-600/20 px-7 py-[6px] text-[11px] font-semibold text-amber-700/80">
                 Lu et al.
               </div>
               <div className="content">
-                <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-2xl">
+                <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-[20px]">
                   <span className="font-bold text-amber-600">Assistant Axis</span>
                 </div>
-                <div className="mt-0 text-sm font-medium leading-tight text-amber-700 sm:mt-0.5 sm:text-[13px]">
-                  Monitor and Stabilize the Character of an LLM
+                <div className="mt-0 text-sm font-medium leading-tight text-amber-700 sm:mt-0.5 sm:text-[12px]">
+                  Monitor & Stabilize the Character of an LLM
                 </div>
 
                 <div className="mt-4 flex flex-col items-center justify-center gap-y-1 sm:mt-6 sm:flex-row sm:gap-x-2.5">
                   <Link href="/llama3.3-70b-it/assistant-axis" className="">
                     <button type="button" className="h-16 min-h-16 transition-all hover:scale-105 sm:w-auto">
-                      <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-amber-700 px-5 py-2 text-white shadow-sm shadow-amber-800/30">
+                      <div className="flex h-16 min-h-16 flex-row items-center justify-center gap-x-2 rounded-xl bg-amber-700/90 px-5 py-2 text-white shadow-sm shadow-amber-800/30">
                         <SquareActivity className="h-6 w-6" style={{ transform: 'rotate(90deg)' }} />
                         <div className="text-[13.5px] font-semibold leading-snug">
                           Launch
@@ -329,15 +425,15 @@ export default async function Page() {
                             strokeWidth="0.25"
                           />
                         </svg>
-                        <div className="text-[12px] font-semibold leading-tight">Read Post</div>
+                        <span className="text-[12px] font-semibold leading-tight sm:hidden">Read Post</span>
                       </div>
                     </button>
                   </Link>
                   <Link href={CAP_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
                     <button type="button" className="h-12 min-h-12 transition-all hover:scale-105 sm:w-auto">
                       <div className="flex h-12 min-h-12 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-amber-600 px-5 py-2 text-white shadow-sm shadow-amber-800/30 sm:px-3">
-                        <Scroll className="h-5 w-5" />
-                        <div className="text-[12px] font-semibold leading-tight">Read Paper</div>
+                        <Newspaper className="h-5 w-5" />
+                        <span className="text-[12px] font-semibold leading-tight sm:hidden">Read Paper</span>
                       </div>
                     </button>
                   </Link>
@@ -346,18 +442,20 @@ export default async function Page() {
             </div>
           </div>
 
-          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
+          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[320px] sm:max-w-[320px] sm:flex-1 sm:px-0">
             <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-emerald-600/20 px-3 py-7 text-center text-emerald-700 shadow-sm shadow-emerald-700/40 sm:gap-y-0 sm:px-5 sm:py-7">
               <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-emerald-600/30 px-7 py-[6px] text-[11px] font-semibold text-emerald-700/80">
                 Multi-Org
               </div>
-              <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-5 sm:text-2xl">Circuit Tracer</div>
-              <div className="mt-0 text-sm font-medium leading-tight sm:mt-0.5 sm:text-[13px]">
-                Trace the Internal Reasoning Steps of a Model
+              <div className="mt-2 text-[24px] font-bold leading-snug sm:mt-4 sm:pt-0.5 sm:text-[20px]">
+                Circuit Tracer
+              </div>
+              <div className="mt-0 text-sm font-medium leading-tight sm:mt-0.5 sm:text-[12px]">
+                Trace a Model's Internal Reasoning Steps
               </div>
 
               <div className="mt-3 flex w-full flex-col items-center justify-center gap-y-2 sm:mt-5 sm:flex-row sm:gap-x-2">
-                <a href="/gemma-2-2b/graph" className="flex-1 text-white">
+                <a href="/gemma-2-2b/graph" className="text-white">
                   <button
                     type="button"
                     className="h-16 min-h-16 w-full rounded-xl bg-emerald-800 shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-900"
@@ -377,33 +475,25 @@ export default async function Page() {
                   href="https://www.youtube.com/playlist?list=PL05yUGfKO5wP6S5_12z7LG30LZigRYx1e"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 text-white"
+                  className="text-white"
                 >
                   <button
                     type="button"
-                    className="flex h-12 min-h-12 w-28 min-w-28 flex-row items-center justify-center rounded-xl bg-emerald-600 px-0 py-0 font-bold leading-none shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
+                    className="flex h-12 min-h-12 flex-row items-center justify-center rounded-xl bg-emerald-600 px-0 px-3 py-0 font-bold leading-none shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
                   >
-                    <Youtube className="mr-2.5 h-6 w-6" />
-                    <div className="text-[12px] font-bold leading-tight text-white">
-                      Watch
-                      <br />
-                      Demo
-                    </div>
+                    <Youtube className="h-6 w-6" />
+                    <span className="ml-1.5 text-[12px] font-semibold leading-tight sm:hidden">Watch Demo</span>
                   </button>
                 </a>
 
-                <Link href="/graph/info" className="flex-1 text-white">
+                <Link href="/graph/info" className="text-white">
                   <button
                     type="button"
-                    className="h-12 min-h-12 w-28 min-w-28 rounded-xl bg-emerald-600 shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
+                    className="h-12 min-h-12 rounded-xl bg-emerald-600 px-3 shadow-sm shadow-emerald-700/40 transition-all hover:scale-105 hover:bg-emerald-700"
                   >
                     <div className="flex flex-row items-center justify-center px-0 py-0 font-bold leading-none">
-                      <Newspaper className="mr-2 h-5 min-h-5 w-5 min-w-5" />
-                      <div className="text-[12px] font-bold leading-tight text-white">
-                        Read
-                        <br />
-                        Post
-                      </div>
+                      <Newspaper className="h-5 min-h-5 w-5 min-w-5" />
+                      <span className="ml-1.5 text-[12px] font-semibold leading-tight sm:hidden">Read Paper</span>
                     </div>
                   </button>
                 </Link>
@@ -411,20 +501,20 @@ export default async function Page() {
             </div>
           </div>
 
-          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[400px] sm:flex-1 sm:px-0">
+          <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[320px] sm:max-w-[320px] sm:flex-1 sm:px-0">
             <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-gBlue/10 px-3 py-7 text-center text-slate-600 shadow-sm shadow-gBlue/40 sm:gap-y-0 sm:px-5 sm:py-7">
               <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-gBlue/15 px-6 py-[6px] text-[11px] font-semibold text-gBlue/80">
                 Google Deepmind
               </div>
               <div className="content">
-                <div className="mt-2 text-[24px] font-bold sm:mt-1.5">
+                <div className="mt-2 text-[24px] font-bold sm:mt-2 sm:text-[20px]">
                   <span className="font-bold text-gBlue">Gemma Scope 2</span>
                 </div>
-                <div className="mt-1 text-[13px] font-medium leading-tight text-slate-500 sm:mb-1 sm:mt-0">
+                <div className="mt-1 text-[13px] font-medium leading-tight text-slate-500 sm:mb-1 sm:mt-0.5 sm:text-[12px]">
                   SAEs and Transcoders for Gemma 3
                 </div>
 
-                <div className="mt-4 flex flex-row items-center justify-center gap-3 gap-x-2 sm:mt-5">
+                <div className="mt-4 flex flex-row items-center justify-center gap-3 gap-x-2 sm:mt-6">
                   <Link href="/gemma-scope-2" className="">
                     <button
                       type="button"
@@ -520,6 +610,10 @@ export default async function Page() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="mb-10 mt-8 flex w-full max-w-screen-sm flex-col items-center justify-center rounded-xl bg-slate-200 sm:mb-8">
+        <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
       <div className="grid w-full grid-cols-2 items-center justify-center gap-x-12 gap-y-5 bg-white px-5 py-5 md:flex md:h-[95px] md:min-h-[95px] md:grid-cols-3 md:flex-row md:py-0">

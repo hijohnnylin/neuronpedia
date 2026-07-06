@@ -100,7 +100,7 @@ export default function NavBar({ session }: { session: Session | null }) {
           </div>
 
           <div className="flex-inline flex items-center">
-            <div className="hidden select-none items-center justify-end gap-0 font-light text-slate-500 sm:flex">
+            <div className="hidden select-none items-center justify-end gap-0 gap-x-0.5 font-light text-slate-500 sm:flex">
               <NavBarButtons />
             </div>
 

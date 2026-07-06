@@ -2,7 +2,7 @@
 
 import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 // Loaded after driver.css so our theme overrides win on equal specificity.
 import {
   NLA_DETAILS_ELEMENT_ID,
@@ -412,6 +412,11 @@ export function useNlaTour(options: NlaTourOptions) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
+  // Whether the main tour is currently running. Consumers use this to give
+  // the chat panel more vertical space on mobile while the tour is active
+  // (the tour's early steps center on the chat conversation).
+  const [isTourActive, setIsTourActive] = useState(false);
+
   useEffect(
     () => () => {
       driverRef.current?.destroy();
@@ -474,7 +479,7 @@ export function useNlaTour(options: NlaTourOptions) {
     hint.drive();
   }, [navigateToFinishState]);
 
-  return useCallback(() => {
+  const startTour = useCallback(() => {
     driverRef.current?.destroy();
     // Force the page onto the model that owns the demo conversation used
     // in step 2. `handleModelChange` is a soft (history.replaceState)
@@ -535,6 +540,7 @@ export function useNlaTour(options: NlaTourOptions) {
       onDestroyed: () => {
         clearStepCleanup();
         clearAvDoneWatcher();
+        setIsTourActive(false);
         // Make sure the tour-only highlight range never persists after
         // the user closes the tour mid-step 5.
         optionsRef.current.setHighlightedRange(null);
@@ -555,6 +561,9 @@ export function useNlaTour(options: NlaTourOptions) {
       },
     });
     driverRef.current = instance;
+    setIsTourActive(true);
     instance.drive();
   }, [showGuideHighlight, navigateToFinishState]);
+
+  return { startTour, isTourActive };
 }

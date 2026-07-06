@@ -18,7 +18,6 @@ import { ChevronDown, ChevronDownIcon, ChevronUpIcon, MessagesSquare, Plus, RssI
 import Link from 'next/link';
 import { useState } from 'react';
 import InferenceActivationAllProvider from '../provider/inference-activation-all-provider';
-import ModelsDropdown from './models-dropdown';
 import ReleasesDropdown from './releases-dropdown';
 
 export default function NavBarButtons() {
@@ -47,14 +46,24 @@ export default function NavBarButtons() {
       )}
 
       <Link
+        href="/qwen3.6-27b/jlens"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+      >
+        Jacobian Lens
+        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+          NEW
+        </span>
+      </Link>
+
+      <Link
         href="/llama3.3-70b-it/nla"
         className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
-        <div className="flex flex-col items-center justify-center px-1 text-xs font-normal leading-tight sm:text-[11.5px]">
+        <div className="flex flex-col items-center justify-center gap-y-[1px] px-1 text-xs font-normal leading-tight sm:text-[11px]">
           <div>Natural Language</div>
           <div>Autoencoders</div>
         </div>
-        <span className="absolute -right-1.5 -top-1 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+        <span className="absolute -right-1 -top-1 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
           NEW
         </span>
       </Link>
@@ -64,7 +73,7 @@ export default function NavBarButtons() {
         className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
         Assistant Axis
-        <span className="absolute -right-2 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
           NEW
         </span>
       </Link>
@@ -243,8 +252,8 @@ export default function NavBarButtons() {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-
-      <ModelsDropdown isInBreadcrumb={false} />
+      {/* 
+      <ModelsDropdown isInBreadcrumb={false} /> */}
 
       <Select.Root
         defaultValue="saes"
@@ -333,7 +342,7 @@ export default function NavBarButtons() {
           href="/sae-bench"
           prefetch={false}
           rel="noreferrer"
-          className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+          className="flex hidden cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
         >
           SAE Evals
         </Link>
@@ -349,7 +358,7 @@ export default function NavBarButtons() {
       </Link>
 
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
+        <DropdownMenu.Trigger className="flex hidden cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
           Guides
           <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
         </DropdownMenu.Trigger>

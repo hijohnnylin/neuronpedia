@@ -20,12 +20,10 @@ import {
 } from './utils';
 import GraphWrapper from './wrapper';
 
-export async function generateMetadata(
-  props: {
-    params: Promise<{ modelId: string }>;
-    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-  }
-): Promise<Metadata> {
+export async function generateMetadata(props: {
+  params: Promise<{ modelId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}): Promise<Metadata> {
   const searchParams = await props.searchParams;
   const params = await props.params;
   const { modelId } = params;
@@ -111,24 +109,22 @@ async function getFeaturedGraphs() {
   return featuredGraphs;
 }
 
-export default async function Page(
-  props: {
-    params: Promise<{ modelId: string }>;
-    searchParams: Promise<{
-      logitDiff?: string;
-      slug?: string;
-      pinnedIds?: string;
-      supernodes?: string;
-      clerps?: string;
-      pruningThreshold?: string;
-      densityThreshold?: string;
-      embed?: string;
-      subgraph?: string;
-      generate?: string;
-      sourceSet?: string;
-    }>;
-  }
-) {
+export default async function Page(props: {
+  params: Promise<{ modelId: string }>;
+  searchParams: Promise<{
+    logitDiff?: string;
+    slug?: string;
+    pinnedIds?: string;
+    supernodes?: string;
+    clerps?: string;
+    pruningThreshold?: string;
+    densityThreshold?: string;
+    embed?: string;
+    subgraph?: string;
+    generate?: string;
+    sourceSet?: string;
+  }>;
+}) {
   const searchParams = await props.searchParams;
   const params = await props.params;
   const { modelId } = params;
@@ -296,9 +292,7 @@ export default async function Page(
     if (!metadataGraph) {
       const featuredForModel = featuredGraphs.find((g) => g.modelId === modelId);
       if (featuredForModel) {
-        metadataGraph = modelIdToGraphMetadatasMap[modelId]?.find(
-          (graph) => graph.slug === featuredForModel.slug,
-        );
+        metadataGraph = modelIdToGraphMetadatasMap[modelId]?.find((graph) => graph.slug === featuredForModel.slug);
       }
     }
 

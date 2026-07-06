@@ -1,6 +1,6 @@
+import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
 import { IS_DOCKER_COMPOSE } from './lib/env';
 

@@ -398,7 +398,9 @@ def convert_to_chat_array(
 
 
 def apply_generic_chat_template(
-    messages: list[dict[str, str]], add_generation_prompt: bool = True
+    messages: list[dict[str, str]],
+    add_generation_prompt: bool = True,
+    continue_final_message: bool = False,
 ) -> str:
     """
     In case the model's tokenizer does not come with a chat template, we apply a generic chatML template.
@@ -406,16 +408,26 @@ def apply_generic_chat_template(
     Args:
         messages: List of message dictionaries with 'role' and 'content' keys
         add_generation_prompt: Whether to add the assistant generation prompt
+        continue_final_message: When True, leave the final turn open (no
+            end-of-turn token) so generation continues from its content. Used to
+            support assistant prefills; mutually exclusive with
+            add_generation_prompt.
 
     Returns:
         str: Formatted chat string ready for tokenization
     """
     formatted_text = ""
 
-    for message in messages:
+    last_index = len(messages) - 1
+    for index, message in enumerate(messages):
         role = message["role"]
         content = message["content"]
-        formatted_text += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+        if continue_final_message and index == last_index:
+            # Leave this turn open: no <|im_end|> so the model keeps generating
+            # from the prefilled content.
+            formatted_text += f"<|im_start|>{role}\n{content}"
+        else:
+            formatted_text += f"<|im_start|>{role}\n{content}<|im_end|>\n"
 
     if add_generation_prompt:
         formatted_text += "<|im_start|>assistant\n"

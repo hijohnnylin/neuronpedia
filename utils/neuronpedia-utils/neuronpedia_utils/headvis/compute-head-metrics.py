@@ -37,8 +37,10 @@ except ImportError:  # pragma: no cover - tqdm is optional for ad-hoc utility ru
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+# Repo base: headvis -> neuronpedia_utils -> neuronpedia-utils -> utils -> root
+REPO_ROOT = SCRIPT_DIR.parents[3]
 DEFAULT_EXPORTS_DIR = SCRIPT_DIR.parent / "exports"
-DEFAULT_MODEL_MAP_PATH = SCRIPT_DIR / "np_model_to_hf.json"
+DEFAULT_MODEL_MAP_PATH = REPO_ROOT / "np_model_to_hf.json"
 DEFAULT_MIN_FREE_VRAM_GB = 12.0
 DEFAULT_INDUCTION_ATTENTION_THRESHOLD = 0.01
 
@@ -80,9 +82,7 @@ METRIC_DESCRIPTIONS = {
         "Mean |q - k| weighted by attention mass. Captures how far back "
         "a head looks on average."
     ),
-    "qk_distance_variance": (
-        "Variance of |q - k| weighted by attention mass."
-    ),
+    "qk_distance_variance": ("Variance of |q - k| weighted by attention mass."),
     "induction_score": (
         "Average attention from a query token to the position after a prior "
         "occurrence of the same token. High = induction head."
@@ -267,17 +267,16 @@ class SequenceSamplingState:
         )
         self.token_cache: dict[int, list[str]] = {}
         self.n_valid_seen = 0
-        self.activations_per_head_sum = np.zeros(
-            (n_layers, n_heads), dtype=np.float64
-        )
-        self.activations_per_head_count = np.zeros(
-            (n_layers, n_heads), dtype=np.int64
-        )
+        self.activations_per_head_sum = np.zeros((n_layers, n_heads), dtype=np.float64)
+        self.activations_per_head_count = np.zeros((n_layers, n_heads), dtype=np.int64)
 
     def maybe_finalize_warmup(self) -> bool:
         if self.boundaries_set:
             return False
-        if self.warmup_filled < self.warmup_size and self.n_valid_seen < self.warmup_size:
+        if (
+            self.warmup_filled < self.warmup_size
+            and self.n_valid_seen < self.warmup_size
+        ):
             return False
         self._compute_boundaries()
         self.boundaries_set = True
@@ -289,7 +288,9 @@ class SequenceSamplingState:
         if n == 0:
             for layer_samplers in self.samplers:
                 for sampler in layer_samplers:
-                    sampler.set_boundaries([0.0] * (self.sampler_config.n_intervals - 1))
+                    sampler.set_boundaries(
+                        [0.0] * (self.sampler_config.n_intervals - 1)
+                    )
             return
         n_intervals = self.sampler_config.n_intervals
         for layer in range(self.n_layers):
@@ -322,7 +323,9 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional Hugging Face dataset config/subset name.",
     )
-    parser.add_argument("--dataset-split", default="train", help="Dataset split to use.")
+    parser.add_argument(
+        "--dataset-split", default="train", help="Dataset split to use."
+    )
     parser.add_argument(
         "--dataset-text-field",
         default="text",
@@ -500,9 +503,7 @@ def resolve_np_model_id(hf_model_name: str, model_map_path: str) -> str:
     if not isinstance(model_map, dict):
         raise ValueError(f"{path} must contain a JSON object.")
     matches = [
-        np_id
-        for np_id, mapped_hf in model_map.items()
-        if mapped_hf == hf_model_name
+        np_id for np_id, mapped_hf in model_map.items() if mapped_hf == hf_model_name
     ]
     if not matches:
         raise ValueError(
@@ -563,7 +564,9 @@ def prepare_model_cache(args: argparse.Namespace) -> tuple[str, bool]:
     if args.hf_cache_dir is not None:
         cache_dir = os.path.abspath(os.path.expanduser(args.hf_cache_dir))
         os.makedirs(cache_dir, exist_ok=True)
-        print(f"Using Hugging Face model cache directory, will delete after this run: {cache_dir}")
+        print(
+            f"Using Hugging Face model cache directory, will delete after this run: {cache_dir}"
+        )
         return cache_dir, True
 
     cache_dir = tempfile.mkdtemp(prefix="headvis-model-cache-")
@@ -774,8 +777,7 @@ def compute_attention_metrics_for_batch(
     attentions = output.attentions
     if attentions is None:
         raise RuntimeError(
-            "Model did not return attention weights. Try "
-            "--attn-implementation eager."
+            "Model did not return attention weights. Try --attn-implementation eager."
         )
 
     sequence_lengths = attention_mask.sum(dim=1)
@@ -791,10 +793,9 @@ def compute_attention_metrics_for_batch(
 
     batch_size, sequence_length = attention_mask.shape
     positions = torch.arange(sequence_length, device=input_ids.device)
-    query_mask = (
-        (positions[None, :] < sequence_lengths[:, None])
-        & valid_sequence_mask[:, None]
-    )
+    query_mask = (positions[None, :] < sequence_lengths[:, None]) & valid_sequence_mask[
+        :, None
+    ]
     pair_mask = query_mask[:, :, None] & query_mask[:, None, :]
     prev_position_mask = positions[1:][None, :] < sequence_lengths[:, None]
     qk_distance = (positions[:, None] - positions[None, :]).abs().float()
@@ -827,29 +828,27 @@ def compute_attention_metrics_for_batch(
         pattern_entropy_sum[layer_idx] += (
             -(
                 layer_attention_float
-                * torch.log(layer_attention_float.clamp_min(torch.finfo(torch.float32).tiny))
+                * torch.log(
+                    layer_attention_float.clamp_min(torch.finfo(torch.float32).tiny)
+                )
             )
             .masked_fill(~pair_mask[:, None, :, :], 0.0)
             .sum(dim=(0, 2, 3))
         )
         qk_distance_sum[layer_idx] += (
-            layer_attention_float
-            .masked_fill(~pair_mask[:, None, :, :], 0.0)
+            layer_attention_float.masked_fill(~pair_mask[:, None, :, :], 0.0)
             .mul(qk_distance)
             .sum(dim=(0, 2, 3))
         )
         qk_distance_squared_sum[layer_idx] += (
-            layer_attention_float
-            .masked_fill(~pair_mask[:, None, :, :], 0.0)
+            layer_attention_float.masked_fill(~pair_mask[:, None, :, :], 0.0)
             .mul(qk_distance_squared)
             .sum(dim=(0, 2, 3))
         )
 
-        max_act = (
-            layer_attention_float
-            .masked_fill(~max_pair_mask[:, None, :, :], 0.0)
-            .amax(dim=(-2, -1))
-        )
+        max_act = layer_attention_float.masked_fill(
+            ~max_pair_mask[:, None, :, :], 0.0
+        ).amax(dim=(-2, -1))
         max_act_cpu = max_act.cpu().numpy()
 
         _update_histogram(
@@ -918,9 +917,7 @@ def compute_attention_metrics_for_batch(
                 induction_attention = induction_attention.masked_fill(
                     induction_attention < induction_attention_threshold, 0.0
                 )
-            induction_sum[layer_idx] += (
-                induction_attention.sum(dim=-1).float()
-            )
+            induction_sum[layer_idx] += induction_attention.sum(dim=-1).float()
 
     seq_id_iter = iter(batch_seq_ids)
     for b in range(batch_size):
@@ -995,7 +992,9 @@ def build_config(
     )
 
 
-def nan_if_zero_divide(numerator: torch.Tensor, denominator: torch.Tensor) -> torch.Tensor:
+def nan_if_zero_divide(
+    numerator: torch.Tensor, denominator: torch.Tensor
+) -> torch.Tensor:
     result = torch.full_like(numerator, math.nan, dtype=torch.float32)
     return torch.where(denominator > 0, numerator / denominator.clamp_min(1), result)
 
@@ -1003,16 +1002,15 @@ def nan_if_zero_divide(numerator: torch.Tensor, denominator: torch.Tensor) -> to
 def print_top_heads(metric_name: str, scores: torch.Tensor, top_k: int = 3) -> None:
     flat_scores = scores.flatten()
     valid_scores = torch.nan_to_num(flat_scores, nan=-math.inf)
-    top_values, top_indices = torch.topk(valid_scores, k=min(top_k, flat_scores.numel()))
+    top_values, top_indices = torch.topk(
+        valid_scores, k=min(top_k, flat_scores.numel())
+    )
 
     print(f"Top {len(top_values)} {metric_name}:")
     for rank, (value, flat_index) in enumerate(zip(top_values, top_indices), start=1):
         layer_idx = int(flat_index // scores.size(1))
         head_idx = int(flat_index % scores.size(1))
-        print(
-            f"  {rank}. layer={layer_idx}, head={head_idx}, "
-            f"score={float(value):.6f}"
-        )
+        print(f"  {rank}. layer={layer_idx}, head={head_idx}, score={float(value):.6f}")
 
 
 def _round_value(value: float, decimals: int = 4) -> float | None:

@@ -330,10 +330,10 @@ function mergePriorAggregates(a: PriorAggregate, b: PriorAggregate): PriorAggreg
  *             properties:
  *               modelId:
  *                 type: string
- *                 description: The Neuronpedia model id (e.g. `gemma-2-9b-it`).
+ *                 description: The Neuronpedia model id (e.g. `gemma-3-27b-it`, or for Llama3, `llama3.3-70b-it`).
  *               nlaSourceId:
  *                 type: string
- *                 description: The NLA source id for this model (e.g. `gemmascope-9-res-131k`). See `GET /api/nla/sources`.
+ *                 description: The NLA source id for this model (e.g. `kitft-l41`, or e.g. `kitft-l53` for Llama3). See `GET /api/nla/sources`.
  *               text:
  *                 type: string
  *                 description: Pre-chat-templated prompt string. Provide this OR `messages`. Max 16384 characters.
@@ -354,13 +354,12 @@ function mergePriorAggregates(a: PriorAggregate, b: PriorAggregate): PriorAggreg
  *                 type: number
  *                 description: Sampling temperature for the NLA explainer. Default `0.7`.
  *             example:
- *               modelId: gemma-2-9b-it
- *               nlaSourceId: gemmascope-9-res-131k
+ *               modelId: gemma-3-27b-it   # For Llama3 use: llama3.3-70b-it
+ *               nlaSourceId: kitft-l41    # For Llama3 use: kitft-l53
  *               messages:
  *                 - role: user
- *                   content: What is the capital of France?
- *               positions: [4, 5]
- *               temperature: 0.7
+ *                   content: What is the capital of Canada?
+ *               positions: [4, 7, 9]
  *     responses:
  *       200:
  *         description: Explanations for the requested positions, plus the canonical token list of the prompt.

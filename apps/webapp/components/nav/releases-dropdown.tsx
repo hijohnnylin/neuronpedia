@@ -17,6 +17,7 @@ export const featuredStarReleases = [
   'gemma-scope-2',
   'headvis',
   'nla',
+  'sae-bench',
 ];
 export const betaReleases = ['sparse-circuits'];
 

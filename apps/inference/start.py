@@ -68,6 +68,12 @@ def parse_args():
         help="Maximum number of tokens to process",
     )
     parser.add_argument(
+        "--lens_token_limit",
+        type=int,
+        default=1024,
+        help="Maximum number of tokens for the lens endpoints only (logit/jacobian lens). Independent of --token_limit.",
+    )
+    parser.add_argument(
         "--device",
         help="Device to run the model on",
     )
@@ -126,6 +132,37 @@ def parse_args():
         action="store_true",
         help="Use chatspace engine.",
     )
+    # Lens endpoints (logit lens / jacobian lens)
+    parser.add_argument(
+        "--jlens_skip",
+        action="store_true",
+        help="Skip loading the fitted Jacobian lens at startup. LOGIT_LENS still works; JACOBIAN_LENS requests return an error.",
+    )
+    parser.add_argument(
+        "--jlens_source",
+        default=None,
+        help="Optional absolute path to a local directory containing a fitted lens (e.g. .../<np_model_id>/jlens/Salesforce-wikitext). When set, used instead of downloading from Hugging Face.",
+    )
+    parser.add_argument(
+        "--jlens_dataset",
+        default="Salesforce-wikitext",
+        help="Dataset folder name the lens was fit on (used in the HF path / local path).",
+    )
+    parser.add_argument(
+        "--jlens_hf_repo",
+        default="neuronpedia/jacobian-lens",
+        help="Hugging Face model repo holding fitted lenses, keyed by neuronpedia model id under '<np_model_id>/jlens/<dataset>/<slug>_jacobian_lens.pt'.",
+    )
+    parser.add_argument(
+        "--jlens_hf_path",
+        default=None,
+        help="Optional exact path (within the HF repo) to the lens .pt file. When set, used verbatim instead of deriving it from the model id / dataset.",
+    )
+    parser.add_argument(
+        "--neuronpedia_model_id",
+        default=None,
+        help="Explicit neuronpedia model id (used to build the HF path). Only needed when np_model_to_hf.json is not present at the repo root.",
+    )
     return parser.parse_args()
 
 
@@ -145,6 +182,8 @@ def main():
         os.environ["SAE_DTYPE"] = args.sae_dtype
     if "TOKEN_LIMIT" not in os.environ:
         os.environ["TOKEN_LIMIT"] = str(args.token_limit)
+    if "LENS_TOKEN_LIMIT" not in os.environ:
+        os.environ["LENS_TOKEN_LIMIT"] = str(args.lens_token_limit)
     if "DEVICE" not in os.environ and args.device is not None:
         os.environ["DEVICE"] = args.device
     if "INCLUDE_SAE" not in os.environ:
@@ -163,7 +202,19 @@ def main():
         os.environ["NNSIGHT_MAX_MEMORY"] = args.nnsight_max_memory
     if "CHATSPACE" not in os.environ:
         os.environ["CHATSPACE"] = "true" if args.chatspace else "false"
-        
+    if "JLENS_SKIP" not in os.environ:
+        os.environ["JLENS_SKIP"] = "true" if args.jlens_skip else "false"
+    if "JLENS_SOURCE" not in os.environ and args.jlens_source is not None:
+        os.environ["JLENS_SOURCE"] = args.jlens_source
+    if "JLENS_DATASET" not in os.environ:
+        os.environ["JLENS_DATASET"] = args.jlens_dataset
+    if "JLENS_HF_REPO" not in os.environ:
+        os.environ["JLENS_HF_REPO"] = args.jlens_hf_repo
+    if "JLENS_HF_PATH" not in os.environ and args.jlens_hf_path is not None:
+        os.environ["JLENS_HF_PATH"] = args.jlens_hf_path
+    if "NEURONPEDIA_MODEL_ID" not in os.environ and args.neuronpedia_model_id is not None:
+        os.environ["NEURONPEDIA_MODEL_ID"] = args.neuronpedia_model_id
+
     if args.list_models:
         from neuronpedia_inference.args import list_available_options
 

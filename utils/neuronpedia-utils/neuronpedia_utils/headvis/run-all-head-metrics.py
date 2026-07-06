@@ -17,10 +17,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
+# Repo base: headvis -> neuronpedia_utils -> neuronpedia-utils -> utils -> root
+REPO_ROOT = SCRIPT_DIR.parents[3]
 DEFAULT_EXPORTS_DIR = SCRIPT_DIR.parent / "exports"
-DEFAULT_MODEL_MAP_PATH = SCRIPT_DIR / "np_model_to_hf.json"
+DEFAULT_MODEL_MAP_PATH = REPO_ROOT / "np_model_to_hf.json"
 
 DEFAULT_N_INTERVALS = 5
 DEFAULT_SAMPLES_PER_INTERVAL = 3
@@ -158,15 +159,8 @@ def load_model_map(models_json_path: Path) -> list[tuple[str, str]]:
     return pairs
 
 
-def run_dir_for_model(
-    exports_dir: Path, np_model_id: str, dataset_name: str
-) -> Path:
-    return (
-        exports_dir
-        / np_model_id
-        / "headvis"
-        / sanitize_filename_part(dataset_name)
-    )
+def run_dir_for_model(exports_dir: Path, np_model_id: str, dataset_name: str) -> Path:
+    return exports_dir / np_model_id / "headvis" / sanitize_filename_part(dataset_name)
 
 
 def run_tree_is_complete(run_dir: Path) -> bool:

@@ -2,11 +2,7 @@ import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import SearchTopkByTokenPane from '@/components/panes/search-topk-by-token-pane';
 import { BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
 
-export default async function Page(
-  props: {
-    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-  }
-) {
+export default async function Page(props: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const searchParams = await props.searchParams;
   const modelId = typeof searchParams.modelId === 'string' ? searchParams.modelId : undefined;
   const source = typeof searchParams.source === 'string' ? searchParams.source : undefined;

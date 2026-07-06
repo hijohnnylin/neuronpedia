@@ -39,10 +39,7 @@ export interface RequestAuthedUser extends NextRequest {
   user: AuthenticatedUser;
 }
 
-type NextHandlerWithAuthedUser<T = any> = (
-  request: RequestAuthedUser,
-  arg?: T,
-) => Promise<NextResponse> | NextResponse;
+type NextHandlerWithAuthedUser<T = any> = (request: RequestAuthedUser, arg?: T) => Promise<NextResponse> | NextResponse;
 
 export function withAuthedUser(handler: NextHandlerWithAuthedUser): NextRouteHandler {
   return async (request: NextRequest, arg?: any) => {
