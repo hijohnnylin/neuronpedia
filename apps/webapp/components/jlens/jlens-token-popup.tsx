@@ -21,7 +21,7 @@ export const DEGENERATE_LAYER_FRACTION = 0.29;
 // Shown above J-Lens readouts for layers before the default layer selection.
 export const JLENS_DEGENERATE_DISCLAIMER = (
   <span>
-    J-Lens is <span className="hidden font-bold sm:inline">typically </span> degenerate in the{' '}
+    J-Lens is <span className="hidden sm:inline">typically </span> degenerate in the{' '}
     <a
       href="https://transformer-circuits.pub/2026/workspace/#struct-layers"
       className="underline"
