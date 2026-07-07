@@ -290,15 +290,19 @@ export function JlensAnalysisPanel({
           {/* DIFF mode: a single search spanning both columns, filtering them at
               once (replaces the per-column search + count headers). */}
           {diffMode && tokens.length > 0 && (
-            <div className="flex flex-row items-center gap-x-1 border-b border-slate-100 px-3 pb-1 pt-1 text-[10px] font-normal text-slate-400">
-              <SidebarSearchControl
-                open={sidebarSearchOpen}
-                query={sidebarSearchQuery}
-                label="Search Both JLens and Logits"
-                onToggle={onSearchToggle}
-                onQueryChange={setSidebarSearchQuery}
-                onOpen={onSearchOpen}
-              />
+            <div className="flex flex-row items-center justify-between gap-x-2 border-b border-slate-100 px-3 pb-1 pt-1 text-[10px] font-normal text-slate-400">
+              <span className="shrink-0 font-medium text-slate-300">J-Lens Readouts</span>
+              <span className="-ml-3 flex min-w-0 max-w-36 flex-1 flex-row items-center justify-center">
+                <SidebarSearchControl
+                  open={sidebarSearchOpen}
+                  query={sidebarSearchQuery}
+                  label="Search J-lens and Logits"
+                  onToggle={onSearchToggle}
+                  onQueryChange={setSidebarSearchQuery}
+                  onOpen={onSearchOpen}
+                />
+              </span>
+              <span className="shrink-0 font-medium text-slate-300">Logit Lens</span>
             </div>
           )}
           {showJlensDegenerateWarning && (
@@ -306,7 +310,7 @@ export function JlensAnalysisPanel({
               {JLENS_DEGENERATE_DISCLAIMER}
             </div>
           )}
-          <div className="flex min-h-0 flex-1 flex-row px-0 sm:px-1">
+          <div className={`flex min-h-0 flex-1 flex-row px-0 sm:px-1 ${diffMode ? 'divide-x divide-slate-100' : ''}`}>
             {sidebarTypes.map((type) => {
               const t = type as LensType;
               const thisSelectedKeys = selected.filter((s) => s.type === t).map((s) => s.key);
