@@ -44,7 +44,7 @@ python convert-saedashboard-to-neuronpedia-export.py \
 
 ```
 aws configure set default.s3.multipart_threshold 64MB
-aws configure set default.s3.max_concurrent_requests 64
+aws configure set default.s3.max_concurrent_requests 16
 cd neuronpedia_utils/exports
-aws s3 sync . s3://neuronpedia-datasets/v1 --delete --exclude "*" --include "*.jsonl.gz" --include "*.jsonl" --include "*.json"
+aws s3 sync . s3://neuronpedia-datasets/v1 --delete --exclude "*" --include "*.jsonl.gz" --include "*.jsonl" --include "*.json" --include "*/jlens/*"
 ```
