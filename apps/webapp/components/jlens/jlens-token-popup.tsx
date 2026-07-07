@@ -12,6 +12,43 @@ const POPUP_BAR_RGB = '100, 116, 139';
 // Inclusive [minLayer, maxLayer] range of layer NUMBERS to display.
 export type LayerRange = [number, number];
 
+// Fraction of the model's layers that the default layer selection skips from
+// the start (kept in sync with `defaultRange` in use-jlens-analysis). Layers
+// below this point (the first ~1/3 of the model) are where the J-Lens tends to
+// be degenerate, so its readouts there are unreliable.
+export const DEGENERATE_LAYER_FRACTION = 0.29;
+
+// Shown above J-Lens readouts for layers before the default layer selection.
+export const JLENS_DEGENERATE_DISCLAIMER = (
+  <span>
+    J-Lens is <span className="hidden font-bold sm:inline">typically </span> degenerate in the{' '}
+    <a
+      href="https://transformer-circuits.pub/2026/workspace/#struct-layers"
+      className="underline"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      first 1/3 layers
+    </a>
+    , leading to unreliable readouts.
+  </span>
+);
+
+// The lowest layer NUMBER included in the default layer selection. Layers below
+// this (the first ~1/3 of the model) are considered degenerate for the J-Lens.
+export function degenerateLayerCutoff(layers: number[]): number {
+  if (layers.length === 0) {
+    return 0;
+  }
+  return layers[0] + Math.floor(layers.length * DEGENERATE_LAYER_FRACTION);
+}
+
+// Whether `layerNumber` sits before the default layer selection (i.e. in the
+// first ~1/3 of the model, where the J-Lens is typically degenerate).
+export function isDegenerateLayer(layers: number[], layerNumber: number): boolean {
+  return layerNumber < degenerateLayerCutoff(layers);
+}
+
 // Indices into `layers` to display: those whose layer number falls within
 // `range` (inclusive). When `range` is null, fall back to the
 // START_LAYER_FRACTION window (skip the lowest 1/N of layers).
@@ -746,6 +783,10 @@ function LayerReadout({
   }, [sliderCtx, slice.type]);
   const nextColorRgb = sliderCtx?.nextColorRgb ?? POPUP_BAR_RGB;
   const lensLabel = slice.type === LensType.JACOBIAN_LENS ? 'J-Lens Readout' : 'Logit Lens';
+  // For the J-Lens, warn when the active layer sits before the default layer
+  // selection (the first ~1/3 of the model), where readouts are unreliable.
+  const showDegenerateWarning =
+    slice.type === LensType.JACOBIAN_LENS && activeLayer != null && isDegenerateLayer(layers, layers[activeLayer]);
 
   // The active layer's top-n readout, each token carrying its OVERALL
   // prominence-by-layer (across all positions) for the right-side stripes.
@@ -794,6 +835,11 @@ function LayerReadout({
             onScroll={onScroll}
             className="flex min-h-0 flex-1 flex-col gap-y-0.5 overflow-y-auto px-5 py-2"
           >
+            {showDegenerateWarning && (
+              <div className="mb-1 shrink-0 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-snug text-amber-700">
+                {JLENS_DEGENERATE_DISCLAIMER}
+              </div>
+            )}
             {layerResultRows.map((it, j) => (
               <PositionTokenRow
                 key={`${j}-${it.key}`}

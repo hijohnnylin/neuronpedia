@@ -25,6 +25,8 @@ import { JlensPopupHost } from './jlens-token';
 import {
   displayToken,
   HideNonWordContext,
+  isDegenerateLayer,
+  JLENS_DEGENERATE_DISCLAIMER,
   LayerStatsContext,
   LensSliderContext,
   LensSliderControls,
@@ -175,10 +177,12 @@ export function JlensAnalysisPanel({
   const {
     lensMode,
     sidebarTypes,
+    layersByType,
     layerBounds,
     effectiveRange,
     defaultRange,
     setLayerRange,
+    sliderHoverLayer,
     setSliderHoverLayer,
     activeSidebar,
     positionScopeLabel,
@@ -206,6 +210,18 @@ export function JlensAnalysisPanel({
   };
   const onSearchOpen = () => setSidebarSearchOpen(true);
   const combinedQuery = sidebarSearchOpen ? sidebarSearchQuery : '';
+
+  // Warn (above the token list) when the J-Lens is displayed and the layer being
+  // hovered in the layer selector — or the start of the currently selected range
+  // — sits before the default selection (the first ~1/3 of the model), where the
+  // J-Lens is typically degenerate.
+  const jLayers = layersByType[LensType.JACOBIAN_LENS] ?? [];
+  const showJlensDegenerateWarning =
+    tokens.length > 0 &&
+    sidebarTypes.includes(LensType.JACOBIAN_LENS) &&
+    jLayers.length > 0 &&
+    ((sliderHoverLayer != null && isDegenerateLayer(jLayers, sliderHoverLayer)) ||
+      (sliderHoverLayer == null && effectiveRange != null && isDegenerateLayer(jLayers, effectiveRange[0])));
 
   return (
     // On mobile the sidebar shares the stacked height with the chat at a 2:3
@@ -283,6 +299,11 @@ export function JlensAnalysisPanel({
                 onQueryChange={setSidebarSearchQuery}
                 onOpen={onSearchOpen}
               />
+            </div>
+          )}
+          {showJlensDegenerateWarning && (
+            <div className="mx-2 -mb-1 shrink-0 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-snug text-amber-700 sm:mx-3">
+              {JLENS_DEGENERATE_DISCLAIMER}
             </div>
           )}
           <div className="flex min-h-0 flex-1 flex-row px-0 sm:px-1">
