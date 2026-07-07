@@ -780,6 +780,401 @@ def test_build_saedashboard_columnar_activation_records_prefers_activation_copy_
     assert records[0]["createdAt"] == "2026-04-05T06:07:08"
 
 
+def _write_columnar_batch_for_activation_hygiene(
+    tmp_path: Path, *, activation_table: str
+) -> Path:
+    """Write a bundle with a TOP/interval duplicate pair, a zero row, and a live row.
+
+    Expected records without hygiene flags: act-5-0 (interval duplicate), act-5-1
+    (TOP duplicate with identical tokens/values), act-5-2 (maxValue == 0), act-6-0.
+    """
+
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_ipc = pytest.importorskip("pyarrow.ipc")
+
+    columnar_root = tmp_path / "batch-0.columnar"
+    feature_batch_dir = columnar_root / "feature_batch_0"
+    feature_batch_dir.mkdir(parents=True)
+
+    if activation_table == "sequence_rows":
+        table = pyarrow.table(
+            {
+                "feature_index": [5, 5, 5, 5, 5, 5, 6, 6],
+                "sequence_index": [0, 0, 1, 1, 2, 2, 0, 0],
+                "group_name": [
+                    "INTERVAL 0.250 - 0.500<br>CONTAINS 12.5%",
+                    "INTERVAL 0.250 - 0.500<br>CONTAINS 12.5%",
+                    "TOP ACTIVATIONS<br>MAX = 0.500",
+                    "TOP ACTIVATIONS<br>MAX = 0.500",
+                    "INTERVAL 0.000 - 0.000<br>CONTAINS 50.0%",
+                    "INTERVAL 0.000 - 0.000<br>CONTAINS 50.0%",
+                    "TOP ACTIVATIONS<br>MAX = 7.000",
+                    "TOP ACTIVATIONS<br>MAX = 7.000",
+                ],
+                "context_token_index": [0, 1, 0, 1, 0, 1, 0, 1],
+                "qualifying_token_index": [1, 1, 1, 1, 1, 1, 1, 1],
+                "token_id": [101, 102, 101, 102, 101, 102, 104, 105],
+                "feat_act": [0.25, 0.5, 0.25, 0.5, 0.0, 0.0, 7.0, 6.0],
+                "token_logit": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            }
+        )
+    elif activation_table == "activation_rows":
+        table = pyarrow.table(
+            {
+                "feature_index": [5, 5, 5, 6],
+                "sequence_index": [0, 1, 2, 0],
+                "tokens": [
+                    ["tok_101", "tok_102"],
+                    ["tok_101", "tok_102"],
+                    ["tok_101", "tok_102"],
+                    ["tok_104", "tok_105"],
+                ],
+                "max_value": [0.5, 0.5, 0.0, 7.0],
+                "max_value_token_index": [1, 1, 0, 0],
+                "min_value": [0.25, 0.25, 0.0, 6.0],
+                "values": [[0.25, 0.5], [0.25, 0.5], [0.0, 0.0], [7.0, 6.0]],
+                "bin_min": [0.25, -1.0, 0.0, -1.0],
+                "bin_max": [0.5, 0.5, 0.0, 7.0],
+                "bin_contains": [0.125, -1.0, 0.5, -1.0],
+                "qualifying_token_index": [0, 0, 0, 0],
+            }
+        )
+    elif activation_table == "activation_copy_rows":
+        table = pyarrow.table(
+            {
+                "id": ["copy-5-0", "copy-5-1", "copy-5-2", "copy-6-0"],
+                "tokens": [
+                    ["tok_101", "tok_102"],
+                    ["tok_101", "tok_102"],
+                    ["tok_101", "tok_102"],
+                    ["tok_104", "tok_105"],
+                ],
+                "dataIndex": [None, None, None, None],
+                "index": [5, 5, 5, 6],
+                "layer": ["9-source-a"] * 4,
+                "modelId": ["model-a"] * 4,
+                "dataSource": [None, None, None, None],
+                "maxValue": [0.5, 0.5, 0.0, 7.0],
+                "maxValueTokenIndex": [1, 1, 0, 0],
+                "minValue": [0.25, 0.25, 0.0, 6.0],
+                "values": [[0.25, 0.5], [0.25, 0.5], [0.0, 0.0], [7.0, 6.0]],
+                "dfaValues": [[], [], [], []],
+                "dfaTargetIndex": [None, None, None, None],
+                "dfaMaxValue": [None, None, None, None],
+                "creatorId": ["creator-a"] * 4,
+                "createdAt": ["2026-01-02T03:04:05"] * 4,
+                "lossValues": [[], [], [], []],
+                "logitContributions": [None, None, None, None],
+                "binMin": [0.25, -1.0, 0.0, -1.0],
+                "binMax": [0.5, 0.5, 0.0, 7.0],
+                "binContains": [0.125, -1.0, 0.5, -1.0],
+                "qualifyingTokenIndex": [0, 0, 0, 0],
+            }
+        )
+    else:
+        raise AssertionError(f"Unknown activation table {activation_table!r}.")
+
+    table_path = feature_batch_dir / f"{activation_table}.arrow"
+    with table_path.open("wb") as handle:
+        with pyarrow_ipc.new_file(handle, table.schema) as writer:
+            writer.write_table(table)
+    (columnar_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "dashboard_output_format": "columnar",
+                "batches": [
+                    {"artifact_dir": "feature_batch_0", "feature_batch_index": 0}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (feature_batch_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "dashboard_output_format": "columnar",
+                "feature_batch_index": 0,
+                "row_counts": {activation_table: table.num_rows},
+                "tables": {activation_table: f"{activation_table}.arrow"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return columnar_root
+
+
+def _build_hygiene_activation_records(
+    columnar_root: Path, **hygiene_kwargs: Any
+) -> list[dict[str, Any]]:
+    return db_import.build_saedashboard_columnar_activation_records(
+        columnar_root,
+        model_id="model-a",
+        layer="9-source-a",
+        creator_id="creator-a",
+        created_at="2026-01-02T03:04:05",
+        activation_id_prefix="act",
+        decode_token_ids=lambda token_ids: [
+            f"tok_{token_id}" for token_id in token_ids
+        ],
+        **hygiene_kwargs,
+    )
+
+
+HYGIENE_ACTIVATION_TABLES = (
+    "sequence_rows",
+    "activation_rows",
+    "activation_copy_rows",
+)
+
+
+@pytest.mark.parametrize("activation_table", HYGIENE_ACTIVATION_TABLES)
+def test_build_saedashboard_columnar_activation_records_dedup_prefers_top_activations(
+    tmp_path: Path, activation_table: str
+) -> None:
+    columnar_root = _write_columnar_batch_for_activation_hygiene(
+        tmp_path, activation_table=activation_table
+    )
+
+    default_records = _build_hygiene_activation_records(columnar_root)
+    assert [record["id"] for record in default_records] == [
+        "act-5-0",
+        "act-5-1",
+        "act-5-2",
+        "act-6-0",
+    ]
+
+    deduped_records = _build_hygiene_activation_records(
+        columnar_root, dedup_activation_rows=True
+    )
+
+    assert [record["id"] for record in deduped_records] == [
+        "act-5-1",
+        "act-5-2",
+        "act-6-0",
+    ]
+    surviving_duplicate = deduped_records[0]
+    assert surviving_duplicate["tokens"] == ["tok_101", "tok_102"]
+    assert surviving_duplicate["values"] == [0.25, 0.5]
+    assert surviving_duplicate["binMin"] == -1.0
+    assert surviving_duplicate["binContains"] == -1.0
+
+
+@pytest.mark.parametrize("activation_table", HYGIENE_ACTIVATION_TABLES)
+def test_build_saedashboard_columnar_activation_records_drops_zero_activation_rows(
+    tmp_path: Path, activation_table: str
+) -> None:
+    columnar_root = _write_columnar_batch_for_activation_hygiene(
+        tmp_path, activation_table=activation_table
+    )
+
+    default_records = _build_hygiene_activation_records(columnar_root)
+    assert [record["id"] for record in default_records] == [
+        "act-5-0",
+        "act-5-1",
+        "act-5-2",
+        "act-6-0",
+    ]
+    assert default_records[2]["maxValue"] == 0.0
+
+    live_records = _build_hygiene_activation_records(
+        columnar_root, drop_zero_activation_rows=True
+    )
+
+    assert [record["id"] for record in live_records] == [
+        "act-5-0",
+        "act-5-1",
+        "act-6-0",
+    ]
+    assert all(record["maxValue"] > 0.0 for record in live_records)
+
+
+@pytest.mark.parametrize("activation_table", HYGIENE_ACTIVATION_TABLES)
+def test_build_saedashboard_columnar_activation_records_composes_hygiene_flags(
+    tmp_path: Path, activation_table: str
+) -> None:
+    columnar_root = _write_columnar_batch_for_activation_hygiene(
+        tmp_path, activation_table=activation_table
+    )
+
+    filtered_records = _build_hygiene_activation_records(
+        columnar_root,
+        dedup_activation_rows=True,
+        drop_zero_activation_rows=True,
+    )
+
+    assert [record["id"] for record in filtered_records] == ["act-5-1", "act-6-0"]
+    assert filtered_records[0]["binMin"] == -1.0
+    assert filtered_records[0]["binContains"] == -1.0
+    assert all(record["maxValue"] > 0.0 for record in filtered_records)
+
+
+@pytest.mark.parametrize("activation_table", HYGIENE_ACTIVATION_TABLES)
+def test_import_saedashboard_columnar_activations_local_db_filters_copy_stream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, activation_table: str
+) -> None:
+    columnar_root = _write_columnar_batch_for_activation_hygiene(
+        tmp_path, activation_table=activation_table
+    )
+    copied_batches: list[Any] = []
+
+    def _fake_copy_import(
+        connection: Any,
+        table_name: str,
+        available_columns: list[str],
+        record_batches: Any,
+        *,
+        chunk_size: int = 65000,
+        substage_seconds: dict[str, float] | None = None,
+        use_stage_table: bool = True,
+    ) -> tuple[int, int, float, float]:
+        copied_batches.extend(list(record_batches))
+        row_count = sum(batch.num_rows for batch in copied_batches)
+        return row_count, row_count, 0.1, 0.2
+
+    monkeypatch.setattr(
+        db_import, "import_arrow_record_batches_copy_local_db", _fake_copy_import
+    )
+
+    summary = (
+        db_import.import_saedashboard_columnar_activations_local_db_with_connection(
+            object(),
+            columnar_root,
+            model_id="model-a",
+            layer="9-source-a",
+            creator_id="creator-a",
+            created_at="2026-01-02T03:04:05",
+            activation_id_prefix="act",
+            decode_token_ids=lambda token_ids: [
+                f"tok_{token_id}" for token_id in token_ids
+            ],
+            dedup_activation_rows=True,
+            drop_zero_activation_rows=True,
+        )
+    )
+
+    copied_rows: list[dict[str, Any]] = []
+    for batch in copied_batches:
+        copied_rows.extend(batch.to_pylist())
+    assert [row["id"] for row in copied_rows] == ["act-5-1", "act-6-0"]
+    assert copied_rows[0]["binMin"] == -1.0
+    assert copied_rows[0]["binContains"] == -1.0
+    assert summary.bundle_row_counts == {"Activation": 2}
+    assert summary.imported_row_counts == {"Activation": 2}
+    assert summary.deduplicated_row_counts == {"Activation": 1}
+    assert summary.zero_dropped_row_counts == {"Activation": 1}
+
+
+def test_import_saedashboard_columnar_activations_local_db_reports_hygiene_defaults_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    columnar_root = _write_columnar_batch_for_activation_hygiene(
+        tmp_path, activation_table="sequence_rows"
+    )
+
+    def _fake_copy_import(
+        connection: Any,
+        table_name: str,
+        available_columns: list[str],
+        record_batches: Any,
+        *,
+        chunk_size: int = 65000,
+        substage_seconds: dict[str, float] | None = None,
+        use_stage_table: bool = True,
+    ) -> tuple[int, int, float, float]:
+        row_count = sum(batch.num_rows for batch in record_batches)
+        return row_count, row_count, 0.1, 0.2
+
+    monkeypatch.setattr(
+        db_import, "import_arrow_record_batches_copy_local_db", _fake_copy_import
+    )
+
+    summary = (
+        db_import.import_saedashboard_columnar_activations_local_db_with_connection(
+            object(),
+            columnar_root,
+            model_id="model-a",
+            layer="9-source-a",
+            creator_id="creator-a",
+            created_at="2026-01-02T03:04:05",
+            activation_id_prefix="act",
+            decode_token_ids=lambda token_ids: [
+                f"tok_{token_id}" for token_id in token_ids
+            ],
+        )
+    )
+
+    assert summary.bundle_row_counts == {"Activation": 4}
+    assert summary.deduplicated_row_counts == {}
+    assert summary.zero_dropped_row_counts == {}
+
+
+def test_import_saedashboard_columnar_bundle_local_db_threads_hygiene_flags(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    columnar_root = tmp_path / "batch-0.columnar"
+    received_activation_kwargs: dict[str, Any] = {}
+
+    def _summary(table_name: str) -> Any:
+        return db_import.NeuronpediaLocalImportSummary(
+            export_root=columnar_root,
+            bundle_row_counts={table_name: 1},
+            imported_row_counts={table_name: 1},
+            processed_files=[],
+            elapsed_seconds=0.1,
+            table_load_seconds={table_name: 0.01},
+            table_import_seconds={table_name: 0.02},
+        )
+
+    monkeypatch.setattr(
+        db_import,
+        "import_saedashboard_columnar_metadata_local_db_with_connection",
+        lambda *args, **kwargs: _summary("Source"),
+    )
+    monkeypatch.setattr(
+        db_import,
+        "import_saedashboard_columnar_neurons_local_db_with_connection",
+        lambda *args, **kwargs: _summary("Neuron"),
+    )
+
+    def _fake_activation_import(connection: Any, root: Path, **kwargs: Any) -> Any:
+        received_activation_kwargs.update(kwargs)
+        return db_import.NeuronpediaLocalImportSummary(
+            export_root=columnar_root,
+            bundle_row_counts={"Activation": 2},
+            imported_row_counts={"Activation": 2},
+            processed_files=[],
+            elapsed_seconds=0.1,
+            table_load_seconds={"Activation": 0.01},
+            table_import_seconds={"Activation": 0.02},
+            deduplicated_row_counts={"Activation": 1},
+            zero_dropped_row_counts={"Activation": 1},
+        )
+
+    monkeypatch.setattr(
+        db_import,
+        "import_saedashboard_columnar_activations_local_db_with_connection",
+        _fake_activation_import,
+    )
+
+    summary = db_import.import_saedashboard_columnar_bundle_local_db_with_connection(
+        object(),
+        columnar_root,
+        model_id="model-a",
+        source_set_name="source-set-a",
+        source_id="9-source-set-a",
+        creator_id="creator-a",
+        decode_token_ids=lambda token_ids: [str(token_id) for token_id in token_ids],
+        dedup_activation_rows=True,
+        drop_zero_activation_rows=True,
+    )
+
+    assert received_activation_kwargs["dedup_activation_rows"] is True
+    assert received_activation_kwargs["drop_zero_activation_rows"] is True
+    assert summary.deduplicated_row_counts == {"Activation": 1}
+    assert summary.zero_dropped_row_counts == {"Activation": 1}
+
+
 def test_import_saedashboard_columnar_activations_local_db_streams_copy_batches(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
