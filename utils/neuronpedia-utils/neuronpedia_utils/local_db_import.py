@@ -145,7 +145,13 @@ class NeuronpediaBundleSummaryParity:
 
 @dataclass(frozen=True)
 class NeuronpediaLocalImportSummary:
-    """Summary of one local Neuronpedia export-bundle import run."""
+    """Summary of one local Neuronpedia export-bundle import run.
+
+    ``deduplicated_row_counts`` and ``zero_dropped_row_counts`` track rows removed by
+    the opt-in ``dedup_activation_rows`` / ``drop_zero_activation_rows`` import-hygiene
+    flags; both stay empty when the flags are disabled (the default), and
+    ``bundle_row_counts`` always reflects post-filter counts.
+    """
 
     export_root: Path
     bundle_row_counts: dict[str, int]
@@ -157,6 +163,8 @@ class NeuronpediaLocalImportSummary:
     table_import_substage_seconds: dict[str, dict[str, float]] = field(
         default_factory=dict
     )
+    deduplicated_row_counts: dict[str, int] = field(default_factory=dict)
+    zero_dropped_row_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -1005,6 +1013,128 @@ def _build_activation_record_from_activation_row(
     }
 
 
+def _is_top_activation_record(record: Mapping[str, Any]) -> bool:
+    return float(record["binMin"]) == -1.0 and float(record["binContains"]) == -1.0
+
+
+class _ActivationRecordHygieneFilter:
+    """Opt-in per-feature dedup and zero-activation filtering for Activation records.
+
+    Records must arrive with each feature's rows contiguous (all three columnar
+    Activation sources emit rows grouped by ``feature_index``). Zero-drop is applied
+    before dedup; the order is immaterial because duplicate records share identical
+    ``values`` and therefore identical ``maxValue``.
+
+    Dedup keys records on (feature_index, tokens tuple, values tuple), keeping the
+    TOP-ACTIVATIONS record (binMin=-1/binContains=-1) in preference to interval-group
+    records when both exist; among interval duplicates the first record wins.
+    """
+
+    def __init__(
+        self,
+        *,
+        dedup_activation_rows: bool,
+        drop_zero_activation_rows: bool,
+        hygiene_counters: dict[str, int] | None = None,
+    ) -> None:
+        self._dedup_activation_rows = dedup_activation_rows
+        self._drop_zero_activation_rows = drop_zero_activation_rows
+        self._hygiene_counters = (
+            hygiene_counters if hygiene_counters is not None else {}
+        )
+        if dedup_activation_rows:
+            self._hygiene_counters.setdefault("deduplicated_rows", 0)
+        if drop_zero_activation_rows:
+            self._hygiene_counters.setdefault("zero_rows_dropped", 0)
+        self._current_feature_index: int | None = None
+        self._kept_records_by_key: dict[tuple[Any, ...], dict[str, Any]] = {}
+
+    def push(self, record: dict[str, Any]) -> list[dict[str, Any]]:
+        if self._drop_zero_activation_rows and float(record["maxValue"]) == 0.0:
+            self._hygiene_counters["zero_rows_dropped"] += 1
+            return []
+        if not self._dedup_activation_rows:
+            return [record]
+
+        feature_index = int(record["index"])
+        emitted_records: list[dict[str, Any]] = []
+        if (
+            self._current_feature_index is not None
+            and feature_index != self._current_feature_index
+        ):
+            emitted_records = list(self._kept_records_by_key.values())
+            self._kept_records_by_key = {}
+        self._current_feature_index = feature_index
+
+        record_key = (tuple(record["tokens"]), tuple(record["values"]))
+        kept_record = self._kept_records_by_key.get(record_key)
+        if kept_record is None:
+            self._kept_records_by_key[record_key] = record
+        else:
+            self._hygiene_counters["deduplicated_rows"] += 1
+            if _is_top_activation_record(record) and not _is_top_activation_record(
+                kept_record
+            ):
+                self._kept_records_by_key[record_key] = record
+        return emitted_records
+
+    def flush(self) -> list[dict[str, Any]]:
+        emitted_records = list(self._kept_records_by_key.values())
+        self._kept_records_by_key = {}
+        self._current_feature_index = None
+        return emitted_records
+
+
+def _iter_hygiene_filtered_activation_records(
+    records: Iterable[dict[str, Any]],
+    *,
+    dedup_activation_rows: bool,
+    drop_zero_activation_rows: bool,
+    hygiene_counters: dict[str, int] | None = None,
+) -> Iterable[dict[str, Any]]:
+    if not (dedup_activation_rows or drop_zero_activation_rows):
+        yield from records
+        return
+    record_filter = _ActivationRecordHygieneFilter(
+        dedup_activation_rows=dedup_activation_rows,
+        drop_zero_activation_rows=drop_zero_activation_rows,
+        hygiene_counters=hygiene_counters,
+    )
+    for record in records:
+        yield from record_filter.push(record)
+    yield from record_filter.flush()
+
+
+def _iter_hygiene_filtered_activation_record_batches(
+    batches: Iterable[Any],
+    *,
+    dedup_activation_rows: bool,
+    drop_zero_activation_rows: bool,
+    hygiene_counters: dict[str, int] | None = None,
+) -> Iterable[Any]:
+    if not (dedup_activation_rows or drop_zero_activation_rows):
+        yield from batches
+        return
+    pyarrow, _, _ = _load_pyarrow_modules()
+    record_filter = _ActivationRecordHygieneFilter(
+        dedup_activation_rows=dedup_activation_rows,
+        drop_zero_activation_rows=drop_zero_activation_rows,
+        hygiene_counters=hygiene_counters,
+    )
+    batch_schema = None
+    pending_records: list[dict[str, Any]] = []
+    for batch in batches:
+        batch_schema = batch.schema
+        for record in cast(list[dict[str, Any]], batch.to_pylist()):
+            pending_records.extend(record_filter.push(record))
+        if pending_records:
+            yield pyarrow.RecordBatch.from_pylist(pending_records, schema=batch_schema)
+            pending_records = []
+    pending_records.extend(record_filter.flush())
+    if pending_records and batch_schema is not None:
+        yield pyarrow.RecordBatch.from_pylist(pending_records, schema=batch_schema)
+
+
 def _iter_activation_records_from_sequence_row_batches(
     batches: Iterable[Any],
     *,
@@ -1533,6 +1663,9 @@ def _iter_saedashboard_columnar_activation_record_batches_with_metadata(
     pad_token_id: int | None = None,
     read_batch_size: int = 65000,
     output_batch_size: int = 65000,
+    dedup_activation_rows: bool = False,
+    drop_zero_activation_rows: bool = False,
+    hygiene_counters: dict[str, int] | None = None,
 ) -> tuple[Iterable[Any], list[Path]]:
     created_at_record_value = _created_at_value(created_at)
     processed_files: list[Path] = []
@@ -1581,7 +1714,13 @@ def _iter_saedashboard_columnar_activation_record_batches_with_metadata(
                     output_batch_size=output_batch_size,
                 )
 
-    return _record_batches(), processed_files
+    filtered_record_batches = _iter_hygiene_filtered_activation_record_batches(
+        _record_batches(),
+        dedup_activation_rows=dedup_activation_rows,
+        drop_zero_activation_rows=drop_zero_activation_rows,
+        hygiene_counters=hygiene_counters,
+    )
+    return filtered_record_batches, processed_files
 
 
 def _build_saedashboard_columnar_activation_records_with_metadata(
@@ -1595,56 +1734,62 @@ def _build_saedashboard_columnar_activation_records_with_metadata(
     activation_id_prefix: str = "columnar-activation",
     pad_token_id: int | None = None,
     read_batch_size: int = 65000,
+    dedup_activation_rows: bool = False,
+    drop_zero_activation_rows: bool = False,
+    hygiene_counters: dict[str, int] | None = None,
 ) -> tuple[list[dict[str, Any]], list[Path], float]:
     created_at_record_value = _created_at_value(created_at)
     records: list[dict[str, Any]] = []
     processed_files: list[Path] = []
     table_load_seconds = 0.0
 
+    def _iter_activation_copy_row_records(table_path: Path) -> Iterable[dict[str, Any]]:
+        for batch in _iter_activation_record_batches_from_activation_copy_row_batches(
+            _iter_columnar_record_batches(table_path, batch_size=read_batch_size),
+            model_id=model_id,
+            layer=layer,
+            creator_id=creator_id,
+            created_at=created_at_record_value,
+            activation_id_prefix=activation_id_prefix,
+        ):
+            yield from cast(list[dict[str, Any]], batch.to_pylist())
+
     for manifest_path in discover_saedashboard_columnar_manifest_paths(columnar_root):
         table_name, table_path = _preferred_activation_table_path(manifest_path)
         processed_files.append(table_path)
         load_start_time = time.perf_counter()
         if table_name == "activation_copy_rows":
-            for (
-                batch
-            ) in _iter_activation_record_batches_from_activation_copy_row_batches(
+            table_records: Iterable[dict[str, Any]] = _iter_activation_copy_row_records(
+                table_path
+            )
+        elif table_name == "activation_rows":
+            table_records = _iter_activation_records_from_activation_row_batches(
                 _iter_columnar_record_batches(table_path, batch_size=read_batch_size),
                 model_id=model_id,
                 layer=layer,
                 creator_id=creator_id,
                 created_at=created_at_record_value,
                 activation_id_prefix=activation_id_prefix,
-            ):
-                records.extend(cast(list[dict[str, Any]], batch.to_pylist()))
-        elif table_name == "activation_rows":
-            records.extend(
-                _iter_activation_records_from_activation_row_batches(
-                    _iter_columnar_record_batches(
-                        table_path, batch_size=read_batch_size
-                    ),
-                    model_id=model_id,
-                    layer=layer,
-                    creator_id=creator_id,
-                    created_at=created_at_record_value,
-                    activation_id_prefix=activation_id_prefix,
-                )
             )
         else:
-            records.extend(
-                _iter_activation_records_from_sequence_row_batches(
-                    _iter_columnar_record_batches(
-                        table_path, batch_size=read_batch_size
-                    ),
-                    model_id=model_id,
-                    layer=layer,
-                    creator_id=creator_id,
-                    created_at=created_at_record_value,
-                    decode_token_ids=decode_token_ids,
-                    activation_id_prefix=activation_id_prefix,
-                    pad_token_id=pad_token_id,
-                )
+            table_records = _iter_activation_records_from_sequence_row_batches(
+                _iter_columnar_record_batches(table_path, batch_size=read_batch_size),
+                model_id=model_id,
+                layer=layer,
+                creator_id=creator_id,
+                created_at=created_at_record_value,
+                decode_token_ids=decode_token_ids,
+                activation_id_prefix=activation_id_prefix,
+                pad_token_id=pad_token_id,
             )
+        records.extend(
+            _iter_hygiene_filtered_activation_records(
+                table_records,
+                dedup_activation_rows=dedup_activation_rows,
+                drop_zero_activation_rows=drop_zero_activation_rows,
+                hygiene_counters=hygiene_counters,
+            )
+        )
         table_load_seconds += time.perf_counter() - load_start_time
 
     return records, processed_files, table_load_seconds
@@ -1660,6 +1805,8 @@ def build_saedashboard_columnar_activation_records(
     created_at: datetime | str | None = None,
     activation_id_prefix: str = "columnar-activation",
     pad_token_id: int | None = None,
+    dedup_activation_rows: bool = False,
+    drop_zero_activation_rows: bool = False,
 ) -> list[dict[str, Any]]:
     """Build legacy-compatible Activation rows from SAEDashboard activation_rows artifacts or sequence_rows fallback."""
 
@@ -1672,6 +1819,8 @@ def build_saedashboard_columnar_activation_records(
         created_at=created_at,
         activation_id_prefix=activation_id_prefix,
         pad_token_id=pad_token_id,
+        dedup_activation_rows=dedup_activation_rows,
+        drop_zero_activation_rows=drop_zero_activation_rows,
     )
     return records
 
@@ -1690,10 +1839,19 @@ def import_saedashboard_columnar_activations_local_db_with_connection(
     chunk_size: int = 65000,
     use_copy: bool = True,
     use_stage_table: bool = True,
+    dedup_activation_rows: bool = False,
+    drop_zero_activation_rows: bool = False,
 ) -> NeuronpediaLocalImportSummary:
     """Import SAEDashboard columnar activation_rows artifacts into Activation, falling back to sequence_rows."""
 
     import_start_time = time.perf_counter()
+    hygiene_counters: dict[str, int] = {}
+
+    def _hygiene_row_counts(counter_name: str, enabled: bool) -> dict[str, int]:
+        if not enabled:
+            return {}
+        return {"Activation": hygiene_counters.get(counter_name, 0)}
+
     if use_copy:
         record_batches, processed_files = (
             _iter_saedashboard_columnar_activation_record_batches_with_metadata(
@@ -1706,6 +1864,9 @@ def import_saedashboard_columnar_activations_local_db_with_connection(
                 activation_id_prefix=activation_id_prefix,
                 pad_token_id=pad_token_id,
                 output_batch_size=chunk_size,
+                dedup_activation_rows=dedup_activation_rows,
+                drop_zero_activation_rows=drop_zero_activation_rows,
+                hygiene_counters=hygiene_counters,
             )
         )
         copy_substage_seconds: dict[str, float] = {}
@@ -1729,6 +1890,12 @@ def import_saedashboard_columnar_activations_local_db_with_connection(
             table_load_seconds={"Activation": load_seconds},
             table_import_seconds={"Activation": import_seconds},
             table_import_substage_seconds={"Activation": copy_substage_seconds},
+            deduplicated_row_counts=_hygiene_row_counts(
+                "deduplicated_rows", dedup_activation_rows
+            ),
+            zero_dropped_row_counts=_hygiene_row_counts(
+                "zero_rows_dropped", drop_zero_activation_rows
+            ),
         )
 
     records, processed_files, load_seconds = (
@@ -1741,6 +1908,9 @@ def import_saedashboard_columnar_activations_local_db_with_connection(
             created_at=created_at,
             activation_id_prefix=activation_id_prefix,
             pad_token_id=pad_token_id,
+            dedup_activation_rows=dedup_activation_rows,
+            drop_zero_activation_rows=drop_zero_activation_rows,
+            hygiene_counters=hygiene_counters,
         )
     )
     table_import_start_time = time.perf_counter()
@@ -1759,6 +1929,12 @@ def import_saedashboard_columnar_activations_local_db_with_connection(
         elapsed_seconds=time.perf_counter() - import_start_time,
         table_load_seconds={"Activation": load_seconds},
         table_import_seconds={"Activation": import_seconds},
+        deduplicated_row_counts=_hygiene_row_counts(
+            "deduplicated_rows", dedup_activation_rows
+        ),
+        zero_dropped_row_counts=_hygiene_row_counts(
+            "zero_rows_dropped", drop_zero_activation_rows
+        ),
     )
 
 
@@ -2055,6 +2231,8 @@ def _combine_local_import_summaries(
     table_load_seconds: dict[str, float] = {}
     table_import_seconds: dict[str, float] = {}
     table_import_substage_seconds: dict[str, dict[str, float]] = {}
+    deduplicated_row_counts: dict[str, int] = {}
+    zero_dropped_row_counts: dict[str, int] = {}
 
     for summary in summaries:
         for table_name, row_count in summary.bundle_row_counts.items():
@@ -2081,6 +2259,14 @@ def _combine_local_import_summaries(
                 combined_substages[substage_name] = (
                     combined_substages.get(substage_name, 0.0) + seconds
                 )
+        for table_name, row_count in summary.deduplicated_row_counts.items():
+            deduplicated_row_counts[table_name] = (
+                deduplicated_row_counts.get(table_name, 0) + row_count
+            )
+        for table_name, row_count in summary.zero_dropped_row_counts.items():
+            zero_dropped_row_counts[table_name] = (
+                zero_dropped_row_counts.get(table_name, 0) + row_count
+            )
         processed_files.extend(summary.processed_files)
 
     return NeuronpediaLocalImportSummary(
@@ -2092,6 +2278,8 @@ def _combine_local_import_summaries(
         table_load_seconds=table_load_seconds,
         table_import_seconds=table_import_seconds,
         table_import_substage_seconds=table_import_substage_seconds,
+        deduplicated_row_counts=deduplicated_row_counts,
+        zero_dropped_row_counts=zero_dropped_row_counts,
     )
 
 
@@ -2110,9 +2298,16 @@ def import_saedashboard_columnar_bundle_local_db_with_connection(
     hook_name: str | None = None,
     chunk_size: int = 65000,
     activation_use_stage_table: bool = True,
+    dedup_activation_rows: bool = False,
+    drop_zero_activation_rows: bool = False,
     **metadata_kwargs: Any,
 ) -> NeuronpediaLocalImportSummary:
-    """Import SAEDashboard columnar metadata, Neuron rows, and Activation rows in dependency order."""
+    """Import SAEDashboard columnar metadata, Neuron rows, and Activation rows in dependency order.
+
+    ``dedup_activation_rows`` and ``drop_zero_activation_rows`` are opt-in Activation
+    import-hygiene filters; both default to off, preserving the existing import
+    contract exactly.
+    """
 
     import_start_time = time.perf_counter()
     shared_metadata_kwargs = {"created_at": created_at, **metadata_kwargs}
@@ -2151,6 +2346,8 @@ def import_saedashboard_columnar_bundle_local_db_with_connection(
             pad_token_id=pad_token_id,
             chunk_size=chunk_size,
             use_stage_table=activation_use_stage_table,
+            dedup_activation_rows=dedup_activation_rows,
+            drop_zero_activation_rows=drop_zero_activation_rows,
         )
     )
     return _combine_local_import_summaries(
@@ -2175,9 +2372,16 @@ def import_saedashboard_columnar_bundle_local_db(
     hook_name: str | None = None,
     chunk_size: int = 65000,
     activation_use_stage_table: bool = True,
+    dedup_activation_rows: bool = False,
+    drop_zero_activation_rows: bool = False,
     **metadata_kwargs: Any,
 ) -> NeuronpediaLocalImportSummary:
-    """Import a SAEDashboard columnar artifact into a local Neuronpedia DB."""
+    """Import a SAEDashboard columnar artifact into a local Neuronpedia DB.
+
+    ``dedup_activation_rows`` and ``drop_zero_activation_rows`` are opt-in Activation
+    import-hygiene filters; both default to off, preserving the existing import
+    contract exactly.
+    """
 
     psycopg = importlib.import_module("psycopg")
     columnar_root_path = Path(columnar_root)
@@ -2201,6 +2405,8 @@ def import_saedashboard_columnar_bundle_local_db(
             hook_name=hook_name,
             chunk_size=chunk_size,
             activation_use_stage_table=activation_use_stage_table,
+            dedup_activation_rows=dedup_activation_rows,
+            drop_zero_activation_rows=drop_zero_activation_rows,
             **metadata_kwargs,
         )
         connection.commit()
