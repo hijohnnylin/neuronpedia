@@ -27,13 +27,27 @@ import { NextResponse } from 'next/server';
 import { gzip } from 'node-gzip';
 import * as yup from 'yup';
 
+// Defense-in-depth caps on otherwise-unbounded array/string inputs. The final
+// S3 blob is size-guarded separately, but several of these (lockedTokens,
+// selectedPositions) are persisted directly to the DB, so cap them up front.
+// The inference re-run also enforces its own token limit (lens_token_limit).
+const MAX_TOKEN_IDS = 4096;
+const MAX_CHAT_MESSAGES = 200;
+const MAX_MESSAGE_CHARS = 10000;
+const MAX_SHARE_PROMPT_CHARS = 1024;
+const MAX_LOCKED_TOKENS = 512;
+const MAX_LOCKED_TOKEN_KEY_CHARS = 256;
+const MAX_SELECTED_POSITIONS = 4096;
+const MAX_STEER_LAYERS = 512;
+const MAX_MODEL_ID_CHARS = 128;
+
 const chatMessageSchema = yup.object({
   role: yup.string().oneOf(['user', 'assistant', 'system']).required(),
-  content: yup.string().required(),
+  content: yup.string().max(MAX_MESSAGE_CHARS).required(),
 });
 
 const lockedTokenSchema = yup.object({
-  key: yup.string().required(),
+  key: yup.string().max(MAX_LOCKED_TOKEN_KEY_CHARS).required(),
   type: yup
     .string()
     .oneOf(LENS_TYPES as unknown as string[])
@@ -44,31 +58,31 @@ const lockedTokenSchema = yup.object({
 // token-id sequence of the steered run, so we can reproduce its read-outs
 // server-side (forced decode over those ids, no generation).
 const shareSteerSchema = yup.object({
-  token: yup.string().required(),
+  token: yup.string().max(MAX_LOCKED_TOKEN_KEY_CHARS).required(),
   type: yup
     .string()
     .oneOf(LENS_TYPES as unknown as string[])
     .required(),
-  layers: yup.array().of(yup.number().integer().required()).min(1).required(),
+  layers: yup.array().of(yup.number().integer().required()).min(1).max(MAX_STEER_LAYERS).required(),
   strength: yup.number().min(-MAX_LENS_STEER_STRENGTH).max(MAX_LENS_STEER_STRENGTH).required(),
   ablate: yup.boolean().required(),
   // Intervention mode + the target token for a swap (empty for plain steers).
   mode: yup.string().oneOf(['steer', 'swap']).default('steer'),
-  swapToken: yup.string().default(''),
+  swapToken: yup.string().max(MAX_LOCKED_TOKEN_KEY_CHARS).default(''),
   // Whether the intervention was applied to generated tokens too.
   steerGenerated: yup.boolean().default(false),
-  inputTokenIds: yup.array().of(yup.number().integer().required()).min(1).required(),
+  inputTokenIds: yup.array().of(yup.number().integer().required()).min(1).max(MAX_TOKEN_IDS).required(),
 });
 
 const shareRequestSchema = yup.object({
-  modelId: yup.string().min(1).required(),
+  modelId: yup.string().min(1).max(MAX_MODEL_ID_CHARS).required(),
   kind: yup.string().oneOf(['chat', 'completion']).default('chat'),
   // Full token-id sequence of the run, used to faithfully re-run inference.
-  inputTokenIds: yup.array().of(yup.number().integer().required()).min(1).required(),
+  inputTokenIds: yup.array().of(yup.number().integer().required()).min(1).max(MAX_TOKEN_IDS).required(),
   // Chat-kind shares carry the conversation turns; completion-kind shares carry
   // the raw prompt text.
-  messages: yup.array().of(chatMessageSchema).default([]),
-  prompt: yup.string().default(''),
+  messages: yup.array().of(chatMessageSchema).max(MAX_CHAT_MESSAGES).default([]),
+  prompt: yup.string().max(MAX_SHARE_PROMPT_CHARS).default(''),
   topN: yup.number().integer().min(1).max(10).required(),
   temperature: yup.number().min(0).max(2).required(),
   numCompletionTokens: yup.number().integer().min(0).max(512).required(),
@@ -81,8 +95,8 @@ const shareRequestSchema = yup.object({
     .oneOf(LENS_MODES as unknown as string[])
     .required(),
   hideNonWordTokens: yup.boolean().required(),
-  lockedTokens: yup.array().of(lockedTokenSchema).default([]),
-  selectedPositions: yup.array().of(yup.number().integer().min(0).required()).default([]),
+  lockedTokens: yup.array().of(lockedTokenSchema).max(MAX_LOCKED_TOKENS).default([]),
+  selectedPositions: yup.array().of(yup.number().integer().min(0).required()).max(MAX_SELECTED_POSITIONS).default([]),
   description: yup.string().max(MAX_JLENS_SHARE_DESCRIPTION_LENGTH).optional(),
   steer: shareSteerSchema.default(undefined),
 });
@@ -108,6 +122,213 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
   return { meta, tokens };
 }
 
+/**
+ * @swagger
+ * /api/lens/share:
+ *   post:
+ *     summary: JLens - Create a Shareable Run
+ *     description: |
+ *       Creates a shareable, permanent snapshot of a [JLens](https://neuronpedia.org/jlens) run.
+ *
+ *       The server re-runs inference over the exact `inputTokenIds` (a forced decode, no generation) so the stored read-outs are trusted (computed by us, not the caller) and reproducible. If a steered run is included, its read-outs are re-computed the same way over `steer.inputTokenIds`. The resulting data is gzipped and uploaded to S3, and a share record is created in the database.
+ *
+ *       Authentication is optional: authenticated shares are attributed to the user, anonymous shares are attributed to an anonymous owner. Requests are rate-limited per IP address per day.
+ *     tags:
+ *       - JLens
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - modelId
+ *               - inputTokenIds
+ *               - topN
+ *               - temperature
+ *               - numCompletionTokens
+ *               - activeLensModeTab
+ *               - hideNonWordTokens
+ *             properties:
+ *               modelId:
+ *                 type: string
+ *                 description: The Neuronpedia model id the run was computed with.
+ *                 maxLength: 128
+ *                 example: qwen3.6-27b
+ *               kind:
+ *                 type: string
+ *                 description: The run kind. `chat` shares carry the conversation turns; `completion` shares carry the raw prompt text.
+ *                 enum: [chat, completion]
+ *                 default: chat
+ *               messages:
+ *                 type: array
+ *                 description: Conversation turns (for `chat`-kind shares).
+ *                 maxItems: 200
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - role
+ *                     - content
+ *                   properties:
+ *                     role:
+ *                       type: string
+ *                       enum: [user, assistant, system]
+ *                     content:
+ *                       type: string
+ *                       maxLength: 10000
+ *               prompt:
+ *                 type: string
+ *                 description: Raw prompt text (for `completion`-kind shares).
+ *                 maxLength: 1024
+ *                 default: ""
+ *               topN:
+ *                 type: integer
+ *                 description: Number of top read-out tokens returned per layer per position.
+ *                 minimum: 1
+ *                 maximum: 10
+ *               temperature:
+ *                 type: number
+ *                 description: Sampling temperature used for the run.
+ *                 minimum: 0
+ *                 maximum: 2
+ *               numCompletionTokens:
+ *                 type: integer
+ *                 description: Number of generated tokens in the run.
+ *                 minimum: 0
+ *                 maximum: 512
+ *               activeLensModeTab:
+ *                 type: string
+ *                 description: The lens display mode tab that was active when sharing.
+ *                 enum: [JACOBIAN_LENS, LOGIT_LENS, DIFF]
+ *               hideNonWordTokens:
+ *                 type: boolean
+ *                 description: Whether non-word tokens were filtered from the read-outs. The stored snapshot is captured with this filter applied.
+ *               lockedTokens:
+ *                 type: array
+ *                 description: Tokens the user pinned in the UI.
+ *                 maxItems: 512
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - key
+ *                     - type
+ *                   properties:
+ *                     key:
+ *                       type: string
+ *                       maxLength: 256
+ *                     type:
+ *                       type: string
+ *                       enum: [LOGIT_LENS, JACOBIAN_LENS]
+ *               selectedPositions:
+ *                 type: array
+ *                 description: Token positions the user selected in the UI.
+ *                 maxItems: 4096
+ *                 items:
+ *                   type: integer
+ *                   minimum: 0
+ *               description:
+ *                 type: string
+ *                 description: Optional description for the shared run.
+ *               inputTokenIds:
+ *                 type: array
+ *                 description: "Advanced. Full token-id sequence of the run, used to faithfully re-run inference server-side."
+ *                 minItems: 1
+ *                 maxItems: 4096
+ *                 items:
+ *                   type: integer
+ *               numPromptTokens:
+ *                 type: integer
+ *                 description: "Advanced. Number of leading prompt tokens (the remainder were generated). Persisted so a reloaded share can mark the prompt/generated boundary."
+ *                 minimum: 0
+ *               steer:
+ *                 type: object
+ *                 description: "Advanced. Optional steered run to carry with the share. Its read-outs are re-computed server-side over `inputTokenIds`."
+ *                 required:
+ *                   - token
+ *                   - type
+ *                   - layers
+ *                   - strength
+ *                   - ablate
+ *                   - inputTokenIds
+ *                 properties:
+ *                   token:
+ *                     type: string
+ *                     description: The exact decoded read-out token that was steered on.
+ *                     maxLength: 256
+ *                   type:
+ *                     type: string
+ *                     enum: [LOGIT_LENS, JACOBIAN_LENS]
+ *                   layers:
+ *                     type: array
+ *                     minItems: 1
+ *                     maxItems: 512
+ *                     items:
+ *                       type: integer
+ *                   strength:
+ *                     type: number
+ *                     minimum: -2
+ *                     maximum: 2
+ *                   ablate:
+ *                     type: boolean
+ *                   mode:
+ *                     type: string
+ *                     enum: [steer, swap]
+ *                     default: steer
+ *                   swapToken:
+ *                     type: string
+ *                     description: Target token for a swap intervention (empty for plain steers).
+ *                     maxLength: 256
+ *                     default: ""
+ *                   steerGenerated:
+ *                     type: boolean
+ *                     description: Whether the intervention was applied to generated tokens too.
+ *                     default: false
+ *                   inputTokenIds:
+ *                     type: array
+ *                     description: Full token-id sequence of the steered run.
+ *                     minItems: 1
+ *                     maxItems: 4096
+ *                     items:
+ *                       type: integer
+ *           example:
+ *             modelId: qwen3.6-27b
+ *             kind: completion
+ *             inputTokenIds: [464, 6722, 315, 9822, 374]
+ *             prompt: "The capital of France is"
+ *             topN: 8
+ *             temperature: 0
+ *             numCompletionTokens: 0
+ *             numPromptTokens: 5
+ *             activeLensModeTab: JACOBIAN_LENS
+ *             hideNonWordTokens: true
+ *             selectedPositions: [4]
+ *             description: "Lens over a capital-city fact"
+ *     responses:
+ *       200:
+ *         description: The shared run was created successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   description: The share id.
+ *                 path:
+ *                   type: string
+ *                   description: The relative path to view the shared run on Neuronpedia.
+ *                 url:
+ *                   type: string
+ *                   description: The S3 url of the stored run data.
+ *       400:
+ *         description: Invalid JSON body or validation error.
+ *       413:
+ *         description: The shared run exceeds the maximum upload size.
+ *       429:
+ *         description: Too many shares created from this IP address today.
+ *       500:
+ *         description: Lens re-run failed, or uploading/saving the share failed.
+ */
 export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   let bodyJson;
   try {

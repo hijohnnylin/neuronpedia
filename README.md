@@ -9,7 +9,7 @@
     open source interpretability platform
     <br />
     <sub>
-    <strong>api · steering · activations · circuits/graphs · autointerp · scoring · inference · search · filter · dashboards · benchmarks · cossim · umap · embeds · probes · saes · lists · exports · uploads</strong>
+    <strong>api · steering · activations · circuits/graphs · natural language autoencoders · jacobian lens · autointerp · scoring · inference · search · filter · dashboards · benchmarks · cossim · umap · embeds · probes · saes · lists · exports · uploads</strong>
     </sub>
   </p>
 </p>
@@ -44,9 +44,9 @@
 - [Contact / Support](#contact--support)
 - [Contributing](#contributing)
 - [Appendix](#appendix)
-  - ['Make' Commands Reference](#make-commands-reference)
-  - [Import Data Into Your Local Database](#import-data-into-your-local-database)
-  - [Why an OpenAI API Key Is Needed for Search Explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
+    - ['Make' Commands Reference](#make-commands-reference)
+    - [Import Data Into Your Local Database](#import-data-into-your-local-database)
+    - [Why an OpenAI API Key Is Needed for Search Explanations](#why-an-openai-api-key-is-needed-for-search-explanations)
 
 # About Neuronpedia
 
