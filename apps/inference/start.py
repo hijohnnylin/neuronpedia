@@ -1,18 +1,20 @@
 # this script launches the uvicorn server and allows us to pass in arguments instead of using environment variables
 # it is often easier to pass in arguments than to set environment variables
 # but environment variables will always override the passed in arguments
+# run it with uv (which resolves/activates the project's virtualenv): `uv run python start.py ...`
 # example usages
-# python start.py --model_id gpt2-small --sae_sets res-jb --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 5-res-jb --include_sae 4-res-jb
-# export INCLUDE_SAE='["9-res-jb"]' && python start.py --reload --reload-dir neuronpedia_inference
+# uv run python start.py --model_id gpt2-small --sae_sets res-jb --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 5-res-jb --include_sae 4-res-jb
+# export INCLUDE_SAE='["9-res-jb"]' && uv run python start.py --reload --reload-dir neuronpedia_inference
 # deepseek example
-# python start.py --device mps --model_dtype bfloat16 --sae_dtype bfloat16 --model_id meta-llama/Llama-3.1-8B --custom_hf_model_id deepseek-ai/DeepSeek-R1-Distill-Llama-8B --sae_sets llamascope-r1-res-32k --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 15-llamascope-slimpj-res-32k
+# uv run python start.py --device mps --model_dtype bfloat16 --sae_dtype bfloat16 --model_id meta-llama/Llama-3.1-8B --custom_hf_model_id deepseek-ai/DeepSeek-R1-Distill-Llama-8B --sae_sets llamascope-r1-res-32k --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 15-llamascope-slimpj-res-32k
 # gemma 2 2b it example
-# python start.py --device mps --model_id gemma-2-2b --model_dtype bfloat16 --sae_dtype bfloat16 --override_model_id gemma-2-2b-it --sae_sets gemmascope-res-16k --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 5-gemmascope-res-16k
+# uv run python start.py --device mps --model_id gemma-2-2b --model_dtype bfloat16 --sae_dtype bfloat16 --override_model_id gemma-2-2b-it --sae_sets gemmascope-res-16k --max_loaded_saes 200  --reload --reload-dir neuronpedia_inference --include_sae 5-gemmascope-res-16k
 
 import argparse
 import json
 import os
 import subprocess
+import sys
 
 
 def parse_args():
@@ -221,7 +223,12 @@ def main():
         list_available_options()
         return
 
+    # Invoke uvicorn via the current interpreter (`python -m uvicorn`) so it
+    # resolves from the active (uv-managed) virtualenv without relying on the
+    # `uvicorn` console script being on PATH.
     uvicorn_args = [
+        sys.executable,
+        "-m",
         "uvicorn",
         "neuronpedia_inference.server:app",
         "--host",

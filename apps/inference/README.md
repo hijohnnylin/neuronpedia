@@ -42,8 +42,8 @@ as much as possible, we try to use classes/types from the `packages/python/neuro
 this loads the `gpt2-small` model and the `res-jb` saes through saelens:
 
 ```
-poetry lock && poetry install
-poetry run python start.py
+uv sync
+uv run python start.py
 ```
 
 ### customizing the inference server (different models, SAEs, etc)
@@ -64,7 +64,7 @@ Notes/Caveats:
 example of loading model `gemma-2-2b` and a gemmascope sae using arguments
 
 ```
-poetry run python start.py \
+uv run python start.py \
   --model_id gemma-2-2b \
   --sae_sets gemmascope-res-16k \
   --model_dtype bfloat16 \
@@ -76,7 +76,7 @@ you'll notice we use the `model_id` and `sae_sets` flags to set which SAE to loa
 you can run the following to get the currently supported models and saes
 
 ```
-poetry run python start.py --list_models
+uv run python start.py --list_models
 ```
 
 the `model_id` is the model id from the [transformerlens model table](https://transformerlensorg.github.io/TransformerLens/generated/model_properties_table.html) and `sae_sets` is the text after the layer number and hyphen in a neuronpedia source ID - for example, if you have a neuronpedia feature at url `http://neuronpedia.org/gpt2-small/0-res-jb/123`, the `0-res-jb` is the source ID, and the `sae_sets` is `res-jb`.
@@ -88,12 +88,15 @@ you can also find neuronpedia source IDs in the saelens [pretrained saes yaml fi
 if you are making changes to the openapi spec (new/updated endpoints) and want to test those changes locally, generate your client and use the following command to point to the local inference client:
 
 ```
-# switch to local inference client
-poetry remove neuronpedia-inference-client && poetry add ../../packages/python-inference-client/
+# switch to local inference client (editable)
+uv add --editable ../../packages/python/neuronpedia-inference-client
 
 # switch back to pypi/production inference client
-poetry remove neuronpedia-inference-client && poetry add neuronpedia-inference-client`
+uv remove neuronpedia-inference-client && uv add neuronpedia-inference-client
 ```
+
+by default `pyproject.toml` already points `neuronpedia-inference-client` at the
+local path via `[tool.uv.sources]`, so `uv sync` uses the local copy out of the box.
 
 ## setup + run - docker
 
@@ -222,7 +225,7 @@ curl -X POST http://127.0.0.1:5002/v1/util/sae-topk-by-decoder-cossim \
 ### steering chat example gemma-2-2b-it (returns dog)
 
 ```
-poetry run python start.py \
+uv run python start.py \
   --model_id gemma-2-2b \
   --override_model_id gemma-2-2b-it \
   --sae_sets gemmascope-res-16k \
@@ -323,7 +326,7 @@ You can override the lens loading with flags (each has a matching env var):
   works).
 
 ```
-poetry run python start.py \
+uv run python start.py \
   --model_id google/gemma-3-4b-pt \
   --model_dtype bfloat16 \
   --sae_dtype bfloat16
@@ -353,7 +356,7 @@ tokenizer's chat template is applied automatically). Here we load the instruct
 model via `--override_model_id`:
 
 ```
-poetry run python start.py \
+uv run python start.py \
   --model_id gemma-3-4b \
   --override_model_id gemma-3-4b-it \
   --model_dtype bfloat16 \

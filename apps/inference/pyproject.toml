@@ -1,48 +1,62 @@
-[tool.poetry]
+[project]
 name = "neuronpedia-inference"
 version = "1.0.0"
 description = "Inference server for Neuronpedia. A more human+AI assisted refactor is probably a good idea."
-authors = ["johnny@neuronpedia.org>"]
+authors = [{ name = "johnny", email = "johnny@neuronpedia.org" }]
 license = "MIT"
 readme = "README.md"
-package-mode = false
-
-[tool.poetry.dependencies]
-python = ">=3.11,<3.14"
-python-dotenv = "^1.0.1"
-numpy = "^1.24"
-psutil = "^5.9.8"
-# copied from transformer-lens
-torch = [
-  { platform = "linux", version = ">=1.10" }, # We can use any torch version on Linux (e.g colab)
-  { platform = "!=linux", version = ">=1.10,!=2.0,!=2.1.0" }, # Pin >=2.1.1 on Apple devices due to known MPS errors on 2.1.0
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "python-dotenv>=1.0.1,<2",
+  "numpy>=1.24,<2",
+  "psutil>=5.9.8,<6",
+  # copied from transformer-lens
+  # We can use any torch version on Linux (e.g colab)
+  "torch>=1.10; sys_platform == 'linux'",
+  # Pin >=2.1.1 on Apple devices due to known MPS errors on 2.1.0
+  "torch>=1.10,!=2.0,!=2.1.0; sys_platform != 'linux'",
+  "transformer-lens",
+  "transformers>=4.57.1,<5",
+  "einops>=0.7.0,<0.8",
+  "pytest>=8.1.1,<9",
+  "huggingface-hub>=0.36.0,<0.37",
+  "huggingface>=0.0.1,<0.0.2",
+  "pandas>=2.2.2,<3",
+  "sae-lens>=6.30.0,<7",
+  "fastapi>=0.115.6,<0.116",
+  "uvicorn>=0.34.0,<0.35",
+  "sentry-sdk[fastapi]>=2.20.0,<3",
+  "nnsight>=0.6.0",
+  "hf-transfer>=0.1.9,<0.2",
+  "nnterp>=1.3.0,<2",
+  "neuronpedia-inference-client",
+  "steerllm",
+  "chatspace",
 ]
-transformer-lens = {git = "https://github.com/hijohnnylin/TransformerLens.git", branch = "temp_branch_version"}
-transformers = "^4.57.1"
-einops = "^0.7.0"
-pytest = "^8.1.1"
-huggingface-hub = "^0.36.0"
-huggingface = "^0.0.1"
-pandas = "^2.2.2"
-sae-lens = "^6.30.0"
-fastapi = "^0.115.6"
-uvicorn = "^0.34.0"
-sentry-sdk = {extras = ["fastapi"], version = "^2.20.0"}
-nnsight = ">=0.6.0"
-hf-transfer = "^0.1.9"
-nnterp = "^1.3.0"
-neuronpedia-inference-client = {path = "../../packages/python/neuronpedia-inference-client"}
-steerllm = {path = "vendor/chatspace/steerllm", develop = true}
-chatspace = {path = "vendor/chatspace", develop = true}
 
-[tool.poetry.group.dev.dependencies]
-# line-profiler = "^4.1.3"
-pytest = "^8.3.1"
-httpx = "^0.28.0"
-coverage = "^7.6.0"
-ruff = "^0.7.4"
-pyright = "^1.1.351"
-pytest-cov = "^6.0.0"
+[dependency-groups]
+dev = [
+  # "line-profiler>=4.1.3,<5",
+  "pytest>=8.3.1,<9",
+  "httpx>=0.28.0,<0.29",
+  "coverage>=7.6.0,<8",
+  "ruff>=0.7.4,<0.8",
+  "pyright>=1.1.351,<2",
+  "pytest-cov>=6.0.0,<7",
+]
+
+[tool.uv]
+# This is an application, not a distributable package (was poetry's
+# `package-mode = false`), so uv installs the dependencies but not the project.
+package = false
+
+[tool.uv.sources]
+transformer-lens = { git = "https://github.com/hijohnnylin/TransformerLens.git", branch = "temp_branch_version" }
+neuronpedia-inference-client = { path = "../../packages/python/neuronpedia-inference-client" }
+# steerllm must match the (non-editable) source declared in vendor/chatspace's
+# own pyproject.toml, otherwise uv reports a conflicting-URL error.
+steerllm = { path = "vendor/chatspace/steerllm" }
+chatspace = { path = "vendor/chatspace", editable = true }
 
 [tool.ruff.lint]
 exclude = ["*.ipynb"]
@@ -72,7 +86,3 @@ reportConstantRedefinition = "none"
 reportUnknownLambdaType = "none"
 reportUnknownParameterType = "none"
 reportPrivateUsage = "none"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"

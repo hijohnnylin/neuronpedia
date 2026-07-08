@@ -2,17 +2,17 @@
 
 # Variables
 PYTHON = python
-POETRY = poetry
-PYTEST = $(POETRY) run pytest
-COVERAGE = $(POETRY) run coverage
-RUFF = $(POETRY) run ruff
+UV = uv
+PYTEST = $(UV) run pytest
+COVERAGE = $(UV) run coverage
+RUFF = $(UV) run ruff
 
 # Targets
 test:
-	$(POETRY) run $(PYTEST) -v --cov=neuronpedia_inference/ --cov-report=term-missing --cov-branch tests
+	$(PYTEST) -v --cov=neuronpedia_inference/ --cov-report=term-missing --cov-branch tests
 
 test-verbose:
-	$(POETRY) run $(PYTEST) -vv --no-header
+	$(PYTEST) -vv --no-header
 
 format:
 	$(RUFF) format .
@@ -23,19 +23,17 @@ check-format:
 	$(RUFF) format --check .
 
 check-type:
-	$(POETRY) run pyright .
+	$(UV) run pyright .
 
 check-ci: check-format check-type test
 
 install:
-	$(POETRY) config virtualenvs.create true
-	$(POETRY) install
+	$(UV) sync --no-dev
 
 install-dev:
-	$(POETRY) config virtualenvs.create true
-	$(POETRY) install --with dev
+	$(UV) sync
 
 all: install-dev format check-format test coverage
 
 run-server:
-	$(POETRY) run python start.py
+	$(UV) run python start.py

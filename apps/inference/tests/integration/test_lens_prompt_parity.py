@@ -9,7 +9,7 @@ meaningful when applied at serve time.
 
 Slow (downloads + runs two models on CPU). Run explicitly with, e.g.:
 
-    cd apps/inference && poetry run pytest tests/integration/test_lens_prompt_parity.py -v
+    cd apps/inference && uv run pytest tests/integration/test_lens_prompt_parity.py -v
 """
 
 from __future__ import annotations
