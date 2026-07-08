@@ -14,6 +14,7 @@ import {
   LENS_MODES,
   LENS_TYPE_ORDER,
   LENS_TYPES,
+  LensChatMessage,
   LensMetaMessage,
   LensTokenMessage,
   LensType,
@@ -77,15 +78,24 @@ const shareSteerSchema = yup.object({
 const shareRequestSchema = yup.object({
   modelId: yup.string().min(1).max(MAX_MODEL_ID_CHARS).required(),
   kind: yup.string().oneOf(['chat', 'completion']).default('chat'),
-  // Full token-id sequence of the run, used to faithfully re-run inference.
-  inputTokenIds: yup.array().of(yup.number().integer().required()).min(1).max(MAX_TOKEN_IDS).required(),
+  // Source of the run — provide exactly one:
+  //   - `prompt` (completion) or `chat` (instruct): the server tokenizes,
+  //     generates `numCompletionTokens`, and stores that fresh run.
+  //   - `inputTokenIds` (advanced): forced decode over an exact sequence (no
+  //     generation), used by the UI to faithfully reproduce the viewed run.
+  // When `inputTokenIds` is present it takes precedence and `prompt`/`chat` (and
+  // `messages`) are treated as display metadata only (backward-compatible path).
+  inputTokenIds: yup.array().of(yup.number().integer().required()).min(1).max(MAX_TOKEN_IDS).optional(),
+  // Chat generation input (instruct), mirrors the `/prompt` endpoint's `chat`.
+  chat: yup.array().of(chatMessageSchema).max(MAX_CHAT_MESSAGES).optional(),
   // Chat-kind shares carry the conversation turns; completion-kind shares carry
-  // the raw prompt text.
+  // the raw prompt text. For the `inputTokenIds` path these are display data;
+  // for the `chat` generation path the turns come from `chat` instead.
   messages: yup.array().of(chatMessageSchema).max(MAX_CHAT_MESSAGES).default([]),
   prompt: yup.string().max(MAX_SHARE_PROMPT_CHARS).default(''),
   topN: yup.number().integer().min(1).max(10).required(),
   temperature: yup.number().min(0).max(2).required(),
-  numCompletionTokens: yup.number().integer().min(0).max(512).required(),
+  numCompletionTokens: yup.number().integer().min(0).max(256).required(),
   // Number of leading prompt tokens (the remainder were generated). Persisted so
   // a reloaded share can mark the prompt→generated boundary; optional for
   // backward-compat.
@@ -130,7 +140,9 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *     description: |
  *       Creates a shareable, permanent snapshot of a [J-lens](https://neuronpedia.org/jlens) run.
  *
- *       The server re-runs inference over the exact `inputTokenIds` (a forced decode, no generation) so the stored read-outs are trusted (computed by us, not the caller) and reproducible. If a steered run is included, its read-outs are re-computed the same way over `steer.inputTokenIds`. The resulting data is gzipped and uploaded to S3, and a share record is created in the database.
+ *       Provide **exactly one** of `prompt` (completion / raw text) or `chat` (instruct / chat-formatted turns) — same input surface as `/api/lens/prompt`. The server tokenizes, generates `numCompletionTokens`, computes the read-outs, gzips the result to S3, and creates a share record. Because the run is computed server-side, the stored data is trusted (not caller-supplied) and the prompt/generated boundary is derived automatically.
+ *
+ *       _Advanced:_ instead of `prompt`/`chat` you may supply `inputTokenIds` to reproduce an exact, pre-tokenized run verbatim (a forced decode, no generation). This is what the JLens UI uses to share exactly the run being viewed. When `inputTokenIds` is present it takes precedence, and `prompt`/`messages` are stored only as display metadata.
  *
  *       Authentication is optional: authenticated shares are attributed to the user, anonymous shares are attributed to an anonymous owner. Requests are rate-limited per IP address per day.
  *     tags:
@@ -143,7 +155,6 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *             type: object
  *             required:
  *               - modelId
- *               - inputTokenIds
  *               - topN
  *               - temperature
  *               - numCompletionTokens
@@ -155,14 +166,14 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                 description: The Neuronpedia model id the run was computed with.
  *                 maxLength: 128
  *                 example: qwen3.6-27b
- *               kind:
+ *               prompt:
  *                 type: string
- *                 description: The run kind. `chat` shares carry the conversation turns; `completion` shares carry the raw prompt text.
- *                 enum: [chat, completion]
- *                 default: chat
- *               messages:
+ *                 description: Raw completion prompt to run and share. Provide exactly one of `prompt` or `chat` (unless `inputTokenIds` is supplied).
+ *                 maxLength: 1024
+ *                 example: "The capital of France is"
+ *               chat:
  *                 type: array
- *                 description: Conversation turns (for `chat`-kind shares).
+ *                 description: Chat-formatted conversation turns to run and share. Provide exactly one of `prompt` or `chat` (unless `inputTokenIds` is supplied).
  *                 maxItems: 200
  *                 items:
  *                   type: object
@@ -176,11 +187,27 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                     content:
  *                       type: string
  *                       maxLength: 10000
- *               prompt:
+ *               kind:
  *                 type: string
- *                 description: Raw prompt text (for `completion`-kind shares).
- *                 maxLength: 1024
- *                 default: ""
+ *                 description: "Advanced. Explicit run kind for the `inputTokenIds` path. For the `prompt`/`chat` path the kind is inferred from the input given."
+ *                 enum: [chat, completion]
+ *                 default: chat
+ *               messages:
+ *                 type: array
+ *                 description: "Advanced. Conversation turns stored for display on the `inputTokenIds` path. For the `chat` generation path, use `chat` instead."
+ *                 maxItems: 200
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - role
+ *                     - content
+ *                   properties:
+ *                     role:
+ *                       type: string
+ *                       enum: [user, assistant, system]
+ *                     content:
+ *                       type: string
+ *                       maxLength: 10000
  *               topN:
  *                 type: integer
  *                 description: Number of top read-out tokens returned per layer per position.
@@ -195,7 +222,7 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                 type: integer
  *                 description: Number of generated tokens in the run.
  *                 minimum: 0
- *                 maximum: 512
+ *                 maximum: 256
  *               activeLensModeTab:
  *                 type: string
  *                 description: The lens display mode tab that was active when sharing.
@@ -231,14 +258,14 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                 description: Optional description for the shared run.
  *               inputTokenIds:
  *                 type: array
- *                 description: "Advanced. Full token-id sequence of the run, used to faithfully re-run inference server-side."
+ *                 description: "Advanced. Exact, pre-tokenized sequence to reproduce verbatim (forced decode, no generation). When provided, takes precedence over `prompt`/`chat` and is the path the JLens UI uses."
  *                 minItems: 1
  *                 maxItems: 4096
  *                 items:
  *                   type: integer
  *               numPromptTokens:
  *                 type: integer
- *                 description: "Advanced. Number of leading prompt tokens (the remainder were generated). Persisted so a reloaded share can mark the prompt/generated boundary."
+ *                 description: "Advanced. Number of leading prompt tokens for the `inputTokenIds` path (the remainder were generated). Ignored on the `prompt`/`chat` path, where it's derived from the run."
  *                 minimum: 0
  *               steer:
  *                 type: object
@@ -291,18 +318,13 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                     items:
  *                       type: integer
  *           example:
- *             modelId: qwen3.6-27b
- *             kind: completion
- *             inputTokenIds: [464, 6722, 315, 9822, 374]
+ *             modelId: gemma-3-12b
  *             prompt: "The capital of France is"
  *             topN: 8
  *             temperature: 0
- *             numCompletionTokens: 0
- *             numPromptTokens: 5
+ *             numCompletionTokens: 3
  *             activeLensModeTab: JACOBIAN_LENS
  *             hideNonWordTokens: true
- *             selectedPositions: [4]
- *             description: "Lens over a capital-city fact"
  *     responses:
  *       200:
  *         description: The shared run was created successfully.
@@ -349,6 +371,24 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
   const userId = request.user?.id ?? null;
 
+  // Determine the run source. `inputTokenIds` (the UI's faithful-reproduction
+  // path) takes precedence; otherwise the server generates from `prompt`/`chat`
+  // like the `/prompt` endpoint. Exactly one of `prompt`/`chat` is required in
+  // the generation path.
+  const hasInputTokenIds = Array.isArray(body.inputTokenIds) && body.inputTokenIds.length > 0;
+  const hasPrompt = typeof body.prompt === 'string' && body.prompt.length > 0;
+  const hasChat = Array.isArray(body.chat) && body.chat.length > 0;
+  if (!hasInputTokenIds && hasPrompt === hasChat) {
+    return NextResponse.json({ error: "Provide exactly one of 'prompt', 'chat', or 'inputTokenIds'" }, { status: 400 });
+  }
+  // For the generation path, the kind follows the input given (chat vs prompt).
+  // For the `inputTokenIds` path, honor the caller's `kind` (backward-compatible).
+  const effectiveKind: 'chat' | 'completion' = hasInputTokenIds
+    ? (body.kind as 'chat' | 'completion')
+    : hasChat
+      ? 'chat'
+      : 'completion';
+
   // Per-IP/day rate limit (mirrors the graph put-request limit).
   const headersList = await headers();
   const forwardedFor = headersList.get('x-forwarded-for');
@@ -367,21 +407,36 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     );
   }
 
-  // Re-run inference server-side over the exact token ids (no generation) so the
-  // stored data is trusted (computed by us, not the user) and reproducible.
+  // Run inference server-side so the stored data is trusted (computed by us, not
+  // the caller) and reproducible. Either a forced decode over the exact token
+  // ids (the UI reproduction path, no generation) or a fresh generation from
+  // `prompt`/`chat` (the simple API path).
   let meta: LensMetaMessage | null;
   let tokens: LensTokenMessage[];
   try {
-    const inferenceResponse = await lensPromptStream(body.modelId, {
-      type: LENS_TYPE_ORDER,
-      input_token_ids: body.inputTokenIds,
-      top_n: body.topN,
-      num_completion_tokens: 0,
-      // Capture the run with the sharer's non-word filter applied, so the stored
-      // blob matches what they were viewing (the share is a frozen snapshot for
-      // this filter; viewers toggle by re-running live).
-      filter_non_word_tokens: body.hideNonWordTokens,
-    });
+    const inferenceResponse = await lensPromptStream(
+      body.modelId,
+      hasInputTokenIds
+        ? {
+            type: LENS_TYPE_ORDER,
+            input_token_ids: body.inputTokenIds,
+            top_n: body.topN,
+            num_completion_tokens: 0,
+            // Capture the run with the sharer's non-word filter applied, so the
+            // stored blob matches what they were viewing (the share is a frozen
+            // snapshot for this filter; viewers toggle by re-running live).
+            filter_non_word_tokens: body.hideNonWordTokens,
+          }
+        : {
+            type: LENS_TYPE_ORDER,
+            prompt: hasChat ? undefined : body.prompt,
+            chat: hasChat ? (body.chat as LensChatMessage[]) : undefined,
+            top_n: body.topN,
+            temperature: body.temperature,
+            num_completion_tokens: body.numCompletionTokens,
+            filter_non_word_tokens: body.hideNonWordTokens,
+          },
+    );
     if (!inferenceResponse.ok || !inferenceResponse.body) {
       const errorBody = await inferenceResponse.json().catch(() => ({ error: inferenceResponse.statusText }));
       return NextResponse.json(
@@ -453,10 +508,17 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
   }
 
+  // Chat turns for display: the `inputTokenIds` path carries them in `messages`
+  // (existing behavior); the `chat` generation path carries them in `chat`.
+  const chatTurns = hasInputTokenIds ? body.messages : (body.chat ?? []);
+  // For the generation path the prompt-token boundary is known from the run's
+  // meta; for the reproduction path honor the caller-supplied value.
+  const resolvedNumPromptTokens = hasInputTokenIds ? (body.numPromptTokens ?? null) : (meta.prompt_len ?? null);
+
   // Assemble the heavy S3 blob (compact, not pretty-printed). The shape depends
   // on the run kind: chat carries the conversation turns, completion the prompt.
   const blob: JlensExport =
-    body.kind === 'completion'
+    effectiveKind === 'completion'
       ? {
           version: 1,
           kind: 'completion',
@@ -472,7 +534,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           kind: 'chat',
           modelId: body.modelId,
           exportedAt: new Date().toISOString(),
-          messages: body.messages.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+          messages: chatTurns.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
           meta,
           tokens,
           steer: steerExport,
@@ -524,7 +586,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     await prisma.jlensShare.create({
       data: {
         id: shareId,
-        kind: body.kind,
+        kind: effectiveKind,
         modelId: body.modelId,
         url,
         description: body.description || null,
@@ -535,7 +597,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         hideNonWordTokens: body.hideNonWordTokens,
         temperature: body.temperature,
         numCompletionTokens: body.numCompletionTokens,
-        numPromptTokens: body.numPromptTokens ?? null,
+        numPromptTokens: resolvedNumPromptTokens,
         steerToken: body.steer?.token ?? null,
         steerType: body.steer?.type ?? null,
         steerLayers: body.steer?.layers ?? [],
