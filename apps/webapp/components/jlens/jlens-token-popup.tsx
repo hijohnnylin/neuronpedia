@@ -9,6 +9,21 @@ import { START_LAYER_FRACTION } from './jlens-panel';
 // "r, g, b" for the per-row occurrence-by-layer mini heatmap stripes.
 const POPUP_BAR_RGB = '100, 116, 139';
 
+// Minimum opacity for a layer cell in the top layer-summary strip when the
+// selected token IS present at that layer (weight > 0). Without a floor, a
+// token whose probability is near 0.00% normalizes to an alpha so close to 0
+// that its color is effectively invisible, even though it occurs there. We keep
+// weight 0 fully transparent (token genuinely absent) and map any nonzero
+// weight into [MIN_BAND_ALPHA, 1] so it always shows while preserving gradient.
+const MIN_BAND_ALPHA = 0.18;
+
+// Opacity for a layer cell in the top layer-summary strip: 0 stays transparent
+// (token absent at that layer); any present-but-tiny weight is lifted to a
+// visible floor so a ~0.00% token's color still shows.
+function bandCellAlpha(weight: number): number {
+  return weight > 0 ? MIN_BAND_ALPHA + (1 - MIN_BAND_ALPHA) * weight : 0;
+}
+
 // Inclusive [minLayer, maxLayer] range of layer NUMBERS to display.
 export type LayerRange = [number, number];
 
@@ -480,26 +495,44 @@ function PositionTokenRow({
 // Per-layer prominence (0..1) of `key` within THIS slice (this token position),
 // normalized against its busiest layer. Uses the predicted probability so the
 // heatmap gradates smoothly across layers (matches the old slider bands).
+//
+// Presence (the token being in a layer's top_tokens) is tracked SEPARATELY from
+// its probability: probabilities can be truncated/rounded to 0.00% upstream, and
+// we still want a present token's band to show. A present layer therefore always
+// gets a strictly-positive weight (normalized prob when we have signal, else a
+// small floor), while an absent layer stays 0 so the band is transparent there.
 function sliceLayerWeights(
   slice: LensTypeSlice,
   layers: number[],
   key: string,
   canonicalOf: Map<string, string>,
 ): number[] {
+  const present: boolean[] = [];
   const probs = layers.map((_, i) => {
     const row = slice.top_tokens[i] ?? [];
     const rowProbs = slice.top_probs[i] ?? [];
     let best = 0;
+    let found = false;
     for (let j = 0; j < row.length; j += 1) {
       const k = normKey(row[j]);
       if ((canonicalOf.get(k) ?? k) === key) {
+        found = true;
         best = Math.max(best, rowProbs[j] ?? 0);
       }
     }
+    present.push(found);
     return best;
   });
   const max = Math.max(0, ...probs);
-  return probs.map((p) => (max > 0 ? p / max : 0));
+  return probs.map((p, i) => {
+    if (!present[i]) {
+      return 0;
+    }
+    const norm = max > 0 ? p / max : 0;
+    // Keep present layers strictly positive so `bandCellAlpha`'s floor renders
+    // them at minimum opacity even when the probability is (or truncates to) 0.
+    return Math.max(norm, Number.MIN_VALUE);
+  });
 }
 
 // A selected sidebar token's heatmap band: a horizontal stripe colored by its
@@ -580,7 +613,7 @@ function LayerSelectorStrip({
                       <span
                         key={i}
                         className="h-full flex-1"
-                        style={{ backgroundColor: `rgba(${band.colorRgb}, ${w})` }}
+                        style={{ backgroundColor: `rgba(${band.colorRgb}, ${bandCellAlpha(w)})` }}
                       />
                     ))}
                   </div>
