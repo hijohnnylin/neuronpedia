@@ -18,6 +18,7 @@ export const featuredStarReleases = [
   'headvis',
   'nla',
   'sae-bench',
+  'jlens',
 ];
 export const betaReleases = ['sparse-circuits'];
 

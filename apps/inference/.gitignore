@@ -180,3 +180,5 @@ logs/
 docker_configs/
 
 ignore_this_test.py
+
+local_scripts/
