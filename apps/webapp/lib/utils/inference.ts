@@ -1006,24 +1006,36 @@ export const lensPromptStream = async (
 
   let lastErrorResponse: Response | null = null;
   let lastError: unknown = null;
-  let anyBusy = false;
+  let firstBusyHost: string | null = null;
 
   // Pass 1: try each host, skipping any that report busy (429) or hard-fail
-  // (connection error / 5xx). Return on the first success or deterministic
-  // client error (4xx).
+  // (connection error / 5xx / 404). Return on the first success or deterministic
+  // client error (other 4xx).
   for (let i = 0; i < hosts.length; i += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop
       const response = await sendRequest(hosts[i], true);
       if (response.status === 429) {
-        anyBusy = true;
+        if (firstBusyHost === null) {
+          firstBusyHost = hosts[i];
+        }
         // Free the connection since we're moving on to the next host.
         void response.body?.cancel();
         // eslint-disable-next-line no-continue
         continue;
       }
-      // Success, or a deterministic client error (4xx) that won't differ across
-      // hosts — return either way. Only 5xx falls through to try another host.
+      // A 404 means this host is unavailable (e.g. the instance went down and
+      // its proxy/gateway returns "Not Found"), not a deterministic client
+      // error — so fall through and try the next host, like a 5xx.
+      if (response.status === 404) {
+        void lastErrorResponse?.body?.cancel();
+        lastErrorResponse = response;
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+      // Success, or a deterministic client error (other 4xx) that won't differ
+      // across hosts — return either way. 5xx (and 404 above) fall through to
+      // try another host.
       if (response.ok || (response.status >= 400 && response.status < 500)) {
         return response;
       }
@@ -1036,12 +1048,14 @@ export const lensPromptStream = async (
   }
 
   // Pass 2: every host was busy and/or hard-failed. If at least one was merely
-  // busy, fall back to queueing on the first host (fail_if_busy=false) so the
+  // busy, fall back to queueing on that busy host (fail_if_busy=false) so the
   // request is still served (matching the previous single-server behavior of
-  // waiting for the lock) rather than rejected.
-  if (anyBusy) {
+  // waiting for the lock) rather than rejected. We queue on a host we know was
+  // reachable-but-busy rather than one that hard-failed (e.g. 404 because it's
+  // down), which would just fail again.
+  if (firstBusyHost !== null) {
     void lastErrorResponse?.body?.cancel();
-    return sendRequest(hosts[0], false);
+    return sendRequest(firstBusyHost, false);
   }
 
   // Every host hard-failed (no busy responses): surface the last failure.

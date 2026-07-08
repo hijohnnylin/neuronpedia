@@ -457,7 +457,18 @@ def _sample_token(logits_row: torch.Tensor, temperature: float) -> int:
     """Pick the next token id from a ``[vocab]`` logit row.
 
     ``temperature == 0`` is greedy (argmax); otherwise temperature sampling.
+
+    Non-finite logits (``nan``/``inf``, e.g. when aggressive steering blows the
+    residual up) are rejected before sampling: ``torch.multinomial`` on a
+    probability tensor containing ``nan``/``inf`` triggers a device-side assert
+    that poisons the process's CUDA context, so we raise a clean error instead.
     """
+    if not torch.isfinite(logits_row).all():
+        raise ValueError(
+            "Non-finite logits during generation (nan/inf) — likely caused by "
+            "steering that is too strong. Reduce the steer strength or the "
+            "number of steered layers."
+        )
     if temperature <= 0:
         return int(logits_row.argmax())
     probs = torch.softmax(logits_row.float() / temperature, dim=-1)
@@ -521,13 +532,38 @@ def _resolve_steer_token_id(index: dict[str, list[int]], token: str) -> int:
     return int(min(ids))
 
 
+def _check_token_id_in_range(token_id: int, vocab_size: int) -> None:
+    """Raise a clear error for a token id outside ``[0, vocab_size)``.
+
+    Guards against indexing the (un)embedding matrix out of bounds, which on a
+    CUDA device raises a device-side assert that corrupts the process's CUDA
+    context (all subsequent CUDA calls then fail until restart).
+    """
+    if not (0 <= token_id < vocab_size):
+        raise ValueError(
+            f"steer token_id {token_id} out of range for unembedding vocab "
+            f"size {vocab_size}"
+        )
+
+
 def _unembed_vector(model, token_id: int) -> torch.Tensor:
-    """Residual-space unembedding direction for ``token_id`` (float32)."""
+    """Residual-space unembedding direction for ``token_id`` (float32).
+
+    ``token_id`` is bounds-checked against the actual unembedding matrix on the
+    host before indexing: an out-of-range id would otherwise trigger a
+    device-side assert that poisons the entire CUDA context for the process.
+    """
     if isinstance(model, HookedTransformer):
-        return model.W_U[:, token_id].detach().float()  # W_U: [d_model, vocab]
+        weight = model.W_U  # W_U: [d_model, vocab]
+        vocab_size = weight.shape[1]
+        _check_token_id_in_range(token_id, vocab_size)
+        return weight[:, token_id].detach().float()
     hf = model._model
     _layers, _norm, head = _hf_decoder_modules(hf)
-    return head.weight[token_id].detach().float()  # lm_head: [vocab, d_model]
+    weight = head.weight  # lm_head: [vocab, d_model]
+    vocab_size = weight.shape[0]
+    _check_token_id_in_range(token_id, vocab_size)
+    return weight[token_id].detach().float()
 
 
 def _build_steer_deltas(
@@ -593,6 +629,14 @@ def _bos_skip_mask(
     return torch.tensor(flags, dtype=torch.bool, device=device).view(1, -1, 1)
 
 
+# Per-layer cap on the additive steering vector, as a fraction of the
+# per-position residual norm. Steering is applied at every selected layer, so
+# the effect compounds; capping each step keeps a strong/multi-layer request
+# from driving the residual (and hence the logits) to inf/nan.
+_MAX_STEER_INJECTION_FRACTION = 1.0
+_STEER_NORM_EPS = 1e-12
+
+
 def _apply_steer(
     tensor: torch.Tensor,
     delta: torch.Tensor,
@@ -606,7 +650,10 @@ def _apply_steer(
     residual (``h <- h - (h.d_hat) d_hat``), fully removing that component
     regardless of ``strength``. Otherwise add ``strength * ||h|| * unit_delta``;
     scaling by the per-position residual norm keeps a given ``strength`` behaving
-    consistently across layers/models (it's a fraction of the residual norm).
+    consistently across layers/models (it's a fraction of the residual norm). The
+    injected vector's norm is additionally capped to
+    ``_MAX_STEER_INJECTION_FRACTION * ||h||`` so a large strength (or steering at
+    many layers, which compounds) can't drive the residual to inf/nan.
 
     ``skip_mask`` (bool, broadcastable to ``[..., seq, 1]``) marks positions to
     leave UNCHANGED (e.g. the BOS token, whose huge attention-sink norm makes the
@@ -621,8 +668,22 @@ def _apply_steer(
         proj = (tensor * d_hat).sum(dim=-1, keepdim=True)
         steered = tensor - proj * d_hat
     else:
+        # The injected vector is ``(strength * ||h||) * d``. Because steering is
+        # applied at every selected layer on that layer's output, the effect
+        # compounds across layers and can blow the residual up to inf/nan.
+        # Cap the injected vector's norm to a fraction of the per-position
+        # residual norm so a large strength (or many steered layers) can't push
+        # the residual arbitrarily far in one step.
         scale = torch.linalg.vector_norm(tensor, dim=-1, keepdim=True)
-        steered = tensor + (strength * scale) * d
+        injected = (strength * scale) * d
+        injected_norm = torch.linalg.vector_norm(injected, dim=-1, keepdim=True)
+        max_norm = _MAX_STEER_INJECTION_FRACTION * scale
+        clamp_factor = torch.where(
+            injected_norm > max_norm,
+            max_norm / injected_norm.clamp_min(_STEER_NORM_EPS),
+            torch.ones_like(injected_norm),
+        )
+        steered = tensor + injected * clamp_factor
     if skip_mask is not None:
         steered = torch.where(skip_mask, tensor, steered)
     return steered
