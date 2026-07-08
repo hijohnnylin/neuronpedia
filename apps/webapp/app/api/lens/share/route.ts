@@ -126,15 +126,15 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  * @swagger
  * /api/lens/share:
  *   post:
- *     summary: JLens - Create a Shareable Run
+ *     summary: Share J-lens Run
  *     description: |
- *       Creates a shareable, permanent snapshot of a [JLens](https://neuronpedia.org/jlens) run.
+ *       Creates a shareable, permanent snapshot of a [J-lens](https://neuronpedia.org/jlens) run.
  *
  *       The server re-runs inference over the exact `inputTokenIds` (a forced decode, no generation) so the stored read-outs are trusted (computed by us, not the caller) and reproducible. If a steered run is included, its read-outs are re-computed the same way over `steer.inputTokenIds`. The resulting data is gzipped and uploaded to S3, and a share record is created in the database.
  *
  *       Authentication is optional: authenticated shares are attributed to the user, anonymous shares are attributed to an anonymous owner. Requests are rate-limited per IP address per day.
  *     tags:
- *       - JLens
+ *       - Jacobian Lens
  *     requestBody:
  *       required: true
  *       content:

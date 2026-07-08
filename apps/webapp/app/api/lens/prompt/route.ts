@@ -107,11 +107,11 @@ const lensPromptRequestSchema = yup.object({
  * @swagger
  * /api/lens/prompt:
  *   post:
- *     summary: JLens - Logit/Jacobian Lens Read-outs
+ *     summary: Run J-lens Over Prompt/Chat
  *     description: |
- *       Runs the Jacobian/Logit lens over a prompt (or chat) and streams the per-position, per-layer top read-out tokens as newline-delimited JSON (NDJSON).
+ *       Runs the Jacobian/Logit lens over a prompt (or chat) and returns the per-position, per-layer top read-out tokens. Results are streamed as newline-delimited JSON (NDJSON) by default, or returned as a single buffered JSON object when `stream: false` (see **Response format** below).
  *
- *       This powers the [JLens](https://neuronpedia.org/jlens) tool. The model is run once and the requested lens types share the same residual stream, so requesting both `LOGIT_LENS` and `JACOBIAN_LENS` is essentially free.
+ *       This powers the [Jacobian Lens](https://neuronpedia.org/jlens) tool. The model is run once and the requested lens types share the same residual stream, so requesting both `LOGIT_LENS` and `JACOBIAN_LENS` is essentially free.
  *
  *       Provide **exactly one** of `prompt` (completion / raw text) or `chat` (instruct / chat-formatted turns). This is all most callers need.
  *
@@ -119,7 +119,7 @@ const lensPromptRequestSchema = yup.object({
  *
  *       **Response format:** By default (`stream: true`) the endpoint responds with `Content-Type: application/x-ndjson` and streams one JSON object per line: a `meta` message describing the run, one `token` message per sequence position (prompt tokens then generated tokens), and finally a `done` message. If an error occurs mid-stream, an `error` message is emitted instead. Set `stream: false` to instead receive a single JSON object `{ meta, tokens, done }` once the run completes.
  *     tags:
- *       - JLens
+ *       - Jacobian Lens
  *     requestBody:
  *       required: true
  *       content:
@@ -259,11 +259,14 @@ const lensPromptRequestSchema = yup.object({
  *                   type: integer
  *           example:
  *             modelId: qwen3.6-27b
- *             prompt: "The capital of France is"
+ *             chat: [
+ *               { role: "user", content: "What is the capital of France? Answer in 1 word." }
+ *             ]
  *             type: [LOGIT_LENS, JACOBIAN_LENS]
  *             topN: 8
  *             temperature: 0
  *             numCompletionTokens: 32
+ *             stream: false
  *     responses:
  *       200:
  *         description: |
