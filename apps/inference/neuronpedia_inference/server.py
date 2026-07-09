@@ -107,6 +107,30 @@ from neuronpedia_inference.utils import checkCudaError
 CHATSPACE_NUM_GPUS = 1
 CHATSPACE_GPU_MEMORY_UTILIZATION = 0.9
 
+# How long to wait before retrying after a HuggingFace 429 (Too Many Requests).
+HF_429_RETRY_WAIT_SECONDS = 60
+
+
+def _is_hf_429_error(exc: BaseException) -> bool:
+    """Return True if `exc` (or anything in its cause/context chain) is a
+    HuggingFace HTTP 429 (Too Many Requests) response.
+
+    HuggingFace downloads raise `requests.exceptions.HTTPError` /
+    `huggingface_hub.utils.HfHubHTTPError`, which carry the originating
+    `requests.Response` on `.response`. We walk the exception chain because the
+    429 is often re-raised as the cause of a higher-level error.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        response = getattr(current, "response", None)
+        status_code = getattr(response, "status_code", None)
+        if status_code == 429:
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
 
 class TextOnlyAutoModelForCausalLM(AutoModelForCausalLM):
     """Loads the text-only causal-LM stack of multimodal (image-text-to-text)
@@ -469,12 +493,28 @@ async def initialize(
         initialized = True
         logger.info("Initialized: %s", initialized)
 
-    try:
-        await asyncio.get_event_loop().run_in_executor(None, load_model_and_sae)
-    except Exception as exc:
-        initialization_error = str(exc)
-        logger.exception("Initialization failed")
-        raise
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            await asyncio.get_event_loop().run_in_executor(None, load_model_and_sae)
+            break
+        except Exception as exc:
+            # HuggingFace sometimes returns 429 (Too Many Requests) while
+            # downloading model/SAE files. Keep retrying indefinitely, waiting a
+            # bit between attempts so we don't hammer the API.
+            if _is_hf_429_error(exc):
+                logger.warning(
+                    "HuggingFace returned 429 (Too Many Requests) during "
+                    "initialization (attempt %d). Retrying in %d seconds...",
+                    attempt,
+                    HF_429_RETRY_WAIT_SECONDS,
+                )
+                await asyncio.sleep(HF_429_RETRY_WAIT_SECONDS)
+                continue
+            initialization_error = str(exc)
+            logger.exception("Initialization failed")
+            raise
 
     # After model is loaded, preload chatspace model if needed
     if args.chatspace and VLLM_AVAILABLE:
