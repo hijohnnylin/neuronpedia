@@ -62,6 +62,29 @@ def _softcap_from_hf_config(hf_config: Any) -> float | None:
     return float(softcap) if softcap is not None else None
 
 
+def _resolve_hf_model_id(model_id: str | None) -> str | None:
+    """Resolve a HuggingFace model id from a (possibly neuronpedia) model id.
+
+    The id passed in may already be a HF id (``google/gemma-2-9b-it``) or a
+    neuronpedia id (``gemma-2-9b-it``). If ``np_model_to_hf.json`` exists at the
+    repo root and contains a mapping for the id, use the mapped HF id; otherwise
+    fall back to the id itself.
+    """
+    if model_id is None:
+        return None
+    try:
+        from neuronpedia_inference.endpoints.lens.lens_loader import (
+            _load_np_to_hf_mapping,
+        )
+
+        mapping = _load_np_to_hf_mapping()
+    except Exception:  # noqa: BLE001 - never let mapping lookup break config load
+        mapping = None
+    if mapping is not None and model_id in mapping:
+        return mapping[model_id]
+    return model_id
+
+
 def _try_get_hf_config(model: Any, hf_model_id: str | None) -> Any | None:
     """Best-effort retrieval of the underlying HuggingFace config.
 
@@ -76,15 +99,16 @@ def _try_get_hf_config(model: Any, hf_model_id: str | None) -> Any | None:
     ):
         return cfg
 
-    if hf_model_id is not None:
+    resolved_id = _resolve_hf_model_id(hf_model_id)
+    if resolved_id is not None:
         try:
             from transformers import AutoConfig
 
-            return AutoConfig.from_pretrained(hf_model_id, trust_remote_code=True)
+            return AutoConfig.from_pretrained(resolved_id, trust_remote_code=True)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Could not load HF config for %s to resolve softcap: %s",
-                hf_model_id,
+                resolved_id,
                 exc,
             )
     return None
