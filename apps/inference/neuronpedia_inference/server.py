@@ -46,6 +46,9 @@ from neuronpedia_inference.endpoints.activation.all import (
 from neuronpedia_inference.endpoints.activation.all_batch import (
     router as activation_all_batch_router,
 )
+from neuronpedia_inference.endpoints.activation.attention import (
+    router as activation_attention_router,
+)
 from neuronpedia_inference.endpoints.activation.single import (
     router as activation_single_router,
 )
@@ -178,6 +181,7 @@ v1_router.include_router(steer_completion_chat_router)
 v1_router.include_router(steer_completion_router)
 v1_router.include_router(activation_single_router)
 v1_router.include_router(activation_single_batch_router)
+v1_router.include_router(activation_attention_router)
 v1_router.include_router(activation_topk_by_token_router)
 v1_router.include_router(activation_topk_by_token_batch_router)
 v1_router.include_router(sae_topk_by_decoder_cossim_router)
@@ -328,6 +332,14 @@ async def initialize(
                     # Qwen3.6) instead of erroring out / pulling in the vision
                     # tower. No-op for plain text models.
                     automodel=TextOnlyAutoModelForCausalLM,
+                    # Expose attention probabilities (forces attn_implementation
+                    # "eager") so the /activation/attention endpoint can read
+                    # per-head attention patterns for custom text. Skip the
+                    # load-time trace validation to avoid dispatching the model
+                    # (and to tolerate hybrid-attention models whose linear-attn
+                    # layers don't produce probabilities).
+                    enable_attention_probs=True,
+                    check_attn_probs_with_trace=False,
                     **nnsight_kwargs,
                 )
             except RecursionError as exc:
