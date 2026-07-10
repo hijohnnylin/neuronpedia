@@ -187,9 +187,9 @@ async def run_batched_generate(
             for i, flag in enumerate(steer_types):
                 if flag == NPSteerType.STEERED:
                     for feature in features:
-                        steering_vector = torch.tensor(feature.steering_vector).to(
-                            activations.device
-                        )
+                        steering_vector = torch.tensor(
+                            feature.steering_vector, dtype=torch.float32
+                        ).to(activations.device)
                         logger.info(f"Steering vector device: {steering_vector.device}")
 
                         if not torch.isfinite(steering_vector).all():

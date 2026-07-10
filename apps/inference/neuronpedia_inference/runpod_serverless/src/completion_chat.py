@@ -159,7 +159,9 @@ def _build_steering_spec(
         else:
             raise ValueError(f"Unsupported hook name: {hook_name}")
 
-        steering_vector = torch.tensor(vector.get("steering_vector", []))
+        steering_vector = torch.tensor(
+            vector.get("steering_vector", []), dtype=torch.float32
+        )
 
         if not torch.isfinite(steering_vector).all():
             raise ValueError("Steering vector contains inf or nan values")

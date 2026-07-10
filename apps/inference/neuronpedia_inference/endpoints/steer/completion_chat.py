@@ -609,9 +609,9 @@ async def run_batched_generate(
                             mask[idx : idx + 2] = 0
                     # Apply steering with the mask
                     for feature in features:
-                        steering_vector = torch.tensor(feature.steering_vector).to(
-                            activations.device
-                        )
+                        steering_vector = torch.tensor(
+                            feature.steering_vector, dtype=torch.float32
+                        ).to(activations.device)
 
                         if not torch.isfinite(steering_vector).all():
                             raise ValueError(
@@ -881,7 +881,9 @@ async def run_batched_generate(
                                     f"Unsupported hook name for chatspace: {hook_name}"
                                 )
 
-                            steering_vector = torch.tensor(feature.steering_vector)
+                            steering_vector = torch.tensor(
+                                feature.steering_vector, dtype=torch.float32
+                            )
 
                             if not torch.isfinite(steering_vector).all():
                                 raise ValueError(
@@ -1273,7 +1275,9 @@ async def run_batched_generate(
                                 f"Unsupported hook name for chatspace: {hook_name}"
                             )
 
-                        steering_vector = torch.tensor(feature.steering_vector)
+                        steering_vector = torch.tensor(
+                            feature.steering_vector, dtype=torch.float32
+                        )
 
                         if not torch.isfinite(steering_vector).all():
                             raise ValueError(
