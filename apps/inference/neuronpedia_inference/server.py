@@ -346,26 +346,66 @@ async def initialize(
             # standardized ``self_attn``. This is a no-op for architectures that
             # don't have a ``linear_attn`` module.
             rename_config = RenameConfig(attn_name=["self_attn", "linear_attn"])
+            hf_model_id = replace_tlens_model_id_with_hf_model_id(model_to_load)
+            # Attention-sink models (e.g. gpt-oss) add a learned per-head sink to
+            # the attention softmax denominator, so their attention probabilities
+            # over the real tokens deliberately do NOT sum to 1. nnterp's
+            # StandardizedTransformer validates that attention probabilities sum
+            # to 1 when enable_attention_probs is set and raises "Attention
+            # probabilities do not sum to 1." otherwise, which aborts loading.
+            # The probabilities are still readable (this is exactly how
+            # compute-head-metrics.py extracts them via eager attention), so for
+            # these models we load with the built-in check disabled but force
+            # eager attention, then re-enable the accessor manually so the
+            # /activation/attention endpoint still works.
+            uses_attention_sinks = "gpt-oss" in hf_model_id.lower()
+            common_kwargs = dict(
+                dtype=STR_TO_DTYPE[config.model_dtype],
+                trust_remote_code=True,
+                rename_config=rename_config,
+                # Load only the text stack of multimodal models (e.g. Qwen3.6)
+                # instead of erroring out / pulling in the vision tower. No-op
+                # for plain text models.
+                automodel=TextOnlyAutoModelForCausalLM,
+                **nnsight_kwargs,
+            )
             try:
-                model = StandardizedTransformer(
-                    replace_tlens_model_id_with_hf_model_id(model_to_load),
-                    dtype=STR_TO_DTYPE[config.model_dtype],
-                    trust_remote_code=True,
-                    rename_config=rename_config,
-                    # Load only the text stack of multimodal models (e.g.
-                    # Qwen3.6) instead of erroring out / pulling in the vision
-                    # tower. No-op for plain text models.
-                    automodel=TextOnlyAutoModelForCausalLM,
-                    # Expose attention probabilities (forces attn_implementation
-                    # "eager") so the /activation/attention endpoint can read
-                    # per-head attention patterns for custom text. Skip the
-                    # load-time trace validation to avoid dispatching the model
-                    # (and to tolerate hybrid-attention models whose linear-attn
-                    # layers don't produce probabilities).
-                    enable_attention_probs=True,
-                    check_attn_probs_with_trace=False,
-                    **nnsight_kwargs,
-                )
+                if uses_attention_sinks:
+                    logger.info(
+                        "Model %s uses attention sinks; loading with eager "
+                        "attention and enabling attention probabilities without "
+                        "nnterp's sum-to-1 check.",
+                        hf_model_id,
+                    )
+                    model = StandardizedTransformer(
+                        hf_model_id,
+                        # Don't let nnterp run its sum-to-1 attention-probs
+                        # validation (which attention-sink models can't pass),
+                        # but still force eager attention so the per-head
+                        # probabilities are computed and readable.
+                        enable_attention_probs=False,
+                        attn_implementation="eager",
+                        **common_kwargs,
+                    )
+                    # Re-enable attention-probability access, bypassing the
+                    # sum-to-1 validation. The accessor's source is already wired
+                    # up during init; only the enabled flag was turned off.
+                    model.attention_probabilities.enabled = True
+                    model.attention_probabilities.initialized_with_enable = True
+                else:
+                    model = StandardizedTransformer(
+                        hf_model_id,
+                        # Expose attention probabilities (forces
+                        # attn_implementation "eager") so the
+                        # /activation/attention endpoint can read per-head
+                        # attention patterns for custom text. Skip the load-time
+                        # trace validation to avoid dispatching the model (and to
+                        # tolerate hybrid-attention models whose linear-attn
+                        # layers don't produce probabilities).
+                        enable_attention_probs=True,
+                        check_attn_probs_with_trace=False,
+                        **common_kwargs,
+                    )
             except RecursionError as exc:
                 raise RuntimeError(
                     "Failed to initialize nnterp StandardizedTransformer due to a recursion error. "
