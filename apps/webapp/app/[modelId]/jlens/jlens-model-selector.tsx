@@ -136,7 +136,7 @@ export default function JlensModelSelector({
   // models at the top as "Featured" (same treatment as the releases dropdown)
   // rather than hiding them.
   const dropdownModelIds = getInferenceEnabledModels()
-    .filter((mId) => mId !== 'llama3.3-70b-it')
+    .filter((mId) => mId !== 'llama3.3-70b-it' && mId !== 'gemma3-27b-it')
     .sort((a, b) => {
       const aIsFeatured = FEATURED_MODEL_IDS.includes(a);
       const bIsFeatured = FEATURED_MODEL_IDS.includes(b);
