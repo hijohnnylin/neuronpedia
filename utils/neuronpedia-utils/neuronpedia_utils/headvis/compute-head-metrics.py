@@ -543,6 +543,50 @@ def get_model_config_value(model: AutoModelForCausalLM, field_name: str) -> Any:
     )
 
 
+# Layer-type markers (as they appear in HF configs' `layer_types`) for token
+# mixers that do NOT return softmax attention weights via output_attentions,
+# e.g. Qwen3-Next / Qwen3.5+ Gated DeltaNet or Mamba-style recurrent blocks.
+# Note: "sliding_attention" and "full_attention" DO return weights, so they are
+# intentionally not listed here.
+NON_ATTENTION_LAYER_MARKERS = ("linear", "mamba", "recurrent", "conv", "delta")
+
+
+def resolve_attention_layer_indices(
+    model: AutoModelForCausalLM, n_layers: int
+) -> list[int]:
+    """Return the global layer indices that emit softmax attention weights.
+
+    Hybrid models (e.g. Qwen3-Next / Qwen3.5+) interleave linear-attention
+    (Gated DeltaNet) layers with full-attention layers. With
+    output_attentions=True, transformers only returns weights for the
+    full-attention layers, so the i-th tensor in output.attentions maps to the
+    i-th *attention* layer, not the i-th model layer. This reads the config's
+    `layer_types` to recover the true global layer index for each returned
+    attention tensor. Dense models (no `layer_types`) map 1:1.
+    """
+    try:
+        layer_types = get_model_config_value(model, "layer_types")
+    except AttributeError:
+        layer_types = None
+
+    if not layer_types:
+        return list(range(n_layers))
+
+    indices = [
+        i
+        for i, layer_type in enumerate(layer_types)
+        if isinstance(layer_type, str)
+        and not any(marker in layer_type.lower() for marker in NON_ATTENTION_LAYER_MARKERS)
+    ]
+    if not indices:
+        raise RuntimeError(
+            "Resolved zero attention layers from config.layer_types="
+            f"{layer_types}. Update NON_ATTENTION_LAYER_MARKERS to match this "
+            "architecture."
+        )
+    return indices
+
+
 def warn_if_low_vram(device: torch.device, min_free_vram_gb: float) -> None:
     if device.type != "cuda":
         print("WARNING: CUDA is not available or not selected; this will be very slow.")
@@ -765,6 +809,7 @@ def compute_attention_metrics_for_batch(
     sparse_topk_per_row: int,
     sparse_threshold: float,
     tokenizer: AutoTokenizer,
+    attention_layer_indices: list[int],
 ) -> tuple[int, int]:
     with torch.inference_mode():
         output = model(
@@ -778,6 +823,14 @@ def compute_attention_metrics_for_batch(
     if attentions is None:
         raise RuntimeError(
             "Model did not return attention weights. Try --attn-implementation eager."
+        )
+    if len(attentions) != len(attention_layer_indices):
+        raise RuntimeError(
+            f"Model returned {len(attentions)} attention tensors but "
+            f"{len(attention_layer_indices)} attention layers were resolved from "
+            "the config. The layer-index mapping would be wrong. Check "
+            "config.layer_types and NON_ATTENTION_LAYER_MARKERS for this "
+            "architecture."
         )
 
     sequence_lengths = attention_mask.sum(dim=1)
@@ -810,7 +863,8 @@ def compute_attention_metrics_for_batch(
     n_heads_runtime = attentions[0].shape[1]
     in_warmup = not sequence_state.boundaries_set
 
-    for layer_idx, attention in enumerate(attentions):
+    for attention_pos, attention in enumerate(attentions):
+        layer_idx = attention_layer_indices[attention_pos]
         layer_attention_float = attention.float()
 
         self_attention_sum[layer_idx] += (
@@ -906,7 +960,8 @@ def compute_attention_metrics_for_batch(
         if induction_queries.numel() == 0:
             continue
 
-        for layer_idx, attention in enumerate(attentions):
+        for attention_pos, attention in enumerate(attentions):
+            layer_idx = attention_layer_indices[attention_pos]
             layer_attention = attention[
                 batch_idx, :, :item_sequence_length, :item_sequence_length
             ]
@@ -1132,12 +1187,12 @@ def write_head_json(
 
 def write_scatter_data(
     output_run_dir: str,
-    n_layers: int,
+    attention_layer_indices: list[int],
     n_heads: int,
     metric_values: dict[str, torch.Tensor],
 ) -> None:
     rows: list[dict[str, Any]] = []
-    for layer in range(n_layers):
+    for layer in attention_layer_indices:
         for head in range(n_heads):
             row: dict[str, Any] = {"layer": layer, "head": head}
             for metric_name in METRIC_NAMES:
@@ -1156,6 +1211,7 @@ def write_run_config_json(
     metrics_config: HeadMetricsConfig,
     n_layers: int,
     n_heads: int,
+    attention_layer_indices: list[int],
     actual_sequences_processed: int,
 ) -> None:
     """Write data/config.json for the HeadVis frontend.
@@ -1163,11 +1219,14 @@ def write_run_config_json(
     Also embeds the original metrics-pipeline config under "pipeline_config"
     so downstream loaders and reproducibility tooling have full provenance.
     """
-    heads = [[layer, head] for layer in range(n_layers) for head in range(n_heads)]
+    heads = [
+        [layer, head] for layer in attention_layer_indices for head in range(n_heads)
+    ]
     pipeline_config = asdict(metrics_config)
     pipeline_config["actual_sequences_processed"] = actual_sequences_processed
     pipeline_config["num_hidden_layers"] = n_layers
     pipeline_config["num_attention_heads"] = n_heads
+    pipeline_config["attention_layer_indices"] = list(attention_layer_indices)
 
     config_payload = {
         "model_name": args.model_name,
@@ -1278,6 +1337,13 @@ def run_head_metrics(
 
     n_layers = get_model_config_value(model, "num_hidden_layers")
     n_heads = get_model_config_value(model, "num_attention_heads")
+    attention_layer_indices = resolve_attention_layer_indices(model, n_layers)
+    if len(attention_layer_indices) != n_layers:
+        print(
+            f"Hybrid architecture detected: {len(attention_layer_indices)} of "
+            f"{n_layers} layers emit softmax attention weights. "
+            f"Attention layer indices: {attention_layer_indices}"
+        )
     accumulator_kwargs = {"device": device, "dtype": torch.float32}
     self_attention_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
     prev_token_sum = torch.zeros(n_layers, n_heads, **accumulator_kwargs)
@@ -1379,6 +1445,7 @@ def run_head_metrics(
                 args.sparse_topk_per_row,
                 args.sparse_threshold,
                 tokenizer,
+                attention_layer_indices,
             )
             prev_token_count += prev_positions_count
             processed_sequences += valid_sequences
@@ -1435,9 +1502,11 @@ def run_head_metrics(
         "induction_score": induction_score,
     }
 
-    write_scatter_data(output_run_dir, n_layers, n_heads, metric_tensors)
+    write_scatter_data(
+        output_run_dir, attention_layer_indices, n_heads, metric_tensors
+    )
 
-    for layer in range(n_layers):
+    for layer in attention_layer_indices:
         for head in range(n_heads):
             counts = sequence_state.histogram_counts[layer, head]
             count = int(sequence_state.activations_per_head_count[layer, head])
@@ -1469,7 +1538,13 @@ def run_head_metrics(
         warmup_size,
     )
     write_run_config_json(
-        output_run_dir, args, metrics_config, n_layers, n_heads, processed_sequences
+        output_run_dir,
+        args,
+        metrics_config,
+        n_layers,
+        n_heads,
+        attention_layer_indices,
+        processed_sequences,
     )
 
     print(f"Wrote HeadVis tree to {output_run_dir}")
