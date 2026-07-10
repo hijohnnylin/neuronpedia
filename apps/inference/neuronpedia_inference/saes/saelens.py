@@ -18,6 +18,13 @@ class SaeLensSAE(BaseSAE):
         loaded_sae.to(device)
         if loaded_sae.cfg.architecture() in ["temporal"]:
             print("Temporal architecture detected, skipping fold_W_dec_norm")
+        elif not getattr(loaded_sae.cfg, "rescale_acts_by_decoder_norm", True):
+            # Folding W_dec_norm is not safe for TopK SAEs when
+            # rescale_acts_by_decoder_norm is False, since it would change which
+            # features are selected in the top-k. Leave the weights as trained.
+            print(
+                "rescale_acts_by_decoder_norm is False, skipping fold_W_dec_norm"
+            )
         else:
             loaded_sae.fold_W_dec_norm()
         loaded_sae.eval()
