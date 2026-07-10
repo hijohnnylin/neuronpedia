@@ -382,6 +382,40 @@ def _encode_raw_text(tokenizer, text: str, prepend_bos: bool) -> list[int]:
     return list(tokenizer(text, add_special_tokens=False)["input_ids"])
 
 
+def _resolve_eos_token_ids(model, tokenizer) -> set[int]:
+    """Collect every token id that should stop generation for this model.
+
+    A single ``tokenizer.eos_token_id`` is not enough for every family: gpt-oss
+    (harmony) ends its assistant turn with ``<|return|>`` (or ``<|call|>`` for a
+    tool call), while its plain ``eos_token`` (``<|endoftext|>``) is never
+    emitted mid-conversation. The model's ``generation_config.eos_token_id``
+    lists all of these (e.g. ``[<|endoftext|>, <|return|>, <|call|>]``), so we
+    union it with the tokenizer's eos. Without this, gpt-oss generation runs
+    past the assistant turn (emitting ``<|return|>`` then continuing) until the
+    completion-token cap. NOTE: harmony's ``<|end|>`` (which closes the
+    *analysis* channel before the *final* channel) is intentionally NOT a stop
+    token — stopping there would truncate the response before its final answer.
+    """
+    ids: set[int] = set()
+
+    def _add(value) -> None:
+        if isinstance(value, bool):
+            return
+        if isinstance(value, int):
+            ids.add(value)
+        elif isinstance(value, list | tuple | set):
+            for item in value:
+                _add(item)
+
+    _add(getattr(tokenizer, "eos_token_id", None))
+    # nnsight/nnterp wrap the HF model as `._model`; TransformerLens has neither
+    # a `._model` nor a `generation_config`, so this is a best-effort lookup.
+    hf = getattr(model, "_model", model)
+    gen_cfg = getattr(hf, "generation_config", None)
+    _add(getattr(gen_cfg, "eos_token_id", None))
+    return ids
+
+
 def _coerce_token_ids(ids) -> list[int]:
     """Normalise the many shapes ``apply_chat_template`` can return into a flat
     ``list[int]``.
@@ -426,6 +460,15 @@ def build_token_ids(model, request: LensPromptRequest) -> list[int]:
             # the template references it, so older templates don't reject it.
             if "preserve_thinking" in chat_template:
                 kwargs["preserve_thinking"] = request.preserve_thinking
+            # gpt-oss (harmony format) has no on/off "thinking" switch — its chat
+            # template controls reasoning via `reasoning_effort` (low/medium/high)
+            # instead of `enable_thinking`. There is no way to fully disable the
+            # analysis (reasoning) channel, so map our boolean thinking flag onto
+            # the lowest / highest effort: disabled -> "low" (minimal reasoning),
+            # enabled -> "high". Only passed when the template references it, so
+            # non-gpt-oss templates are unaffected.
+            if "reasoning_effort" in chat_template:
+                kwargs["reasoning_effort"] = "high" if request.enable_thinking else "low"
             ids = tokenizer.apply_chat_template(
                 messages,
                 tokenize=True,
@@ -816,7 +859,7 @@ def _iter_residuals(
     *,
     num_completion_tokens: int,
     temperature: float,
-    eos_token_id: int | None,
+    eos_token_ids: set[int] | None,
     steer_deltas: dict[int, torch.Tensor] | None = None,
     steer_strength: float = 0.0,
     steer_ablate: bool = False,
@@ -846,7 +889,7 @@ def _iter_residuals(
             union_layers,
             num_completion_tokens=num_completion_tokens,
             temperature=temperature,
-            eos_token_id=eos_token_id,
+            eos_token_ids=eos_token_ids,
             steer_deltas=steer_deltas,
             steer_strength=steer_strength,
             steer_ablate=steer_ablate,
@@ -862,7 +905,7 @@ def _iter_residuals(
             union_layers,
             num_completion_tokens=num_completion_tokens,
             temperature=temperature,
-            eos_token_id=eos_token_id,
+            eos_token_ids=eos_token_ids,
             steer_deltas=steer_deltas,
             steer_strength=steer_strength,
             steer_ablate=steer_ablate,
@@ -884,7 +927,7 @@ def _iter_residuals_tlens(
     *,
     num_completion_tokens: int,
     temperature: float,
-    eos_token_id: int | None,
+    eos_token_ids: set[int] | None,
     steer_deltas: dict[int, torch.Tensor] | None = None,
     steer_strength: float = 0.0,
     steer_ablate: bool = False,
@@ -984,7 +1027,7 @@ def _iter_residuals_tlens(
             True,
             {layer: captures[layer][0, -1] for layer in union_layers},
         )
-        if eos_token_id is not None and next_id == eos_token_id:
+        if eos_token_ids and next_id in eos_token_ids:
             break
         last_logits = logits[0, -1, :]
 
@@ -996,7 +1039,7 @@ def _iter_residuals_hf(
     *,
     num_completion_tokens: int,
     temperature: float,
-    eos_token_id: int | None,
+    eos_token_ids: set[int] | None,
     steer_deltas: dict[int, torch.Tensor] | None = None,
     steer_strength: float = 0.0,
     steer_ablate: bool = False,
@@ -1092,7 +1135,7 @@ def _iter_residuals_hf(
                 True,
                 {layer: captures[layer][0, -1] for layer in union_layers},
             )
-            if eos_token_id is not None and next_id == eos_token_id:
+            if eos_token_ids and next_id in eos_token_ids:
                 break
             last_logits = out.logits[0, -1, :]
     finally:
@@ -1455,7 +1498,7 @@ def _build_messages(
     decode_cache: dict[int, str] = {}
     prompt_len = len(prompt_token_ids)
     union_layers = _union_layers(layers_by_type)
-    eos_token_id = getattr(tokenizer, "eos_token_id", None)
+    eos_token_ids = _resolve_eos_token_ids(model, tokenizer)
     bos_token_id = getattr(tokenizer, "bos_token_id", None)
 
     yield LensMetaMessage(
@@ -1584,7 +1627,7 @@ def _build_messages(
         union_layers,
         num_completion_tokens=request.num_completion_tokens,
         temperature=request.temperature,
-        eos_token_id=eos_token_id,
+        eos_token_ids=eos_token_ids,
         steer_deltas=steer_deltas,
         steer_strength=steer_strength,
         steer_ablate=steer_ablate,
