@@ -731,7 +731,7 @@ export function JlensSteerPanel({
           </div>
         </div>
 
-        {/* Apply the intervention to generated tokens too (default off). */}
+        {/* Apply the intervention to generated tokens too (default on). */}
         <div
           className={`${showAdvanced ? 'flex' : 'hidden'} mb-2 flex-row items-center justify-start gap-x-2.5 ${locked ? 'pointer-events-none opacity-50' : ''}`}
         >

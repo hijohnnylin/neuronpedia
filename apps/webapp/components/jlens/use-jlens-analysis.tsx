@@ -719,7 +719,7 @@ export function useJlensAnalysis({
         ablate: false,
         mode,
         swapToken: '',
-        steerGenerated: false,
+        steerGenerated: true,
       };
       // Enter steer mode with this config, but DON'T run yet — the user presses
       // "Steer" to send the request.

@@ -25,7 +25,7 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
       { shareId: 'cmr1hlmkj0001pt2x8udm0029', displayName: '🤔 Directed Modulation' },
       { shareId: 'cmr2l0fqc000npt2xbku41y8u', displayName: '🕷️ Multi-Hop Reasoning' },
       { shareId: 'cmr1s0uq90009pt2xbk2o3wqr', displayName: '🛜 General Broadcast' },
-      { shareId: 'cmr1vpdne000kpt2x53dc7kqe', displayName: '🔀 Selective Mediation' },
+      { shareId: 'cmrfaefrz0000nw2xaty0eats', displayName: '🔀 Selective Mediation' },
       { shareId: 'cmr33z92d0000dw2xd7972w77', displayName: '🤼 Versus Logit-Lens' },
       // { shareId: 'cmr1jc4nm0006pt2xg8a39vii', displayName: '🇦🇺 Australia' },
       // { shareId: 'cmr1j5ocu0005pt2x2178homz', displayName: '💰 Blackmail' },
