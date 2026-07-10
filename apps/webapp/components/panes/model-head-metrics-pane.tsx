@@ -470,14 +470,18 @@ export default function ModelHeadMetricsPane({
     : null;
 
   const { layerOptions, headIndexOptions } = useMemo(() => {
-    let maxLayer = 0;
+    // Layers can be non-contiguous for hybrid models (e.g. Qwen3-Next / Qwen3.5+),
+    // where only every Nth layer is a full-attention layer with head metrics. Build
+    // the layer list from the layers actually present rather than assuming 0..max.
+    const layersSet = new Set<number>();
     let maxHeadIndex = 0;
     finderMetrics.forEach((metric) => {
-      if (metric.layer > maxLayer) maxLayer = metric.layer;
+      layersSet.add(metric.layer);
       if (metric.headIndex > maxHeadIndex) maxHeadIndex = metric.headIndex;
     });
     return {
-      layerOptions: Array.from({ length: maxLayer + 1 }, (_, i) => i),
+      layerOptions: Array.from(layersSet).sort((a, b) => a - b),
+      // Head indices are dense (num_attention_heads is uniform across layers).
       headIndexOptions: Array.from({ length: maxHeadIndex + 1 }, (_, i) => i),
     };
   }, [finderMetrics]);
@@ -487,7 +491,7 @@ export default function ModelHeadMetricsPane({
   };
 
   const selectHeadIndex = (headIndex: number) => {
-    setSelectedHead((prev) => ({ layer: prev?.layer ?? 0, headIndex }));
+    setSelectedHead((prev) => ({ layer: prev?.layer ?? layerOptions[0] ?? 0, headIndex }));
   };
 
   // Switching models on the head page invalidates the current selection: the new model may not
@@ -761,6 +765,7 @@ export default function ModelHeadMetricsPane({
               defaultModelId={modelId}
               includeHeads
               numHeadLayers={layerOptions.length}
+              headLayers={layerOptions}
               numHeadIndexes={headIndexOptions.length}
               defaultHeadLayer={selectedHead?.layer}
               defaultIndex={selectedHead?.headIndex?.toString()}

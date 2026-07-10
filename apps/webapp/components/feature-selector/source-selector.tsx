@@ -35,6 +35,7 @@ export default function SourceSelector({
   filterToLayerNumber = undefined,
   includeHeads = false,
   numHeadLayers = 0,
+  headLayers = undefined,
   selectedHeadLayer = undefined,
   headLayerChangedCallback,
 }: {
@@ -51,11 +52,17 @@ export default function SourceSelector({
   // When true, injects an "Attention Heads" pseudo-release at the top that lets users pick a layer.
   includeHeads?: boolean;
   numHeadLayers?: number;
+  // Explicit (possibly non-contiguous) list of layers with head data. Falls back
+  // to a contiguous 0..numHeadLayers-1 range when omitted.
+  headLayers?: number[] | undefined;
   selectedHeadLayer?: number | undefined;
   headLayerChangedCallback?: (layer: number) => void;
 }) {
   const isMount = useIsMount();
   const router = useRouter();
+  // Layers offered in the "Attention At Layer" submenu. Prefer an explicit list
+  // (non-contiguous for hybrid models); otherwise fall back to 0..numHeadLayers-1.
+  const headLayerList = headLayers ?? Array.from({ length: numHeadLayers }, (_, i) => i);
   const { getSourceSetsForModelId, releases, getSourceSet, getReleaseForSourceSet } = useGlobalContext();
 
   function getFirstSourceSetForModelId() {
@@ -206,7 +213,7 @@ export default function SourceSelector({
             </DropdownMenu.Label>
             {includeHeads &&
               !MODELS_WITHOUT_HEAD_DATA.includes(modelId) &&
-              (numHeadLayers === 0 ? (
+              (headLayerList.length === 0 ? (
                 // No per-layer metrics available yet: make the row a direct link into the head finder.
                 <button
                   type="button"
@@ -257,7 +264,7 @@ export default function SourceSelector({
                       <DropdownMenu.Label className="sticky top-0 cursor-default border-b border-slate-100 bg-white py-1.5 text-center text-[10px] uppercase text-slate-400">
                         Attention At Layer
                       </DropdownMenu.Label>
-                      {Array.from({ length: numHeadLayers }, (_, i) => i).map((layer) => (
+                      {headLayerList.map((layer) => (
                         <button
                           key={layer}
                           type="button"

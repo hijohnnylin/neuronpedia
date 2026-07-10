@@ -103,6 +103,7 @@ export default function FeatureSelector({
   exclusiveCallback = false,
   includeHeads = false,
   numHeadLayers = 0,
+  headLayers,
   numHeadIndexes = 0,
   defaultHeadLayer,
   showHeadFinderToggle = false,
@@ -130,6 +131,10 @@ export default function FeatureSelector({
   // becomes a head-index dropdown that navigates to /[modelId]/head/[layer]/[index].
   includeHeads?: boolean;
   numHeadLayers?: number;
+  // Explicit list of layers that have head data. Used for hybrid models (e.g.
+  // Qwen3-Next / Qwen3.5+) where attention layers are non-contiguous. When
+  // omitted, the selector falls back to a contiguous 0..numHeadLayers-1 range.
+  headLayers?: number[];
   numHeadIndexes?: number;
   defaultHeadLayer?: number;
   // Shows a "Head Finder" toggle button (only in head mode) to reveal an external head finder UI.
@@ -265,6 +270,7 @@ export default function FeatureSelector({
           filterToPublic={filterToPublic}
           includeHeads={includeHeads}
           numHeadLayers={numHeadLayers}
+          headLayers={headLayers}
           selectedHeadLayer={headLayer}
           headLayerChangedCallback={headLayerChanged}
         />
