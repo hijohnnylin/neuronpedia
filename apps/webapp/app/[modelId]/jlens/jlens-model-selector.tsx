@@ -1,7 +1,9 @@
 'use client';
 
 import { useGlobalContext } from '@/components/provider/global-provider';
+import { compareModelIdsBySize } from '@/lib/utils/general';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { StarFilledIcon } from '@radix-ui/react-icons';
 import { ChevronDownIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { JLENS_DEMOS_BAR_ID } from './jlens-tour-constants';
@@ -17,6 +19,7 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
   {
     modelId: 'qwen3.6-27b',
     displayName: 'Qwen 27B',
+    featured: true,
     demos: [
       { shareId: 'cmr1qav5a0008pt2xhsvp0scq', displayName: '💬 Verbal Report' },
       { shareId: 'cmr1hlmkj0001pt2x8udm0029', displayName: '🤔 Directed Modulation' },
@@ -35,6 +38,7 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
   {
     modelId: 'gemma-3-12b',
     displayName: 'Gemma 12B',
+    featured: true,
     demos: [
       { shareId: 'cmr47wh200000dw2xbls3cm95', displayName: '💬 Verbal Report' },
       { shareId: 'cmr48a0230001dw2x72fe4khn', displayName: '🤔 Directed Modulation' },
@@ -43,18 +47,43 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
       { shareId: 'cmr4dwlm6000004le6mkd3we1', displayName: '🤼 Versus Logit-Lens' },
     ],
   },
-  // {
-  //   modelId: 'llama3.1-8b',
-  //   displayName: 'Llama 8B',
-  //   demos: [
-  //     { shareId: 'cmr00f0lt00048l2xchr5167k', displayName: '🕷️ Multi-Hop Legs' },
-  //     { shareId: 'PLACEHOLDER_LLAMA_2', displayName: '🤖 Some Demo' },
-  //     { shareId: 'PLACEHOLDER_LLAMA_3', displayName: '🤖 Some Demo' },
-  //   ],
-  // },
-] as const satisfies readonly { modelId: string; displayName: string; demos: readonly JlensDemo[] }[];
+  {
+    modelId: 'gemma-3-1b',
+    displayName: 'Gemma 1B',
+    demos: [{ shareId: 'cmre470y20000vf2xaw0xccb9', displayName: '🏛️ Multi-Hop Reasoning' }],
+  },
+  {
+    modelId: 'gemma-3-4b',
+    displayName: 'Gemma 4B',
+    demos: [{ shareId: 'cmreg8wka0000ut2xf5m67mda', displayName: '🕷️ Multi-Hop Reasoning' }],
+  },
+  {
+    modelId: 'gpt-oss-20b',
+    displayName: 'GPT-OSS 20B',
+    demos: [{ shareId: 'cmrehmfir0000t32x8pr1be5q', displayName: '🕷️ Multi-Hop Reasoning' }],
+  },
+  {
+    modelId: 'llama3.1-8b-it',
+    displayName: 'Llama 3.1 8B IT',
+    demos: [{ shareId: 'cmreirhmk0000vc2xfq1697b7', displayName: '🕷️ Multi-Hop Reasoning' }],
+  },
+] as const satisfies readonly {
+  modelId: string;
+  displayName: string;
+  featured?: boolean;
+  demos: readonly JlensDemo[];
+}[];
 
-const PINNED_MODEL_IDS = JLENS_MODEL_TOGGLE_OPTIONS.map((o) => o.modelId) as readonly string[];
+// Models shown with a "Featured" badge and surfaced at the top of the dropdown.
+const FEATURED_MODEL_IDS = JLENS_MODEL_TOGGLE_OPTIONS.filter((o) => 'featured' in o && o.featured).map(
+  (o) => o.modelId,
+) as readonly string[];
+
+// Models that have their own dedicated toggle tab (hardcoded below). When one of
+// these is active, its name shows on the tab, so the dropdown trigger just reads
+// "Models". Any other model (even if it has curated demos) shows its name in the
+// dropdown trigger instead.
+const TAB_MODEL_IDS: readonly string[] = ['qwen3.6-27b', 'gemma-3-12b'];
 
 // Given the model + currently-viewed shareId, return where a "Next demo" button
 // should go: the next demo in that model's curated list, or free chat when on
@@ -75,7 +104,7 @@ export function getNextJlensDemo(
 }
 
 const tabClass = (active: boolean, rounding: string) =>
-  `relative flex h-7 cursor-pointer items-center justify-center border px-2.5 text-[11px] font-medium transition-colors hover:z-20 hover:border-sky-700 hover:bg-sky-100 sm:px-3 ${rounding} ${
+  `relative flex h-7 cursor-pointer items-center justify-center border text-[10px] sm:text-[11px] font-medium transition-colors hover:z-20 hover:border-sky-700 hover:bg-sky-100 sm:px-3 ${rounding} ${
     active ? 'z-10 border-sky-700 bg-sky-700 text-white hover:bg-sky-700' : 'border-slate-200 bg-white text-slate-500'
   }`;
 
@@ -100,12 +129,21 @@ export default function JlensModelSelector({
   const { globalModels, getInferenceEnabledModels } = useGlobalContext();
 
   const currentOption = JLENS_MODEL_TOGGLE_OPTIONS.find((o) => o.modelId === modelId);
-  const isPinned = Boolean(currentOption);
+  const hasDedicatedTab = TAB_MODEL_IDS.includes(modelId);
   const demos: readonly JlensDemo[] = currentOption?.demos ?? [];
 
+  // Show every inference-enabled model in the dropdown, but surface the pinned
+  // models at the top as "Featured" (same treatment as the releases dropdown)
+  // rather than hiding them.
   const dropdownModelIds = getInferenceEnabledModels()
-    .filter((mId) => !PINNED_MODEL_IDS.includes(mId))
-    .sort((a, b) => a.localeCompare(b));
+    .filter((mId) => mId !== 'llama3.3-70b-it')
+    .sort((a, b) => {
+      const aIsFeatured = FEATURED_MODEL_IDS.includes(a);
+      const bIsFeatured = FEATURED_MODEL_IDS.includes(b);
+      if (aIsFeatured && !bIsFeatured) return -1;
+      if (!aIsFeatured && bIsFeatured) return 1;
+      return compareModelIdsBySize(a, b);
+    });
 
   // When switching to a demo, horizontally scroll the active demo button into
   // view within its own scroll container only (no ancestor scrolling, which is
@@ -132,7 +170,7 @@ export default function JlensModelSelector({
           <button
             type="button"
             onClick={() => onModelChange('qwen3.6-27b')}
-            className={tabClass(modelId === 'qwen3.6-27b', 'rounded-l-lg')}
+            className={tabClass(modelId === 'qwen3.6-27b', 'rounded-l-md px-2.5 sm:rounded-l-lg')}
           >
             Qwen <span className="hidden sm:inline sm:px-1">3.6</span> 27B
           </button>
@@ -146,7 +184,7 @@ export default function JlensModelSelector({
           <button
             type="button"
             onClick={() => onModelChange('gemma-3-12b')}
-            className={`-ml-px ${tabClass(modelId === 'gemma-3-12b', 'rounded-r-lg')}`}
+            className={`-ml-px ${tabClass(modelId === 'gemma-3-12b', 'px-2.5')}`}
           >
             Gemma <span className="hidden sm:inline sm:px-1">3</span> 12B
           </button>
@@ -154,19 +192,19 @@ export default function JlensModelSelector({
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className={`relative -ml-px flex hidden w-[130px] min-w-[130px] max-w-[130px] justify-center gap-x-1 sm:w-[132px] sm:min-w-[132px] sm:max-w-[132px] ${tabClass(!isPinned, 'rounded-r-lg')}`}
+                className={`relative -ml-px flex ${!hasDedicatedTab ? 'w-[110px] min-w-[110px] max-w-[110px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[120px]' : 'w-[70px] min-w-[70px] max-w-[70px] sm:w-[90px] sm:min-w-[90px] sm:max-w-[90px]'} justify-center gap-x-1 px-2 text-[10px] ${tabClass(!hasDedicatedTab, 'rounded-r-md sm:rounded-r-lg')}`}
               >
-                <span className="truncate pr-2">
-                  {!isPinned ? (globalModels[modelId]?.displayName ?? modelId) : 'Other Models'}
+                <span className="flex-1 truncate pr-2">
+                  {!hasDedicatedTab ? (globalModels[modelId]?.displayName ?? modelId) : 'Models'}
                 </span>
-                <ChevronDownIcon className="absolute right-2 h-3.5 w-3.5 shrink-0" />
+                <ChevronDownIcon className="absolute right-1 h-3 w-3 shrink-0 sm:right-2 sm:h-3.5 sm:w-3.5" />
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
                 align="center"
                 sideOffset={4}
-                className="z-30 max-h-[400px] w-[160px] overflow-y-auto rounded-md border border-slate-300 bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+                className="z-30 max-h-[400px] w-[200px] overflow-y-auto rounded-md border border-slate-300 bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
               >
                 {dropdownModelIds.length === 0 ? (
                   <div className="px-3 py-2.5 text-[11px] font-normal text-slate-400">No models available</div>
@@ -175,11 +213,16 @@ export default function JlensModelSelector({
                     <DropdownMenu.Item
                       key={mId}
                       onSelect={() => onModelChange(mId)}
-                      className={`flex cursor-pointer flex-col items-start gap-y-0.5 border-b border-b-slate-100 px-3 py-2.5 text-xs focus:outline-none ${
-                        mId === modelId ? 'bg-sky-100 text-sky-700' : 'text-slate-600'
+                      className={`flex cursor-pointer flex-row items-center justify-between gap-x-1.5 border-b border-b-slate-200 px-3 py-2.5 text-xs focus:outline-none ${
+                        mId === modelId ? 'bg-sky-100 text-sky-700' : 'text-slate-500'
                       } hover:bg-slate-100`}
                     >
-                      <span className="font-mono">{globalModels[mId]?.displayNameShort ?? mId}</span>
+                      <span className="font-sans">{globalModels[mId]?.displayNameShort ?? mId}</span>
+                      {FEATURED_MODEL_IDS.includes(mId) && (
+                        <span className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-emerald-600">
+                          <StarFilledIcon className="h-2 w-2" /> Featured
+                        </span>
+                      )}
                     </DropdownMenu.Item>
                   ))
                 )}

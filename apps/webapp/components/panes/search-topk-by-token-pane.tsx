@@ -21,8 +21,8 @@ export default function SearchTopkByTokenPane({
   showResultsInNewPage?: boolean;
 }) {
   return (
-    <div className="flex w-full flex-col items-center">
-      <Card className="w-full bg-white">
+    <div className="flex w-full flex-col items-center overflow-y-hidden sm:h-full">
+      <Card className="w-full overflow-y-hidden bg-white sm:h-full">
         <CardHeader className="w-full pb-3 pt-6">
           <div className="flex w-full flex-row items-center justify-between">
             <CardTitle>Search TopK by Token</CardTitle>

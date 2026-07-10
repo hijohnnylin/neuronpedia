@@ -91,6 +91,7 @@ export const EMBEDDING_PROVIDER = EmbeddingProviderSchema.parse(process.env.EMBE
 // Support Servers
 // Inference Server
 export const USE_LOCALHOST_INFERENCE = process.env.USE_LOCALHOST_INFERENCE === 'true';
+export const LOCALHOST_INFERENCE_HOST_OVERRIDE = process.env.LOCALHOST_INFERENCE_HOST_OVERRIDE || '';
 export const INFERENCE_SERVER_SECRET = process.env.INFERENCE_SERVER_SECRET || '';
 export const INFERENCE_RUNPOD_API_KEY = process.env.INFERENCE_RUNPOD_API_KEY || '';
 

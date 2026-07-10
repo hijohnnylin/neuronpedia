@@ -1,6 +1,7 @@
 'use client';
 
 import { DEFAULT_MODELID } from '@/lib/env';
+import { compareModelIdsBySize } from '@/lib/utils/general';
 import * as Select from '@radix-ui/react-select';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { useGlobalContext } from '../provider/global-provider';
@@ -89,7 +90,7 @@ export default function ModelSelector({
                   if (b === 'circuitgpt-python') {
                     return -1;
                   }
-                  return a.localeCompare(b);
+                  return compareModelIdsBySize(a, b);
                 })
                 .map((mId) => (
                   <Select.Item

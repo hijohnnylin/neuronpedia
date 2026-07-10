@@ -359,7 +359,11 @@ export default function JlensChat({
           completion = d.completion;
         },
       });
-      const generated = stripTurnEnd(completion || liveAssistantText, fmt.turnEndToken);
+      const raw = completion || liveAssistantText;
+      // Harmony (and other custom formats) may need bespoke extraction of the
+      // clean assistant text (e.g. gpt-oss returns analysis + final channels
+      // wrapped in structural tokens); fall back to stripping the turn-end.
+      const generated = fmt.parseCompletion ? fmt.parseCompletion(raw) : stripTurnEnd(raw, fmt.turnEndToken);
       const assistantText = hasPrefill ? prefill + generated : generated;
       setMessages([...nextMessages, { role: 'assistant', content: assistantText }]);
     } catch (err) {
@@ -1158,12 +1162,22 @@ export default function JlensChat({
 
   const hasConversation = messages.length > 0 || tokens.length > 0;
 
+  // Formats with a custom grouper (gpt-oss harmony) may emit more bubbles than
+  // there are chat messages (an injected system turn, and separate analysis /
+  // final assistant channels), so the group index no longer maps 1:1 onto the
+  // `messages` array. Inline editing (which slices `messages` by that index) is
+  // therefore disabled for such formats; copy still works off the bubble's own
+  // rendered text.
+  const supportsInlineEdit = !fmt.groupTokens;
+
   const defaultMessages = (
     <>
       {groupedMessages &&
         groupedMessages.map((group, idx) => {
-          const content = messages[idx]?.content ?? '';
-          if (editingIdx === idx) {
+          const content = supportsInlineEdit
+            ? (messages[idx]?.content ?? '')
+            : group.contentTokens.map((t) => t.token).join('');
+          if (supportsInlineEdit && editingIdx === idx) {
             return (
               <AssistantEditBubble
                 key={idx}
@@ -1193,8 +1207,9 @@ export default function JlensChat({
                       idx,
                       content,
                       copied: copiedMessageIdx === idx,
-                      canEdit: !streaming && !steering && !isEditing,
+                      canEdit: supportsInlineEdit && !streaming && !steering && !isEditing,
                       canCopy: !isEditing,
+                      showEdit: supportsInlineEdit,
                       onCopy: handleCopyMessage,
                       onEdit: group.role === 'user' ? handleEditUserMessage : handleStartAssistantEdit,
                     }

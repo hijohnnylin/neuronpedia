@@ -252,7 +252,7 @@ export default function SteerCompletion({
         showSettingsOnMobile ? 'hidden sm:flex' : 'flex'
       }`}
     >
-      <div className="hidden h-full flex-1 flex-col overflow-y-scroll bg-slate-100 px-5 py-2 pt-28 text-left text-xs text-slate-400 sm:flex">
+      <div className="hidden h-full max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] flex-1 flex-col overflow-y-scroll bg-slate-100 px-5 py-2 pt-28 text-left text-xs text-slate-400 sm:flex sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)]">
         <div className="sticky top-0.5 flex flex-row justify-center uppercase text-white sm:top-0">
           <div className="select-none rounded-full px-5 py-1 text-[10px] font-bold text-slate-600">Normal</div>
         </div>

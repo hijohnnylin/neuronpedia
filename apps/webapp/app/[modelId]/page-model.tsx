@@ -92,7 +92,11 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
       {modelHeadMetrics.length > 0 && (
         <div className="mt-6 w-full max-w-screen-lg">
           <div className="flex w-full flex-col items-center justify-center">
-            <ModelHeadMetricsPane modelId={model.id} metrics={modelHeadMetrics} />
+            <ModelHeadMetricsPane
+              modelId={model.id}
+              metrics={modelHeadMetrics}
+              inferenceEnabled={model.inferenceEnabled}
+            />
           </div>
         </div>
       )}

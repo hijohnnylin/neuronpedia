@@ -64,6 +64,7 @@ export default async function Page(props: { params: Promise<PageParams> }) {
       initialLayer={layer}
       initialHeadIndex={headIndex}
       metrics={modelHeadMetrics}
+      inferenceEnabled={model.inferenceEnabled}
     />
   );
 }

@@ -905,6 +905,71 @@ export const getActivationsTopKByToken = async (
   return result;
 };
 
+export type InferenceAttentionResult = {
+  tokens: string[];
+  attention_indices: number[];
+  attention_values: number[];
+  max_activation: number;
+  seq_len: number;
+};
+
+// Runs custom-text attention for a single (layer, head) on the model's inference
+// server. Attention heads aren't tied to a Source, so we use any model-level host
+// on a supported engine (TransformerLens or NNsight; not nnsight-vllm/chatspace).
+// The /activation/attention endpoint isn't in the generated client, so we call it
+// with a raw fetch (like the lens endpoint).
+export const getAttentionForHead = async (
+  modelId: string,
+  layer: number,
+  headIndex: number,
+  prompt: string,
+): Promise<InferenceAttentionResult> => {
+  let host: string | null = null;
+  if (USE_LOCALHOST_INFERENCE) {
+    host = LOCALHOST_INFERENCE_HOST;
+  } else {
+    for (const engine of [InferenceEngine.TRANSFORMER_LENS, InferenceEngine.NNSIGHT]) {
+      // eslint-disable-next-line no-await-in-loop
+      let hosts = await getAllInstanceHostsForModel(modelId, engine);
+      if (hosts.length === 0) {
+        // eslint-disable-next-line no-await-in-loop
+        hosts = [...new Set(await getAllServerHostsForModel(modelId, engine))];
+      }
+      if (hosts.length > 0) {
+        host = hosts[Math.floor(Math.random() * hosts.length)];
+        break;
+      }
+    }
+  }
+  if (!host) {
+    throw new Error('No inference server host found for this model.');
+  }
+
+  const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
+
+  const response = await fetch(`${host}/v1/activation/attention`, {
+    method: 'POST',
+    cache: 'no-cache',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
+    },
+    body: JSON.stringify({
+      model: transformerLensModelId,
+      prompt,
+      layer,
+      head: headIndex,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    throw new Error(errorBody?.error || `Inference server error (${response.status})`);
+  }
+
+  return (await response.json()) as InferenceAttentionResult;
+};
+
 export const tokenizeText = async (modelId: string, text: string, prependBos: boolean) => {
   const serverHost = await getOneRandomServerHostForModel(modelId);
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);

@@ -1,12 +1,14 @@
 import { prisma } from '@/lib/db';
 import { InferenceEngine, InferenceHostSource, InferenceHostSourceOnSource } from '@prisma/client';
-import { IS_DOCKER_COMPOSE, USE_LOCALHOST_INFERENCE } from '../env';
+import { IS_DOCKER_COMPOSE, LOCALHOST_INFERENCE_HOST_OVERRIDE, USE_LOCALHOST_INFERENCE } from '../env';
 import { getSourceSetNameFromSource } from '../utils/source';
 import { AuthenticatedUser } from '../with-user';
 import { getSourceInferenceHosts } from './source';
 import { userCanAccessModelAndSourceSet } from './userCanAccess';
 
-export const LOCALHOST_INFERENCE_HOST = IS_DOCKER_COMPOSE ? 'http://inference:5002' : 'http://127.0.0.1:5002';
+export const LOCALHOST_INFERENCE_HOST = IS_DOCKER_COMPOSE
+  ? 'http://inference:5002'
+  : LOCALHOST_INFERENCE_HOST_OVERRIDE || 'http://127.0.0.1:5002';
 
 export const createInferenceHostSource = async (input: InferenceHostSource) =>
   prisma.inferenceHostSource.create({

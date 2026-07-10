@@ -94,7 +94,7 @@ async function* generateResponse(
     // eslint-disable-next-line
     const steerCompletionResult = (await steerCompletion(
       body.modelId,
-      steerTypesToRun,
+      [steerType],
       body.prompt,
       body.strength_multiplier,
       body.n_tokens,

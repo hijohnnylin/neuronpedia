@@ -2,6 +2,7 @@
 
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { useEffect, useMemo, useState } from 'react';
+import ReactTextareaAutosize from 'react-textarea-autosize';
 import HeadActivationItem, { HeadSequenceData } from './head-activation-item';
 import { LoadingSquare } from './svg/loading-square';
 
@@ -24,6 +25,7 @@ export default function HeadActivationsList({
   defaultShowLineBreaks = true,
   defaultShowRawTokens = true,
   unbounded = false,
+  inferenceEnabled = false,
 }: {
   sequences: HeadSequenceData[];
   modelId?: string;
@@ -37,11 +39,70 @@ export default function HeadActivationsList({
   defaultShowRawTokens?: boolean;
   // When true, the list grows to its full height (no internal scroll) and lets the page scroll.
   unbounded?: boolean;
+  // When true (model has an inference host), show a custom-text box to run
+  // attention on the user's own input for this head.
+  inferenceEnabled?: boolean;
 }) {
   const [selectedRange, setSelectedRange] = useState(defaultRange);
   const [showLineBreaks, setShowLineBreaks] = useState(defaultShowLineBreaks);
   const [showRawTokens, setShowRawTokens] = useState(defaultShowRawTokens);
   const [maxAttentionMode, setMaxAttentionMode] = useState<'all' | 'keys' | 'queries'>('all');
+
+  // Custom-text attention state. Only used when `inferenceEnabled` and we have a
+  // concrete (modelId, layer, headIndex) to run against.
+  const [customText, setCustomText] = useState('');
+  const [customResult, setCustomResult] = useState<HeadSequenceData | null>(null);
+  const [isRunningCustom, setIsRunningCustom] = useState(false);
+  const [customError, setCustomError] = useState<string | null>(null);
+  const canRunCustom = inferenceEnabled && modelId !== undefined && layer !== undefined && headIndex !== undefined;
+
+  // A head change (new layer/head/model) invalidates any prior custom result.
+  useEffect(() => {
+    setCustomResult(null);
+    setCustomError(null);
+  }, [modelId, layer, headIndex]);
+
+  const runCustom = (textArg?: string) => {
+    if (!canRunCustom) return;
+    const text = textArg !== undefined ? textArg : customText;
+    if (text.trim().length === 0) {
+      setCustomError('Please enter some text.');
+      return;
+    }
+    setIsRunningCustom(true);
+    setCustomError(null);
+    fetch('/api/model/head-attention/get', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modelId, layer, headIndex, text }),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorBody = await res.json().catch(() => null);
+          throw new Error(errorBody?.error || `Failed to run attention (${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data: HeadSequenceData) => {
+        setCustomResult(data);
+        setIsRunningCustom(false);
+      })
+      .catch((error) => {
+        setCustomResult(null);
+        setCustomError(error?.message || 'Failed to run attention');
+        setIsRunningCustom(false);
+      });
+  };
+
+  // Drop a top-sequence's text into the custom field and immediately run it.
+  const copyRemix = (text: string) => {
+    if (!canRunCustom) return;
+    setCustomText(text);
+    runCustom(text);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Discover the intervals present in the data, sorted highest-first.
   // The first (highest) interval is labeled "Top"; the rest use their numeric value.
@@ -99,6 +160,51 @@ export default function HeadActivationsList({
 
   return (
     <div className={`flex w-full flex-col ${unbounded ? '' : 'max-h-[600px] overflow-y-auto overscroll-contain'}`}>
+      {canRunCustom && (
+        <div className="flex w-full flex-col gap-y-1.5 border-b border-slate-200 bg-white px-3 py-2 sm:px-4">
+          <div className="text-[9px] font-medium uppercase text-slate-400">Test Custom Text</div>
+          <div className="flex w-full flex-row items-stretch gap-x-1.5">
+            <ReactTextareaAutosize
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  runCustom();
+                }
+              }}
+              minRows={2}
+              placeholder="Enter custom text to see this head's attention pattern."
+              className="form-input min-h-[38px] flex-1 resize-none rounded border border-slate-300 px-2.5 py-2 font-mono text-[11px] leading-tight text-slate-700 placeholder-slate-400 focus:border-sky-500 focus:outline-0 focus:ring-0"
+            />
+            <button
+              type="button"
+              onClick={() => runCustom()}
+              disabled={isRunningCustom}
+              className="flex w-[54px] min-w-[54px] flex-col items-center justify-center gap-y-0.5 rounded bg-sky-700 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-sky-600 disabled:bg-slate-300 disabled:text-slate-400"
+            >
+              {isRunningCustom ? <LoadingSquare size={16} className="text-white" /> : 'Test'}
+            </button>
+          </div>
+          {customError && <div className="text-[10px] font-medium text-rose-500">{customError}</div>}
+          {customResult && (
+            <div className="mt-1 flex w-full flex-col rounded-md border border-slate-200 bg-slate-50 px-3 pb-3 pt-0 sm:px-4">
+              <HeadActivationItem
+                key={`custom-${modelId}-${layer}-${headIndex}-${showLineBreaks}-${showRawTokens}-${maxAttentionMode}`}
+                sequence={customResult}
+                modelId={modelId}
+                tokensToDisplayAroundMaxActToken={100000}
+                showLineBreaks={showLineBreaks}
+                showRawTokens={showRawTokens}
+                enableExpanding={false}
+                overallMaxActivationValueInList={customResult.maxActivation}
+                overrideTextSize="text-[9.5px] sm:text-[11px]"
+                maxAttentionMode={maxAttentionMode}
+              />
+            </div>
+          )}
+        </div>
+      )}
       {hasLayerHead && (
         <div
           className={`${unbounded ? '' : 'sticky top-0'} z-10 flex flex-row items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1 pt-1.5 text-[11px] font-medium text-slate-600`}
@@ -237,6 +343,7 @@ export default function HeadActivationsList({
                     overallMaxActivationValueInList={overallMaxActivation}
                     overrideTextSize="text-[9.5px] sm:text-[11px]"
                     maxAttentionMode={maxAttentionMode}
+                    onCopyRemix={canRunCustom ? copyRemix : undefined}
                   />
                 </div>
               </div>

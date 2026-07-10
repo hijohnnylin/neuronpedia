@@ -244,6 +244,7 @@ export default function ModelHeadMetricsPane({
   initialLayer,
   initialHeadIndex,
   onHeadChange,
+  inferenceEnabled = false,
 }: {
   modelId: string;
   metrics: ModelHeadMetricsRow[];
@@ -253,6 +254,8 @@ export default function ModelHeadMetricsPane({
   initialHeadIndex?: number;
   // Notified when the selected head changes (head-page mode), e.g. so breadcrumbs can stay in sync.
   onHeadChange?: (head: { modelId: string; layer: number; headIndex: number }) => void;
+  // When true (model has an inference host), enable the per-head custom-text box.
+  inferenceEnabled?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1265,6 +1268,7 @@ export default function ModelHeadMetricsPane({
                 isLoading={isLoadingSequences}
                 errorMessage={sequencesError}
                 unbounded={!showCard}
+                inferenceEnabled={inferenceEnabled}
               />
             ) : (
               <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">

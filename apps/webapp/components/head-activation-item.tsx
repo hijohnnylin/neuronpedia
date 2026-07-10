@@ -7,8 +7,11 @@ import {
   replaceHtmlAnomalies,
 } from '@/lib/utils/activations';
 import { cn } from '@/lib/utils/ui';
+import { Copy } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+
+const HEAD_MAX_COPY_TOKENS = 512;
 
 export type HeadSequenceData = {
   id: string;
@@ -71,6 +74,7 @@ export default function HeadActivationItem({
   className,
   showRawTokens = true,
   maxAttentionMode = 'all',
+  onCopyRemix,
 }: {
   sequence: HeadSequenceData;
   modelId?: string;
@@ -84,6 +88,10 @@ export default function HeadActivationItem({
   className?: string;
   showRawTokens?: boolean;
   maxAttentionMode?: 'all' | 'keys' | 'queries';
+  // When provided, renders a Copy/Remix button that hands the row's text (joined
+  // tokens, truncated around the max-attention token) back to the parent so it
+  // can drop it into the custom-text field and re-run it.
+  onCopyRemix?: (text: string) => void;
 }) {
   const [currentRange, setCurrentRange] = useState(tokensToDisplayAroundMaxActToken);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -599,6 +607,26 @@ export default function HeadActivationItem({
           </div>
         )}
       </div>
+      {onCopyRemix && (
+        <button
+          type="button"
+          className="flex cursor-pointer flex-row items-center rounded bg-slate-100 p-1.5 text-[10px] font-medium text-slate-400 hover:bg-slate-200"
+          title="Copy/Remix in custom text"
+          onClick={(e) => {
+            e.stopPropagation();
+            const { tokens } = sequence;
+            let text = tokens.join('');
+            if (tokens.length > HEAD_MAX_COPY_TOKENS) {
+              const startIndex = Math.max(0, maxActivationTokenIndex - HEAD_MAX_COPY_TOKENS / 2);
+              const endIndex = Math.min(tokens.length, maxActivationTokenIndex + HEAD_MAX_COPY_TOKENS / 2);
+              text = tokens.slice(startIndex, endIndex).join('');
+            }
+            onCopyRemix(text);
+          }}
+        >
+          <Copy className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }
