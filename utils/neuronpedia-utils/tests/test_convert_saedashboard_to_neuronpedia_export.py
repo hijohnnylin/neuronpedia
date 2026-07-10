@@ -9,7 +9,19 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
-import polars as pl
+import pytest
+
+try:
+    import polars as pl
+except ImportError:
+    pl = None
+
+# polars backs only the converter's opt-in --emit-arrow legacy-sidecar mode (default off; the
+# production columnar lane writes/reads Arrow via pyarrow). Tests exercising that mode skip
+# cleanly in environments without polars installed.
+requires_polars = pytest.mark.skipif(
+    pl is None, reason="polars not installed (only needed for the optional --emit-arrow mode)"
+)
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = (
@@ -52,6 +64,7 @@ def test_converter_uses_fallback_creator_id_outside_package_cwd(tmp_path: Path) 
             os.environ["DEFAULT_CREATOR_ID"] = previous_creator_id
 
 
+@requires_polars
 def test_converter_cli_runs_outside_package_cwd(tmp_path: Path) -> None:
     module = _load_converter_module()
 
@@ -98,6 +111,7 @@ def test_converter_cli_runs_outside_package_cwd(tmp_path: Path) -> None:
     assert (expected_export_root / "activations" / "batch-0.arrow").exists()
 
 
+@requires_polars
 def test_converter_cli_prefers_neuronpedia_env_export_root(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -206,6 +220,7 @@ def _sample_batch_data() -> dict[str, object]:
     }
 
 
+@requires_polars
 def test_write_flat_table_rows_arrow_matches_legacy_metadata_row(
     tmp_path: Path,
 ) -> None:
@@ -239,6 +254,7 @@ def test_write_flat_table_rows_arrow_matches_legacy_metadata_row(
     ] == legacy_rows
 
 
+@requires_polars
 def test_write_flat_table_rows_removes_stale_arrow_when_disabled(tmp_path: Path) -> None:
     module = _load_converter_module()
     row = module._normalize_export_row({"id": "gemma-3-1b-it", "layers": 26})
@@ -259,6 +275,7 @@ def test_write_flat_table_rows_removes_stale_arrow_when_disabled(tmp_path: Path)
     assert not stale_batch_arrow.exists()
 
 
+@requires_polars
 def test_process_data_arrow_jsonl_matches_legacy_rows(tmp_path: Path) -> None:
     module = _load_converter_module()
     module.DEFAULT_CREATOR_ID = "test-creator"
@@ -316,6 +333,7 @@ def test_process_data_arrow_jsonl_matches_legacy_rows(tmp_path: Path) -> None:
     ] == arrow_activation_rows
 
 
+@requires_polars
 def test_benchmark_flat_table_write_modes_exposes_pre_db_arrow_timing(
     tmp_path: Path,
 ) -> None:
