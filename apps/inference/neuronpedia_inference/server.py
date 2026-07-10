@@ -26,12 +26,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from nnterp import StandardizedTransformer
-from nnterp.rename_utils import RenameConfig
+from nnterp.rename_utils import AttnProbFunction, RenameConfig, RenamingError
 from transformer_lens import HookedTransformer
 from transformer_lens.hook_points import HookPoint
 
 # from transformer_lens.model_bridge.sources.transformers import boot
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 if VLLM_AVAILABLE:
     from vllm import SamplingParams
@@ -146,6 +146,65 @@ class TextOnlyAutoModelForCausalLM(AutoModelForCausalLM):
     skipping the guard. It behaves identically to ``AutoModelForCausalLM`` for
     plain text models.
     """
+
+
+class HybridAttnProbFunction(AttnProbFunction):
+    """Attention-probability source for hybrid linear/full-attention models
+    (e.g. Qwen3-Next / Qwen3.6) under transformers >= 4.57 (including v5).
+
+    Full-attention layers run ``attn_output, attn_weights = attention_interface(self, ...)``
+    (that call site is unchanged across the transformers v5 attention-dispatch
+    refactor, which only rewrote the *assignment* of ``attention_interface``),
+    and ``eager_attention_forward`` applies ``nn.functional.softmax`` then
+    ``nn.functional.dropout`` — the dropout output is the attention-probability
+    tensor (dropout is a no-op in eval). The interleaved linear-attention
+    (GatedDeltaNet) layers have no such call site, so we raise a clear
+    RenamingError instead of surfacing nnsight's opaque ``AttributeError``.
+    """
+
+    def get_attention_prob_source(
+        self, attention_module, return_module_source: bool = False
+    ):
+        source = attention_module.source
+        if not hasattr(source, "attention_interface_0"):
+            raise RenamingError(
+                "This layer has no softmax attention probabilities "
+                "(hybrid linear-attention layer). Attention patterns are only "
+                "available on full-attention layers of this model."
+            )
+        inner = source.attention_interface_0.source
+        if return_module_source:
+            return inner
+        # eager_attention_forward runs softmax then dropout; prefer the dropout
+        # output (matches nnterp's default), falling back to softmax if a given
+        # implementation omits the dropout call.
+        if hasattr(inner, "nn_functional_dropout_0"):
+            return inner.nn_functional_dropout_0
+        return inner.nn_functional_softmax_0
+
+
+def _model_uses_hybrid_attention(hf_model_id: str) -> bool:
+    """Return True if the model interleaves linear- and full-attention layers.
+
+    Detected via ``config.layer_types`` (e.g. Qwen3-Next / Qwen3.6), which lists
+    ``"linear_attention"`` / ``"full_attention"`` per layer. Such models only
+    expose softmax attention probabilities on their full-attention layers, and
+    nnterp's load-time attention-probability check probes layer 0 (a
+    linear-attention layer here), so that check must be skipped. Best-effort:
+    any failure to read the config returns False (treat as a standard model).
+    """
+    try:
+        cfg = AutoConfig.from_pretrained(hf_model_id, trust_remote_code=True)
+    except Exception:  # noqa: BLE001 - config probe is best-effort
+        return False
+    layer_types = getattr(cfg, "layer_types", None)
+    if not layer_types:
+        text_cfg = getattr(cfg, "text_config", None)
+        layer_types = getattr(text_cfg, "layer_types", None)
+    if not layer_types:
+        return False
+    return "linear_attention" in layer_types and "full_attention" in layer_types
+
 
 # Initialize logging at module level
 initialize_logging()
@@ -337,6 +396,8 @@ async def initialize(
                         i: f"{mem_values[i]}GiB" for i in range(num_gpus)
                     }
                 logger.info("nnsight max_memory: %s", nnsight_kwargs["max_memory"])
+            hf_model_id = replace_tlens_model_id_with_hf_model_id(model_to_load)
+
             # Hybrid-attention models (e.g. Qwen3-Next / Qwen3.6) interleave
             # gated linear-attention layers (module named ``linear_attn``) with
             # full-attention layers (module named ``self_attn``). nnterp only
@@ -345,19 +406,22 @@ async def initialize(
             # ``linear_attn`` as the attention module so every layer exposes a
             # standardized ``self_attn``. This is a no-op for architectures that
             # don't have a ``linear_attn`` module.
-            rename_config = RenameConfig(attn_name=["self_attn", "linear_attn"])
-            hf_model_id = replace_tlens_model_id_with_hf_model_id(model_to_load)
+            uses_hybrid_attention = _model_uses_hybrid_attention(hf_model_id)
+            # For hybrid models, only the full-attention layers expose softmax
+            # probabilities; this source reads them (and raises a clear error on
+            # the interleaved linear-attention layers) rather than surfacing
+            # nnsight's opaque AttributeError from the default source path.
+            rename_config = RenameConfig(
+                attn_name=["self_attn", "linear_attn"],
+                attn_prob_source=(
+                    HybridAttnProbFunction() if uses_hybrid_attention else None
+                ),
+            )
+
             # Attention-sink models (e.g. gpt-oss) add a learned per-head sink to
             # the attention softmax denominator, so their attention probabilities
-            # over the real tokens deliberately do NOT sum to 1. nnterp's
-            # StandardizedTransformer validates that attention probabilities sum
-            # to 1 when enable_attention_probs is set and raises "Attention
-            # probabilities do not sum to 1." otherwise, which aborts loading.
-            # The probabilities are still readable (this is exactly how
-            # compute-head-metrics.py extracts them via eager attention), so for
-            # these models we load with the built-in check disabled but force
-            # eager attention, then re-enable the accessor manually so the
-            # /activation/attention endpoint still works.
+            # over the real tokens deliberately do NOT sum to 1, which fails
+            # nnterp's sum-to-1 validation and aborts loading.
             uses_attention_sinks = "gpt-oss" in hf_model_id.lower()
             common_kwargs = dict(
                 dtype=STR_TO_DTYPE[config.model_dtype],
@@ -370,26 +434,33 @@ async def initialize(
                 **nnsight_kwargs,
             )
             try:
-                if uses_attention_sinks:
+                if uses_attention_sinks or uses_hybrid_attention:
+                    # Neither can pass nnterp's load-time attention-probs check:
+                    # attention-sink models fail the sum-to-1 assertion, and
+                    # hybrid models fail because the check probes layer 0 — a
+                    # linear-attention layer with no softmax probabilities. Load
+                    # with the built-in check disabled but force eager attention
+                    # (so per-head probabilities are still computed and
+                    # readable), then re-enable the accessor manually so the
+                    # /activation/attention endpoint works on the layers that do
+                    # have probabilities.
                     logger.info(
-                        "Model %s uses attention sinks; loading with eager "
-                        "attention and enabling attention probabilities without "
-                        "nnterp's sum-to-1 check.",
+                        "Model %s uses %s; loading with eager attention and "
+                        "enabling attention probabilities without nnterp's "
+                        "load-time check.",
                         hf_model_id,
+                        "attention sinks"
+                        if uses_attention_sinks
+                        else "hybrid linear/full attention",
                     )
                     model = StandardizedTransformer(
                         hf_model_id,
-                        # Don't let nnterp run its sum-to-1 attention-probs
-                        # validation (which attention-sink models can't pass),
-                        # but still force eager attention so the per-head
-                        # probabilities are computed and readable.
                         enable_attention_probs=False,
                         attn_implementation="eager",
                         **common_kwargs,
                     )
-                    # Re-enable attention-probability access, bypassing the
-                    # sum-to-1 validation. The accessor's source is already wired
-                    # up during init; only the enabled flag was turned off.
+                    # The accessor's source is already wired up during init; only
+                    # the enabled flag was turned off. Re-enable it directly.
                     model.attention_probabilities.enabled = True
                     model.attention_probabilities.initialized_with_enable = True
                 else:
@@ -399,9 +470,7 @@ async def initialize(
                         # attn_implementation "eager") so the
                         # /activation/attention endpoint can read per-head
                         # attention patterns for custom text. Skip the load-time
-                        # trace validation to avoid dispatching the model (and to
-                        # tolerate hybrid-attention models whose linear-attn
-                        # layers don't produce probabilities).
+                        # trace validation to avoid dispatching the model.
                         enable_attention_probs=True,
                         check_attn_probs_with_trace=False,
                         **common_kwargs,

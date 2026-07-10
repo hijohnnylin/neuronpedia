@@ -5,6 +5,7 @@ import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 from nnterp import StandardizedTransformer
+from nnterp.rename_utils import RenamingError
 from pydantic import BaseModel
 from transformer_lens import HookedTransformer
 
@@ -123,8 +124,19 @@ async def activation_attention(
                 },
                 status_code=400,
             )
-        with model.trace(tokens):
-            saved = nnsight.save(model.attention_probabilities[request.layer])
+        try:
+            with model.trace(tokens):
+                saved = nnsight.save(model.attention_probabilities[request.layer])
+        except RenamingError as exc:
+            # Hybrid models (e.g. Qwen3.6) only have softmax attention on their
+            # full-attention layers; the interleaved linear-attention layers
+            # have no attention pattern to return.
+            return JSONResponse(
+                content={
+                    "error": f"No attention probabilities for layer {request.layer}: {exc}"
+                },
+                status_code=400,
+            )
         # (batch, n_heads, q, k) -> (q, k)
         attention = saved[0, request.head].float().detach().cpu()
     else:
