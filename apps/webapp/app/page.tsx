@@ -95,11 +95,15 @@ export default async function Page() {
     : undefined;
 
   return (
-    <div className="flex w-full select-none flex-col items-center justify-center bg-slate-100 px-0 pt-5 sm:mt-0 sm:px-0">
+    <div className="flex w-full select-none flex-col items-center justify-center bg-slate-100 px-0 pt-5 dark:bg-slate-950 sm:mt-0 sm:px-0">
       {IS_LOCALHOST && !DEMO_MODE && (
-        <div className="mb-4 flex w-full max-w-screen-sm flex-col items-center justify-center gap-2 rounded-lg border bg-white px-8 py-4 shadow-sm">
-          <div className="text-xs font-bold text-slate-400">You are running a local instance of Neuronpedia.</div>
-          <div className="text-sm text-slate-700">Would you like to go to the Admin panel to import sources/SAEs?</div>
+        <div className="mb-4 flex w-full max-w-screen-sm flex-col items-center justify-center gap-2 rounded-lg border bg-white px-8 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="text-xs font-bold text-slate-400 dark:text-slate-500">
+            You are running a local instance of Neuronpedia.
+          </div>
+          <div className="text-sm text-slate-700 dark:text-slate-300">
+            Would you like to go to the Admin panel to import sources/SAEs?
+          </div>
           <Link href="/admin">
             <Button className="gap-x-2">
               <Computer className="h-4 w-4" /> Admin
@@ -110,11 +114,11 @@ export default async function Page() {
 
       <div className="mb-1 mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:flex-row">
         <div className="flex basis-[55%] flex-col items-center justify-center text-center text-sm sm:text-base">
-          <div className="text-lg font-medium text-slate-800 sm:text-[15px]">
+          <div className="text-lg font-medium text-slate-800 dark:text-slate-200 sm:text-[15px]">
             Neuronpedia is an{' '}
             <a
               href="https://github.com/hijohnnylin/neuronpedia"
-              className="transition-all hover:text-slate-900/70 hover:underline"
+              className="transition-all hover:text-slate-900/70 hover:underline dark:hover:text-slate-100/70"
               target="_blank"
               rel="noreferrer"
             >
@@ -122,7 +126,7 @@ export default async function Page() {
             </a>{' '}
             <CustomTooltip
               trigger={
-                <span className="font-bold text-sky-700 transition-all hover:cursor-default hover:text-sky-600">
+                <span className="font-bold text-sky-700 transition-all hover:cursor-default hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300">
                   interpretability
                 </span>
               }
@@ -132,7 +136,7 @@ export default async function Page() {
             </CustomTooltip>{' '}
             platform.
           </div>
-          <div className="mb-0.5 mt-0 mt-0.5 text-sm font-normal leading-none text-slate-500 sm:text-[12px]">
+          <div className="mb-0.5 mt-0 mt-0.5 text-sm font-normal leading-none text-slate-500 dark:text-slate-400 sm:text-[12px]">
             Explore, visualize, and steer the internals of AI models.
           </div>
           <div className="mt-2 flex hidden flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2 sm:flex-row">
@@ -187,7 +191,7 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="mx-2 mb-2 mt-2 flex w-full max-w-screen-sm flex-col items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-md sm:mb-1 sm:mt-3 sm:rounded-xl">
+      <div className="mx-2 mb-2 mt-2 flex w-full max-w-screen-sm flex-col items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-900 sm:mb-1 sm:mt-3 sm:rounded-xl">
         <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
@@ -202,20 +206,20 @@ export default async function Page() {
           <div className="flex flex-col items-center justify-center gap-x-4 gap-y-0 px-1 pt-1.5 sm:flex-col sm:gap-y-0 sm:px-0 sm:pt-0">
             <div className="flex w-full flex-row items-center justify-center sm:pb-0 sm:pt-0">
               <div className="relative z-0 mb-3 mt-4 flex w-full flex-1 flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-0 sm:mt-2 sm:h-[300px] sm:min-h-[300px] sm:min-w-[900px] sm:max-w-[900px] sm:px-0">
-                <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-14 gap-y-1 overflow-hidden rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-[0_8px_36px_-8px_#444443b3] sm:flex-row sm:gap-y-0 sm:py-0 sm:pl-16">
+                <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-14 gap-y-1 overflow-hidden rounded-3xl bg-[#e5e4df] px-3 py-7 text-center text-slate-600 shadow-[0_8px_36px_-8px_#444443b3] dark:bg-stone-800 dark:text-stone-300 sm:flex-row sm:gap-y-0 sm:py-0 sm:pl-16">
                   {/* <div className="absolute -right-2 -top-0.5" style={{ transform: 'rotate(35deg)' }}>
                     <span className="bg-amber-300 px-3 py-0.5 pl-4 text-[7px] font-medium leading-none text-slate-800">
                       FEATURED
                     </span>
                   </div> */}
-                  <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/20 px-8 py-[6px] text-[11px] font-semibold text-[#262625]/70">
+                  <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#666663]/20 px-8 py-[6px] text-[11px] font-semibold text-[#262625]/70 dark:text-stone-200">
                     Gurnee et al.
                   </div>
                   <div className="content order-2 sm:order-1">
-                    <div className="mt-1 text-[26px] font-bold leading-tight tracking-tight text-[#666663] sm:mt-1 sm:mt-4 sm:whitespace-nowrap sm:px-10 sm:text-[32px] sm:leading-normal">
+                    <div className="mt-1 text-[26px] font-bold leading-tight tracking-tight text-[#666663] dark:text-stone-200 sm:mt-1 sm:mt-4 sm:whitespace-nowrap sm:px-10 sm:text-[32px] sm:leading-normal">
                       Jacobian Lens
                     </div>
-                    <div className="mt-1.5 text-sm font-medium leading-none text-[#666663] sm:mt-0.5 sm:whitespace-nowrap sm:text-[13.5px]">
+                    <div className="mt-1.5 text-sm font-medium leading-none text-[#666663] dark:text-stone-300 sm:mt-0.5 sm:whitespace-nowrap sm:text-[13.5px]">
                       Revealing a Global Workspace in Language Models
                     </div>
 
@@ -312,15 +316,15 @@ export default async function Page() {
 
         <div className="mb-6 flex w-full max-w-screen-2xl flex-col items-center justify-center gap-x-3 sm:mb-10 sm:flex-row sm:px-3">
           <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[320px] sm:max-w-[320px] sm:flex-1 sm:px-0">
-            <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#f3dfe3] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#8f5763]/30 sm:gap-y-0 sm:px-5 sm:py-7">
-              <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#e4c0c7] px-7 py-[6px] text-[11px] font-semibold text-[#8a4a57]">
+            <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#f3dfe3] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#8f5763]/30 dark:bg-rose-950 dark:text-rose-300 sm:gap-y-0 sm:px-5 sm:py-7">
+              <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#e4c0c7] px-7 py-[6px] text-[11px] font-semibold text-[#8a4a57] dark:bg-rose-900 dark:text-rose-200">
                 Fraser-Taliente, Kantamneni, Ong et al.
               </div>
               <div className="content">
                 <div className="mt-2 text-[22px] font-bold leading-snug sm:mt-5 sm:text-[17px]">
-                  <span className="font-bold text-[#b04a5b]">Natural Language Autoencoders</span>
+                  <span className="font-bold text-[#b04a5b] dark:text-rose-300">Natural Language Autoencoders</span>
                 </div>
-                <div className="mt-0.5 text-sm font-medium leading-tight text-[#b04a5b] sm:mt-1 sm:text-[12px]">
+                <div className="mt-0.5 text-sm font-medium leading-tight text-[#b04a5b] dark:text-rose-300 sm:mt-1 sm:text-[12px]">
                   Translate a Model&apos;s Internal Thoughts Into Text
                 </div>
 
@@ -710,27 +714,31 @@ export default async function Page() {
         </a> */}
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center bg-sky-100 py-12 sm:py-16 sm:pt-14">
+      <div className="flex w-full flex-1 flex-col items-center justify-center bg-sky-100 py-12 dark:bg-sky-950 sm:py-16 sm:pt-14">
         <div className="flex max-w-screen-xl flex-1 flex-col items-center gap-x-5 rounded-xl px-2 sm:px-0">
           <div className="flex flex-col text-center">
-            <div className="text-3xl font-black text-sky-800">Releases and Models</div>
-            <div className="mt-3 text-[15px] font-medium leading-relaxed text-sky-800">
+            <div className="text-3xl font-black text-sky-800 dark:text-sky-400">Releases and Models</div>
+            <div className="mt-3 text-[15px] font-medium leading-relaxed text-sky-800 dark:text-sky-300">
               Browse five+ terabytes of activations, explanations, and metadata. <br className="hidden sm:block" />
               Neuronpedia supports probes,{' '}
-              <a href="https://docs.neuronpedia.org/features" className="text-sky-600 underline" target="_blank">
+              <a
+                href="https://docs.neuronpedia.org/features"
+                className="text-sky-600 underline dark:text-sky-400"
+                target="_blank"
+              >
                 latents/features
               </a>
               , custom vectors,{' '}
-              <a href="/axbench" className="text-sky-600 underline" target="_blank">
+              <a href="/axbench" className="text-sky-600 underline dark:text-sky-400" target="_blank">
                 concepts
               </a>
               , and more.
             </div>
           </div>
           <div className="flex w-full flex-1 flex-col gap-x-3 gap-y-3 pt-6 sm:flex-row">
-            <Card className="flex flex-1 flex-col gap-x-3 bg-white">
+            <Card className="flex flex-1 flex-col gap-x-3 bg-white dark:bg-slate-900">
               <CardHeader className="pb-3">
-                <CardTitle className="flex flex-row gap-x-2 text-slate-800">
+                <CardTitle className="flex flex-row gap-x-2 text-slate-800 dark:text-slate-200">
                   <div>Releases</div>
                   <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4" />}>
                     <div className="flex flex-col">
@@ -745,9 +753,9 @@ export default async function Page() {
                 <HomeReleases />
               </CardContent>
             </Card>
-            <Card className="flex flex-1 flex-col gap-x-3 bg-white sm:max-w-[360px]">
+            <Card className="flex flex-1 flex-col gap-x-3 bg-white dark:bg-slate-900 sm:max-w-[360px]">
               <CardHeader className="pb-3">
-                <CardTitle className="flex flex-row gap-x-2 text-slate-800">
+                <CardTitle className="flex flex-row gap-x-2 text-slate-800 dark:text-slate-200">
                   <div>Models</div>
                   <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4" />}>
                     <div className="flex flex-col">
@@ -763,9 +771,9 @@ export default async function Page() {
               </CardContent>
             </Card>
 
-            <Card className="flex flex-1 flex-col gap-x-3 bg-white sm:max-w-[380px]">
+            <Card className="flex flex-1 flex-col gap-x-3 bg-white dark:bg-slate-900 sm:max-w-[380px]">
               <CardHeader className="pb-3">
-                <CardTitle className="flex flex-row gap-x-2 text-slate-800">
+                <CardTitle className="flex flex-row gap-x-2 text-slate-800 dark:text-slate-200">
                   <div>Jump To</div>
                   <CustomTooltip wide trigger={<QuestionMarkCircledIcon className="h-4 w-4" />}>
                     <div className="flex flex-col">
@@ -779,8 +787,10 @@ export default async function Page() {
               </CardHeader>
               <CardContent className="flex flex-1 flex-col items-start justify-start gap-x-3 px-3 pl-6">
                 <JumpToSAE modelId={DEFAULT_MODELID || ''} layer={DEFAULT_SOURCE || ''} modelOnSeparateRow />
-                <div className="mt-4 flex w-full cursor-pointer flex-col items-start justify-start border-t border-b-slate-100 pt-4 text-sm font-medium text-sky-700 outline-none">
-                  <div className="text-[10px] font-medium uppercase text-slate-500">Jump to Feature</div>
+                <div className="mt-4 flex w-full cursor-pointer flex-col items-start justify-start border-t border-b-slate-100 pt-4 text-sm font-medium text-sky-700 outline-none dark:border-b-slate-800 dark:text-sky-400">
+                  <div className="text-[10px] font-medium uppercase text-slate-500 dark:text-slate-400">
+                    Jump to Feature
+                  </div>
                   <FeatureSelector
                     showModel
                     openInNewTab={false}
@@ -793,8 +803,10 @@ export default async function Page() {
                   />
                 </div>
                 {DEFAULT_MODELID && DEFAULT_SOURCE && (
-                  <div className="mt-4 flex w-full flex-col border-t pt-4">
-                    <div className="mb-1 font-sans text-[9px] font-medium uppercase text-slate-500">Jump to Random</div>
+                  <div className="mt-4 flex w-full flex-col border-t pt-4 dark:border-slate-700">
+                    <div className="mb-1 font-sans text-[9px] font-medium uppercase text-slate-500 dark:text-slate-400">
+                      Jump to Random
+                    </div>
                     <RandomFeatureLink modelId={DEFAULT_MODELID || ''} source={DEFAULT_SOURCE || ''} />
                   </div>
                 )}
@@ -804,18 +816,18 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-slate-50 px-2 py-12 sm:px-8 sm:py-16">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-slate-50 px-2 py-12 dark:bg-slate-900 sm:px-8 sm:py-16">
         <div className="flex max-w-screen-xl flex-1 flex-col items-center justify-center gap-x-8 gap-y-8 rounded-xl px-2 sm:flex-row sm:px-0 sm:pb-0">
           <div className="flex flex-col sm:basis-1/3">
-            <div className="text-3xl font-black text-slate-800">Graph</div>
-            <div className="mt-3 text-[15px] font-medium text-slate-700">
+            <div className="text-3xl font-black text-slate-800 dark:text-slate-200">Graph</div>
+            <div className="mt-3 text-[15px] font-medium text-slate-700 dark:text-slate-300">
               Visualize and trace the internal reasoning steps of a model with custom prompts, pioneered by Anthropic
               {`'`}s{' '}
               <a
                 href="https://transformer-circuits.pub/2025/attribution-graphs/methods.html"
                 target="_blank"
                 rel="noreferrer"
-                className="text-sky-600 underline"
+                className="text-sky-600 underline dark:text-sky-400"
               >
                 circuit tracing
               </a>{' '}
@@ -850,7 +862,7 @@ export default async function Page() {
             href="https://www.neuronpedia.org/gemma-2-2b/graph"
             target="_blank"
             rel="noreferrer"
-            className="w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 pt-2 shadow transition-all duration-300 hover:ring-4 hover:ring-blue-400 hover:ring-opacity-50 sm:flex-initial sm:basis-2/3"
+            className="w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 pt-2 shadow transition-all duration-300 hover:ring-4 hover:ring-blue-400 hover:ring-opacity-50 dark:border-slate-700 dark:bg-slate-900 sm:flex-initial sm:basis-2/3"
           >
             <Image
               src="https://neuronpedia.s3.us-east-1.amazonaws.com/site-assets/blog/tracer.png"
@@ -863,11 +875,11 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-sky-100 px-2 py-12 sm:px-8 sm:py-16">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-sky-100 px-2 py-12 dark:bg-sky-950 sm:px-8 sm:py-16">
         <div className="flex max-w-screen-xl flex-1 flex-col items-center justify-center gap-x-8 gap-y-8 rounded-xl px-2 sm:flex-row sm:px-0 sm:pb-0">
           <div className="flex flex-col sm:basis-1/3">
-            <div className="text-3xl font-black text-sky-800">Steer</div>
-            <div className="mt-3 text-[15px] font-medium text-sky-700">
+            <div className="text-3xl font-black text-sky-800 dark:text-sky-400">Steer</div>
+            <div className="mt-3 text-[15px] font-medium text-sky-700 dark:text-sky-300">
               Modify model behavior by steering its activations using latents or custom vectors. Steering supports
               instruct (chat) and reasoning models, and has fully customizable temperature, strength, seed, etc.
             </div>
@@ -888,7 +900,7 @@ export default async function Page() {
             href="https://www.neuronpedia.org/gemma-2-9b-it/steer?saved=cm7cp63af00jx1q952neqg6e5"
             target="_blank"
             rel="noreferrer"
-            className="w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 pt-2 shadow transition-all duration-300 hover:ring-4 hover:ring-blue-400 hover:ring-opacity-50 sm:flex-initial sm:basis-2/3"
+            className="w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 pt-2 shadow transition-all duration-300 hover:ring-4 hover:ring-blue-400 hover:ring-opacity-50 dark:border-slate-700 dark:bg-slate-900 sm:flex-initial sm:basis-2/3"
           >
             <Image
               src="/steering-example.png"
@@ -901,11 +913,11 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-slate-50 px-2 py-12 sm:px-8 sm:py-16">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-slate-50 px-2 py-12 dark:bg-slate-900 sm:px-8 sm:py-16">
         <div className="flex max-w-screen-xl flex-1 flex-col items-center gap-x-8 gap-y-8 rounded-xl px-2 sm:flex-row sm:px-0 sm:pb-0">
           <div className="flex flex-col sm:basis-1/3">
-            <div className="text-3xl font-black text-slate-800">Search</div>
-            <div className="mt-3 text-[15px] font-medium text-slate-700">
+            <div className="text-3xl font-black text-slate-800 dark:text-slate-200">Search</div>
+            <div className="mt-3 text-[15px] font-medium text-slate-700 dark:text-slate-300">
               Search over 50,000,000 latents/vectors, either by semantic similarity to explanation text, or by running
               custom text via inference through a model to find top matches.{' '}
             </div>
@@ -925,9 +937,9 @@ export default async function Page() {
             </div>
           </div>
           <div className="w-full flex-1 sm:flex-initial sm:basis-2/3">
-            <Card className="flex flex-1 flex-col gap-x-3 bg-white">
+            <Card className="flex flex-1 flex-col gap-x-3 bg-white dark:bg-slate-900">
               <CardHeader className="pb-3">
-                <CardTitle className="flex flex-row gap-x-2 text-slate-800">
+                <CardTitle className="flex flex-row gap-x-2 text-slate-800 dark:text-slate-200">
                   <div>Search via Inference</div>
                 </CardTitle>
               </CardHeader>
@@ -941,11 +953,11 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-sky-100 px-2 py-12 sm:px-8 sm:py-16">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-sky-100 px-2 py-12 dark:bg-sky-950 sm:px-8 sm:py-16">
         <div className="flex max-w-screen-xl flex-1 flex-col items-center justify-center gap-x-8 gap-y-8 rounded-xl px-2 sm:flex-row sm:px-0 sm:pb-0">
           <div className="flex flex-col sm:basis-1/3">
-            <div className="text-3xl font-black text-sky-800">API + Libraries</div>
-            <div className="mt-3 text-[15px] font-medium text-sky-700">
+            <div className="text-3xl font-black text-sky-800 dark:text-sky-400">API + Libraries</div>
+            <div className="mt-3 text-[15px] font-medium text-sky-700 dark:text-sky-300">
               Neuronpedia hosts the {`world's first interpretability API (March 2024)`} - and all functionality is
               available by API or Python/TypeScript libraries. Most endpoints have an OpenAPI spec and interactive docs.
             </div>
@@ -962,7 +974,7 @@ export default async function Page() {
             href="/api-doc"
             target="_blank"
             rel="noreferrer"
-            className="w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 pt-2 shadow transition-all duration-300 hover:ring-4 hover:ring-blue-400 hover:ring-opacity-50 sm:flex-initial sm:basis-2/3"
+            className="w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 pt-2 shadow transition-all duration-300 hover:ring-4 hover:ring-blue-400 hover:ring-opacity-50 dark:border-slate-700 dark:bg-slate-900 sm:flex-initial sm:basis-2/3"
           >
             <Image
               src="/search-screenshot.png"
@@ -975,11 +987,11 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-slate-50 px-2 py-12 sm:px-8 sm:py-16">
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-slate-50 px-2 py-12 dark:bg-slate-900 sm:px-8 sm:py-16">
         <div className="flex w-full max-w-screen-xl flex-1 flex-col items-center gap-x-8 gap-y-8 rounded-xl px-2 sm:flex-row sm:px-0 sm:pb-0">
           <div className="flex flex-1 flex-col sm:basis-1/3">
-            <div className="text-3xl font-black text-slate-800">Inspect</div>
-            <div className="mt-3 text-[15px] font-medium text-slate-700">
+            <div className="text-3xl font-black text-slate-800 dark:text-slate-200">Inspect</div>
+            <div className="mt-3 text-[15px] font-medium text-slate-700 dark:text-slate-300">
               Go in depth on each probe/latent/feature with top activations, top logits, activation density, and live
               inference testing. All dashboards have unique links, can be compiled into sharable lists, and supports
               IFrame embedding, as demonstrated here.{' '}
@@ -1005,19 +1017,24 @@ export default async function Page() {
               src="https://neuronpedia.org/gpt2-small/0-res-jb/14057?embed=true&embedexplanation=true&embedplots=true"
               style={{ width: '100%', height: '540px' }}
               scrolling="no"
-              className="overflow-hidden rounded-lg border"
+              className="overflow-hidden rounded-lg border dark:border-slate-700"
             />
           </div>
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center bg-slate-100 sm:flex-row sm:px-10">
+      <div className="flex w-full flex-1 flex-col items-center justify-center bg-slate-100 dark:bg-slate-950 sm:flex-row sm:px-10">
         <div className="flex w-full max-w-screen-xl flex-col items-center justify-center gap-y-5 px-2 py-12 sm:flex-row sm:px-8 sm:py-16">
-          <div className="flex flex-1 flex-col items-center justify-center gap-x-5 bg-slate-100">
-            <div className="text-2xl font-black text-slate-700">Who We Are</div>
-            <div className="mt-3 text-base font-medium leading-normal text-slate-700">
+          <div className="flex flex-1 flex-col items-center justify-center gap-x-5 bg-slate-100 dark:bg-slate-950">
+            <div className="text-2xl font-black text-slate-700 dark:text-slate-200">Who We Are</div>
+            <div className="mt-3 text-base font-medium leading-normal text-slate-700 dark:text-slate-300">
               Neuronpedia was created by{' '}
-              <a href="https://johnnylin.co" target="_blank" rel="noreferrer" className="text-sky-600">
+              <a
+                href="https://johnnylin.co"
+                target="_blank"
+                rel="noreferrer"
+                className="text-sky-600 dark:text-sky-400"
+              >
                 Johnny Lin
               </a>
               , an ex-Apple engineer who previously founded a privacy startup. Neuronpedia is supported by Decode
@@ -1025,8 +1042,8 @@ export default async function Page() {
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col items-center gap-x-5 bg-slate-100 text-left">
-            <div className="text-2xl font-black text-slate-700">Get Involved</div>
+          <div className="flex flex-1 flex-col items-center gap-x-5 bg-slate-100 text-left dark:bg-slate-950">
+            <div className="text-2xl font-black text-slate-700 dark:text-slate-200">Get Involved</div>
             <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-base font-medium leading-snug text-amber-100 sm:mt-3 sm:gap-x-3 sm:gap-y-3">
               <a
                 href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3z9o0hxjl-MDX9pbATO2qESOazNDLpdQ"
@@ -1062,9 +1079,9 @@ export default async function Page() {
         </div>
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center bg-white py-16">
-        <div className="mt-0 text-2xl font-black text-slate-700">Citation</div>
-        <div className="mt-4 flex max-w-[320px] flex-row items-start justify-start overflow-x-scroll text-[10px] font-medium leading-normal text-slate-700 sm:max-w-[100%] sm:text-sm">
+      <div className="flex w-full flex-1 flex-col items-center justify-center bg-white py-16 dark:bg-slate-900">
+        <div className="mt-0 text-2xl font-black text-slate-700 dark:text-slate-200">Citation</div>
+        <div className="mt-4 flex max-w-[320px] flex-row items-start justify-start overflow-x-scroll text-[10px] font-medium leading-normal text-slate-700 dark:text-slate-300 sm:max-w-[100%] sm:text-sm">
           <pre className="flex cursor-text select-text flex-row justify-start whitespace-pre-wrap text-left font-mono">
             {`@misc{neuronpedia,
     title = {Neuronpedia: Interactive Reference and Tooling for Analyzing Neural Networks},
