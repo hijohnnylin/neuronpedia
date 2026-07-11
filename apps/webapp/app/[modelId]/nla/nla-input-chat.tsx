@@ -591,11 +591,16 @@ export default function NLAInputChat() {
     // RMSE = worse reconstruction, so "low confidence" is `>= threshold`.
     const isLowConfidence = chipScore !== null && chipScore >= CONFIDENCE_THRESHOLD;
     const cannotAdd = !isInSelection && selectionLimitReached;
-    // The slate sweep keeps animating until we have a score: it covers
-    // both "not yet started / mid-explain" (paired with the amber bg) and
-    // the brief "explained but not scored" window (paired with the white
-    // bg, so the chip clearly reads as "explanation done, awaiting score").
-    const showLoadingSweep = !isScored && (chipIsGenerating || isExplained);
+    // The slate sweep animates while work is still outstanding: during
+    // generation (amber bg), and during the brief "explanation streamed in
+    // but the final result event hasn't landed yet" window (white bg —
+    // reads as "explanation done, awaiting score"). The score is delivered
+    // bundled in the final result event, so once `result` arrives there is
+    // nothing left to wait for and the sweep stops — even when `mse` is
+    // null (e.g. the reconstructor/scoring is disabled server-side).
+    // Keying this on `isScored` instead would leave the sweep running
+    // forever whenever scoring is off.
+    const showLoadingSweep = chipIsGenerating || (isExplained && !result);
     const isExplanationSearchHit = explanationSearchActive && explanationSearchMatchSet.has(tok.position);
 
     let colorClass: string;

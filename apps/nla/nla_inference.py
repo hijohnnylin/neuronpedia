@@ -143,16 +143,72 @@ def resolve_checkpoint_path(model_path: str) -> str:
       - HF hub ID like 'kitft/nla-qwen2.5-7b-actor-step2000'
     """
     if Path(model_path).is_dir():
+        _sanitize_tokenizer_config(model_path)
         return model_path
     # Treat as HF hub ID — snapshot_download caches locally.
     # Skip Meta's `original/consolidated.*.pth` shards: these are duplicates of
     # the HF-format `*.safetensors` weights we actually load, but ~17.6 GB each
     # (e.g. 8 × 17.6 GB = ~140 GB extra for a Llama-3.x-70B repo).
     print(f"[NLA] Downloading {model_path} from HuggingFace Hub...")
-    return snapshot_download(
+    local_path = snapshot_download(
         model_path,
         ignore_patterns=["original/*", "consolidated.*"],
     )
+    _sanitize_tokenizer_config(local_path)
+    return local_path
+
+
+def _sanitize_tokenizer_config(local_path: str) -> None:
+    """Fix a malformed ``extra_special_tokens`` list in ``tokenizer_config.json``.
+
+    Some NLA checkpoints (e.g. dormantx/Qwen2.5-1.5B-NLA-*) were saved with
+    ``extra_special_tokens`` as a **list** of token strings. transformers >=
+    4.49 expects a ``dict`` and calls ``.keys()`` on it, so loading crashes
+    with ``AttributeError: 'list' object has no attribute 'keys'``. This bites
+    both our own ``AutoTokenizer.from_pretrained`` and the tokenizer that
+    ``sgl.Engine`` loads in its subprocess from the same ``model_path``.
+
+    We rewrite the config in place: move the stray tokens into
+    ``additional_special_tokens`` (where standard Qwen2.5 tokenizers keep them)
+    and reset ``extra_special_tokens`` to an empty dict. No-op for well-formed
+    configs. HF cache blobs are symlinked, so we replace the symlink with a
+    real file to avoid mutating the shared blob store.
+    """
+    cfg_path = Path(local_path) / "tokenizer_config.json"
+    if not cfg_path.is_file():
+        return
+    try:
+        cfg = json.loads(cfg_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return
+
+    extra = cfg.get("extra_special_tokens")
+    if not isinstance(extra, list):
+        return
+
+    existing = cfg.get("additional_special_tokens") or []
+    if not isinstance(existing, list):
+        existing = []
+    merged = existing + [t for t in extra if t not in existing]
+    cfg["additional_special_tokens"] = merged
+    cfg["extra_special_tokens"] = {}
+
+    print(
+        f"[NLA] Sanitizing malformed 'extra_special_tokens' (list) in {cfg_path}: "
+        "moving tokens to 'additional_special_tokens'."
+    )
+    # Replace the symlink (if any) with a fresh regular file so we don't clobber
+    # the content-addressed blob shared across snapshots.
+    if cfg_path.is_symlink():
+        cfg_path.unlink()
+    cfg_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2))
+
+
+def _load_tokenizer(local_path: str) -> Any:
+    """Load a tokenizer, repairing a malformed ``extra_special_tokens`` config
+    on disk first (see :func:`_sanitize_tokenizer_config`)."""
+    _sanitize_tokenizer_config(local_path)
+    return AutoTokenizer.from_pretrained(local_path, trust_remote_code=True)
 
 
 def make_nla_config(
@@ -439,9 +495,7 @@ class NLAClient:
         # Resolve HF hub path -> local dir
         local_path = resolve_checkpoint_path(verbalizer_model_path)
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            local_path, trust_remote_code=True
-        )
+        self.tokenizer = _load_tokenizer(local_path)
 
         # Load or use provided NLA config
         if nla_config is not None:
@@ -667,6 +721,22 @@ class NLAClient:
             f" finish_reason={finish!r} completion_tokens={ctoks} prompt_tokens={ptoks}"
         )
 
+    def _strip_special_tokens(self, text: str) -> str:
+        """Remove the tokenizer's special tokens (e.g. ``<|im_end|>``,
+        ``<|endoftext|>``) from ``text`` and trim surrounding whitespace.
+
+        Used for verbalizers that don't wrap their output in
+        ``<explanation>`` tags: generation runs with
+        ``skip_special_tokens=False`` (to preserve the ``</explanation>`` stop
+        string for tag-style models), so the chat EOS ends up embedded in the
+        raw text and must be stripped before the description is returned.
+        """
+        specials = getattr(self.tokenizer, "all_special_tokens", None) or []
+        # Longest-first so multi-char tokens are removed before any substrings.
+        for tok in sorted((t for t in specials if t), key=len, reverse=True):
+            text = text.replace(tok, "")
+        return text.strip()
+
     def _extract_text(
         self,
         out: dict,
@@ -681,11 +751,18 @@ class NLAClient:
         meta_summary = self._summarize_meta(out)
         m = EXPLANATION_RE.search(text)
         if m is None:
+            # Some verbalizers (e.g. the Qwen2.5-1.5B chat-format NLA models)
+            # aren't trained on the <explanation>…</explanation> schema — they
+            # emit a plain sentence terminated by the chat EOS. Generation is
+            # kept as raw text with `skip_special_tokens=False` (so the
+            # </explanation> stop string survives for tag-style models), which
+            # leaves the trailing `<|im_end|>` / `<|endoftext|>` visible here.
+            # Strip special tokens so they don't leak into the description.
             print(
                 f"[NLAClient] WARNING: no <explanation> opening tag.{ctx}"
                 f"{meta_summary} Raw[:200]={text[:200]!r}"
             )
-            return text
+            return self._strip_special_tokens(text)
         body = m.group(1).strip()
         if "</explanation>" not in m.group(0):
             # If sglang's `</explanation>` stop-string matched, the model
@@ -1110,9 +1187,7 @@ class NLAReconstructor:
                 reconstructor_prompt_template or DEFAULT_RECONSTRUCTOR_PROMPT_TEMPLATE
             )
 
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            local_path, trust_remote_code=True
-        )
+        self.tokenizer = _load_tokenizer(local_path)
 
         # BOS invariant: training tokenized reconstructor prompts with
         # add_special_tokens=True (reward.py, nla_generate.py). For Gemma/Llama
@@ -1178,10 +1253,17 @@ class NLAReconstructor:
         elif not hasattr(self, "mse_scale"):
             self.mse_scale = math.sqrt(d)
 
-        self.value_head = torch.nn.Linear(d, d, bias=False, dtype=dtype)
         head_path = checkpoint_dir / "value_head.safetensors"
         assert head_path.exists(), f"no value_head.safetensors at {checkpoint_dir!r}."
-        self.value_head.load_state_dict(load_file(str(head_path)))
+        head_sd = load_file(str(head_path))
+        # Some reconstructor checkpoints train the value head WITH a bias term
+        # (e.g. dormantx/Qwen2.5-1.5B-NLA-L18-ar), others without. Match the
+        # Linear to whatever the checkpoint actually stored so load_state_dict
+        # doesn't reject an unexpected/missing "bias" key.
+        self.value_head = torch.nn.Linear(
+            d, d, bias="bias" in head_sd, dtype=dtype
+        )
+        self.value_head.load_state_dict(head_sd)
 
         self.fp8 = fp8
         self.int4 = int4
@@ -1459,9 +1541,7 @@ class SourceModel:
             f"[SourceModel] Loading {model_path} "
             f"(layer {layer_index}, truncate={truncate}, fp8={fp8})..."
         )
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            local_path, trust_remote_code=True
-        )
+        self.tokenizer = _load_tokenizer(local_path)
         # Load on CPU first so truncation drops weights BEFORE the .to(device)
         # transfer — avoids the transient GPU memory spike of loading the full
         # model onto GPU only to immediately free 25%+ of it.
