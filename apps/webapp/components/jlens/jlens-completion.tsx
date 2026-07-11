@@ -29,7 +29,8 @@ import {
   JlensExportCompletion,
   JlensExportSteer,
 } from './jlens-export';
-import { LensModeSetContext } from './jlens-lens-mode';
+import JlensField, { JlensLeftView, JlensViewToggle } from './jlens-field';
+import { LensModeSetContext, lensTypesForMode } from './jlens-lens-mode';
 import { JlensShareDialog } from './jlens-share-dialog';
 import { DefaultOutputHeader, SteerOutputHeader } from './jlens-steer-panel';
 import { runLensStream as baseRunLensStream, RunLensStreamParams } from './jlens-stream';
@@ -155,6 +156,11 @@ export default function JlensCompletion({
     handleTokenHover,
     bandsByPosition,
   } = analysis;
+
+  // Whether the left panel shows the token transcript or the animated field.
+  const [leftView, setLeftView] = useState<JlensLeftView>('default');
+  // DIFF has no single read-out direction; fall back to its first lens type.
+  const fieldLensType = lensTypesForMode(lensMode)[0];
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -948,41 +954,51 @@ export default function JlensCompletion({
                   </div>
                 )}
 
-                <div
-                  ref={scrollRef}
-                  onPointerDown={steering ? undefined : onChatPointerDown}
-                  className={`mt-2 min-h-0 flex-1 overflow-y-auto ${dragging ? 'select-none' : ''}`}
-                >
-                  {/* Inner row is `min-h-full` so it grows to the taller of the
+                {hasRun && !steering && tokens.length > 0 && (
+                  <div className="mt-2 flex flex-row items-center justify-end px-1">
+                    <JlensViewToggle view={leftView} onChange={setLeftView} defaultLabel="Tokens" />
+                  </div>
+                )}
+
+                {leftView === 'field' && !steering && hasRun ? (
+                  <JlensField tokens={tokens} lensType={fieldLensType} className="mt-2" />
+                ) : (
+                  <div
+                    ref={scrollRef}
+                    onPointerDown={steering ? undefined : onChatPointerDown}
+                    className={`mt-2 min-h-0 flex-1 overflow-y-auto ${dragging ? 'select-none' : ''}`}
+                  >
+                    {/* Inner row is `min-h-full` so it grows to the taller of the
                       viewport and the scrolled content — otherwise the steered
                       column's divider (align-stretch) would only span the first
                       visible page and stop mid-transcript when scrolled. */}
-                  <div className="flex min-h-full flex-row gap-x-0 gap-y-2.5">
-                    {hasRun ? (
-                      <>
-                        {steering ? (
-                          <div className="sm:min-w-auto mt-1 flex flex-1 flex-col gap-y-2.5">
-                            <DefaultOutputHeader />
-                            {defaultOutput}
-                          </div>
-                        ) : (
-                          <div className="flex min-h-0 flex-1 flex-col gap-y-2.5">{defaultOutput}</div>
-                        )}
-                        {analysis.steer && (
-                          <div className="sm:min-w-auto ml-4 mt-1 flex flex-1 flex-col gap-y-2.5 border-l border-slate-300 pl-4">
-                            <SteerOutputHeader steer={analysis.steer} />
-                            {renderSteerResults()}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex max-h-[64px] w-full items-center gap-x-2 self-start rounded-xl bg-white px-4 py-3 text-slate-400 shadow">
-                        <LoadingSquare size={16} />
-                        <span className="text-[13px]">Generating…</span>
-                      </div>
-                    )}
+                    <div className="flex min-h-full flex-row gap-x-0 gap-y-2.5">
+                      {hasRun ? (
+                        <>
+                          {steering ? (
+                            <div className="sm:min-w-auto mt-1 flex flex-1 flex-col gap-y-2.5">
+                              <DefaultOutputHeader />
+                              {defaultOutput}
+                            </div>
+                          ) : (
+                            <div className="flex min-h-0 flex-1 flex-col gap-y-2.5">{defaultOutput}</div>
+                          )}
+                          {analysis.steer && (
+                            <div className="sm:min-w-auto ml-4 mt-1 flex flex-1 flex-col gap-y-2.5 border-l border-slate-300 pl-4">
+                              <SteerOutputHeader steer={analysis.steer} />
+                              {renderSteerResults()}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex max-h-[64px] w-full items-center gap-x-2 self-start rounded-xl bg-white px-4 py-3 text-slate-400 shadow">
+                          <LoadingSquare size={16} />
+                          <span className="text-[13px]">Generating…</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-y-3 px-1">

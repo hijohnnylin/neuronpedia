@@ -44,7 +44,8 @@ import {
   JlensExportSteer,
   parseFixture,
 } from './jlens-export';
-import { LensModeSetContext } from './jlens-lens-mode';
+import JlensField, { JlensLeftView, JlensViewToggle } from './jlens-field';
+import { LensModeSetContext, lensTypesForMode } from './jlens-lens-mode';
 import { JlensShareDialog } from './jlens-share-dialog';
 import { DefaultOutputHeader, SteerOutputHeader } from './jlens-steer-panel';
 import { runLensStream as baseRunLensStream, RunLensStreamParams } from './jlens-stream';
@@ -210,6 +211,11 @@ export default function JlensChat({
   // The in-flight steered run's abort controller.
   const steerAbortRef = useRef<AbortController | null>(null);
   const steering = analysis.steer != null;
+
+  // Whether the left panel shows the token transcript or the animated field.
+  const [leftView, setLeftView] = useState<JlensLeftView>('default');
+  // DIFF has no single read-out direction; fall back to its first lens type.
+  const fieldLensType = lensTypesForMode(lensMode)[0];
   // A steered run restored from a shared link, applied once the main tokens have
   // been hydrated (so the steer panel's per-layer counts compute correctly).
   const pendingSteerRef = useRef<JlensExportSteer | null>(null);
@@ -1449,41 +1455,50 @@ export default function JlensChat({
                     />
                   </div>
                 )}
-                <div
-                  ref={scrollRef}
-                  id={JLENS_STEER_COLUMNS_ID}
-                  onPointerDown={isEditing || steering ? undefined : onChatPointerDown}
-                  className={`min-h-0 flex-1 overflow-y-auto ${dragging ? 'select-none' : ''}`}
-                >
-                  {/* Inner row is `min-h-full` so it grows to the taller of the
+                {!steering && tokens.length > 0 && (
+                  <div className="mb-2 mt-1 flex flex-row items-center justify-end px-2 sm:px-4">
+                    <JlensViewToggle view={leftView} onChange={setLeftView} defaultLabel="Chat" />
+                  </div>
+                )}
+                {leftView === 'field' && !steering ? (
+                  <JlensField tokens={tokens} lensType={fieldLensType} className="px-2 pb-2 sm:px-4" />
+                ) : (
+                  <div
+                    ref={scrollRef}
+                    id={JLENS_STEER_COLUMNS_ID}
+                    onPointerDown={isEditing || steering ? undefined : onChatPointerDown}
+                    className={`min-h-0 flex-1 overflow-y-auto ${dragging ? 'select-none' : ''}`}
+                  >
+                    {/* Inner row is `min-h-full` so it grows to the taller of the
                       viewport and the scrolled content — otherwise the steered
                       column's divider (align-stretch) would only span the first
                       visible page and stop mid-transcript when scrolled. */}
-                  <div className="flex min-h-full flex-row gap-x-0 gap-y-2.5">
-                    {steering ? (
-                      <div className="sm:min-w-auto mt-1 flex flex-1 flex-col gap-y-2.5 px-2 sm:px-0 sm:pt-2">
-                        <DefaultOutputHeader />
-                        {defaultMessages}
-                      </div>
-                    ) : (
-                      <div
-                        id={JLENS_CHAT_ID}
-                        className="flex min-h-0 flex-1 flex-col gap-y-2.5 px-2 pt-2 sm:px-4 sm:pt-4"
-                      >
-                        {defaultMessages}
-                      </div>
-                    )}
-                    {analysis.steer && (
-                      <div
-                        id={JLENS_STEER_OUTPUT_ID}
-                        className="sm:min-w-auto mt-1 flex flex-1 flex-col gap-y-2.5 border-l border-slate-300 px-2 sm:ml-4 sm:pl-4 sm:pt-2"
-                      >
-                        <SteerOutputHeader steer={analysis.steer} />
-                        {renderSteerResults()}
-                      </div>
-                    )}
+                    <div className="flex min-h-full flex-row gap-x-0 gap-y-2.5">
+                      {steering ? (
+                        <div className="sm:min-w-auto mt-1 flex flex-1 flex-col gap-y-2.5 px-2 sm:px-0 sm:pt-2">
+                          <DefaultOutputHeader />
+                          {defaultMessages}
+                        </div>
+                      ) : (
+                        <div
+                          id={JLENS_CHAT_ID}
+                          className="flex min-h-0 flex-1 flex-col gap-y-2.5 px-2 pt-2 sm:px-4 sm:pt-4"
+                        >
+                          {defaultMessages}
+                        </div>
+                      )}
+                      {analysis.steer && (
+                        <div
+                          id={JLENS_STEER_OUTPUT_ID}
+                          className="sm:min-w-auto mt-1 flex flex-1 flex-col gap-y-2.5 border-l border-slate-300 px-2 sm:ml-4 sm:pl-4 sm:pt-2"
+                        >
+                          <SteerOutputHeader steer={analysis.steer} />
+                          {renderSteerResults()}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {error && (
                   <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
