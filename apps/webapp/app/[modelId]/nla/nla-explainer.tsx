@@ -254,12 +254,13 @@ export default function NLAExplainer() {
               />
             )}
           </button>
-          <div className="absolute left-1/2 top-1 -ml-6 flex w-64 -translate-x-1/2 flex-col items-center justify-center gap-y-0 sm:relative sm:left-0 sm:ml-0 sm:w-full sm:translate-x-0 sm:items-start">
+          <div className="absolute left-1/2 top-1 -ml-12 flex w-64 -translate-x-1/2 flex-col items-center justify-center gap-y-0 sm:relative sm:left-0 sm:ml-0 sm:w-full sm:translate-x-0 sm:items-start">
             <div
               className="whitespace-nowrap text-[11px] font-semibold leading-none text-slate-800 sm:-mt-2 sm:mb-0.5 sm:text-base"
               id="chat"
             >
-              Natural Language Autoencoders
+              <span className="sm:hidden">NLAs</span>
+              <span className="hidden sm:inline">Natural Language Autoencoders</span>
             </div>
             <CustomTooltip
               wide
@@ -327,7 +328,7 @@ export default function NLAExplainer() {
                     key={opt.modelId}
                     value={opt.modelId}
                     aria-label={`${opt.displayName} (Layer ${opt.layer})`}
-                    className={`relative ${opt.modelId === 'qwen2.5-1.5b-it' ? 'hidden sm:flex' : 'flex'} ${opt.modelId === 'gemma-3-27b-it' ? 'max-sm:rounded-r-lg' : ''} cursor-pointer items-center justify-center border bg-white px-2 text-[11px] font-medium text-slate-500 transition-colors first:rounded-l-lg last:rounded-r-lg hover:border-sky-700 hover:bg-sky-100 data-[state=on]:border data-[state=on]:border-sky-700 data-[state=on]:bg-sky-700 data-[state=off]:text-slate-500 data-[state=on]:text-white sm:gap-x-2 sm:px-5`}
+                    className="relative flex cursor-pointer items-center justify-center border bg-white px-2 text-[11px] font-medium text-slate-500 transition-colors first:rounded-l-lg last:rounded-r-lg hover:border-sky-700 hover:bg-sky-100 data-[state=on]:border data-[state=on]:border-sky-700 data-[state=on]:bg-sky-700 data-[state=off]:text-slate-500 data-[state=on]:text-white sm:gap-x-2 sm:px-5"
                   >
                     {/* Split displayName by space */}
                     <span className="sm:hidden">{opt.displayName.split(' ')[0]}</span>

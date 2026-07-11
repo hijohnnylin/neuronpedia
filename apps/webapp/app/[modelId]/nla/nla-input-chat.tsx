@@ -151,21 +151,40 @@ export default function NLAInputChat() {
   // After hydrating from a cache the conversation is swapped in
   // synchronously across multiple state updates; the existing effect above
   // races with subsequent layout passes (chips render after tokenList
-  // updates). Force a scroll-to-bottom after the next paint so the user
-  // always lands at the most recent turn.
+  // updates). Force a scroll after the next paint so the user lands
+  // somewhere useful.
+  //
+  // When the hydrated demo/deep-link pre-selects a token (`lockedPosition`
+  // / `selectedPosition`, batched into the same render as `chatScrollNonce`),
+  // that token can sit above the fold on mobile where the chat pane is
+  // short — snapping to the bottom would hide it. So bring the pre-selected
+  // token into view instead; otherwise fall back to scrolling to the
+  // most recent turn. `lockedPosition`/`selectedPosition` are intentionally
+  // read via closure (not deps) so ordinary hover/lock changes don't
+  // re-trigger this scroll — only a fresh hydrate (nonce bump) does.
   useEffect(() => {
     if (chatScrollNonce === 0) return undefined;
+    const focusPosition = lockedPosition ?? selectedPosition;
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       raf2 = requestAnimationFrame(() => {
         const el = scrollRef.current;
-        if (el) el.scrollTop = el.scrollHeight;
+        if (!el) return;
+        if (focusPosition !== null) {
+          const target = el.querySelector(`[data-token-position="${focusPosition}"]`);
+          if (target) {
+            target.scrollIntoView({ block: 'center', behavior: 'auto' });
+            return;
+          }
+        }
+        el.scrollTop = el.scrollHeight;
       });
     });
     return () => {
       cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatScrollNonce]);
 
   // ── Chip selection / drag state
