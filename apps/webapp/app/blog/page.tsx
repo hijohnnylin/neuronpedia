@@ -59,7 +59,7 @@ export default async function Page() {
                       alt={post.title}
                       width={800}
                       height={400}
-                      className="w-[30%] max-w-[30%] flex-1 rounded-md"
+                      className="w-[38%] max-w-[38%] flex-1 rounded-md"
                     />
                     <div className="flex w-full flex-1 flex-col">
                       <p className="mb-0.5 mt-1.5 text-sm font-bold text-slate-800 group-hover:text-sky-700 sm:mb-1 sm:mt-0 sm:text-[16px]">
