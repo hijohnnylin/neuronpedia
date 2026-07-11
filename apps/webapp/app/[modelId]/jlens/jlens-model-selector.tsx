@@ -192,10 +192,16 @@ export default function JlensModelSelector({
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className={`relative -ml-px flex ${!hasDedicatedTab ? 'w-[110px] min-w-[110px] max-w-[110px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[120px]' : 'w-[70px] min-w-[70px] max-w-[70px] sm:w-[90px] sm:min-w-[90px] sm:max-w-[90px]'} justify-center gap-x-1 px-2 text-[10px] ${tabClass(!hasDedicatedTab, 'rounded-r-md sm:rounded-r-lg')}`}
+                className={`relative -ml-px flex ${!hasDedicatedTab ? 'w-[110px] min-w-[110px] max-w-[110px] sm:w-[130px] sm:min-w-[130px] sm:max-w-[120px]' : 'w-[70px] min-w-[70px] max-w-[70px] sm:w-[120px] sm:min-w-[120px] sm:max-w-[120px]'} justify-center gap-x-1 px-2 text-[10px] ${tabClass(!hasDedicatedTab, 'rounded-r-md sm:rounded-r-lg')}`}
               >
                 <span className="flex-1 truncate pr-2">
-                  {!hasDedicatedTab ? (globalModels[modelId]?.displayName ?? modelId) : 'Models'}
+                  {!hasDedicatedTab ? (
+                    (globalModels[modelId]?.displayName ?? modelId)
+                  ) : (
+                    <span className="">
+                      <span className="hidden sm:inline">Other</span> Models
+                    </span>
+                  )}
                 </span>
                 <ChevronDownIcon className="absolute right-1 h-3 w-3 shrink-0 sm:right-2 sm:h-3.5 sm:w-3.5" />
               </button>

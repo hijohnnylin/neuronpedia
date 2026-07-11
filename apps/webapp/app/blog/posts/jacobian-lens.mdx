@@ -1,0 +1,68 @@
+---
+title: 'Welcome to the J-Space 🌌'
+description: "What Your Model's Thinking While It's Thinking"
+date: 2026-7-10
+author: Johnny Lin, David Chanin
+image: ASSET_BASE_URL/blog/canarobot.jpg
+imagePreview: ASSET_BASE_URL/blog/canarobot.jpg
+---
+
+<div className="mt-2"></div>
+
+_This post is human-written and not AI generated or edited._
+
+- ➡️ [**⭐️ Jacobian Lens**](/jlens) - Available for 13 models including Gemma, Llama, GPT-OSS, and Qwen.
+- ➡️ [**HeadVis Updates**](/headvis) - Use your own custom prompts and share them.
+- ➡️ [**NLA for Qwen 1.5B**](/nla/cmrfw1pis002n36z485pl833l) - Try NLAs on a tiny model, trained by Andy Xu.
+- ➡️ **[SAELens](https://github.com/decoderesearch/SAELens) + [InterpKit](https://github.com/z4nix/InterpKit)** - Community contributions and updates.
+
+---
+
+## Jacobian Lens
+
+### ➡️ [**Launch Demo**](/jlens) - 13 Models Supported
+
+#### [Paper](https://transformer-circuits.pub/2026/workspace/index.html) | [Tweet](https://x.com/AnthropicAI/status/2074185348142280912) | [HuggingFace](https://huggingface.co/neuronpedia/jacobian-lens) | [GitHub](https://github.com/anthropics/jacobian-lens) | [Blog](http://www.anthropic.com/research/global-workspace) | [LW](https://www.lesswrong.com/posts/3PaLrzxagpbnNtPLT/a-global-workspace-in-language-models)
+
+If someone asked you to "think about a dog while saying the word 'cat'", could you do that? You probably could! But what specific feature about our human brains lets us do this?
+One [neuroscience theory](https://philpapers.org/rec/BAAACT) is that our brains have a "[global workspace](https://www.pnas.org/doi/10.1073/pnas.95.24.14529)" that simultaneously holds the concept of a dog while we say the word cat.
+
+This same global workspace can do other things. For example, it lets us solve problems that take multiple steps, without having to write anything down. If you were asked: "how many legs does the animal that spins webs have?", you'd first think of the animal that spins webs, which is a spider. You put the spider in your workspace, and then you think of how many legs it has: eight.
+
+When we ask an AI (Qwen) the same spider question, it answers correctly without using any thinking tokens. So where's the AI doing its hidden thinking? Everyone, please welcome **the J-space**.
+
+<img src="ASSET_BASE_URL/blog/jlens-home.gif" alt="JSpace showing the model thinking about spiders" />
+
+[Gurnee et al](https://transformer-circuits.pub/2026/workspace) argue that AI models _also_ have a global workspace, inside what they call the **Jacobian space**, or J-space. The J-space can be revealed by using **Jacobian lens**, which are specially "fitted" for each model. In the J-lens Neuronpedia interface above, we see that the AI has "spiders" as the top entry in its J-space.
+
+### 13 Models Supported - Gemma, Llama, GPT-OSS, Qwen
+
+Since the launch [on Monday](https://x.com/AnthropicAI/status/2074185390060110138), we've added J-lens support for 11 more models from the Gemma, Llama, GPT-OSS, and Qwen families. Access them by clicking the "Other Models" dropdown, or directly at neuronpedia.org/[modelId]/jlens. For smaller models, we noticed that it was easy to oversteer swaps - it required selecting fewer layers to swap to the desired result.
+
+🙋 **Opportunity to Contribute**: Pre-fitted J-lens - We provide pre-fitted J-lenses for [36 models](https://huggingface.co/neuronpedia/jacobian-lens/tree/main), with the largest being Llama 70B. We're taking contributions for more pre-fitted J-lenses that we don't have, especially larger models and different model families.
+
+---
+
+## HeadVis Enhancements
+
+Updates to [HeadVis](https://transformer-circuits.pub/2026/headvis/index.html), which was released on Neuronpedia [last month](/blog/headvis).
+
+<img src="ASSET_BASE_URL/blog/testinduction.gif" alt="Testing an induction head." />
+
+- **NEW: Custom Text** - Enter custom text to test an attention head. Above, we test if an attention head is an induction head. Custom text results are also directly sharable - the above result is [here](/qwen3.6-27b/head/15/22?defaulttesttext=Is%20this%20an%20induction%20head%3F%0AIs%20this%20an%20induction%20head%3F%0AIs%20this%20an%20induction%20head%3F).
+- **NEW: Qwen 3.6 27B** - Added attention head metrics and sequences.
+- **FIX: Qwen Heads** - Qwen 3.5 and 3.6 have full attention only every 4 layers, so the layers were previously indexed incorrectly. They now show only full attention layers with correct indexing.
+
+---
+
+## Hosted 1.5B NLA, SAELens, and InterpKit
+
+- [**Qwen 1.5B NLA**](/qwen2.5-1.5b-it/nla): Can a small model have a comprehensible NLA? Andy Xu trained one ([Activation Verbalizer](https://huggingface.co/dormantx/Qwen2.5-1.5B-Instruct-NLA-L18-av) | [Activation Reconstructor](https://huggingface.co/dormantx/Qwen2.5-1.5B-Instruct-NLA-L18-ar)), and you get to find out - [try it here](/qwen2.5-1.5b-it/nla). We found it surprisingly workable, especially for simple concepts, though we couldn't replicate more complex things like poetry planning - let us know if you're able to!
+
+- [**SAELens Contributors**](https://github.com/decoderesearch/SAELens): SAELens has seen a surge of contributions from community members - our thanks to @danra, @amaljithkuttamath, @chandrudp29, @J0YY, and of course David Chanin for keeping up with fixes and updates. Also, thanks to Michael Hanna for keeping [circuit-tracer](https://github.com/decoderesearch/circuit-tracer) up-to-date.
+
+- [**InterpKit**](https://github.com/z4nix/InterpKit): Featured in a previous post, @z4nix continues to iterate on InterpKit with the vision of being an easy-to-use Python toolkit for mech interp on all models. New since last post - it now has a local UI supporting most of InterpKit's functionality.
+
+---
+
+As always, please [contact us](https://www.neuronpedia.org/contact) with your questions, feedback, and suggestions.

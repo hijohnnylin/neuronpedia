@@ -1,9 +1,12 @@
 'use client';
 
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import { useEffect, useMemo, useState } from 'react';
+import copy from 'copy-to-clipboard';
+import { Check, Copy, Share, XIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 import HeadActivationItem, { HeadSequenceData } from './head-activation-item';
+import { useGlobalContext } from './provider/global-provider';
 import { LoadingSquare } from './svg/loading-square';
 
 export const ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS = [
@@ -26,6 +29,7 @@ export default function HeadActivationsList({
   defaultShowRawTokens = true,
   unbounded = false,
   inferenceEnabled = false,
+  defaultCustomText,
 }: {
   sequences: HeadSequenceData[];
   modelId?: string;
@@ -42,7 +46,10 @@ export default function HeadActivationsList({
   // When true (model has an inference host), show a custom-text box to run
   // attention on the user's own input for this head.
   inferenceEnabled?: boolean;
+  // Custom text from the `defaulttesttext` URL param, auto-run once on mount to make results linkable.
+  defaultCustomText?: string;
 }) {
+  const { showToastMessage } = useGlobalContext();
   const [selectedRange, setSelectedRange] = useState(defaultRange);
   const [showLineBreaks, setShowLineBreaks] = useState(defaultShowLineBreaks);
   const [showRawTokens, setShowRawTokens] = useState(defaultShowRawTokens);
@@ -54,13 +61,34 @@ export default function HeadActivationsList({
   const [customResult, setCustomResult] = useState<HeadSequenceData | null>(null);
   const [isRunningCustom, setIsRunningCustom] = useState(false);
   const [customError, setCustomError] = useState<string | null>(null);
+  const [copyClicked, setCopyClicked] = useState(false);
   const canRunCustom = inferenceEnabled && modelId !== undefined && layer !== undefined && headIndex !== undefined;
+  // Ensures the `defaulttesttext` URL param is only auto-run once (for the initial head), not again
+  // when the user edits or switches heads.
+  const didAutoRunRef = useRef(false);
 
   // A head change (new layer/head/model) invalidates any prior custom result.
   useEffect(() => {
     setCustomResult(null);
     setCustomError(null);
+    setCopyClicked(false);
   }, [modelId, layer, headIndex]);
+
+  // Write the tested text into the URL (as `defaulttesttext`) so the result is linkable/shareable,
+  // preserving any other existing query params (e.g. `headFinder`).
+  const writeTestTextToUrl = (text: string) => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('defaulttesttext', text);
+    window.history.replaceState(window.history.state, '', url.toString());
+  };
+
+  const clearTestTextFromUrl = () => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('defaulttesttext');
+    window.history.replaceState(window.history.state, '', url.toString());
+  };
 
   const runCustom = (textArg?: string) => {
     if (!canRunCustom) return;
@@ -71,6 +99,7 @@ export default function HeadActivationsList({
     }
     setIsRunningCustom(true);
     setCustomError(null);
+    setCopyClicked(false);
     fetch('/api/model/head-attention/get', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -86,6 +115,7 @@ export default function HeadActivationsList({
       .then((data: HeadSequenceData) => {
         setCustomResult(data);
         setIsRunningCustom(false);
+        writeTestTextToUrl(data.tokens.join(''));
       })
       .catch((error) => {
         setCustomResult(null);
@@ -93,6 +123,18 @@ export default function HeadActivationsList({
         setIsRunningCustom(false);
       });
   };
+
+  // Auto-run the custom text passed via the `defaulttesttext` URL param, once, so shared links
+  // reproduce the tested result on load.
+  useEffect(() => {
+    if (didAutoRunRef.current) return;
+    if (!canRunCustom) return;
+    if (!defaultCustomText || defaultCustomText.trim().length === 0) return;
+    didAutoRunRef.current = true;
+    setCustomText(defaultCustomText);
+    runCustom(defaultCustomText);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canRunCustom, defaultCustomText]);
 
   // Drop a top-sequence's text into the custom field and immediately run it.
   const copyRemix = (text: string) => {
@@ -201,6 +243,53 @@ export default function HeadActivationsList({
                 overrideTextSize="text-[9.5px] sm:text-[11px]"
                 maxAttentionMode={maxAttentionMode}
               />
+              <div className="mt-0 flex flex-row items-center justify-start">
+                <button
+                  type="button"
+                  className="my-1 flex w-[62px] cursor-pointer flex-row items-center justify-center gap-x-0.5 whitespace-pre rounded bg-slate-200 px-1.5 py-1.5 text-[9px] font-medium text-slate-600 hover:bg-slate-300 sm:px-2 sm:py-1.5 sm:text-[10.5px]"
+                  title="Clear Result"
+                  onClick={() => {
+                    setCustomResult(null);
+                    setCustomText('');
+                    setCopyClicked(false);
+                    clearTestTextFromUrl();
+                  }}
+                >
+                  <XIcon className="h-3 w-3" /> Reset
+                </button>
+                <button
+                  type="button"
+                  className="my-1 ml-1.5 flex w-[62px] cursor-pointer flex-row items-center justify-center gap-x-0.5 whitespace-pre rounded bg-slate-200 px-1.5 py-1.5 text-[9px] font-medium text-slate-600 hover:bg-slate-300 sm:px-2 sm:py-1.5 sm:text-[10.5px]"
+                  title="Share Custom Attention Test Result"
+                  onClick={() => {
+                    const url = `${window.location.origin}/${modelId}/head/${layer}/${headIndex}?defaulttesttext=${encodeURIComponent(
+                      customResult.tokens.join(''),
+                    )}`;
+                    copy(url);
+                    setCopyClicked(true);
+                    showToastMessage(
+                      <div className="flex flex-col items-center justify-center gap-y-1">
+                        <div className="flex flex-row items-center justify-center gap-x-1 font-semibold">
+                          <Copy className="h-4 w-4" /> Copied!
+                        </div>
+                        <div className="mt-1 text-xs">
+                          The link to this head, including this attention test result, has been copied to your clipboard.
+                        </div>
+                      </div>,
+                    );
+                  }}
+                >
+                  {copyClicked ? (
+                    <>
+                      <Check className="h-3 w-3" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Share className="h-3 w-3" /> Share
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>

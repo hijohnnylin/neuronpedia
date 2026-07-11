@@ -15,15 +15,15 @@ Hey all! We're introducing a new Neuronpedia core feature for exploring attentio
 
 ---
 
-## ➡️ [**Try HeadVis**](/qwen3.5-0.8b/head/4/5?headFinder=true) - Qwen 3.5 0.8B
+## ➡️ [**Try HeadVis**](/qwen3.6-27b/head/15/22?headFinder=true) - Qwen 3.6 27B
 
 HeadVis ([Luger, Kamath, et al](https://transformer-circuits.pub/2026/headvis/index.html)) is Anthropic's tool for exploring attention heads, and it's now available for 37 models on Neuronpedia, for a total of 36,000+ attention head dashboards.
 
-Let's examine an [induction head](https://www.neuronpedia.org/qwen3.5-0.8b/head/4/5?headFinder=true) (an attention head responsible for repeating previously seen token patterns like [A][B]...[A]->[B]) in [Qwen3.5-0.8B](https://www.neuronpedia.org/qwen3.5-0.8b/head/4/5?headFinder=true):
+Let's examine an [induction head](https://www.neuronpedia.org/qwen3.6-27b/head/15/22?headFinder=true) (an attention head responsible for repeating previously seen token patterns like [A][B]...[A]->[B]) in [Qwen3.6-27B](https://www.neuronpedia.org/qwen3.6-27b/head/15/22?headFinder=true):
 
-<img src="ASSET_BASE_URL/blog/headvis.gif" alt="Induction head in Qwen 3.5 0.8B" />
+<img src="ASSET_BASE_URL/blog/headvis22.gif" alt="Induction head in Qwen 3.6 27B" />
 
-In the sequence above, the species name "Glenea anticepunctata" is repeated multiple times. As we hover over the tokens in its name, the orange lines show the attention head looking back at previous copies of the species name (specifically, the token immediately after the previous instance of the current token) so it knows what to output next. The grey lines show the opposite: where the hovered token is being referenced by a future token.
+In the sequence above, the term "Hypoxic vasoconstriction" is repeated multiple times. As we hover over the tokens in its name, the orange lines show the attention head looking back at previous copies of the species name (specifically, the token immediately after the previous instance of the current token) so it knows what to output next. The grey lines show the opposite: where the hovered token is being referenced by a future token.
 
 The rest of the attention dashboard shows other metrics and visualizations such as self attention score, max attenetion distribution, and top query and key tokens.
 
@@ -41,7 +41,7 @@ Since HeadVis is a core Neuronpedia integration, there are a few ways to access 
 
 1. **Model Page** - There's now an "Attention Visualizer" panel on all model pages, which contains the whole HeadVis interface and finder. Model pages on Neuronpedia are in the URL format: neuronpedia.org/[modelId], like [neuronpedia.org/qwen3.5-0.8b](https://www.neuronpedia.org/qwen3.5-0.8b).
 2. **Dropdowns** - From any dashboard page or "jump to" panel on Neuronpedia, choose your model and select the "Attention Heads" release.
-3. **Direct Links** - Like feature dashboards, attention heads are directly shareable simply by copying its URL, which is in the format neuronpedia.org/[modelId]/head/[layer]/[head_index], like [neuronpedia.org/qwen3.5-0.8b/head/4/5](https://www.neuronpedia.org/qwen3.5-0.8b/head/4/5). Also like feature dashbarods, you can embed attention heads in an iframe with the embed=true query parameter.
+3. **Direct Links** - Like feature dashboards, attention heads are directly shareable simply by copying its URL, which is in the format neuronpedia.org/[modelId]/head/[layer]/[head_index], like [neuronpedia.org/qwen3.6-27b/head/15/22](https://www.neuronpedia.org/qwen3.6-27b/head/15/22). Also like feature dashbarods, you can embed attention heads in an iframe with the embed=true query parameter.
 4. **Exports** - Attention head metrics and sequences based on the HeadVis [specification](https://github.com/anthropics/headvis) are downloadable in our [exports](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/) under [model]/headvis/[dataset_used]. For example, the HeadVis data for Gemma-3-27B-IT is available [here](https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/gemma-3-27b-it/headvis/). We used pile-uncopyrighted to generate all HeadVis data.
 
 ---

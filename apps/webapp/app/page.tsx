@@ -95,7 +95,7 @@ export default async function Page() {
     : undefined;
 
   return (
-    <div className="flex w-full select-none flex-col items-center justify-center bg-slate-100 px-0 pt-8 sm:mt-0 sm:px-0">
+    <div className="flex w-full select-none flex-col items-center justify-center bg-slate-100 px-0 pt-5 sm:mt-0 sm:px-0">
       {IS_LOCALHOST && !DEMO_MODE && (
         <div className="mb-4 flex w-full max-w-screen-sm flex-col items-center justify-center gap-2 rounded-lg border bg-white px-8 py-4 shadow-sm">
           <div className="text-xs font-bold text-slate-400">You are running a local instance of Neuronpedia.</div>
@@ -110,7 +110,7 @@ export default async function Page() {
 
       <div className="mb-1 mt-0 flex w-full max-w-screen-xl flex-col items-center justify-center gap-x-3 gap-y-5 px-3 sm:flex-row">
         <div className="flex basis-[55%] flex-col items-center justify-center text-center text-sm sm:text-base">
-          <div className="text-lg font-medium text-slate-800 sm:text-[16px]">
+          <div className="text-lg font-medium text-slate-800 sm:text-[15px]">
             Neuronpedia is an{' '}
             <a
               href="https://github.com/hijohnnylin/neuronpedia"
@@ -132,7 +132,7 @@ export default async function Page() {
             </CustomTooltip>{' '}
             platform.
           </div>
-          <div className="mt-0 text-sm font-normal text-slate-500 sm:text-[14px]">
+          <div className="mb-0.5 mt-0 mt-0.5 text-sm font-normal leading-none text-slate-500 sm:text-[12px]">
             Explore, visualize, and steer the internals of AI models.
           </div>
           <div className="mt-2 flex hidden flex-row items-center justify-center gap-x-2.5 gap-y-2 sm:mt-2 sm:flex-row">
@@ -185,6 +185,10 @@ export default async function Page() {
             </Link>
           </div>
         </div>
+      </div>
+
+      <div className="mx-2 mb-2 mt-2 flex w-full max-w-screen-sm flex-col items-center justify-center overflow-hidden border border-slate-200 bg-white shadow-md sm:mb-1 sm:mt-3 sm:rounded-xl">
+        <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
       <div className="flex w-full flex-col items-center justify-center px-1.5 sm:px-0">
@@ -306,7 +310,7 @@ export default async function Page() {
           </div>
         </div>
 
-        <div className="flex w-full max-w-screen-2xl flex-col items-center justify-center gap-x-3 sm:flex-row sm:px-3">
+        <div className="mb-6 flex w-full max-w-screen-2xl flex-col items-center justify-center gap-x-3 sm:mb-10 sm:flex-row sm:px-3">
           <div className="relative z-0 mb-3 mt-3 flex w-full flex-col items-center justify-center rounded-lg px-3 sm:mx-0 sm:mb-2 sm:h-[210px] sm:min-h-[210px] sm:min-w-[320px] sm:max-w-[320px] sm:flex-1 sm:px-0">
             <div className="relative z-0 mb-0 flex h-full w-full min-w-full max-w-screen-sm flex-1 flex-col items-center justify-center gap-x-8 gap-y-1 rounded-3xl bg-[#f3dfe3] px-3 py-7 text-center text-slate-600 shadow-sm shadow-[#8f5763]/30 sm:gap-y-0 sm:px-5 sm:py-7">
               <div className="absolute left-0 top-0 cursor-help flex-row items-center justify-center rounded-br-3xl rounded-tl-3xl bg-[#e4c0c7] px-7 py-[6px] text-[11px] font-semibold text-[#8a4a57]">
@@ -610,10 +614,6 @@ export default async function Page() {
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="mb-10 mt-8 flex w-full max-w-screen-sm flex-col items-center justify-center rounded-xl bg-slate-200 sm:mb-8">
-        <HomeNewsletterSignup latestPost={latestPost} />
       </div>
 
       <div className="grid w-full grid-cols-2 items-center justify-center gap-x-12 gap-y-5 bg-white px-5 py-5 md:flex md:h-[95px] md:min-h-[95px] md:grid-cols-3 md:flex-row md:py-0">

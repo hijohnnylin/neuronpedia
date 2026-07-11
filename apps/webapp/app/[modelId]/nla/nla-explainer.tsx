@@ -104,6 +104,53 @@ const NLA_MODEL_TOGGLE_OPTIONS = [
       </div>
     ),
   },
+  {
+    modelId: 'qwen2.5-1.5b-it',
+    displayName: 'Qwen 1.5B',
+    layer: 18,
+    url: '/qwen2.5-1.5b-it/nla',
+    hoverInfo: (
+      <div className="flex flex-col gap-y-1.5">
+        <p>
+          <strong>Model:</strong> <code>Qwen 2.5 1.5B Instruct</code>
+        </p>
+        <p>
+          <strong>Activation Verbalizer:</strong>{' '}
+          <a
+            href="https://huggingface.co/dormantx/Qwen2.5-1.5B-Instruct-NLA-L18-av"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <code className="text-sky-600 hover:underline">dormantx/Qwen2.5-1.5B-Instruct-NLA-L18-av</code>
+          </a>
+        </p>
+        <p>
+          <strong>Activation Reconstructor:</strong>{' '}
+          <a
+            href="https://huggingface.co/dormantx/Qwen2.5-1.5B-Instruct-NLA-L18-ar"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <code className="text-sky-600 hover:underline">dormantx/Qwen2.5-1.5B-Instruct-NLA-L18-ar</code>
+          </a>
+        </p>
+        <p className="flex flex-col gap-y-1">
+          <strong>Deployment</strong>
+          <ul className="ml-4 list-inside list-disc">
+            <li>
+              <strong>Source Model:</strong> <code>bfloat16</code>
+            </li>
+            <li>
+              <strong>Verbalizer:</strong> <code>bfloat16</code>
+            </li>
+            <li>
+              <strong>Reconstructor*:</strong> <code>bfloat16</code>
+            </li>
+          </ul>
+        </p>
+      </div>
+    ),
+  },
 ] as const;
 
 export default function NLAExplainer() {
@@ -280,7 +327,7 @@ export default function NLAExplainer() {
                     key={opt.modelId}
                     value={opt.modelId}
                     aria-label={`${opt.displayName} (Layer ${opt.layer})`}
-                    className="relative flex cursor-pointer items-center justify-center border bg-white px-2 text-[11px] font-medium text-slate-500 transition-colors first:rounded-l-lg last:rounded-r-lg hover:border-sky-700 hover:bg-sky-100 data-[state=on]:border data-[state=on]:border-sky-700 data-[state=on]:bg-sky-700 data-[state=off]:text-slate-500 data-[state=on]:text-white sm:gap-x-2 sm:px-5"
+                    className={`relative ${opt.modelId === 'qwen2.5-1.5b-it' ? 'hidden sm:flex' : 'flex'} ${opt.modelId === 'gemma-3-27b-it' ? 'max-sm:rounded-r-lg' : ''} cursor-pointer items-center justify-center border bg-white px-2 text-[11px] font-medium text-slate-500 transition-colors first:rounded-l-lg last:rounded-r-lg hover:border-sky-700 hover:bg-sky-100 data-[state=on]:border data-[state=on]:border-sky-700 data-[state=on]:bg-sky-700 data-[state=off]:text-slate-500 data-[state=on]:text-white sm:gap-x-2 sm:px-5`}
                   >
                     {/* Split displayName by space */}
                     <span className="sm:hidden">{opt.displayName.split(' ')[0]}</span>

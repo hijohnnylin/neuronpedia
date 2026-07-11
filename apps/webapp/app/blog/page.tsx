@@ -6,7 +6,7 @@ import { ASSET_BASE_URL } from '@/lib/env';
 import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import HomeNewsletterSignup from '../home/home-newsletter-signup';
+import BlogNewsletterSignup from '../home/blog-newsletter-signup';
 import BlogSidebar from './blog-sidebar';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -39,7 +39,7 @@ export default async function Page() {
         ]}
       />
       <div className="-mb-4 mt-4 flex w-full max-w-screen-sm justify-center px-2 sm:px-0">
-        <HomeNewsletterSignup />
+        <BlogNewsletterSignup />
       </div>
       <div className="flex h-full w-full max-w-screen-lg flex-col items-start justify-start px-2 pt-4 text-slate-800 sm:flex-row sm:items-start sm:justify-center sm:gap-x-7 sm:px-0">
         <BlogSidebar />
@@ -52,17 +52,17 @@ export default async function Page() {
                   <Link
                     href={`/blog/${post.slug}`}
                     key={index}
-                    className={`flex w-full flex-col items-start justify-center gap-x-4 gap-y-1 ${index !== posts.length - 1 ? 'border-b border-slate-200' : ''} px-2 py-2 pb-4 transition-all hover:bg-slate-50 sm:flex-row sm:items-center sm:px-4`}
+                    className={`group flex w-full flex-col items-start justify-center gap-x-4 gap-y-1 ${index !== posts.length - 1 ? 'border-b border-slate-200' : ''} px-2 py-2 pb-4 transition-all hover:bg-sky-50 sm:flex-row sm:items-center sm:px-4`}
                   >
                     <Image
                       src={post.image}
                       alt={post.title}
                       width={800}
                       height={400}
-                      className="w-[40%] max-w-[40%] flex-1 rounded-md"
+                      className="w-[30%] max-w-[30%] flex-1 rounded-md"
                     />
                     <div className="flex w-full flex-1 flex-col">
-                      <p className="mb-0.5 mt-1.5 text-sm font-bold text-slate-800 sm:mb-1 sm:mt-0 sm:text-[16px]">
+                      <p className="mb-0.5 mt-1.5 text-sm font-bold text-slate-800 group-hover:text-sky-700 sm:mb-1 sm:mt-0 sm:text-[16px]">
                         {post.title}
                       </p>
                       <p className="mb-1 text-xs font-medium leading-normal text-slate-600 sm:mb-1.5 sm:text-[12px]">

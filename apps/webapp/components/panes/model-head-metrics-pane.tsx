@@ -245,6 +245,7 @@ export default function ModelHeadMetricsPane({
   initialHeadIndex,
   onHeadChange,
   inferenceEnabled = false,
+  defaultCustomText,
 }: {
   modelId: string;
   metrics: ModelHeadMetricsRow[];
@@ -256,6 +257,8 @@ export default function ModelHeadMetricsPane({
   onHeadChange?: (head: { modelId: string; layer: number; headIndex: number }) => void;
   // When true (model has an inference host), enable the per-head custom-text box.
   inferenceEnabled?: boolean;
+  // Custom text (from the `defaulttesttext` URL param) to auto-run against the initially selected head.
+  defaultCustomText?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1274,6 +1277,11 @@ export default function ModelHeadMetricsPane({
                 errorMessage={sequencesError}
                 unbounded={!showCard}
                 inferenceEnabled={inferenceEnabled}
+                defaultCustomText={
+                  selectedHead.layer === initialLayer && selectedHead.headIndex === initialHeadIndex
+                    ? defaultCustomText
+                    : undefined
+                }
               />
             ) : (
               <div className="flex h-full min-h-[12rem] w-full items-center justify-center px-4 text-center">

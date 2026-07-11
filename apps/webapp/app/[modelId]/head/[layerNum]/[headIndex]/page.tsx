@@ -19,11 +19,16 @@ export async function generateMetadata(props: { params: Promise<PageParams> }): 
   };
 }
 
-export default async function Page(props: { params: Promise<PageParams> }) {
+export default async function Page(props: {
+  params: Promise<PageParams>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const { modelId } = params;
   const layer = Number(params.layerNum);
   const headIndex = Number(params.headIndex);
+  const defaultCustomText = typeof searchParams.defaulttesttext === 'string' ? searchParams.defaulttesttext : undefined;
 
   if (!Number.isInteger(layer) || !Number.isInteger(headIndex) || layer < 0 || headIndex < 0) {
     notFound();
@@ -65,6 +70,7 @@ export default async function Page(props: { params: Promise<PageParams> }) {
       initialHeadIndex={headIndex}
       metrics={modelHeadMetrics}
       inferenceEnabled={model.inferenceEnabled}
+      defaultCustomText={defaultCustomText}
     />
   );
 }

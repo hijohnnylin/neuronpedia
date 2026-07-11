@@ -23,6 +23,15 @@ import { NextResponse } from 'next/server';
 // activations of a different model than what generated the text.
 const USE_OPENROUTER_FOR_COMPLETION = true;
 
+// Model ids that should always bypass OpenRouter for completions and use the
+// self-hosted NLA server's `/completion` endpoint instead, even when
+// `USE_OPENROUTER_FOR_COMPLETION` is true. Useful for models that are cheap to
+// self-host or whose OpenRouter providers don't match the NLA reference model.
+const OPENROUTER_COMPLETION_EXCLUDED_MODEL_IDS = new Set<string>(['qwen2.5-1.5b-it']);
+
+const shouldUseOpenRouterForCompletion = (modelId?: string): boolean =>
+  USE_OPENROUTER_FOR_COMPLETION && !!modelId && !OPENROUTER_COMPLETION_EXCLUDED_MODEL_IDS.has(modelId);
+
 type TokenInfo = {
   token: string;
   token_id: number;
@@ -382,7 +391,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // and we have an OpenRouter mapping, this is the path researchers hit.
   // Always uses OpenRouter so the wire format and provider are consistent
   // across API calls. Returns canonical NLA-tokenized positions.
-  if (!wantsStream && USE_OPENROUTER_FOR_COMPLETION && effectiveCompletionTokens > 0 && hasMessages && modelId) {
+  if (!wantsStream && shouldUseOpenRouterForCompletion(modelId) && effectiveCompletionTokens > 0 && hasMessages && modelId) {
     const model = await prisma.model.findUnique({ where: { id: modelId } });
     if (!model?.openRouterId) {
       return NextResponse.json({ error: `Model ${modelId} has no openRouterId configured` }, { status: 400 });
@@ -401,7 +410,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // Mirrors the previous behavior: the chat UI passes `stream: true` plus
   // `messages` and gets SSE prompt/token events. Same provider-routing
   // rules as the non-streaming API path (must have an openRouterId).
-  if (USE_OPENROUTER_FOR_COMPLETION && effectiveCompletionTokens > 0 && wantsStream && hasMessages && modelId) {
+  if (shouldUseOpenRouterForCompletion(modelId) && effectiveCompletionTokens > 0 && wantsStream && hasMessages && modelId) {
     const model = await prisma.model.findUnique({ where: { id: modelId } });
     if (!model?.openRouterId) {
       return NextResponse.json({ error: `Model ${modelId} has no openRouterId configured` }, { status: 400 });

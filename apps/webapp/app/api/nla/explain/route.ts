@@ -330,10 +330,10 @@ function mergePriorAggregates(a: PriorAggregate, b: PriorAggregate): PriorAggreg
  *             properties:
  *               modelId:
  *                 type: string
- *                 description: The Neuronpedia model id (e.g. `gemma-3-27b-it`, or for Llama3, `llama3.3-70b-it`).
+ *                 description: The Neuronpedia model id (`gemma-3-27b-it`, `llama3.3-70b-it`, `qwen2.5-1.5b-it`).
  *               nlaSourceId:
  *                 type: string
- *                 description: The NLA source id for this model (e.g. `kitft-l41`, or e.g. `kitft-l53` for Llama3). See `GET /api/nla/sources`.
+ *                 description: The NLA source id for this model (`kitft-l41` for gemma 3, `kitft-l53` for llama 70b, or `andyxu-l18` for qwen 1.5b). See `GET /api/nla/sources`.
  *               text:
  *                 type: string
  *                 description: Pre-chat-templated prompt string. Provide this OR `messages`. Max 16384 characters.
