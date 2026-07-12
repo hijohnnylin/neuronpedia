@@ -5,6 +5,10 @@ help:  ## Show available commands
 	@echo "\n\033[1;35mThe pattern for commands is generally 'make [app]-[environment]-[action]''.\nFor example, 'make webapp-demo-build' will _build_ the _webapp for the demo environment.\033[0m"
 	@awk 'BEGIN {FS = ":.*## "; printf "\n"} /^[a-zA-Z_-]+:.*## / { printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+.env:
+	@touch .env
+	@echo "Created an empty .env file (no API keys set). Run 'make init-env' if you want to add an OpenAI API key or Hugging Face token."
+
 init-env: ## Initialize the environment
 	@echo "Initializing environment..."
 	@if [ -f .env ]; then \
@@ -42,7 +46,7 @@ webapp-demo-build: ## Webapp: Public Demo Environment - Build
 	fi
 	ENV_FILE=../.env.demo docker compose -f docker/compose.yaml build webapp
 
-webapp-demo-run: ## Webapp: Public Demo Environment - Run
+webapp-demo-run: .env ## Webapp: Public Demo Environment - Run
 	@echo "Bringing up the webapp and connecting to the demo database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -67,7 +71,7 @@ webapp-localhost-build: ## Webapp: Localhost Environment - Build (Production Bui
 	CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE) ENV_FILE=../.env.localhost \
 		docker compose -f docker/compose.yaml build webapp db-init postgres
 
-webapp-localhost-run: ## Webapp: Localhost Environment - Run (Production Build)
+webapp-localhost-run: .env ## Webapp: Localhost Environment - Run (Production Build)
 	@echo "Bringing up the webapp and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -90,7 +94,7 @@ webapp-localhost-install: ## Webapp: Localhost Environment - Install Dependencie
 	cd apps/webapp && \
 	npm install
 	
-webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
+webapp-localhost-dev: .env ## Webapp: Localhost Environment - Run (Development Build)
 	@echo "Bringing up the webapp for development and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -103,7 +107,7 @@ webapp-localhost-dev: ## Webapp: Localhost Environment - Run (Development Build)
 		--env-file .env \
 		up webapp db-init postgres
 
-webapp-localhost-test: ## Webapp: Localhost Environment - Run (Playwright)
+webapp-localhost-test: .env ## Webapp: Localhost Environment - Run (Playwright)
 	@echo "Bringing up the webapp for development and connecting to the localhost database..."
 	@if ! which docker > /dev/null 2>&1; then \
 		echo "Error: Docker is not installed. Please install Docker first."; \
@@ -136,7 +140,7 @@ inference-localhost-build: ## Inference: Localhost Environment - Build
 inference-localhost-build-gpu: ## Inference: Localhost Environment - Build (CUDA). Usage: make inference-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
 	$(MAKE) inference-localhost-build BUILD_TYPE=cuda CUSTOM_CA_BUNDLE=$(CUSTOM_CA_BUNDLE)
 
-inference-localhost-dev: ## Inference: Localhost Environment - Run (Development Build). Usage: make inference-localhost-dev [MODEL_SOURCESET=gpt2-small.res-jb] [AUTORELOAD=1]
+inference-localhost-dev: .env ## Inference: Localhost Environment - Run (Development Build). Usage: make inference-localhost-dev [MODEL_SOURCESET=gpt2-small.res-jb] [AUTORELOAD=1]
 	@echo "Bringing up the inference server for development in the localhost environment..."
 	@if [ "$(MODEL_SOURCESET)" != "" ]; then \
 		if [ ! -f ".env.inference.$(MODEL_SOURCESET)" ]; then \
@@ -198,7 +202,7 @@ autointerp-localhost-build: ## Autointerp: Localhost Environment - Build
 autointerp-localhost-build-gpu: ## Autointerp: Localhost Environment - Build (CUDA). Usage: make autointerp-localhost-build-gpu [USE_LOCAL_HF_CACHE=1]
 	$(MAKE) autointerp-localhost-build BUILD_TYPE=cuda
 
-autointerp-localhost-dev: ## Autointerp: Localhost Environment - Run (Development Build). Usage: make autointerp-localhost-dev [AUTORELOAD=1]
+autointerp-localhost-dev: .env ## Autointerp: Localhost Environment - Run (Development Build). Usage: make autointerp-localhost-dev [AUTORELOAD=1]
 	@echo "Bringing up the autointerp server for development in the localhost environment..."
 	RELOAD=$$([ "$(AUTORELOAD)" = "1" ] && echo "1" || echo "0") \
 	ENV_FILE=../.env.localhost \
