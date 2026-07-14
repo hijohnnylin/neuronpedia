@@ -1,5 +1,5 @@
 ---
-title: 'Interp Explorer, Circuit Tracing w/ Attention, and Weight-Sparse Transformers'
+title: 'Circuit Tracing w/ Attention, Weight-Sparse Transformers, and Interp Explorer'
 description: 'Plus Library Updates and Awesome Community Projects'
 date: 2026-4-21
 author: Johnny Lin, David Chanin, Michael Hanna, and Community Contributors
@@ -17,9 +17,9 @@ With frontier AI models, building interp applications/tools or getting started o
 
 #### Releases
 
-- 🌎 Interpretability Explorer (Public Beta) [**➡️ Launch**](https://www.neuronpedia.org/explorer) - Crowdsourced interp tools, projects, resources.
 - 🧩 Circuit Tracing + Attention (OpenMOSS) [**➡️ Launch**](https://www.neuronpedia.org/qwen3-1.7b/graph?slug=dallas-austin) - Generate graphs with LORSA and QK Tracing.
 - 💡 Weight-Sparse Transformers (OpenAI) [**➡️ Launch**](https://www.neuronpedia.org/circuitgpt-python/6-mlp/5543) - Visualizer for Gao et al's weight-sparse model.
+- 🌎 Interpretability Explorer (Public Beta) [**➡️ Launch**](https://www.neuronpedia.org/explorer) - Crowdsourced interp tools, projects, resources.
 
 #### Updates
 
@@ -29,29 +29,8 @@ With frontier AI models, building interp applications/tools or getting started o
 #### Community Projects
 
 - 🔬 Circuit-Motifs (Michael J. Kenney) [**➡️ Post**](https://open2interp.substack.com/p/applying-network-motif-analysis-to) - Applying network motif analysis to attribution graphs.
-- 👯 MechInterp-Replication (Zach Goldfine) [**➡️ GitHub (Beta)**](https://github.com/zachgoldfine44/mechinterp-replication) - Harness for replicating interp papers.
 - 🔨 InterpKit (Davide Zani) [**➡️ GitHub (Beta)**](https://github.com/z4nix/interpkit) - One-line mech interp for any HuggingFace model.
 - 🤼 NP-Feature-Compare [**➡️ Launch**](https://np-feature-compare.netlify.app/?left=gemma-3-4b%2F9-gemmascope-2-res-16k%2F83&right=gemma-3-4b-it%2F9-gemmascope-2-res-16k%2F83) - Compare Neuronpedia features side-by-side.
-
-🔊 Summary by NotebookLM - The Babble on [[Apple]](https://podcasts.apple.com/us/podcast/the-babble-a-neuronpedia-podcast-by-notebooklm/id1809283401?i=1000763158862) [[Spotify]](https://creators.spotify.com/pod/profile/neuronpedia/episodes/Ep--7-Interpretability-Explorer--Circuit-Tracing--and-Weight-Sparse-Transformers-e3iak4d)
-
----
-
-## 🌎 Interpretability Explorer (Crowdsourced Beta)
-
-<img
-  src="ASSET_BASE_URL/blog/apr/newnode.gif"
-  alt="Browsing the explorer and adding a sub-item under Circuit Tracing"
-  className="h-auto w-full"
-/>
-
-"What are the latest mech interp tools? What extension works have been done on circuit tracing? Are there any replications for this paper?" These are questions that we find ourselves and community members frequently asking. To help connect people to the most relevant resources in mech interp, Interpretability Explorer is a crowdsourced map of the latest tools, papers, replications, and more, grouped by topic.
-
-Each node is [directly linkable/sharable](https://www.neuronpedia.org/explorer/164), so you can keep tabs on the topics that you care most about.
-
-It's new and is still in the seeding phase - help fill it out! Hover over any topic/node and click "+ Sub-Item". A wide range of submissions are accepted: blog posts, agent skills, datasets, notebooks, Youtube videos, etc. Interp Explorer wants your favorite interp stuff, so that other people can find and use it too. And of course, feedback is welcome.
-
-[**➡️ Launch Interpretability Explorer**](https://www.neuronpedia.org/explorer)
 
 ---
 
@@ -102,6 +81,26 @@ Note: This work has not yet been fully validated - exercise caution before using
 
 > Stefan Heimersheim and I are attempting to interpret individual weights of Gao et al.'s sparse transformer. We're examining random nonzero weights and trying to understand what each one does. Our current approach: for each weight, we ablate it (set to zero) and measure KL divergence across many dataset samples. We then inspect (1) dataset examples in different quantile bands of effect size, and (2) quantile-activating examples of the connected source and target activations. Our goal is to reach the bar of "can you write a regex or Python function that correctly predicts when this weight matters?"
 > We've uploaded initial weight visualizations and specific case studies at: [weightpedia.org](https://weightpedia.org).
+
+---
+
+## 🌎 Interpretability Explorer (Crowdsourced Beta)
+
+**_Update July 2026 - We're pausing work on Interp Explorer as we figure out a more intuitive way to surface great interp content._**
+
+<img
+  src="ASSET_BASE_URL/blog/apr/newnode.gif"
+  alt="Browsing the explorer and adding a sub-item under Circuit Tracing"
+  className="h-auto w-full"
+/>
+
+"What are the latest mech interp tools? What extension works have been done on circuit tracing? Are there any replications for this paper?" These are questions that we find ourselves and community members frequently asking. To help connect people to the most relevant resources in mech interp, Interpretability Explorer is a crowdsourced map of the latest tools, papers, replications, and more, grouped by topic.
+
+Each node is [directly linkable/sharable](https://www.neuronpedia.org/explorer/164), so you can keep tabs on the topics that you care most about.
+
+It's new and is still in the seeding phase - help fill it out! Hover over any topic/node and click "+ Sub-Item". A wide range of submissions are accepted: blog posts, agent skills, datasets, notebooks, Youtube videos, etc. Interp Explorer wants your favorite interp stuff, so that other people can find and use it too. And of course, feedback is welcome.
+
+[**➡️ Launch Interpretability Explorer**](https://www.neuronpedia.org/explorer)
 
 ---
 
@@ -158,7 +157,7 @@ Zach on Slack (shortened):
 > In the repo I used the harness for an initial replication attempt: a draft replication of Anthropic's (Sofroniew et al.'s) recent Emotion Concepts paper across 6 open-source models (Llama / Qwen / Gemma, 1B–9B).
 > Check it out and let me know what you think! And please use it to replicate a paper of your choosing, submit it, or suggest ways to improve the harness or existing replications.
 
-We're particularly excited about a well-crafted harness that encourages standardized structures (eg tables like the one below), validation, and outputs relevant data and figures. We're looking forward to: generation of code/notebooks in addition to data/markdown (for quick re-replications), more models and larger sizes, and benchmarking against manual human/AI-assisted replications. Neuronpedia plans to include replications generated by this harness in Interpretability Explorer.
+We're particularly excited about a well-crafted harness that encourages standardized structures (eg tables like the one below), validation, and outputs relevant data and figures. We're looking forward to: generation of code/notebooks in addition to data/markdown (for quick re-replications), more models and larger sizes, and benchmarking against manual human/AI-assisted replications.
 
 <img
   src="ASSET_BASE_URL/blog/apr/emotions.png"
