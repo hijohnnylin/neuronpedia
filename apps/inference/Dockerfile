@@ -113,29 +113,29 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install poetry
-RUN python -m pip install poetry
+# Install uv (apps/inference is uv-managed: PEP-621 pyproject + uv.lock)
+RUN python -m pip install uv
 
-ENV POETRY_VIRTUALENVS_CREATE=false
-RUN poetry config virtualenvs.create false
+# Install into the image venv rather than a uv-created .venv
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 
-# Configure poetry/pip to use custom CA if provided
+# Configure pip/uv to use custom CA if provided
 RUN if [ -n "${CUSTOM_CA_BUNDLE}" ] && [ "${CUSTOM_CA_BUNDLE}" != ".nocustomca" ]; then \
-    pip config set global.cert /etc/ssl/certs/ca-certificates.crt && \
-    poetry config certificates.default.cert /etc/ssl/certs/ca-certificates.crt; \
+    pip config set global.cert /etc/ssl/certs/ca-certificates.crt; \
     fi
 
 # Copy the client package first
 COPY packages/python/neuronpedia-inference-client /app/packages/python/neuronpedia-inference-client/
 COPY apps/inference/vendor/chatspace /app/apps/inference/vendor/chatspace/
 
-# Copy only poetry files
-COPY apps/inference/pyproject.toml apps/inference/poetry.lock* apps/inference/
+# Copy only project metadata
+COPY apps/inference/pyproject.toml apps/inference/uv.lock apps/inference/
 WORKDIR /app/apps/inference
 
-# Install only main dependencies
-ENV POETRY_REQUESTS_TIMEOUT=30
-RUN poetry install --only main
+# Install only main (non-dev) dependencies from the lockfile; the app itself runs
+# from source (start.py) so the project doesn't need to be installed as a package
+ENV UV_HTTP_TIMEOUT=30
+RUN uv sync --locked --no-dev --no-install-project
 
 # Now copy the rest of the application code
 COPY apps/inference /app/apps/inference/
