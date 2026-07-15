@@ -26,5 +26,14 @@ crm = ["llamascopium"]
 package = false
 
 [tool.uv.sources]
+# PyPI's default torch wheels (>=2.11) are built against CUDA 13 (cu13), which
+# needs a newer NVIDIA driver than our GPU pods provide (they cap at CUDA 12.8).
+# Pin torch to PyTorch's CUDA 12.8 wheel index so it runs on those drivers.
+torch = { index = "pytorch-cu128" }
 circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.4.1" }
 llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b34" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
