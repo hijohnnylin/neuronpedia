@@ -247,7 +247,7 @@ wheels = [
 [[package]]
 name = "circuit-tracer"
 version = "0.4.1"
-source = { git = "https://github.com/decoderesearch/circuit-tracer.git?tag=v0.4.1#a2e9eb9ab0e7c7a4f033ff4bafa1bb140412d162" }
+source = { git = "https://github.com/decoderesearch/circuit-tracer.git?tag=v0.5.1#eb0e0f9347a521d7634b7ccbe95756f46f1df2a1" }
 dependencies = [
     { name = "einops" },
     { name = "huggingface-hub" },
@@ -1139,7 +1139,7 @@ crm = [
 
 [package.metadata]
 requires-dist = [
-    { name = "circuit-tracer", git = "https://github.com/decoderesearch/circuit-tracer.git?tag=v0.4.1" },
+    { name = "circuit-tracer", git = "https://github.com/decoderesearch/circuit-tracer.git?tag=v0.5.1" },
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "hf-transfer", specifier = ">=0.1.9,<0.2" },
     { name = "llamascopium", marker = "extra == 'crm'", git = "https://github.com/OpenMOSS/Language-Model-SAEs.git?tag=v2.0.0b34" },
