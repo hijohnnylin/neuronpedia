@@ -26,5 +26,5 @@ crm = ["llamascopium"]
 package = false
 
 [tool.uv.sources]
-circuit-tracer = { git = "https://github.com/safety-research/circuit-tracer.git", tag = "v0.3.1" }
+circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.4.1" }
 llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b34" }
