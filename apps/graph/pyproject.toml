@@ -1,30 +1,39 @@
-[tool.poetry]
+[project]
 name = "neuronpedia-graph"
 version = "0.1.0"
 description = "Based on Circuit Tracer by Piotrowski & Hanna. Server for generating and pruning circuit graphs from prompts."
-authors = ["Johnny Lin <johnny@neuronpedia.org>"]
+authors = [{ name = "Johnny Lin", email = "johnny@neuronpedia.org" }]
 license = "MIT"
 readme = "README.md"
-package-mode = false
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115.12",
+  "uvicorn[standard]>=0.34.2",
+  "pydantic>=2.11.4",
+  "torch>=2.11.0",
+  "transformers>=4.57.1",
+  "circuit-tracer",
+  "python-dotenv>=1.1.0,<2",
+  "hf-transfer>=0.1.9,<0.2",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.12,<3.13.dev0"
-fastapi = ">=0.115.12"
-uvicorn = {extras = ["standard"], version = ">=0.34.2"}
-pydantic = ">=2.11.4"
-torch = ">=2.11.0"
-transformers = ">=4.57.1"
-circuit-tracer = { git = "https://github.com/safety-research/circuit-tracer.git", tag = "v0.3.1" }
-llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b34", optional = true }
-python-dotenv = "^1.1.0"
-hf-transfer = "^0.1.9"
-
-[tool.poetry.extras]
+[project.optional-dependencies]
 crm = ["llamascopium"]
 
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.uv]
+# This is an application, not a distributable package (was poetry's
+# `package-mode = false`), so uv installs the dependencies but not the project.
+package = false
 
-[virtualenvs]
-in-project = true
+[tool.uv.sources]
+# PyPI's default torch wheels (>=2.11) are built against CUDA 13 (cu13), which
+# needs a newer NVIDIA driver than our GPU pods provide (they cap at CUDA 12.8).
+# Pin torch to PyTorch's CUDA 12.8 wheel index so it runs on those drivers.
+torch = { index = "pytorch-cu128" }
+circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.5.1" }
+llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b34" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

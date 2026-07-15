@@ -22,11 +22,11 @@ This is the attribution graph generation server. It supports two backends:
 # Navigate to the graph app directory
 cd apps/graph
 
-# Install dependencies using Poetry (circuit-tracer backend only)
-poetry install
+# Install dependencies using uv (circuit-tracer backend only)
+uv sync
 
 # Install with CRM backend support (includes lm-saes and its dependencies)
-poetry install --extras crm
+uv sync --extra crm
 ```
 
 ### Config
@@ -44,26 +44,26 @@ Create an `.env` file with `SECRET` and `HF_TOKEN` (see `.env.example`)
 # Only run one of the following, depending on which model you want to run.
 
 # Run with Gemma-2-2B model with the Gemmascope transcoders
-poetry run python start.py --model_id google/gemma-2-2b --transcoder_set gemma
+uv run python start.py --model_id google/gemma-2-2b --transcoder_set gemma
 
 # Run with Qwen3-4B model with transcoders trained by Anthropic Fellows
-poetry run python start.py --model_id Qwen/Qwen3-4B --transcoder_set mwhanna/qwen3-4b-transcoders
+uv run python start.py --model_id Qwen/Qwen3-4B --transcoder_set mwhanna/qwen3-4b-transcoders
 
 # Run with Gemma-2-2B model with CLTs trained by Anthropic Fellows
-poetry run python start.py --model_id google/gemma-2-2b --transcoder_set mntss/clt-gemma-2-2b-2.5M
+uv run python start.py --model_id google/gemma-2-2b --transcoder_set mntss/clt-gemma-2-2b-2.5M
 ```
 
 ### Start Server - CRM Backend (Lorsa + Transcoders)
 
 The Complete Replacement Model (CRM) backend uses [lm-saes](https://github.com/OpenMOSS/Language-Model-SAEs) to generate graphs. These graphs include both transcoder features (MLP decomposition) and Lorsa features (attention decomposition), enabling complete circuit tracing as described in [Bridging the Attention Gap](https://interp.open-moss.com/posts/complete-replacement).
 
-Requires `poetry install --extras crm` first.
+Requires `uv sync --extra crm` first.
 
 Available checkpoints are hosted at [OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B](https://huggingface.co/OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B) with configurations: expansion `8x` or `32x`, top-k `k64`, `k128`, or `k256`.
 
 ```
 # Qwen3-1.7B with 8x expansion, K=64 (smallest, fastest - good for testing)
-poetry run python start.py \
+uv run python start.py \
   --backend lm-saes-crm \
   --model_id Qwen/Qwen3-1.7B \
   --sae_repo OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B \
@@ -71,7 +71,7 @@ poetry run python start.py \
   --sae_topk k64
 
 # Qwen3-1.7B with 8x expansion, K=128 (higher quality graphs)
-poetry run python start.py \
+uv run python start.py \
   --backend lm-saes-crm \
   --model_id Qwen/Qwen3-1.7B \
   --sae_repo OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B \

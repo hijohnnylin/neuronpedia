@@ -4,8 +4,11 @@ import json
 import os
 import threading
 import time
+import tomllib
 from importlib.metadata import version as pkg_version
+from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import psutil
 import requests
@@ -122,10 +125,34 @@ TLENS_MODEL_ID_TO_NP_MODEL_ID = {
     "Qwen/Qwen3-4B": "qwen3-4b",
 }
 
+def _circuit_tracer_version() -> str:
+    """Report the pinned circuit-tracer git tag (e.g. "v0.4.1") from uv.lock.
+
+    circuit-tracer is pinned to a git tag in pyproject.toml, but the tag name is
+    the meaningful version to surface. We read it from uv.lock's recorded git
+    source (`...?tag=v0.4.1#<commit>`) rather than importlib metadata, since a
+    package's self-reported version can lag its release tags. Falls back to the
+    installed package's metadata version if the lock can't be read.
+    """
+    lock_path = Path(__file__).resolve().parent.parent / "uv.lock"
+    try:
+        with lock_path.open("rb") as f:
+            lock = tomllib.load(f)
+        for pkg in lock.get("package", []):
+            if pkg.get("name") == "circuit-tracer":
+                git_url = (pkg.get("source") or {}).get("git", "")
+                tag = parse_qs(urlparse(git_url).query).get("tag", [None])[0]
+                if tag:
+                    return tag
+    except (OSError, tomllib.TOMLDecodeError):
+        pass
+    return pkg_version("circuit-tracer")
+
+
 GENERATOR_INFO = {
     "name": "circuit-tracer by Hanna & Piotrowski",
-    "version": pkg_version("circuit-tracer"),
-    "url": "https://github.com/safety-research/circuit-tracer",
+    "version": _circuit_tracer_version(),
+    "url": "https://github.com/decoderesearch/circuit-tracer",
 }
 
 loaded_model_arg = os.getenv("MODEL_ID")
@@ -169,6 +196,24 @@ else:
         lazy_decoder=True,
         backend="nnsight" if is_nnsight_model else "transformerlens",
     )
+
+
+def ensure_bos_for_circuit_tracer(prompt: str) -> str:
+    """Prepend <bos> to gemma-3-it prompts for the circuit-tracer backend.
+
+    circuit-tracer's ReplacementModel.ensure_tokenized() tokenizes with
+    add_special_tokens=False and, for gemma-3 instruct models, asserts the
+    tokens already start with <bos><start_of_turn>user (unlike base models, it
+    does NOT auto-prepend BOS). The webapp sends a chat-templated prompt without
+    a leading <bos>, so add it here to satisfy that check.
+    """
+    is_gemma_3_it = "gemma-3" in loaded_model_arg and loaded_model_arg.endswith("-it")
+    if not is_gemma_3_it:
+        return prompt
+    tokens = model.tokenizer.encode(prompt, add_special_tokens=False)
+    if tokens and tokens[0] == model.tokenizer.bos_token_id:
+        return prompt
+    return model.tokenizer.bos_token + prompt
 
 
 def printMemory():
@@ -688,9 +733,11 @@ async def generate_graph(req: Request):
 
             print(f"Thread {threading.get_ident()} (worker): Prompt: '{prompt}'")
 
+            ct_prompt = ensure_bos_for_circuit_tracer(prompt)
+
             attribution_start = time.time()
             _graph = attribute(
-                prompt,
+                ct_prompt,
                 model,
                 max_n_logits=max_n_logits,
                 desired_logit_prob=desired_logit_prob,
