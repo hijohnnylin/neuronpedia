@@ -5,7 +5,7 @@ import { useNlaContext } from '@/components/provider/nla-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { Share2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cleanPartialText, computeRelativeMse, confidenceLabel } from './nla-utils';
@@ -399,7 +399,12 @@ export default function NLADetailsColumn() {
   }, [selectionPopover]);
 
   return (
-    <div ref={detailsColumnRef} className="relative flex min-h-0 w-full flex-1 flex-col rounded-md sm:rounded-xl">
+    <div
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion -- upstream type error
+      // under the pinned @types/react matrix in production `next build` (upstream CI runs no prod build).
+      ref={detailsColumnRef as RefObject<HTMLDivElement>}
+      className="relative flex min-h-0 w-full flex-1 flex-col rounded-md sm:rounded-xl"
+    >
       <div
         className={`relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-md bg-white px-0 pt-0 transition-[border-color,box-shadow] sm:rounded-xl ${
           isLocked && !isHydratingDemo ? 'border border-sky-600 shadow sm:border-2' : 'border-2 border-slate-100 shadow'
