@@ -198,6 +198,24 @@ else:
     )
 
 
+def ensure_bos_for_circuit_tracer(prompt: str) -> str:
+    """Prepend <bos> to gemma-3-it prompts for the circuit-tracer backend.
+
+    circuit-tracer's ReplacementModel.ensure_tokenized() tokenizes with
+    add_special_tokens=False and, for gemma-3 instruct models, asserts the
+    tokens already start with <bos><start_of_turn>user (unlike base models, it
+    does NOT auto-prepend BOS). The webapp sends a chat-templated prompt without
+    a leading <bos>, so add it here to satisfy that check.
+    """
+    is_gemma_3_it = "gemma-3" in loaded_model_arg and loaded_model_arg.endswith("-it")
+    if not is_gemma_3_it:
+        return prompt
+    tokens = model.tokenizer.encode(prompt, add_special_tokens=False)
+    if tokens and tokens[0] == model.tokenizer.bos_token_id:
+        return prompt
+    return model.tokenizer.bos_token + prompt
+
+
 def printMemory():
     if torch.cuda.is_available():
         current_memory = torch.cuda.memory_allocated() / (1024**3)
@@ -715,9 +733,11 @@ async def generate_graph(req: Request):
 
             print(f"Thread {threading.get_ident()} (worker): Prompt: '{prompt}'")
 
+            ct_prompt = ensure_bos_for_circuit_tracer(prompt)
+
             attribution_start = time.time()
             _graph = attribute(
-                prompt,
+                ct_prompt,
                 model,
                 max_n_logits=max_n_logits,
                 desired_logit_prob=desired_logit_prob,
