@@ -30,7 +30,7 @@ package = false
 # needs a newer NVIDIA driver than our GPU pods provide (they cap at CUDA 12.8).
 # Pin torch to PyTorch's CUDA 12.8 wheel index so it runs on those drivers.
 torch = { index = "pytorch-cu128" }
-circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.4.1" }
+circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.5.1" }
 llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b34" }
 
 [[tool.uv.index]]
