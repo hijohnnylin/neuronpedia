@@ -353,8 +353,13 @@ export function JlensPopupHost({
             collisionPadding={8}
             onOpenAutoFocus={(e) => e.preventDefault()}
             onCloseAutoFocus={(e) => e.preventDefault()}
-            onPointerEnter={clearHideTimer}
-            onPointerLeave={hideSoon}
+            // Hover-out close is desktop-only. On mobile a touch scroll of the
+            // content fires `pointercancel` + `pointerleave` on the Content once
+            // the browser takes over scrolling, which would otherwise dismiss the
+            // popup mid-scroll. Mobile dismissal is handled by the tap-outside
+            // effect instead.
+            onPointerEnter={isMobile ? undefined : clearHideTimer}
+            onPointerLeave={isMobile ? undefined : hideSoon}
             className={`shadow-0 z-50 rounded-2xl border-none bg-transparent p-0 pt-0 shadow-none outline-none data-[state=closed]:!duration-0 data-[state=open]:!duration-0 ${popupWidthClass}`}
           >
             <div
