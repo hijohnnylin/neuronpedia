@@ -102,6 +102,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# runpod-sdk is a server-external package (next.config.js) that the standalone output tracer
+# omits entirely, and it requires its own package.json at runtime — without this copy every
+# route importing lib/utils/inference.ts (e.g. /api/search-all) 500s with MODULE_NOT_FOUND.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/runpod-sdk ./node_modules/runpod-sdk
+
 # Copy Prisma files for runtime database operations
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 

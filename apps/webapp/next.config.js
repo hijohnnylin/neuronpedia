@@ -6,6 +6,10 @@ const nextConfig = {
   outputFileTracingRoot: __dirname,
   outputFileTracingIncludes: {
     '/api-doc': ['./app/api/**/*.{ts,tsx}'],
+    // runpod-sdk does require('../../package.json') at runtime; the standalone tracer copies its
+    // dist but not that file, so every route importing lib/utils/inference.ts 500s in the docker
+    // image (MODULE_NOT_FOUND). Force-include it for all routes.
+    '/**': ['./node_modules/runpod-sdk/package.json'],
   },
   pageExtensions: ['js', 'jsx', 'mdx', 'ts', 'tsx'],
   output: 'standalone', // for docker
