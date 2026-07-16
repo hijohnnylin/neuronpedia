@@ -75,7 +75,7 @@ https://github.com/user-attachments/assets/d7fbb46e-8522-4f98-aa08-21c6529424af
 
 > ⚠️ **warning:** your database will start out empty. you will need to use the admin panel to [import sources/data](#import-data-into-your-local-database) (activations, explanations, etc).
 
-> ⚠️ **warning:** the local database environment does not have any inference servers connected, so you won't be able to do activation testing, steering, etc initially. you will need to [configure a local inference instance]().
+> ⚠️ **warning:** the local database environment does not have any inference servers connected, so you won't be able to do activation testing, steering, etc initially. you will need to [configure a local inference instance](#i-want-to-rundevelop-inference-locally).
 
 #### Steps
 
