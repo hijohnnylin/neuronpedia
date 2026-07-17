@@ -1,3 +1,5 @@
+import { lookup } from 'node:dns/promises';
+import { isIPv4, isIPv6 } from 'node:net';
 import { MAX_TITLE_LENGTH } from '@/app/explorer/explorer-shared';
 
 export { detectTypeFromUrl } from './problem-url-types';
@@ -14,18 +16,101 @@ function decodeEntities(str: string): string {
     .replace(/&#x27;/g, "'");
 }
 
-const BLOCKED_IP_RANGES = [
-  /^127\./, // loopback
-  /^10\./, // RFC 1918
-  /^172\.(1[6-9]|2\d|3[01])\./, // RFC 1918
-  /^192\.168\./, // RFC 1918
-  /^169\.254\./, // link-local
-  /^0\./, // current network
-  /^100\.(6[4-9]|[7-9]\d|1[0-2]\d)\./, // shared address space
-  /^::1$/, // IPv6 loopback
-  /^f[cd]/, // IPv6 private
-  /^fe80:/, // IPv6 link-local
-];
+function ipv4IsBlocked(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) return true;
+  const [a, b] = parts;
+  if (a === 0) return true; // 0.0.0.0/8 (incl. unspecified)
+  if (a === 127) return true; // loopback
+  if (a === 10) return true; // RFC 1918
+  if (a === 172 && b >= 16 && b <= 31) return true; // RFC 1918
+  if (a === 192 && b === 168) return true; // RFC 1918
+  if (a === 169 && b === 254) return true; // link-local (incl. cloud metadata 169.254.169.254)
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT / shared address space
+  if (a >= 224) return true; // 224/4 multicast, 240/4 reserved, 255.255.255.255 broadcast
+  return false;
+}
+
+// Decode an IPv4-mapped / IPv4-compatible IPv6 address to its dotted v4 form.
+// Handles both the dotted (`::ffff:127.0.0.1`) and hex (`::ffff:7f00:1`, which
+// is how Node normalizes the former) representations. Returns null if the
+// address doesn't embed an IPv4.
+function extractEmbeddedV4(addr: string): string | null {
+  const dotted = addr.match(/((?:\d{1,3}\.){3}\d{1,3})$/);
+  if (dotted) return dotted[1];
+  // `::[ffff:]HHHH:LLLL` — the trailing 32 bits carry the IPv4.
+  const hex = addr.match(/^::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (hex) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+  }
+  return null;
+}
+
+function ipv6IsBlocked(ip: string): boolean {
+  const addr = ip.toLowerCase();
+  if (addr === '::' || addr === '::1') return true; // unspecified, loopback
+  if (addr.startsWith('fe80')) return true; // link-local
+  if (addr.startsWith('fc') || addr.startsWith('fd')) return true; // unique local fc00::/7
+  if (addr.startsWith('ff')) return true; // multicast
+  // IPv4-mapped/compatible (e.g. ::ffff:169.254.169.254): validate the embedded v4.
+  const embeddedV4 = extractEmbeddedV4(addr);
+  if (embeddedV4) return ipv4IsBlocked(embeddedV4);
+  return false;
+}
+
+function ipIsBlocked(ip: string): boolean {
+  if (isIPv4(ip)) return ipv4IsBlocked(ip);
+  if (isIPv6(ip)) return ipv6IsBlocked(ip);
+  return true; // unparseable → block
+}
+
+// Resolve the hostname and reject if ANY resolved address is private/internal.
+// Checking the resolved IPs (not the hostname string) is what defeats
+// attacker-controlled DNS records that point at internal hosts, and numeric/
+// alternate-encoding hosts (the WHATWG URL parser normalizes those to a dotted
+// IP that dns.lookup returns verbatim). Note: a determined DNS-rebinding
+// attacker could still flip the record between this check and the fetch's own
+// resolution (TOCTOU) — acceptable residual risk for this metadata fetcher.
+async function assertHostAllowed(hostname: string): Promise<void> {
+  const host = hostname.replace(/^\[|\]$/g, ''); // strip IPv6 literal brackets
+  let addresses: { address: string }[];
+  try {
+    addresses = await lookup(host, { all: true, verbatim: true });
+  } catch {
+    throw new Error('URLs pointing to private/internal networks are not allowed');
+  }
+  if (addresses.length === 0 || addresses.some(({ address }) => ipIsBlocked(address))) {
+    throw new Error('URLs pointing to private/internal networks are not allowed');
+  }
+}
+
+// fetch() wrapper that validates the target (scheme + resolved IPs) before each
+// request and follows redirects manually, re-validating every hop — an open
+// redirect to an internal host would otherwise bypass a one-time up-front check.
+async function safeFetch(startUrl: string, init: RequestInit, maxRedirects = 5): Promise<Response> {
+  let currentUrl = startUrl;
+  for (let hop = 0; ; hop += 1) {
+    const parsed = new URL(currentUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Only http and https URLs are allowed');
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await assertHostAllowed(parsed.hostname);
+    // eslint-disable-next-line no-await-in-loop
+    const res = await fetch(currentUrl, { ...init, redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) return res;
+      if (hop >= maxRedirects) throw new Error('Too many redirects');
+      res.body?.cancel().catch(() => {});
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+    return res;
+  }
+}
 
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024; // 2MB — some SSR apps (e.g. LessWrong) emit og: meta tags well past the first 512KB
 // We stop reading early once we've seen og:title AND og:description — these are the main signals we need.
@@ -120,20 +205,6 @@ async function fetchLessWrongMetadata(url: string): Promise<{
   }
 }
 
-function isPrivateUrl(urlString: string): boolean {
-  try {
-    const parsed = new URL(urlString);
-    const { hostname } = parsed;
-    if (hostname === 'localhost' || hostname === '[::1]') return true;
-    if (BLOCKED_IP_RANGES.some((re) => re.test(hostname))) return true;
-    // Block cloud metadata endpoints
-    if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') return true;
-    return false;
-  } catch {
-    return true;
-  }
-}
-
 export async function fetchUrlMetadata(url: string): Promise<{
   title: string | null;
   description: string | null;
@@ -141,11 +212,6 @@ export async function fetchUrlMetadata(url: string): Promise<{
 }> {
   const t0 = Date.now();
   console.log('[url-metadata] ▶ start', url);
-
-  if (isPrivateUrl(url)) {
-    console.log('[url-metadata] ✗ rejected as private URL', url);
-    throw new Error('URLs pointing to private/internal networks are not allowed');
-  }
 
   // LessWrong / Alignment Forum: their bot protection blocks server-side HTML fetches regardless
   // of headers (TLS fingerprinting). Use their public GraphQL API instead.
@@ -160,7 +226,7 @@ export async function fetchUrlMetadata(url: string): Promise<{
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await safeFetch(url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -178,7 +244,6 @@ export async function fetchUrlMetadata(url: string): Promise<{
         'Cache-Control': 'no-cache',
         Pragma: 'no-cache',
       },
-      redirect: 'follow',
       signal: controller.signal,
     });
   } catch (err) {

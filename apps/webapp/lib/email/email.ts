@@ -182,16 +182,10 @@ export const sendLoginEmail = async (emailAddress: string, signInURL: string) =>
           </td>
         </tr>
         <tr>
-          <td align="center" style="padding: 8px 40px 16px 40px;">
-            <table border="0" cellspacing="0" cellpadding="0">
-              <tr>
-                <td align="center" style="border-radius: 5px;">
-                  <a href="${signInURL}" target="_blank" style="font-size: 14px; font-family: Helvetica, Arial, sans-serif; color: ${buttonColor}; text-decoration: none; display: inline-block; font-weight: normal;">
-                    ${signInURL}
-                  </a>
-                </td>
-              </tr>
-            </table>
+          <td align="center" style="padding: 8px 40px 16px 40px; word-break: break-all; overflow-wrap: break-word;">
+            <a href="${signInURL}" target="_blank" style="font-size: 14px; font-family: Helvetica, Arial, sans-serif; color: ${buttonColor}; text-decoration: none; font-weight: normal; word-break: break-all; overflow-wrap: break-word;">
+              ${signInURL}
+            </a>
           </td>
         </tr>
         <tr>
