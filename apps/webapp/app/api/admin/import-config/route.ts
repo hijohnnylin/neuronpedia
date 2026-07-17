@@ -4,8 +4,11 @@ import { getAuthedAdminUser, RequestAuthedAdminUser, RequestOptionalUser, withOp
 import { NextResponse } from 'next/server';
 
 export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
-  if (!IS_LOCALHOST && request.user && !(await getAuthedAdminUser(request as RequestAuthedAdminUser))) {
-    return NextResponse.json({ error: 'This route is only available on localhost or to admin users' }, { status: 400 });
+  if (!IS_LOCALHOST && (!request.user || !(await getAuthedAdminUser(request as RequestAuthedAdminUser)))) {
+    return NextResponse.json(
+      { error: 'This route is only available on localhost or to admin users' },
+      { status: 403 },
+    );
   }
 
   await importConfigFromS3();

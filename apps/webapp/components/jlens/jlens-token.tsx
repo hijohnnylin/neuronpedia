@@ -259,25 +259,57 @@ export function JlensPopupHost({
   // On mobile the popup opens on tap, so there's no pointer-leave to close it.
   // Dismiss it when the user taps anywhere outside the popup and outside a
   // token (token taps are handled by the chip's own toggle).
+  //
+  // We must NOT dismiss on `pointerdown`: on touch devices the first touch of a
+  // scroll gesture is a pointerdown, so tearing the popup down then makes it
+  // impossible to scroll its (overflowing) contents. Instead we wait for
+  // `pointerup` and only dismiss on a genuine stationary tap — a scroll/drag
+  // either moves the pointer beyond a small tolerance or fires `pointercancel`
+  // (when the browser takes over scrolling), neither of which dismisses.
   useEffect(() => {
     if (!isMobile || !active) {
       return undefined;
     }
-    const onDocPointerDown = (e: PointerEvent) => {
-      const target = e.target as HTMLElement | null;
+    const MOVE_TOLERANCE_PX = 10;
+    let startX = 0;
+    let startY = 0;
+    let downTarget: HTMLElement | null = null;
+    const onPointerDown = (e: PointerEvent) => {
+      startX = e.clientX;
+      startY = e.clientY;
+      downTarget = e.target as HTMLElement | null;
+    };
+    const onPointerCancel = () => {
+      downTarget = null;
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      const target = downTarget;
+      downTarget = null;
       if (!target) {
         return;
       }
+      // A scroll/drag moved the pointer: treat it as a gesture, not a tap.
+      if (Math.abs(e.clientX - startX) > MOVE_TOLERANCE_PX || Math.abs(e.clientY - startY) > MOVE_TOLERANCE_PX) {
+        return;
+      }
+      // Token taps are handled by the chip's own toggle.
       if (target.closest('[data-token-position]')) {
         return;
       }
+      // A tap inside the popup (e.g. selecting a row) must not dismiss it.
       if (contentRef.current && contentRef.current.contains(target)) {
         return;
       }
       closeNow();
     };
-    document.addEventListener('pointerdown', onDocPointerDown, true);
-    return () => document.removeEventListener('pointerdown', onDocPointerDown, true);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('pointerup', onPointerUp, true);
+    document.addEventListener('pointercancel', onPointerCancel, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('pointerup', onPointerUp, true);
+      document.removeEventListener('pointercancel', onPointerCancel, true);
+    };
   }, [isMobile, active, closeNow]);
 
   // Keep the sidebar's position readout in sync with the open popup.
@@ -321,8 +353,13 @@ export function JlensPopupHost({
             collisionPadding={8}
             onOpenAutoFocus={(e) => e.preventDefault()}
             onCloseAutoFocus={(e) => e.preventDefault()}
-            onPointerEnter={clearHideTimer}
-            onPointerLeave={hideSoon}
+            // Hover-out close is desktop-only. On mobile a touch scroll of the
+            // content fires `pointercancel` + `pointerleave` on the Content once
+            // the browser takes over scrolling, which would otherwise dismiss the
+            // popup mid-scroll. Mobile dismissal is handled by the tap-outside
+            // effect instead.
+            onPointerEnter={isMobile ? undefined : clearHideTimer}
+            onPointerLeave={isMobile ? undefined : hideSoon}
             className={`shadow-0 z-50 rounded-2xl border-none bg-transparent p-0 pt-0 shadow-none outline-none data-[state=closed]:!duration-0 data-[state=open]:!duration-0 ${popupWidthClass}`}
           >
             <div

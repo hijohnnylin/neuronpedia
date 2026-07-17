@@ -33,8 +33,16 @@ Please adhere to the following:
 
 ## AI Coding / Agents
 
-- Code written or assisted by AI and/or AI agents is welcome
+- Code written or assisted by AI and/or AI agents is welcome, however, we ask that you (the human) manually review all code and verify correct functionality first.
 - We've also added some [Cursor Rules](https://docs.cursor.com/context/rules-for-ai) files, though they are not extensive
+
+## Contributing Terms
+
+By submitting a contribution to this project, you agree that your contribution is
+licensed to the project under the terms of the [Contributor License Agreement](./CLA.md),
+which grants the project the right to use, distribute, and sublicense your contribution,
+including under license terms that differ from the project's current license. You retain
+copyright to your work.
 
 ## Code of Conduct
 

@@ -514,6 +514,15 @@ export function hideTooltip() {
   d3.select('.tooltip').classed('tooltip-hidden', true);
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function showTooltip(ev: MouseEvent, d: CLTGraphNode, overrideClerp?: string) {
   const tooltipSel = d3.select('.tooltip');
   const x = ev.clientX;
@@ -525,8 +534,16 @@ export function showTooltip(ev: MouseEvent, d: CLTGraphNode, overrideClerp?: str
 
   const clerp = overrideClerp || d.ppClerp || `F#${d.feature}`;
 
+  // `clerp` is fully user-controlled (uploaded graph node labels, the `?clerps=`
+  // and `?supernodes=` query params, and in-app label edits) and is injected
+  // into the tooltip via d3's `.html()` (innerHTML), so it must be HTML-escaped
+  // to prevent stored/reflected XSS. We escape everything, then re-allow only
+  // `<br>`/`<br/>` line breaks (which carry no attributes and cannot execute
+  // script) so the intended ` <br/> ` separators from makeTooltipText survive.
+  const safeClerp = escapeHtml(clerp).replace(/&lt;br\s*\/?&gt;/gi, '<br/>');
+
   const tooltipHtml = `<div className="text-center flex flex-col items-center justify-center">
-  ${clerp}
+  ${safeClerp}
   ${ev.metaKey ? `<div className="text-slate-400 text-center mt-1 text-[7px]" > Holding CMD/Ctrl: Click to Pin to Subgraph</div>` : ''}
 </div>`;
   // if (ev.metaKey) {

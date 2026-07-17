@@ -16,7 +16,7 @@ export default function FeatureModal() {
           onPointerDownOutside={() => {
             setFeatureModalOpen(false);
           }}
-          className="fixed left-[50%] top-[50%] z-50 flex h-[100vh] max-h-[100vh] w-[100vw] max-w-[100%] translate-x-[-50%] translate-y-[-50%] flex-col overflow-y-scroll bg-slate-50 shadow-xl focus:outline-none sm:top-[50%] sm:h-[90vh] sm:max-h-[90vh] sm:w-[65vw] sm:max-w-[65%] sm:rounded-md"
+          className="fixed left-[50%] top-[50%] z-50 mt-12 flex h-[100vh] max-h-[100vh] w-[100vw] max-w-[100%] translate-x-[-50%] translate-y-[-50%] flex-col overflow-y-scroll bg-slate-50 shadow-xl focus:outline-none sm:top-[50%] sm:mt-0 sm:h-[90vh] sm:max-h-[90vh] sm:w-[65vw] sm:max-w-[65%] sm:rounded-md"
         >
           <div className="sticky top-0 z-20 w-full flex-col items-center border-slate-300">
             <div className="mb-0 flex w-full flex-row items-start justify-between gap-x-4 rounded-t-md border-b bg-white px-2 pb-2 pt-2 sm:px-4">

@@ -81,8 +81,8 @@ export const authOptions: NextAuthOptions = {
         : {
             // Use custom handling for AWS/Resend
             generateVerificationToken() {
-              const random = crypto.getRandomValues(new Uint8Array(8));
-              return Buffer.from(random).toString('hex').slice(0, 6);
+              const random = crypto.getRandomValues(new Uint8Array(32));
+              return Buffer.from(random).toString('hex');
             },
             async sendVerificationRequest(params) {
               const { identifier } = params;
