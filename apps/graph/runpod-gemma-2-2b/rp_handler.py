@@ -339,7 +339,11 @@ def steer_handler(event):
         topk_steered_by_token = []
 
         with torch.inference_mode():
-            default_logits = model(default_generation)
+            # Pass token IDs directly to avoid retokenization (which can
+            # prepend a duplicate BOS and shift logit positions by one).
+            default_logits = model(default_tokenized.unsqueeze(0))
+            if default_logits.dim() == 2:
+                default_logits = default_logits.unsqueeze(0)
 
             # iterate through the tokens and get the logits
             for i in range(len(default_tokenized_str_tokens)):
