@@ -36,7 +36,7 @@ export default function NavBar({ session }: { session: Session | null }) {
   return (
     <>
       <SignInModal />
-      <div className="fixed top-0 z-20 w-full select-none border-b border-slate-200 bg-white px-5 transition-all sm:pr-8">
+      <div className="fixed top-0 z-20 w-full select-none border-b border-slate-200 bg-white px-5 transition-all dark:border-slate-800 dark:bg-slate-900 sm:pr-8">
         <GithubCorner
           href="https://github.com/hijohnnylin/neuronpedia#readme"
           size={36}
@@ -61,10 +61,10 @@ export default function NavBar({ session }: { session: Session | null }) {
               {SITE_NAME_VERCEL_DEPLOY ? (
                 <p className="ml-1.5 font-medium text-[#7B3F00] sm:mt-0">{SITE_NAME_VERCEL_DEPLOY}</p>
               ) : (
-                <p className="flex flex-col items-start justify-start gap-y-[1px] pl-0.5 font-normal text-sky-800 sm:mt-0">
+                <p className="flex flex-col items-start justify-start gap-y-[1px] pl-0.5 font-normal text-sky-800 dark:text-sky-400 sm:mt-0">
                   Neuronpedia
                   {pathname.endsWith('/graph') ? (
-                    <span className="hidden whitespace-nowrap text-[9px] font-semibold uppercase leading-none text-slate-600 sm:inline">
+                    <span className="hidden whitespace-nowrap text-[9px] font-semibold uppercase leading-none text-slate-600 dark:text-slate-400 sm:inline">
                       {' '}
                       Circuit Tracer
                     </span>
@@ -100,7 +100,7 @@ export default function NavBar({ session }: { session: Session | null }) {
           </div>
 
           <div className="flex-inline flex items-center">
-            <div className="hidden select-none items-center justify-end gap-0 gap-x-0.5 font-light text-slate-500 sm:flex">
+            <div className="hidden select-none items-center justify-end gap-0 gap-x-0.5 font-light text-slate-500 dark:text-slate-400 sm:flex">
               <NavBarButtons />
             </div>
 
@@ -110,12 +110,14 @@ export default function NavBar({ session }: { session: Session | null }) {
               <>
                 <button
                   type="button"
-                  className="flex h-9 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm transition-all duration-75 hover:bg-slate-50 focus:outline-none sm:ml-2.5 sm:h-8"
+                  className="flex h-9 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm transition-all duration-75 hover:bg-slate-50 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 sm:ml-2.5 sm:h-8"
                   onClick={() => {
                     setSignInModalOpen(true);
                   }}
                 >
-                  <p className="w-full whitespace-nowrap text-center text-xs font-normal text-slate-600">Sign In</p>
+                  <p className="w-full whitespace-nowrap text-center text-xs font-normal text-slate-600 dark:text-slate-300">
+                    Sign In
+                  </p>
                 </button>
                 <UserDropdown session={session} />
               </>

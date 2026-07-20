@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import InferenceActivationAllProvider from '../provider/inference-activation-all-provider';
 import ReleasesDropdown from './releases-dropdown';
+import ThemeToggle from './theme-toggle';
 
 export default function NavBarButtons() {
   const router = useRouter();
@@ -425,17 +426,19 @@ export default function NavBarButtons() {
         API
       </Link>
 
+      <ThemeToggle />
+
       <Link
         href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3z9o0hxjl-MDX9pbATO2qESOazNDLpdQ"
         target="_blank"
         rel="noreferrer"
-        className="flex cursor-pointer items-center whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-medium text-emerald-700 transition-all hover:bg-emerald-200 hover:text-emerald-700 focus:outline-none data-[state=open]:bg-emerald-700 data-[state=open]:text-white sm:mr-1"
+        className="flex cursor-pointer items-center whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-medium text-emerald-700 transition-all hover:bg-emerald-200 hover:text-emerald-700 focus:outline-none data-[state=open]:bg-emerald-700 data-[state=open]:text-white dark:bg-emerald-950 dark:text-emerald-400 dark:hover:bg-emerald-900 sm:mr-1"
       >
         <MessagesSquare className="mr-1.5 h-3.5 w-3.5" /> Community
       </Link>
       <Link
         href="/blog"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full bg-sky-100 px-3 py-1 text-[13px] font-medium text-sky-700 transition-all hover:bg-sky-200 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full bg-sky-100 px-3 py-1 text-[13px] font-medium text-sky-700 transition-all hover:bg-sky-200 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white dark:bg-sky-950 dark:text-sky-400 dark:hover:bg-sky-900"
       >
         <RssIcon className="mr-1.5 h-3.5 w-3.5" /> Blog
       </Link>

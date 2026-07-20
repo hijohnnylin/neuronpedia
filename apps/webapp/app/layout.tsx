@@ -1,6 +1,7 @@
 import Navbar from '@/components/nav/navbar';
 import AuthProvider from '@/components/provider/auth-provider';
 import { Providers } from '@/components/provider/providers';
+import { ThemeProvider } from '@/components/provider/theme-provider';
 import SimilarityMatrixModal from '@/components/similarity-matrix-modal';
 import Toast from '@/components/toast';
 import {
@@ -86,36 +87,40 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isEmbed = headersList.get('x-is-embed') === 'true';
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`flex min-h-[100dvh] flex-col bg-slate-50 bg-fixed ${inter.className} ${
+        className={`flex min-h-[100dvh] flex-col bg-slate-50 bg-fixed text-slate-900 dark:bg-slate-950 dark:text-slate-200 ${inter.className} ${
           isEmbed ? 'overscroll-auto' : 'overscroll-none'
         }`}
       >
-        <AuthProvider session={session}>
-          <Providers
-            initialModels={initialModels}
-            initialExplanationTypes={explanationTypes}
-            initialExplanationModels={explanationModels}
-            initialReleases={releases}
-            initialExplanationScoreTypes={explanationScoreTypes}
-            initialExplanationScoreModelTypes={explanationScoreModelTypes}
-          >
-            <Toast />
-            {!isEmbed && (
-              <Suspense fallback="">
-                <Navbar session={session} />
-              </Suspense>
-            )}
-            <FeatureModal />
-            <SimilarityMatrixModal />
-            <main className={`flex w-full flex-1 flex-col items-center gap-0 ${isEmbed ? 'pt-0' : 'pt-12 sm:pt-12'}`}>
-              {children}
-            </main>
-            {!isEmbed && <Footer />}
-            {ENABLE_VERCEL_ANALYTICS && <Analytics />}
-          </Providers>
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider session={session}>
+            <Providers
+              initialModels={initialModels}
+              initialExplanationTypes={explanationTypes}
+              initialExplanationModels={explanationModels}
+              initialReleases={releases}
+              initialExplanationScoreTypes={explanationScoreTypes}
+              initialExplanationScoreModelTypes={explanationScoreModelTypes}
+            >
+              <Toast />
+              {!isEmbed && (
+                <Suspense fallback="">
+                  <Navbar session={session} />
+                </Suspense>
+              )}
+              <FeatureModal />
+              <SimilarityMatrixModal />
+              <main
+                className={`flex w-full flex-1 flex-col items-center gap-0 ${isEmbed ? 'pt-0' : 'pt-12 sm:pt-12'}`}
+              >
+                {children}
+              </main>
+              {!isEmbed && <Footer />}
+              {ENABLE_VERCEL_ANALYTICS && <Analytics />}
+            </Providers>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
