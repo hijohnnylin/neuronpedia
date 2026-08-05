@@ -6,7 +6,11 @@ authors = ["Neuronpedia <johnny@neuronpedia.org>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-typer = {version = "^0.12.0"}
+# `^0.12.0` capped typer below 0.13, which is incompatible with click >= 8.2 ("Secondary flag is not
+# valid for non-boolean flag" at import time). Since typer is a hard dependency, that cap broke the
+# `hf` CLI entirely in any environment installing this package. Only typer.Typer/Option/Context/Abort
+# and typer.run are used here, all stable across the range.
+typer = {version = ">=0.12.0,<1.0.0"}
 sae-dashboard = ">=0.6.8,<0.9"
 cuid2 = "^2.0.0"
 python-dotenv = "^1.0.0"
