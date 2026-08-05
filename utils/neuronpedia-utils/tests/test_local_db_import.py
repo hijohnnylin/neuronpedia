@@ -2470,3 +2470,105 @@ def test_iter_jsonb_record_payloads_raises_for_single_oversized_record() -> None
                 records, chunk_size=10, max_payload_bytes=100
             )
         )
+
+
+def _write_activation_manifest(
+    tmp_path: Path, *, declared: dict[str, str], present: tuple[str, ...]
+) -> Path:
+    """A feature-batch manifest declaring `declared`, with only `present` written to disk."""
+    pyarrow = pytest.importorskip("pyarrow")
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+
+    feature_batch_dir = tmp_path / "batch-0.columnar" / "feature_batch_0"
+    feature_batch_dir.mkdir(parents=True)
+    for table_name in present:
+        pyarrow_parquet.write_table(
+            pyarrow.table({"feature_index": [0], "sequence_index": [0]}),
+            str(feature_batch_dir / declared[table_name]),
+        )
+    manifest_path = feature_batch_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"dashboard_output_format": "columnar", "tables": declared}),
+        encoding="utf-8",
+    )
+    return manifest_path
+
+
+def test_preferred_activation_table_prefers_copy_rows_when_present(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_activation_manifest(
+        tmp_path,
+        declared={
+            "activation_copy_rows": "activation_copy_rows.parquet",
+            "activation_rows": "activation_rows.parquet",
+        },
+        present=("activation_copy_rows", "activation_rows"),
+    )
+
+    table_name, _ = db_import._preferred_activation_table_path(manifest_path)
+
+    assert table_name == "activation_copy_rows"
+
+
+def test_preferred_activation_table_falls_back_when_declared_table_is_absent(
+    tmp_path: Path,
+) -> None:
+    """A manifest may declare a table a publisher chose not to ship.
+
+    `activation_copy_rows` is a pre-flattened duplicate of `activation_rows` and roughly 45% of a
+    corpus, so omitting it to save transfer is reasonable. Aborting on the declared-but-absent
+    preferred table made such a corpus unimportable even though a complete alternative encoding of
+    the same activations sat beside it.
+    """
+    manifest_path = _write_activation_manifest(
+        tmp_path,
+        declared={
+            "activation_copy_rows": "activation_copy_rows.parquet",
+            "activation_rows": "activation_rows.parquet",
+        },
+        present=("activation_rows",),
+    )
+
+    table_name, table_path = db_import._preferred_activation_table_path(manifest_path)
+
+    assert table_name == "activation_rows"
+    assert table_path.exists()
+
+
+def test_preferred_activation_table_reports_paths_tried_when_all_are_absent(
+    tmp_path: Path,
+) -> None:
+    """Declared-but-all-absent is an incomplete corpus, not an unsupported one.
+
+    It has a different cause and a different fix from 'nothing declared', so the two must not share
+    an error message -- and listing the paths tried is what makes a truncated download diagnosable.
+    """
+    manifest_path = _write_activation_manifest(
+        tmp_path,
+        declared={"activation_copy_rows": "activation_copy_rows.parquet"},
+        present=(),
+    )
+
+    with pytest.raises(
+        db_import.NeuronpediaLocalDBImportError, match="none of them exist on disk"
+    ) as excinfo:
+        db_import._preferred_activation_table_path(manifest_path)
+
+    assert "activation_copy_rows.parquet" in str(excinfo.value)
+
+
+def test_preferred_activation_table_still_raises_when_none_declared(
+    tmp_path: Path,
+) -> None:
+    manifest_path = _write_activation_manifest(
+        tmp_path,
+        declared={"feature_statistics": "feature_statistics.parquet"},
+        present=(),
+    )
+
+    with pytest.raises(
+        db_import.NeuronpediaLocalDBImportError,
+        match="missing Activation import tables",
+    ):
+        db_import._preferred_activation_table_path(manifest_path)

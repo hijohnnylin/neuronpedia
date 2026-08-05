@@ -728,16 +728,31 @@ def _preferred_activation_table_path(manifest_path: Path) -> tuple[str, Path]:
             f"Columnar manifest {manifest_path} must contain a tables object."
         )
 
+    # A declared-but-absent table falls through to the next candidate rather than aborting the
+    # import. The tables in the priority list are alternative encodings of the same activations, so
+    # any one of them is sufficient; aborting on the first missing file made a corpus unimportable
+    # whenever a publisher omitted the preferred table while the manifest still declared it --
+    # `activation_copy_rows` is a pre-flattened duplicate of `activation_rows` and roughly 45% of a
+    # corpus, so omitting it to save transfer is a reasonable thing for a publisher to do.
+    missing: list[str] = []
     for table_name in SAEDASHBOARD_COLUMNAR_ACTIVATION_TABLE_PRIORITY:
         if table_name not in tables:
             continue
         table_path = manifest_path.parent / str(tables[table_name])
         if not table_path.exists():
-            raise NeuronpediaLocalDBImportError(
-                f"Columnar table {table_path} for {table_name} referenced by {manifest_path} does not exist."
-            )
+            missing.append(f"{table_name} -> {table_path}")
+            continue
         return table_name, table_path
 
+    # Distinguish the two ways to get here: nothing declared at all, versus everything declared but
+    # absent on disk. They have different causes and different fixes, and reporting the paths that
+    # were tried is what makes an incomplete download diagnosable.
+    if missing:
+        raise NeuronpediaLocalDBImportError(
+            f"Columnar manifest {manifest_path} declares Activation import tables, but none of them "
+            f"exist on disk: {missing}. The corpus is incomplete -- re-download it, or regenerate "
+            f"with one of {list(SAEDASHBOARD_COLUMNAR_ACTIVATION_TABLE_PRIORITY)} emitted."
+        )
     raise NeuronpediaLocalDBImportError(
         f"Columnar manifest {manifest_path} is missing Activation import tables: "
         f"{list(SAEDASHBOARD_COLUMNAR_ACTIVATION_TABLE_PRIORITY)}."
