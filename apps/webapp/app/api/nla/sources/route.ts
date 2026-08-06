@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
+// Reads the DB per-request; must not be statically prerendered at build time
+// (production `next build` has no database, e.g. the localhost Docker image build).
+export const dynamic = 'force-dynamic';
+
 /**
  * @swagger
  * /api/nla/sources:

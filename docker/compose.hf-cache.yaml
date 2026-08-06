@@ -4,11 +4,11 @@
 services:
   inference:
     volumes:
-      - ${HOME}/.cache/huggingface/hub:/root/.cache/huggingface/hub
+      - ${HF_HUB_CACHE}:/root/.cache/huggingface/hub
   autointerp:
     volumes:
-      - ${HOME}/.cache/huggingface/hub:/root/.cache/huggingface/hub
+      - ${HF_HUB_CACHE}:/root/.cache/huggingface/hub
   graph:
     volumes:
-      - ${HOME}/.cache/huggingface/hub:/root/.cache/huggingface/hub
+      - ${HF_HUB_CACHE}:/root/.cache/huggingface/hub
 

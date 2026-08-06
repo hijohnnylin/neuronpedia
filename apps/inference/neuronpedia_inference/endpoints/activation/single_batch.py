@@ -22,6 +22,7 @@ from nnterp import StandardizedTransformer
 from transformer_lens import ActivationCache, HookedTransformer
 
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.endpoints.activation.nnsight_hooks import save_nnsight_hook_outputs
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, with_request_lock
 
@@ -291,12 +292,7 @@ def process_activations_batch(
     if isinstance(model, StandardizedTransformer):
         layer_num = get_layer_num_from_sae_id(layer)
         with model.trace(padded_tokens):
-            if "resid_post" in hook_name:
-                outputs = nnsight.save(model.layers_output[layer_num])
-            elif "hook_mlp_in" in hook_name:
-                outputs = nnsight.save(model.mlps_input[layer_num])
-            else:
-                raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
+            outputs = save_nnsight_hook_outputs(model, hook_name, layer_num)
         cache = {hook_name: outputs}
     else:
         _, cache = model.run_with_cache(padded_tokens)

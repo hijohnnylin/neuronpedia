@@ -112,4 +112,16 @@ TLENS_MODEL_ID_TO_HF_MODEL_ID = {
 def replace_tlens_model_id_with_hf_model_id(model_id: str) -> str:
     if model_id in TLENS_MODEL_ID_TO_HF_MODEL_ID:
         return TLENS_MODEL_ID_TO_HF_MODEL_ID[model_id]
+    if model_id.startswith("gemma-3-") and "/" not in model_id:
+        return f"google/{model_id}"
     return model_id
+
+
+def resolve_model_id_for_load(
+    model_id: str,
+    override_model_id: str | None = None,
+    custom_hf_model_id: str | None = None,
+) -> str:
+    return replace_tlens_model_id_with_hf_model_id(
+        custom_hf_model_id or override_model_id or model_id
+    )

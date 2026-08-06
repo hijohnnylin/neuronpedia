@@ -52,6 +52,8 @@ package = false
 
 [tool.uv.sources]
 transformer-lens = { git = "https://github.com/hijohnnylin/TransformerLens.git", branch = "temp_branch_version" }
+# Fork pin: gemma-scope-2 Neuronpedia alias metadata (flip to a released floor after the SL PR merges).
+sae-lens = { git = "https://github.com/speediedan/SAELens.git", branch = "streamlined-streamable-dashboard-generation-phase-1" }
 neuronpedia-inference-client = { path = "../../packages/python/neuronpedia-inference-client" }
 # steerllm must match the (non-editable) source declared in vendor/chatspace's
 # own pyproject.toml, otherwise uv reports a conflicting-URL error.

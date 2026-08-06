@@ -52,9 +52,9 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${POSTGRES_DATA_DIR:-/var/lib/postgresql/data}:/var/lib/postgresql/data
       - ../apps/webapp/prisma/pgvector-init:/docker-entrypoint-initdb.d
 
   inference:
@@ -131,9 +131,6 @@ services:
     environment:
       - HF_TOKEN=${HF_TOKEN}
       - SECRET=${GRAPH_SERVER_SECRET}
-
-volumes:
-  postgres_data:
 
 networks:
   default:

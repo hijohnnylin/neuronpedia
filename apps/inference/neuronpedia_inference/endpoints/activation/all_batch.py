@@ -23,6 +23,7 @@ from neuronpedia_inference_client.models.activation_all_post200_response_activat
     ActivationAllPost200ResponseActivationsInner,
 )
 from nnterp import StandardizedTransformer
+from neuronpedia_inference.endpoints.activation.nnsight_hooks import save_nnsight_hook_outputs
 from transformer_lens import ActivationCache
 
 # from transformer_lens.model_bridge import TransformerBridge
@@ -331,21 +332,7 @@ class ActivationProcessor:
                     for selected_source in ordered_selected_sources:
                         layer_num = self._get_layer_num(selected_source)
                         hook_name = sae_manager.get_sae_hook(selected_source)
-                        if "resid_post" in hook_name:
-                            outputs = nnsight.save(model.layers_output[layer_num])
-                        elif "resid_pre" in hook_name:
-                            if layer_num == 0:
-                                outputs = nnsight.save(model.embeddings_output)
-                            else:
-                                outputs = nnsight.save(
-                                    model.layers_output[layer_num - 1]
-                                )
-                        elif "hook_mlp_in" in hook_name:
-                            outputs = nnsight.save(model.mlps_input[layer_num])
-                        else:
-                            raise ValueError(
-                                f"Unsupported hook name for nnsight: {hook_name}"
-                            )
+                        outputs = save_nnsight_hook_outputs(model, hook_name, layer_num)
                         cache[hook_name] = outputs
             else:
                 if max_layer:

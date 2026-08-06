@@ -21,6 +21,7 @@ from transformer_lens import ActivationCache
 
 # from transformer_lens.model_bridge import TransformerBridge
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.endpoints.activation.nnsight_hooks import save_nnsight_hook_outputs
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, with_request_lock
 
@@ -219,14 +220,7 @@ class ActivationProcessor:
                     for selected_source in ordered_selected_sources:
                         layer_num = self._get_layer_num(selected_source)
                         hook_name = sae_manager.get_sae_hook(selected_source)
-                        if "resid_post" in hook_name:
-                            outputs = nnsight.save(model.layers_output[layer_num])
-                        elif "hook_mlp_in" in hook_name:
-                            outputs = nnsight.save(model.mlps_input[layer_num])
-                        else:
-                            raise ValueError(
-                                f"Unsupported hook name for nnsight: {hook_name}"
-                            )
+                        outputs = save_nnsight_hook_outputs(model, hook_name, layer_num)
                         cache[hook_name] = outputs
             else:
                 # if isinstance(model, TransformerBridge) and tokens.ndim == 1:
