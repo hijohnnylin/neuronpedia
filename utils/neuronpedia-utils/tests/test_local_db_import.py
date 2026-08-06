@@ -2572,3 +2572,129 @@ def test_preferred_activation_table_still_raises_when_none_declared(
         match="missing Activation import tables",
     ):
         db_import._preferred_activation_table_path(manifest_path)
+
+
+def _summary_with(
+    bundle: dict[str, int], imported: dict[str, int], root: Path
+) -> Any:
+    return db_import.NeuronpediaLocalImportSummary(
+        export_root=root,
+        bundle_row_counts=bundle,
+        imported_row_counts=imported,
+        processed_files=[],
+        elapsed_seconds=0.1,
+        table_load_seconds={},
+        table_import_seconds={},
+    )
+
+
+def test_skipped_existing_row_counts_reports_declined_payload_rows(
+    tmp_path: Path,
+) -> None:
+    """A re-import over an occupied set inserts nothing; the summary has to say so."""
+    summary = _summary_with(
+        {"Neuron": 16384, "Activation": 620000},
+        {"Neuron": 0, "Activation": 0},
+        tmp_path,
+    )
+
+    assert summary.skipped_existing_row_counts == {
+        "Neuron": 16384,
+        "Activation": 620000,
+    }
+
+
+def test_skipped_existing_row_counts_ignores_per_layer_metadata_conflicts(
+    tmp_path: Path,
+) -> None:
+    """Model/Source rows are re-offered on every layer, so declining them is routine, not a signal."""
+    summary = _summary_with(
+        {"Model": 1, "SourceSet": 1, "Source": 1, "Neuron": 16384, "Activation": 620000},
+        {"Model": 0, "SourceSet": 0, "Source": 1, "Neuron": 16384, "Activation": 620000},
+        tmp_path,
+    )
+
+    assert summary.skipped_existing_row_counts == {}
+
+
+def test_skipped_existing_row_counts_empty_on_a_clean_import(tmp_path: Path) -> None:
+    summary = _summary_with(
+        {"Neuron": 16384, "Activation": 620000},
+        {"Neuron": 16384, "Activation": 620000},
+        tmp_path,
+    )
+
+    assert summary.skipped_existing_row_counts == {}
+
+
+def test_warn_on_skipped_existing_rows_emits_a_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    summary = _summary_with({"Neuron": 10}, {"Neuron": 0}, tmp_path)
+
+    with caplog.at_level("WARNING", logger=db_import.logger.name):
+        skipped = db_import.warn_on_skipped_existing_rows(summary, context="layer 3")
+
+    assert skipped == {"Neuron": 10}
+    assert len(caplog.records) == 1
+    message = caplog.records[0].getMessage()
+    assert "layer 3" in message
+    assert "Neuron=10" in message
+    assert "ON CONFLICT DO NOTHING" in message
+
+
+def test_warn_on_skipped_existing_rows_stays_quiet_when_everything_landed(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    summary = _summary_with({"Neuron": 10}, {"Neuron": 10}, tmp_path)
+
+    with caplog.at_level("WARNING", logger=db_import.logger.name):
+        assert db_import.warn_on_skipped_existing_rows(summary) == {}
+
+    assert caplog.records == []
+
+
+def test_bundle_import_warns_when_the_target_source_set_is_occupied(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """End to end through the real roll-up: the no-op must not be silent."""
+    columnar_root = tmp_path / "batch-0.columnar"
+
+    def _fake(table_name: str, attempted: int, imported: int):
+        def _call(connection: Any, root: Path, **kwargs: Any) -> Any:
+            return _summary_with({table_name: attempted}, {table_name: imported}, root)
+
+        return _call
+
+    monkeypatch.setattr(
+        db_import,
+        "import_saedashboard_columnar_metadata_local_db_with_connection",
+        _fake("Source", 1, 0),
+    )
+    monkeypatch.setattr(
+        db_import,
+        "import_saedashboard_columnar_neurons_local_db_with_connection",
+        _fake("Neuron", 16384, 0),
+    )
+    monkeypatch.setattr(
+        db_import,
+        "import_saedashboard_columnar_activations_local_db_with_connection",
+        _fake("Activation", 620000, 0),
+    )
+
+    with caplog.at_level("WARNING", logger=db_import.logger.name):
+        summary = db_import.import_saedashboard_columnar_bundle_local_db_with_connection(
+            object(),
+            columnar_root,
+            model_id="model-a",
+            source_set_name="source-set-a",
+            source_id="9-source-set-a",
+            creator_id="creator-a",
+            decode_token_ids=lambda token_ids: [str(t) for t in token_ids],
+        )
+
+    assert summary.skipped_existing_row_counts == {"Neuron": 16384, "Activation": 620000}
+    assert len(caplog.records) == 1
+    assert "636384 row(s) were NOT imported" in caplog.records[0].getMessage()

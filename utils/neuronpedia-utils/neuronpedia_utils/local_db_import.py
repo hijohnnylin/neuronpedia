@@ -4,12 +4,20 @@ import argparse
 import gzip
 import importlib
 import json
+import logging
 import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import asdict, dataclass, field, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+
+logger = logging.getLogger(__name__)
+
+#: Tables whose declined rows mean the corpus itself did not land. Metadata tables (``Model``,
+#: ``SourceSet``, ``Source``) are deliberately re-offered on every layer, so their conflicts are
+#: routine and carry no signal.
+SKIP_SIGNIFICANT_TABLES = ("Neuron", "Activation")
 
 DEFAULT_COLUMNAR_IMPORT_TABLES = frozenset({"Activation"})
 DEFAULT_COLUMNAR_COPY_IMPORT_TABLES = frozenset({"Activation"})
@@ -165,6 +173,57 @@ class NeuronpediaLocalImportSummary:
     )
     deduplicated_row_counts: dict[str, int] = field(default_factory=dict)
     zero_dropped_row_counts: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def skipped_existing_row_counts(self) -> dict[str, int]:
+        """Payload rows the import offered that the database already had, per table.
+
+        Every insert path here is ``ON CONFLICT DO NOTHING``, which makes a re-import over an
+        occupied source set *look* successful while writing nothing. This is the difference the
+        caller needs to tell "imported" from "silently declined"; ``warn_on_skipped_existing_rows``
+        turns it into a log line so the no-op is never silent.
+
+        Restricted to ``SKIP_SIGNIFICANT_TABLES``: the metadata tables are re-offered once per layer
+        by design, so on a 26-layer corpus 25 of the 26 ``Model`` rows are *expected* to be declined
+        and warning about them would bury the one signal that matters.
+        """
+        skipped: dict[str, int] = {}
+        for table_name in SKIP_SIGNIFICANT_TABLES:
+            attempted = int(self.bundle_row_counts.get(table_name, 0))
+            if not attempted:
+                continue
+            difference = attempted - int(self.imported_row_counts.get(table_name, 0))
+            if difference > 0:
+                skipped[table_name] = difference
+        return skipped
+
+
+def warn_on_skipped_existing_rows(
+    summary: NeuronpediaLocalImportSummary,
+    *,
+    context: str | None = None,
+) -> dict[str, int]:
+    """Log a warning for any rows ``ON CONFLICT DO NOTHING`` declined. Returns those counts.
+
+    Called at every roll-up rather than only at the end of a run: a per-layer warning names the
+    layer that collided, whereas one aggregate line at the end cannot say which part of a 26-layer
+    corpus was already resident.
+    """
+    skipped = summary.skipped_existing_row_counts
+    if not skipped:
+        return skipped
+    detail = ", ".join(
+        f"{table_name}={row_count}" for table_name, row_count in sorted(skipped.items())
+    )
+    logger.warning(
+        "%s: %s row(s) were NOT imported because matching rows already exist (ON CONFLICT DO "
+        "NOTHING): %s. This is not an error, but importing over an occupied source set writes "
+        "nothing -- import under a different source set id, or clear the existing rows first.",
+        context or str(summary.export_root),
+        sum(skipped.values()),
+        detail,
+    )
+    return skipped
 
 
 @dataclass(frozen=True)
@@ -2284,7 +2343,7 @@ def _combine_local_import_summaries(
             )
         processed_files.extend(summary.processed_files)
 
-    return NeuronpediaLocalImportSummary(
+    combined = NeuronpediaLocalImportSummary(
         export_root=Path(export_root),
         bundle_row_counts=bundle_row_counts,
         imported_row_counts=imported_row_counts,
@@ -2296,6 +2355,8 @@ def _combine_local_import_summaries(
         deduplicated_row_counts=deduplicated_row_counts,
         zero_dropped_row_counts=zero_dropped_row_counts,
     )
+    warn_on_skipped_existing_rows(combined, context=str(export_root))
+    return combined
 
 
 def import_saedashboard_columnar_bundle_local_db_with_connection(
