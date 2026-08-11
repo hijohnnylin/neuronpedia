@@ -46,6 +46,7 @@ secretGenerator:
       - ANTHROPIC_API_KEY=your-anthropic-api-key
       - GEMINI_API_KEY=your-gemini-api-key
       - OPENROUTER_API_KEY=your-openrouter-api-key
+      - ORCAROUTER_API_KEY=your-orcarouter-api-key
       - AZURE_OPENAI_API_KEY=your-azure-openai-api-key
       
       # Server secrets
