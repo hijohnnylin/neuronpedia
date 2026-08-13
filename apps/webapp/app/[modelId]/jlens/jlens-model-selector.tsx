@@ -72,7 +72,6 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
     displayName: 'Llama 3.3 70B IT',
     demos: [{ shareId: 'cmsr81qce0000fd2x7mbn7wby', displayName: '🤕 Confused Capital' }],
   },
-  
 ] as const satisfies readonly {
   modelId: string;
   displayName: string;

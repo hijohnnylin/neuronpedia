@@ -72,7 +72,7 @@ const lensPromptRequestSchema = yup.object({
     .default([...LENS_TYPES]),
   topN: yup.number().integer().min(1).max(8).default(DEFAULT_LENS_TOP_N),
   temperature: yup.number().min(0).max(2).default(DEFAULT_LENS_TEMPERATURE),
-  numCompletionTokens: yup.number().integer().min(0).max(256).default(DEFAULT_LENS_COMPLETION_TOKENS),
+  numCompletionTokens: yup.number().integer().min(0).max(1024).default(DEFAULT_LENS_COMPLETION_TOKENS),
   prependBos: yup.boolean().default(true),
   enableThinking: yup.boolean().default(false),
   // Token ids the client already has read-outs for (prefix-reuse). The server
