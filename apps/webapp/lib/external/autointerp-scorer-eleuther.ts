@@ -1,3 +1,4 @@
+import { badRequest } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
 import { Activation, Explanation, ExplanationModelType } from '@prisma/client';
 import { AUTOINTERP_SERVER_API, unwrapAutointerpResponse } from '../utils/autointerp';
@@ -16,6 +17,14 @@ export const generateScoreEleuther = async (
 ) => {
   if (!explanationModel.openRouterModelId) {
     throw new Error('Explaining using np-auto-interp requires an OpenRouter model id.');
+  }
+  // All three eleuther scorers measure how well the explanation separates text the feature fires
+  // on from text it does not, so they need both kinds. Given only one, embedding's AUC is nan,
+  // which is not JSON and fails the request 30 seconds in, and fuzz/detection quietly score 0.
+  if (activations.length === 0 || zeroActivations.length === 0) {
+    throw badRequest(
+      'Scoring with this method needs both activating and non-activating example texts, and this feature only has one kind stored.',
+    );
   }
   const bareActivations = activations
     .concat(zeroActivations)
