@@ -3,12 +3,12 @@
 import { SteerResult } from '@/app/api/steer/route';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
+import { NPLogprob, NPSteerMethod } from '@/lib/api/inference-types';
 import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { STEER_MAX_PROMPT_CHARS, SteerFeature } from '@/lib/utils/steer';
 import copy from 'copy-to-clipboard';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import { ArrowUp, RotateCcw, Share, X } from 'lucide-react';
-import { NPLogprob, NPSteerMethod } from 'neuronpedia-inference-client';
 import { useRef } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 import CustomTooltip from '../custom-tooltip';
@@ -17,6 +17,8 @@ export default function SteerCompletion({
   showSettingsOnMobile,
   isSteering,
   setIsSteering,
+  completionPrompt,
+  setCompletionPrompt,
   defaultCompletionText,
   setDefaultCompletionText,
   defaultCompletionLogProbs,
@@ -44,6 +46,8 @@ export default function SteerCompletion({
   showSettingsOnMobile: boolean;
   isSteering: boolean;
   setIsSteering: (isSteering: boolean) => void;
+  completionPrompt: string;
+  setCompletionPrompt: (text: string) => void;
   defaultCompletionText: string;
   setDefaultCompletionText: (text: string) => void;
   defaultCompletionLogProbs: NPLogprob[] | null;
@@ -86,25 +90,21 @@ export default function SteerCompletion({
       alert('Please enter a message.');
       return;
     }
-    setIsSteering(true);
-
-    setDefaultCompletionText(typedInText);
-    setSteeredCompletionText(typedInText);
-    setDefaultCompletionLogProbs(null);
-    setSteeredCompletionLogProbs(null);
-
     // check for character limit
     if (typedInText.length >= STEER_MAX_PROMPT_CHARS) {
       alert(
         `Sorry, we limit the length of each completion.\nPlease keep your completion text under ${STEER_MAX_PROMPT_CHARS} characters.`,
       );
-      setDefaultCompletionText('');
-      setSteeredCompletionText('');
-      setDefaultCompletionLogProbs(null);
-      setSteeredCompletionLogProbs(null);
-      setIsSteering(false);
       return;
     }
+
+    setIsSteering(true);
+
+    setCompletionPrompt(typedInText);
+    setDefaultCompletionText('');
+    setSteeredCompletionText('');
+    setDefaultCompletionLogProbs(null);
+    setSteeredCompletionLogProbs(null);
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -143,6 +143,7 @@ export default function SteerCompletion({
         }
         showToastServerError();
         setIsSteering(false);
+        setCompletionPrompt('');
         setDefaultCompletionText('');
         setSteeredCompletionText('');
         setDefaultCompletionLogProbs(null);
@@ -186,6 +187,7 @@ export default function SteerCompletion({
       if (error instanceof DOMException && error.name === 'AbortError') {
         showToastMessage('Steering aborted.');
         setIsSteering(false);
+        setCompletionPrompt('');
         setDefaultCompletionText('');
         setSteeredCompletionText('');
       } else {
@@ -257,20 +259,17 @@ export default function SteerCompletion({
           <div className="select-none rounded-full px-5 py-1 text-[10px] font-bold text-slate-600">Normal</div>
         </div>
         <div className="pb-5 pt-6 text-[14px] font-medium leading-normal text-slate-600 sm:pb-32 sm:pt-1">
-          {!isSteering && defaultCompletionText.length === 0 && (
+          {!isSteering && completionPrompt.length === 0 && defaultCompletionText.length === 0 && (
             <div className="w-full pl-3 pt-3 text-left text-xl text-slate-400">
               Hey, {`I'm normal ${modelId}!`}
               <div className="mt-2 text-sm text-slate-500">{`I'm the default, non-steered model.`}</div>
             </div>
           )}
           <div className="whitespace-pre-wrap break-words">
-            {defaultCompletionText
-              ? defaultCompletionLogProbs && defaultCompletionLogProbs.length > 0
-                ? makeCompletionText(defaultCompletionText, defaultCompletionLogProbs)
-                : defaultCompletionText
-              : isSteering
-                ? typedInText
-                : defaultCompletionText}
+            {completionPrompt}
+            {defaultCompletionLogProbs && defaultCompletionLogProbs.length > 0
+              ? makeCompletionText(defaultCompletionText, defaultCompletionLogProbs)
+              : defaultCompletionText}
           </div>
           {isSteering && <LoadingSquare className="px-0 py-3" />}
         </div>
@@ -280,7 +279,7 @@ export default function SteerCompletion({
           <div className="select-none rounded-full px-5 py-1 text-[10px] font-bold">Steered</div>
         </div>
         <div className="pb-28 pt-5 text-[14px] font-medium leading-normal text-slate-600 sm:pb-32 sm:pt-1">
-          {!isSteering && steeredCompletionText.length === 0 && (
+          {!isSteering && completionPrompt.length === 0 && steeredCompletionText.length === 0 && (
             <div className="w-full pl-3 pr-3 pt-3 text-left text-xl text-sky-600">
               Hey, {`I'm steered ${modelId}!`}
               {selectedFeatures.length > 0 ? (
@@ -309,13 +308,10 @@ export default function SteerCompletion({
             </div>
           )}
           <div className="whitespace-pre-wrap break-words">
-            {steeredCompletionText
-              ? steeredCompletionLogProbs && steeredCompletionLogProbs.length > 0
-                ? makeCompletionText(steeredCompletionText, steeredCompletionLogProbs)
-                : steeredCompletionText
-              : isSteering
-                ? typedInText
-                : steeredCompletionText}
+            {completionPrompt}
+            {steeredCompletionLogProbs && steeredCompletionLogProbs.length > 0
+              ? makeCompletionText(steeredCompletionText, steeredCompletionLogProbs)
+              : steeredCompletionText}
           </div>
           {isSteering && <LoadingSquare className="px-0 py-3" />}
         </div>

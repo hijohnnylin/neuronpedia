@@ -2,12 +2,12 @@ import { SteerResultChat } from '@/app/api/steer-chat/route';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import SteerChatMessage from '@/components/steer/chat-message';
 import { LoadingSquare } from '@/components/svg/loading-square';
+import { NPSteerMethod, STEER_METHOD_LABELS } from '@/lib/api/inference-types';
 import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { ChatMessage, STEER_MAX_PROMPT_CHARS, STEER_MAX_PROMPT_CHARS_THINKING, SteerFeature } from '@/lib/utils/steer';
 import copy from 'copy-to-clipboard';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import { ArrowUp, RotateCcw, Share, X } from 'lucide-react';
-import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { useEffect, useRef } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 
@@ -240,7 +240,7 @@ export default function SteerCompletionChat({
         <div className="flex-1 bg-sky-100" />
       </div>
       <div className="relative flex h-full w-full flex-col sm:flex-row">
-        <div className="hidden h-full flex-1 flex-col overflow-y-scroll bg-slate-100 px-5 py-2 text-left text-xs text-slate-400 sm:flex">
+        <div className="hidden h-full flex-1 flex-col overflow-y-scroll bg-slate-100 px-5 py-2 text-left text-xs text-slate-400 sm:flex sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)]">
           <div className="sticky top-0.5 flex flex-row justify-center uppercase text-white sm:top-0">
             <div className="select-none rounded-full bg-slate-100 px-5 py-1 text-[10px] font-bold text-slate-600">
               Default
@@ -263,7 +263,7 @@ export default function SteerCompletionChat({
         <div className="flex h-full max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] w-full flex-1 flex-col overflow-y-scroll bg-sky-100 px-3 py-2 text-left text-xs text-slate-400 sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)] sm:px-5">
           <div className="sticky top-0.5 flex flex-row justify-center uppercase text-sky-700 sm:top-0">
             <div className="select-none rounded-full bg-sky-100 px-5 py-1 text-[10px] font-bold">
-              {steerMethod === NPSteerMethod.ProjectionCap ? 'Capped' : 'Steered'}
+              {steerMethod === NPSteerMethod.PROJECTION_CAP ? 'Capped' : 'Steered'}
             </div>
           </div>
           <div
@@ -272,13 +272,10 @@ export default function SteerCompletionChat({
           >
             {!isSteering && steeredChatMessages.length === 0 && (
               <div className="w-full pl-3 pr-3 pt-8 text-left text-lg text-sky-600">
-                Hey, {`I'm ${steerMethod === NPSteerMethod.ProjectionCap ? 'capped' : 'steered'} ${modelId}!`}
+                Hey, {`I'm ${steerMethod === NPSteerMethod.PROJECTION_CAP ? 'capped' : 'steered'} ${modelId}!`}
                 {selectedFeatures.length > 0 ? (
                   <div className="mt-5 text-sm text-sky-700">
-                    {`Using method "${steerMethod
-                      .replaceAll('_', ' ')
-                      .toLowerCase()
-                      .replace(/\b\w/g, (c) => c.toUpperCase())}":`}
+                    {`Using method "${STEER_METHOD_LABELS[steerMethod]}":`}
                     {selectedFeatures.slice(0, 5).map((f) => (
                       <div key={f.index} className="ml-3 mt-1">
                         - {f.explanation}

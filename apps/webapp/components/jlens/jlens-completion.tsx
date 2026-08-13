@@ -21,6 +21,7 @@ import ReactTextareaAutosize from 'react-textarea-autosize';
 import JlensAdvanced from './jlens-advanced';
 import { MAX_SELECT } from './jlens-analysis';
 import { JlensAnalysisPanel, JlensProviders } from './jlens-analysis-panel';
+import { tokensToText } from './jlens-chat-format';
 import { JlensCommentary, useSharedCommentary } from './jlens-commentary';
 import {
   buildSteerShareBody,
@@ -33,8 +34,7 @@ import { LensModeSetContext } from './jlens-lens-mode';
 import { JlensShareDialog } from './jlens-share-dialog';
 import { DefaultOutputHeader, SteerOutputHeader } from './jlens-steer-panel';
 import { runLensStream as baseRunLensStream, RunLensStreamParams } from './jlens-stream';
-import JlensTokenChip, { scrollContainerToTokenPositions, TokenBand } from './jlens-token';
-import { LayerRange } from './jlens-token-popup';
+import { JlensTokenRun, scrollContainerToTokenPositions } from './jlens-token';
 import { SteerConfig, useJlensAnalysis } from './use-jlens-analysis';
 
 export default function JlensCompletion({
@@ -238,13 +238,13 @@ export default function JlensCompletion({
           },
           onPromptTokens: (p) => {
             setAwaitingFirstResponse(false);
+            // Spread the frame rather than copying its fields: a prompt token is a token
+            // message minus `kind`/`results`, so anything the server adds to the frame
+            // (`is_char_continuation`) arrives without another line here.
             setTokens(
               p.tokens.map((t) => ({
+                ...t,
                 kind: 'token' as const,
-                position: t.position,
-                token: t.token,
-                id: t.id,
-                is_generated: t.is_generated,
                 results: t.position < reuseLen ? (priorTokens[t.position]?.results ?? []) : [],
               })),
             );
@@ -333,11 +333,8 @@ export default function JlensCompletion({
           onPromptTokens: (p) => {
             setSteerTokens(
               p.tokens.map((t) => ({
+                ...t,
                 kind: 'token' as const,
-                position: t.position,
-                token: t.token,
-                id: t.id,
-                is_generated: t.is_generated,
                 results: [],
               })),
             );
@@ -399,10 +396,8 @@ export default function JlensCompletion({
           onPromptTokens: (p) => {
             setTokens(
               p.tokens.map((t) => ({
+                ...t,
                 kind: 'token' as const,
-                position: t.position,
-                token: t.token,
-                id: t.id,
                 is_generated: priorTokens[t.position]?.is_generated ?? t.is_generated,
                 results: priorTokens[t.position]?.results ?? [],
               })),
@@ -458,10 +453,8 @@ export default function JlensCompletion({
             onPromptTokens: (p) => {
               setSteerTokens(
                 p.tokens.map((t) => ({
+                  ...t,
                   kind: 'token' as const,
-                  position: t.position,
-                  token: t.token,
-                  id: t.id,
                   is_generated: priorSteer[t.position]?.is_generated ?? t.is_generated,
                   results: [],
                 })),
@@ -544,8 +537,8 @@ export default function JlensCompletion({
       <JlensProviders analysis={steerAnalysis} steering>
         {steerTokens.length > 0 ? (
           <div className="group relative w-full rounded-lg bg-white px-3 py-2 text-slate-800 sm:rounded-xl sm:px-4 sm:py-5">
-            <CompletionCopyButton text={steerTokens.map((t) => t.token).join('')} />
-            <CompletionTokens
+            <CompletionCopyButton text={tokensToText(steerTokens)} />
+            <JlensTokenRun
               tokens={steerTokens}
               layersByType={steerAnalysis.layersByType}
               bandsByPosition={steerAnalysis.bandsByPosition}
@@ -708,8 +701,8 @@ export default function JlensCompletion({
 
   const defaultOutput = (
     <div className="group relative w-full rounded-lg bg-white px-3 py-2 text-slate-800 sm:rounded-xl sm:px-4 sm:py-5">
-      {tokens.length > 0 && <CompletionCopyButton text={tokens.map((t) => t.token).join('')} />}
-      <CompletionTokens
+      {tokens.length > 0 && <CompletionCopyButton text={tokensToText(tokens)} />}
+      <JlensTokenRun
         tokens={tokens}
         layersByType={layersByType}
         bandsByPosition={bandsByPosition}
@@ -1027,76 +1020,6 @@ export default function JlensCompletion({
         />
       </div>
     </JlensProviders>
-  );
-}
-
-// The flat token transcript for a completion run: the prompt tokens followed by
-// the generated continuation, every token a hoverable + selectable lens chip.
-// Always monospaced.
-function CompletionTokens({
-  tokens,
-  layersByType,
-  bandsByPosition,
-  layerRange,
-  onTokenHover,
-  selectedPositions,
-  highlightedPosition,
-}: {
-  tokens: LensTokenMessage[];
-  layersByType: Record<string, number[]>;
-  bandsByPosition: Map<number, TokenBand[]>;
-  layerRange: LayerRange | null;
-  onTokenHover: (token: LensTokenMessage, open: boolean) => void;
-  selectedPositions: Set<number>;
-  highlightedPosition: number | null;
-}) {
-  // Index of the first generated token, so we can mark the prompt→generated
-  // boundary with a vertical bar. Only meaningful when there's a prompt before
-  // it (> 0); -1 means nothing was generated.
-  const firstGeneratedIdx = tokens.findIndex((t) => t.is_generated);
-  return (
-    <div className="select-text whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed">
-      {tokens.map((token, tokenIdx) => {
-        const newlineCount = (token.token.match(/\n/g) || []).length;
-        const prevToken = tokenIdx > 0 ? tokens[tokenIdx - 1].token : undefined;
-        const prevEndsWithLineBreak = tokenIdx === 0 || (prevToken !== undefined && /\n/.test(prevToken));
-        const nextStartsNewLine = tokenIdx === tokens.length - 1;
-        return (
-          <span key={token.position}>
-            {tokenIdx === firstGeneratedIdx && firstGeneratedIdx > 0 && (
-              // Zero-width inline anchor so the (absolutely positioned) bar can
-              // extend beyond the line height without growing the line box.
-              <span
-                className="relative mt-0 inline-block w-0 bg-slate-600 align-middle sm:-mt-[7px]"
-                aria-hidden="true"
-              >
-                <span
-                  className="absolute left-0 top-1/2 h-[1.6em] w-[2px] -translate-y-1/2 border-l-2 border-dotted border-slate-400 sm:h-[2.2em]"
-                  aria-hidden="true"
-                />
-              </span>
-            )}
-            <JlensTokenChip
-              token={token}
-              layersByType={layersByType}
-              variant={token.is_generated ? 'generated' : 'content'}
-              bands={bandsByPosition.get(token.position)}
-              layerRange={layerRange}
-              onHoverChange={onTokenHover}
-              positionSelected={highlightedPosition == null && selectedPositions.has(token.position)}
-              prevSelected={highlightedPosition == null && selectedPositions.has(token.position - 1)}
-              nextSelected={highlightedPosition == null && selectedPositions.has(token.position + 1)}
-              highlighted={highlightedPosition === token.position}
-              prevEndsWithLineBreak={prevEndsWithLineBreak}
-              nextStartsNewLine={nextStartsNewLine}
-            />
-            {Array.from({ length: newlineCount }).map((_, i) => (
-              <div key={i} className="h-1 max-h-1 leading-[0em]" />
-            ))}
-          </span>
-        );
-      })}
-    </div>
   );
 }
 

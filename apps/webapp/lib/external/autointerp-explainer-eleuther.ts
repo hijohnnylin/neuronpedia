@@ -1,5 +1,5 @@
 import { Activation, ExplanationModelType } from '@prisma/client';
-import { AUTOINTERP_SERVER_API } from '../utils/autointerp';
+import { AUTOINTERP_SERVER_API, unwrapAutointerpResponse } from '../utils/autointerp';
 
 export const generateExplanationEleutherActsTop20 = async (
   activations: Activation[],
@@ -10,13 +10,15 @@ export const generateExplanationEleutherActsTop20 = async (
     throw new Error('Explaining using np-auto-interp requires an OpenRouter model id.');
   }
 
-  const result = await AUTOINTERP_SERVER_API.explainDefaultPost({
-    explainDefaultPostRequest: {
-      activations,
-      openrouterKey: explainerKey,
-      model: explanationModel.openRouterModelId,
-    },
-  });
+  const result = await unwrapAutointerpResponse(
+    AUTOINTERP_SERVER_API.POST('/v1/explain/default', {
+      body: {
+        activations: activations.map((act) => ({ tokens: act.tokens, values: act.values })),
+        openrouterKey: explainerKey,
+        model: explanationModel.openRouterModelId,
+      },
+    }),
+  );
 
   return result.explanation;
 };

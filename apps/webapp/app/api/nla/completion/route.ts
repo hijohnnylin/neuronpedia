@@ -1,12 +1,8 @@
+import type { TokenizeResponse } from '@/lib/api/nla-types';
 import { prisma } from '@/lib/db';
 import { nlaFetch } from '@/lib/db/nla-source';
-import {
-  ChatMessage,
-  formatChatForModel,
-  formatChatWithAssistantCompletion,
-  isChatMessageArray,
-} from '@/lib/nla-chat-template';
-import { MAX_COMPLETION_TOKENS, MAX_TEXT_LENGTH } from '@/lib/nla-constants';
+import { ChatMessage, isChatMessageArray } from '@/lib/nla-chat-template';
+import { MAX_COMPLETION_TOKENS, MAX_TEXT_LENGTH, NLA_ENABLE_THINKING } from '@/lib/nla-constants';
 import { OpenAIClientFactory } from '@/lib/openai-client';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
@@ -32,28 +28,26 @@ const OPENROUTER_COMPLETION_EXCLUDED_MODEL_IDS = new Set<string>(['qwen2.5-1.5b-
 const shouldUseOpenRouterForCompletion = (modelId?: string): boolean =>
   USE_OPENROUTER_FOR_COMPLETION && !!modelId && !OPENROUTER_COMPLETION_EXCLUDED_MODEL_IDS.has(modelId);
 
-type TokenInfo = {
-  token: string;
-  token_id: number;
-  position: number;
-  fragment_index?: number;
-  fragment_count?: number;
-};
-
-type TokenizeResponse = {
-  tokens: TokenInfo[];
-  prompt_length: number;
-  text: string;
-};
-
+// Tokenize on the NLA server. Prefer structured `messages` (the server applies
+// the model's real chat template and returns per-token spans); `text` is the
+// raw-string fallback for legacy callers.
 async function fetchNlaTokenize(args: {
-  text: string;
+  messages?: ChatMessage[];
+  text?: string;
   modelId?: string;
   nlaSourceId?: string;
+  addGenerationPrompt?: boolean;
 }): Promise<TokenizeResponse> {
+  const payload = args.messages
+    ? {
+        messages: args.messages,
+        add_generation_prompt: args.addGenerationPrompt ?? true,
+        enable_thinking: NLA_ENABLE_THINKING,
+      }
+    : { text: args.text };
   const res = await nlaFetch(args.modelId, args.nlaSourceId, '/tokenize', {
     method: 'POST',
-    body: JSON.stringify({ text: args.text }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const errorText = await res.text();
@@ -112,26 +106,25 @@ async function nonStreamingOpenRouterCompletion(args: {
     return NextResponse.json({ error: 'OpenRouter returned an empty completion.' }, { status: 502 });
   }
 
-  // Re-render the entire chat-templated string with the assistant's turn
-  // appended. The NLA tokenizer will see `prompt + assistant_completion`
-  // exactly as a follow-up `/explain` call would, so the positions match.
-  const fullText = formatChatWithAssistantCompletion(args.modelId, args.messages, completionText);
-
+  // Re-tokenize the full chat (prompt + the assistant's completed turn) on the
+  // NLA server so the NLA tokenizer sees `prompt + assistant_completion`
+  // exactly as a follow-up `/explain` call would (positions match). The server
+  // applies the model's real chat template — no client-side templating.
   const tokenized = await fetchNlaTokenize({
-    text: fullText,
+    messages: [...args.messages, { role: 'assistant', content: completionText }],
+    addGenerationPrompt: false,
     modelId: args.modelId,
     nlaSourceId: args.nlaSourceId,
   });
 
   return NextResponse.json({
     completion: completionText,
-    full_text: fullText,
+    full_text: tokenized.text,
     tokens: tokenized.tokens,
   });
 }
 
 async function streamOpenRouterCompletion(args: {
-  text: string;
   messages: ChatMessage[];
   openRouterModel: string;
   modelId?: string;
@@ -140,7 +133,8 @@ async function streamOpenRouterCompletion(args: {
   completionTokens: number;
 }): Promise<NextResponse> {
   const tokenized = await fetchNlaTokenize({
-    text: args.text,
+    messages: args.messages,
+    addGenerationPrompt: true,
     modelId: args.modelId,
     nlaSourceId: args.nlaSourceId,
   });
@@ -221,7 +215,9 @@ async function streamOpenRouterCompletion(args: {
           for (const piece of pieces) {
             const tokenEvent = {
               type: 'token',
-              token: { token: piece, token_id: 0, position },
+              // Generated deltas are the assistant continuation; tag them so
+              // span-driven grouping renders them in the assistant turn.
+              token: { token: piece, token_id: 0, position, role: 'assistant', section: 'content' },
             };
             position += 1;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(tokenEvent)}\n\n`));
@@ -349,6 +345,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     modelId,
     nlaSourceId,
     messages,
+    add_generation_prompt: addGenerationPrompt,
   } = body as {
     text?: string;
     completion_tokens?: number;
@@ -357,6 +354,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     modelId?: string;
     nlaSourceId?: string;
     messages?: unknown;
+    add_generation_prompt?: boolean;
   };
 
   const effectiveCompletionTokens = Math.min(completionTokens ?? 0, MAX_COMPLETION_TOKENS);
@@ -368,18 +366,18 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   const wantsStream = stream === true;
   const hasMessages = isChatMessageArray(messages);
 
-  // Resolve the chat-templated `text`. The chat UI sends both `text`
-  // (pre-rendered client-side) and `messages`; API callers typically send
-  // only `messages` and we render server-side.
-  let text: string | undefined = typeof rawText === 'string' ? rawText : undefined;
-  if (!text && hasMessages && modelId) {
-    text = formatChatForModel(modelId, messages);
-  }
+  // The chat template is applied by the NLA server (single source of truth), so
+  // the frontend/API sends structured `messages`. A raw `text` string is still
+  // accepted as a legacy fallback for direct callers.
+  const text: string | undefined = typeof rawText === 'string' ? rawText : undefined;
 
-  if (!text || typeof text !== 'string') {
+  if (!hasMessages && !text) {
     return NextResponse.json({ error: 'Provide `messages` (or `text`).' }, { status: 400 });
   }
-  if (text.length > MAX_TEXT_LENGTH) {
+  // Rough guard on total input size; the NLA server enforces the exact
+  // rendered-length cap after templating.
+  const approxChars = hasMessages ? messages.reduce((sum, m) => sum + m.content.length, 0) : (text?.length ?? 0);
+  if (approxChars > MAX_TEXT_LENGTH) {
     return NextResponse.json(
       { error: `Chat exceeds the maximum character length of ${MAX_TEXT_LENGTH}.` },
       { status: 400 },
@@ -391,7 +389,13 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // and we have an OpenRouter mapping, this is the path researchers hit.
   // Always uses OpenRouter so the wire format and provider are consistent
   // across API calls. Returns canonical NLA-tokenized positions.
-  if (!wantsStream && shouldUseOpenRouterForCompletion(modelId) && effectiveCompletionTokens > 0 && hasMessages && modelId) {
+  if (
+    !wantsStream &&
+    shouldUseOpenRouterForCompletion(modelId) &&
+    effectiveCompletionTokens > 0 &&
+    hasMessages &&
+    modelId
+  ) {
     const model = await prisma.model.findUnique({ where: { id: modelId } });
     if (!model?.openRouterId) {
       return NextResponse.json({ error: `Model ${modelId} has no openRouterId configured` }, { status: 400 });
@@ -410,13 +414,18 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // Mirrors the previous behavior: the chat UI passes `stream: true` plus
   // `messages` and gets SSE prompt/token events. Same provider-routing
   // rules as the non-streaming API path (must have an openRouterId).
-  if (shouldUseOpenRouterForCompletion(modelId) && effectiveCompletionTokens > 0 && wantsStream && hasMessages && modelId) {
+  if (
+    shouldUseOpenRouterForCompletion(modelId) &&
+    effectiveCompletionTokens > 0 &&
+    wantsStream &&
+    hasMessages &&
+    modelId
+  ) {
     const model = await prisma.model.findUnique({ where: { id: modelId } });
     if (!model?.openRouterId) {
       return NextResponse.json({ error: `Model ${modelId} has no openRouterId configured` }, { status: 400 });
     }
     return streamOpenRouterCompletion({
-      text,
       messages,
       openRouterModel: model.openRouterId,
       modelId,
@@ -434,7 +443,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const nlaResponse = await nlaFetch(modelId, nlaSourceId, '/completion', {
       method: 'POST',
       body: JSON.stringify({
-        text,
+        ...(hasMessages ? { messages, enable_thinking: NLA_ENABLE_THINKING } : { text }),
         completion_tokens: effectiveCompletionTokens,
         temperature: effectiveTemperature,
         stream: wantsStream,
@@ -473,7 +482,20 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // main path, or compute tokens from a /completion response's `tokens`).
   const nlaResponse = await nlaFetch(modelId, nlaSourceId, '/tokenize', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(
+      hasMessages
+        ? {
+            messages,
+            // Same rule as /api/nla/explain, so these positions are the ones an
+            // explain call will see. A conversation whose last turn is a
+            // completed assistant message has nothing left to generate, and the
+            // NLA server's default would otherwise append a dangling
+            // generation-prompt header the chat has no bubble for.
+            add_generation_prompt: addGenerationPrompt ?? messages[messages.length - 1]?.role !== 'assistant',
+            enable_thinking: NLA_ENABLE_THINKING,
+          }
+        : { text },
+    ),
   });
 
   if (!nlaResponse.ok) {

@@ -188,7 +188,7 @@ export function getHeadMetricsTooltip(showFirstParagraph = true) {
       <p>
         For our specific implementation for Neuronpedia, check out our{' '}
         <a
-          href="https://github.com/neuronpedia/neuronpedia/blob/main/utils/neuronpedia-utils/neuronpedia_utils/headvis/compute-head-metrics.py"
+          href="https://github.com/hijohnnylin/neuronpedia/blob/main/utils/neuronpedia-utils/neuronpedia_utils/headvis/compute-head-metrics.py"
           target="_blank"
           rel="noreferrer"
           className="font-bold text-sky-700 hover:underline"

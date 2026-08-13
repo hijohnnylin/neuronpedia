@@ -18,6 +18,7 @@ import { ChevronDown, ChevronDownIcon, ChevronUpIcon, MessagesSquare, Plus, RssI
 import Link from 'next/link';
 import { useState } from 'react';
 import InferenceActivationAllProvider from '../provider/inference-activation-all-provider';
+import ModelsDropdown from './models-dropdown';
 import ReleasesDropdown from './releases-dropdown';
 
 export default function NavBarButtons() {
@@ -185,6 +186,8 @@ export default function NavBarButtons() {
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
 
+      <ModelsDropdown isInBreadcrumb={false} />
+
       <DropdownMenu.Root>
         <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
           Search
@@ -252,8 +255,6 @@ export default function NavBarButtons() {
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-      {/* 
-      <ModelsDropdown isInBreadcrumb={false} /> */}
 
       <Select.Root
         defaultValue="saes"

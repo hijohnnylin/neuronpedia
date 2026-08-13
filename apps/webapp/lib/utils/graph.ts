@@ -1,3 +1,12 @@
+import type {
+  ForwardPassResponse,
+  GraphChatMessage,
+  SteerResponse as GraphSteerResponse,
+  LogitsByToken,
+  ParseChatPromptResponse,
+  SalientLogit,
+  SteerFeature,
+} from '@/lib/api/graph-types';
 import { GRAPH_RUNPOD_SECRET } from '@/lib/env';
 import * as yup from 'yup';
 import {
@@ -91,6 +100,22 @@ export const graphGenerateSchemaClient = yup.object({
     .max(GRAPH_MAX_PROMPT_LENGTH_CHARS, `Prompt cannot exceed ${GRAPH_MAX_PROMPT_LENGTH_CHARS} characters.`)
     .min(1, 'Prompt is required.')
     .required(),
+  // Structured chat turns (instruct models). When present, the graph server
+  // renders the prompt string via the model's real chat template — the frontend
+  // does no chat-template building. `prompt` still carries a plain-text version
+  // of the turns for length/required validation and is ignored server-side.
+  messages: yup
+    .array()
+    .of(
+      yup.object({
+        role: yup.string().required(),
+        // `defined`, not `required`: an empty final assistant turn is how the
+        // caller asks for that turn to be left open for the model to continue,
+        // and yup's `required` rejects the empty string.
+        content: yup.string().defined(),
+      }),
+    )
+    .nullable(),
   modelId: yup.string().min(1, 'Model is required.').oneOf(GRAPH_GENERATION_ENABLED_MODELS).required(),
   sourceSetName: yup.string().nullable(),
   maxNLogits: yup
@@ -158,15 +183,15 @@ export const checkRunpodQueueJobs = async (host: string) => {
   throw new Error('RunPod health check failed: jobs not found');
 };
 
-export type SalientLogit = { token: string; token_id: number; probability: number };
+export type { SalientLogit };
 
-export type GraphTokenizeResponse = {
-  prompt: string;
-  input_tokens: string[];
-  salient_logits: SalientLogit[];
-  total_salient_tokens: number;
-  cumulative_probability: number;
-};
+// `/forward-pass` on the graph server. The name is the webapp's, kept because every caller and
+// route uses it; the shape is the generated one.
+export type GraphTokenizeResponse = ForwardPassResponse;
+
+// Structured chat turn sent to the graph server, which applies the model's real
+// chat template server-side (the frontend does no chat-template special-casing).
+export type { GraphChatMessage };
 
 export interface GraphGenerateRunpodResponse {
   error?: string;
@@ -179,11 +204,15 @@ export const getGraphTokenize = async (
   desiredLogitProb: number,
   modelId: string,
   sourceSetName: string,
+  // Structured chat turns. When provided, the graph server renders the prompt
+  // string via the model's real chat template (no frontend chat templating);
+  // the rendered string is returned as `prompt`.
+  messages?: GraphChatMessage[] | null,
 ): Promise<GraphTokenizeResponse> => {
   const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
   const action = 'forward-pass';
   const body = {
-    prompt,
+    ...(messages && messages.length > 0 ? { messages } : { prompt }),
     max_n_logits: maxNLogits,
     desired_logit_prob: desiredLogitProb,
     request_type: action,
@@ -228,7 +257,8 @@ export const getGraphTokenize = async (
   }));
 
   const toReturn: GraphTokenizeResponse = {
-    prompt,
+    // Prefer the server-rendered prompt (when `messages` was sent); else echo.
+    prompt: typeof json.prompt === 'string' ? json.prompt : prompt,
     input_tokens: json.input_tokens,
     salient_logits: salientLogits,
     total_salient_tokens: json.total_salient_tokens,
@@ -236,6 +266,66 @@ export const getGraphTokenize = async (
   };
 
   return toReturn;
+};
+
+// Field-level documentation now lives on the python model these are generated from.
+export type GraphParseChatPromptResponse = ParseChatPromptResponse;
+
+// The inverse of the `messages` rendering done by `getGraphTokenize` /
+// `generateGraphAndUploadToS3`: recover the structured turns behind a stored
+// (already-rendered) graph prompt. The graph server does this against the
+// model's own chat template, which is what keeps per-family special tokens out
+// of the frontend.
+export const getGraphParseChatPrompt = async (
+  prompt: string,
+  modelId: string,
+  sourceSetName: string,
+): Promise<GraphParseChatPromptResponse> => {
+  const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
+  const action = 'parse-chat-prompt';
+  const body = { prompt, request_type: action };
+
+  const response = await fetch(
+    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
+      },
+      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
+    },
+  );
+
+  const responseText = await response.text();
+  let json;
+  try {
+    json = JSON.parse(responseText);
+  } catch {
+    throw new Error(
+      `Graph server returned non-JSON response (HTTP ${response.status}${responseText ? `: ${responseText.slice(0, 200)}` : ''})`,
+    );
+  }
+  if (json.error) {
+    throw new Error(json.error);
+  }
+  if (!response.ok) {
+    throw new Error(`External API returned ${response.status}: ${response.statusText}`);
+  }
+  if (isRunpodServerlessHost) {
+    json = json.output;
+  }
+
+  const messages = Array.isArray(json.messages) ? (json.messages as GraphChatMessage[]) : null;
+  // Both fallbacks cover a graph server that predates these fields, and both
+  // degrade the same way: toward doing nothing. An echoed prompt costs a visible
+  // BOS, and an empty position list costs a slider that the server ignores.
+  return {
+    messages,
+    is_chat: messages !== null,
+    prompt: typeof json.prompt === 'string' ? json.prompt : prompt,
+    unsteerable_positions: Array.isArray(json.unsteerable_positions) ? (json.unsteerable_positions as number[]) : [],
+  };
 };
 
 export const generateGraphAndUploadToS3 = async (
@@ -252,6 +342,10 @@ export const generateGraphAndUploadToS3 = async (
   userId: string | undefined,
   qkTopFraction: number = GRAPH_QKTOPFRACTION_DEFAULT,
   qkTopk: number = GRAPH_QKTOPK_DEFAULT,
+  // Structured chat turns; when set the graph server renders the prompt string
+  // via the model's real chat template (the generated graph's metadata.prompt
+  // holds the rendered string, which is what gets stored).
+  messages?: GraphChatMessage[] | null,
 ) => {
   const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
   const action = 'generate-graph';
@@ -259,7 +353,7 @@ export const generateGraphAndUploadToS3 = async (
   const batchSize = isLorsa ? LORSA_BATCH_SIZE : GRAPH_BATCH_SIZE;
 
   const body = {
-    prompt,
+    ...(messages && messages.length > 0 ? { messages } : { prompt }),
     model_id: GRAPH_MODEL_MAP[modelId as keyof typeof GRAPH_MODEL_MAP],
     batch_size: batchSize,
     max_n_logits: maxNLogits,
@@ -303,7 +397,12 @@ export const generateGraphAndUploadToS3 = async (
   // no need to return anything since it was uploaded to s3
 };
 
-export const SteerLogitFeatureSchema = yup.object({
+// Annotated with the generated type rather than inferred from the schema. These fields are
+// forwarded to the graph server untouched AND documented as public request fields on
+// /api/steer-logits, so the yup schema and the python model have to describe the same thing --
+// the annotation is what makes a rename in `schemas.py` a compile error here instead of a 422
+// at runtime. The runtime validation itself is still yup's job; this only pins the shape.
+export const SteerLogitFeatureSchema: yup.ObjectSchema<SteerFeature> = yup.object({
   layer: yup.number().required('Layer is required'),
   index: yup.number().required('Index is required'),
   token_active_position: yup.number().required('Token active position is required'),
@@ -313,7 +412,7 @@ export const SteerLogitFeatureSchema = yup.object({
   ablate: yup.boolean().required('Ablate is required'),
 });
 
-export type SteerLogitFeature = yup.InferType<typeof SteerLogitFeatureSchema>;
+export type SteerLogitFeature = SteerFeature;
 
 export const SteerLogitsRequestSchema = yup.object({
   modelId: yup.string().required('Model ID is required'),
@@ -330,12 +429,13 @@ export const SteerLogitsRequestSchema = yup.object({
     .min(STEER_FREQUENCY_PENALTY_MIN)
     .max(STEER_FREQUENCY_PENALTY_MAX),
   seed: yup.number().default(STEER_SEED).nullable(),
-  steeredOutputOnly: yup.boolean().default(false),
 });
 
 export type SteerLogitsRequest = yup.InferType<typeof SteerLogitsRequestSchema>;
 
-export const SteerResponseLogitsByTokenSchema = yup
+// Left inferred: the pin that matters is on SteerResponseSchema below, which checks this
+// schema's output against the generated LogitsByToken as part of the whole object.
+const SteerResponseLogitsByTokenSchema = yup
   .array()
   .of(
     yup
@@ -355,16 +455,18 @@ export const SteerResponseLogitsByTokenSchema = yup
   )
   .required();
 
-export type SteerResponseLogitsByToken = yup.InferType<typeof SteerResponseLogitsByTokenSchema>;
+export type SteerResponseLogitsByToken = LogitsByToken[];
 
-export const SteerResponseSchema = yup.object({
+// Same reasoning as SteerLogitFeatureSchema: /api/steer-logits returns this nearly verbatim, so
+// the annotation pins it to the python model while yup keeps validating at runtime.
+export const SteerResponseSchema: yup.ObjectSchema<GraphSteerResponse> = yup.object({
   DEFAULT_GENERATION: yup.string().required('Default generation is required'),
   STEERED_GENERATION: yup.string().required('Steered generation is required'),
   DEFAULT_LOGITS_BY_TOKEN: SteerResponseLogitsByTokenSchema,
   STEERED_LOGITS_BY_TOKEN: SteerResponseLogitsByTokenSchema,
 });
 
-export type SteerResponse = yup.InferType<typeof SteerResponseSchema>;
+export type SteerResponse = GraphSteerResponse;
 
 export type SteeredPositionIdentifier = {
   modelId: string;
@@ -384,7 +486,6 @@ export const steerLogits = async (
   temperature: number,
   freqPenalty: number,
   seed: number | null,
-  steeredOutputOnly: boolean,
 ) => {
   const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
 
@@ -403,7 +504,6 @@ export const steerLogits = async (
     temperature,
     freq_penalty: freqPenalty,
     seed,
-    steered_output_only: steeredOutputOnly,
     request_type: action,
   };
 

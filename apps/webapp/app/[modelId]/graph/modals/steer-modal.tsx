@@ -15,7 +15,6 @@ import { Button } from '@/components/shadcn/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import { LoadingSquare } from '@/components/svg/loading-square';
-import { BOS_TOKENS } from '@/lib/utils/activations';
 import { SearchExplanationsType } from '@/lib/utils/general';
 import { SteeredPositionIdentifier, SteerLogitFeature, SteerLogitsRequest, SteerResponse } from '@/lib/utils/graph';
 import { getLayerNumFromSource } from '@/lib/utils/source';
@@ -44,9 +43,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CLTGraphNode } from '../graph-types';
 import NodeToSteer from './steer-modal/node-to-steer';
 import TokenTooltip from './steer-modal/token-tooltip';
+import useUnsteerablePositions from './steer-modal/use-unsteerable-positions';
 
 // sometimes comparing the multipliers can be a bit off, so we allow a small tolerance
 const DELTA_COMPARISON_TOLERANCE = 0.1;
+
+function PromptTokenStrip({ tokens }: { tokens: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-x-0 gap-y-[0px]">
+      {tokens.map((token, index) => (
+        <span
+          key={`${token}-${index}`}
+          className="h-[29px] min-h-[29px] cursor-default font-mono text-[12px] leading-[29px] text-slate-800"
+        >
+          {token.replaceAll(' ', '\u00A0').replaceAll('\n', '↵')}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function SteerModal() {
   const { isSteerModalOpen, setIsSteerModalOpen } = useGraphModalContext();
@@ -75,6 +90,15 @@ export default function SteerModal() {
   const [manualLayer, setManualLayer] = useState<string>('');
   const [manualIndex, setManualIndex] = useState<string>('');
   const [lastSteerRequestBody, setLastSteerRequestBody] = useState<SteerLogitsRequest | undefined>(undefined);
+
+  // Same three values the steer request below sends, so these positions index
+  // the tokenization the server will actually steer against.
+  const unsteerablePositions = useUnsteerablePositions({
+    enabled: isSteerModalOpen,
+    prompt: selectedGraph?.metadata.prompt,
+    modelId: selectedGraph?.metadata.scan,
+    sourceSetName: selectedSourceSetName,
+  });
 
   const getFeatureNodeForNodeId = (id: string): CLTGraphNode | null => {
     const node = selectedGraph?.nodes.find((n) => n.nodeId === id);
@@ -285,8 +309,8 @@ export default function SteerModal() {
       return false;
     }
     for (let i = 0; i < selectedGraph.metadata.prompt_tokens.length; i += 1) {
-      // don't check BOS
-      if (BOS_TOKENS.includes(selectedGraph.metadata.prompt_tokens[i])) {
+      // An unsteerable position has no slider, so it can never carry this delta
+      if (unsteerablePositions.has(i)) {
         continue;
       }
       const feature = findSteeredPositionByPosition(nodeSteerIdentifier, i);
@@ -320,8 +344,8 @@ export default function SteerModal() {
       );
       // then set this delta for every position
       for (let i = 0; i < selectedGraph.metadata.prompt_tokens.length; i += 1) {
-        // don't steer BOS
-        if (BOS_TOKENS.includes(selectedGraph.metadata.prompt_tokens[i])) {
+        // the server would drop these anyway
+        if (unsteerablePositions.has(i)) {
           continue;
         }
         newSteeredPositionFeatures.push({
@@ -515,11 +539,12 @@ export default function SteerModal() {
       return;
     }
 
-    // TODO: remove <bos> hack
     const requestBody: SteerLogitsRequest = {
       modelId: selectedGraph?.metadata.scan || '',
       sourceSetName: selectedSourceSetName || '',
-      prompt: selectedGraph?.metadata.prompt.replaceAll('<bos>', '') || '',
+      // Sent as stored; the graph server strips the baked-in BOS before
+      // tokenizing so `steer_position` indices still line up with prompt_tokens.
+      prompt: selectedGraph?.metadata.prompt || '',
       features: steeredPositions,
       nTokens: steerTokens,
       topK: 5,
@@ -527,9 +552,11 @@ export default function SteerModal() {
       temperature,
       freqPenalty,
       seed,
-      steeredOutputOnly: false,
     };
 
+    // Purely a client-side decision about which half of the response to keep. It used to be
+    // sent to the graph server as well, but that server has no such field and recomputes the
+    // default generation either way, so the flag only ever cost a round trip's worth of work.
     let steeredOutputOnly = false;
     if (lastSteerRequestBody && steerResult?.DEFAULT_GENERATION && steerResult?.DEFAULT_GENERATION?.length > 0) {
       // compare all properties except features
@@ -557,7 +584,6 @@ export default function SteerModal() {
       setSteerResult(undefined);
     }
 
-    requestBody.steeredOutputOnly = steeredOutputOnly;
     setLastSteerRequestBody(requestBody);
 
     fetch('/api/steer-logits', {
@@ -758,7 +784,7 @@ export default function SteerModal() {
                           ]);
                         }}
                         className={`mx-0.5 bg-slate-200 px-1 font-mono text-[11px] text-base font-medium text-slate-600 shadow-none hover:bg-sky-200 hover:text-sky-700 ${
-                          BOS_TOKENS.includes(token) ? 'hidden' : ''
+                          unsteerablePositions.has(index) ? 'hidden' : ''
                         }`}
                       >
                         {token.toString().replaceAll(' ', '\u00A0').replaceAll('\n', '↵')}
@@ -1003,6 +1029,7 @@ export default function SteerModal() {
                                     index: getIndexFromFeatureAndGraph(modelId, customNode, selectedGraph),
                                     tokenActivePosition: customNode.ctx_idx,
                                   })}
+                                  unsteerablePositions={unsteerablePositions}
                                 />
                                 <Button
                                   variant="ghost"
@@ -1254,7 +1281,7 @@ export default function SteerModal() {
                                           }
                                         }}
                                         className={`mx-1.5 min-w-fit flex-col items-center justify-center gap-y-1 ${
-                                          BOS_TOKENS.includes(token) ? 'hidden' : 'flex'
+                                          unsteerablePositions.has(i) ? 'hidden' : 'flex'
                                         }`}
                                       >
                                         <Slider.Root
@@ -1500,6 +1527,7 @@ export default function SteerModal() {
                                     lastChangedTokenPosition={getLastChangedTokenPosition(
                                       makeNodeSteerIdentifier(node),
                                     )}
+                                    unsteerablePositions={unsteerablePositions}
                                   />
                                 );
                               })}
@@ -1552,6 +1580,7 @@ export default function SteerModal() {
                                   setAllTokensDelta={setAllTokensDelta}
                                   isSteering={isSteering}
                                   lastChangedTokenPosition={getLastChangedTokenPosition(makeNodeSteerIdentifier(node))}
+                                  unsteerablePositions={unsteerablePositions}
                                 />
                               );
                             })}
@@ -1733,20 +1762,7 @@ export default function SteerModal() {
                           <TokenTooltip logitsByToken={steerResult.DEFAULT_LOGITS_BY_TOKEN} />
                         ) : (
                           <div className="mt-0 flex w-full flex-col text-xs text-slate-400">
-                            <div className="flex flex-wrap gap-x-0 gap-y-[0px]">
-                              {selectedMetadataGraph?.promptTokens.map((token, index) => (
-                                <span
-                                  key={`${token}-${index}`}
-                                  className="h-[29px] min-h-[29px] cursor-default font-mono text-[12px] leading-[29px] text-slate-800"
-                                >
-                                  {token
-                                    .toString()
-                                    .replaceAll(' ', '\u00A0')
-                                    .replaceAll('\n', '↵')
-                                    .replaceAll('<bos>', '')}
-                                </span>
-                              ))}
-                            </div>
+                            <PromptTokenStrip tokens={selectedMetadataGraph?.promptTokens ?? []} />
                             {isSteering ? (
                               <div className="mt-1 h-10">
                                 <LoadingSquare className="h-5 w-5" />
@@ -1767,21 +1783,7 @@ export default function SteerModal() {
                           <TokenTooltip logitsByToken={steerResult.STEERED_LOGITS_BY_TOKEN} />
                         ) : (
                           <div className="mt-0 flex w-full flex-col text-xs text-slate-400">
-                            <div className="flex flex-wrap gap-x-0 gap-y-[0px]">
-                              {/* {selectedMetadataGraph?.promptTokens} */}
-                              {selectedMetadataGraph?.promptTokens.map((token, index) => (
-                                <span
-                                  key={`${token}-${index}`}
-                                  className="h-[29px] min-h-[29px] cursor-default font-mono text-[12px] leading-[29px] text-slate-800"
-                                >
-                                  {token
-                                    .toString()
-                                    .replaceAll(' ', '\u00A0')
-                                    .replaceAll('\n', '↵')
-                                    .replaceAll('<bos>', '')}
-                                </span>
-                              ))}
-                            </div>
+                            <PromptTokenStrip tokens={selectedMetadataGraph?.promptTokens ?? []} />
                             {isSteering ? (
                               <div className="mt-1 h-10">
                                 <LoadingSquare className="h-5 w-5" />

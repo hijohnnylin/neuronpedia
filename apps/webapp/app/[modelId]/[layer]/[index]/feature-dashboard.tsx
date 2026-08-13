@@ -359,8 +359,6 @@ export default function FeatureDashboard({
                 activationTestTextCallback={(activation) => {
                   setTestTextResult(activation);
                 }}
-                // by default we try to show the chat/formatted tokens instead of the raw tokens
-                defaultShowRawTokens={false}
                 // if false, only show the activation test
                 showActivations={embedActivations}
                 showSteerButton={embedSteer}

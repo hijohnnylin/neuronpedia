@@ -11,7 +11,7 @@ export default function TokenTooltip({ logitsByToken }: { logitsByToken: SteerRe
               key={`${token.token}-${index}`}
               className="h-[29px] max-h-[29px] min-h-[29px] cursor-default font-mono text-[12px] leading-[29px] text-slate-800"
             >
-              {token.token.toString().replaceAll(' ', '\u00A0').replaceAll('\n', '↵').replaceAll('<bos>', '')}
+              {token.token.toString().replaceAll(' ', '\u00A0').replaceAll('\n', '↵')}
             </span>
           );
         }

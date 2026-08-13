@@ -8,6 +8,7 @@ import {
   GRAPH_MAXNLOGITS_DEFAULT,
   GRAPH_MAXNLOGITS_MAX,
   GRAPH_MAXNLOGITS_MIN,
+  GraphChatMessage,
 } from '@/lib/utils/graph';
 import { NextResponse } from 'next/server';
 import * as yup from 'yup';
@@ -15,7 +16,21 @@ import * as yup from 'yup';
 const MAX_TOKENIZE_CHARS = 10000;
 
 const tokenizeRequestSchema = yup.object({
-  prompt: yup.string().max(MAX_TOKENIZE_CHARS).min(1).required(),
+  // Provide `prompt` (raw string) OR `messages` (structured chat turns the graph
+  // server templates with the model's real chat template).
+  prompt: yup.string().max(MAX_TOKENIZE_CHARS).nullable(),
+  messages: yup
+    .array()
+    .of(
+      yup.object({
+        role: yup.string().required(),
+        // `defined`, not `required`: an empty final assistant turn is how the
+        // caller asks for that turn to be left open for the model to continue,
+        // and yup's `required` rejects the empty string.
+        content: yup.string().defined(),
+      }),
+    )
+    .nullable(),
   modelId: yup.string().min(1).required().oneOf(GRAPH_GENERATION_ENABLED_MODELS),
   sourceSetName: yup.string().nullable(),
   maxNLogits: yup
@@ -146,6 +161,10 @@ export async function POST(request: Request) {
 
     const validatedData = await tokenizeRequestSchema.validate(body);
 
+    if (!validatedData.prompt && !(validatedData.messages && validatedData.messages.length > 0)) {
+      return NextResponse.json({ error: 'Provide either `prompt` or `messages`.' }, { status: 400 });
+    }
+
     if (!validatedData.sourceSetName) {
       const model = await getModelById(validatedData.modelId);
       validatedData.sourceSetName = model?.defaultGraphSourceSetName;
@@ -161,11 +180,12 @@ export async function POST(request: Request) {
     }
 
     const tokenizedResponse = await getGraphTokenize(
-      validatedData.prompt,
+      validatedData.prompt ?? '',
       validatedData.maxNLogits,
       validatedData.desiredLogitProb,
       validatedData.modelId,
       validatedData.sourceSetName,
+      validatedData.messages as GraphChatMessage[] | null,
     );
 
     // console.log('tokenizedResponse', tokenizedResponse);

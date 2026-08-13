@@ -14,6 +14,7 @@ import {
   GRAPH_MAX_TOKENS,
   GRAPH_S3_USER_GRAPHS_DIR,
   GRAPH_SLUG_MIN,
+  GraphChatMessage,
   graphGenerateSchemaClient,
   LORSA_MAX_TOKENS,
   LORSA_MODELS,
@@ -207,6 +208,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         validatedData.desiredLogitProb,
         validatedData.modelId,
         validatedData.sourceSetName,
+        validatedData.messages as GraphChatMessage[] | null,
       );
       numTokens = tokenized.input_tokens.length;
       const maxTokens = LORSA_MODELS.includes(validatedData.modelId) ? LORSA_MAX_TOKENS : GRAPH_MAX_TOKENS;
@@ -331,6 +333,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       userName || 'Anonymous (CT)',
       validatedData.qkTopFraction,
       validatedData.qkTopk,
+      validatedData.messages as GraphChatMessage[] | null,
     );
 
     // download the file from S3

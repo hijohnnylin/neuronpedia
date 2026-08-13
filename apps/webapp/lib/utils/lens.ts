@@ -1,3 +1,4 @@
+import type { components } from '@/lib/api/inference';
 // Shared types + constants for the streaming Jacobian/Logit lens endpoint
 // (`POST /v1/lens/prompt` on the inference server). Pure types only — safe to
 // import from both server and client code.
@@ -79,73 +80,25 @@ export interface LensSteerToken {
   type: LensType;
 }
 
-export interface LensPromptRequest {
-  model: string;
-  // One or more lens types to compute. Requesting both is essentially free
-  // (the model is run once and residuals are shared).
-  type: LensType[];
-  // Provide exactly one of `prompt` (raw text) or `chat` (chat-formatted).
-  prompt?: string | null;
-  chat?: LensChatMessage[] | null;
-  top_n?: number;
-  // Layers to read out. Empty/omitted = all available layers for the lens
-  // type. The model's final layer is always included.
-  layers?: number[];
-  max_seq_len?: number | null;
-  prepend_bos?: boolean;
-  // Enable "thinking" mode when applying a chat template (chat requests only).
-  enable_thinking?: boolean;
-  // Stream results as NDJSON (one message per line).
-  stream?: boolean;
-  // Sampling temperature for generated tokens. 0 = greedy (argmax).
-  temperature?: number;
-  // Number of tokens to generate after the prompt. 0 = lens over the prompt
-  // only (no generation).
-  num_completion_tokens?: number;
-  // Token ids the client already has read-outs for (the previous response's
-  // prompt + generated tokens, in order). The server reuses the longest common
-  // token-id prefix and only recomputes/streams the new positions.
-  cached_token_ids?: number[];
-  // Exact input token ids to read out over, bypassing tokenization. When
-  // provided, `prompt`/`chat` are ignored and generation is disabled
-  // (num_completion_tokens forced to 0) — used to faithfully reproduce a
-  // previously-computed run (e.g. a shared jlens link).
-  input_token_ids?: number[];
-  // Steering: readouts to additively inject (negatively, to suppress) into the
-  // residual stream at every position, during prefill + generation. When set
-  // with a non-zero `steer_strength`, prefix-reuse is disabled server-side.
-  steer_tokens?: LensSteerToken[];
-  // Layers to inject the steering direction at (the selected layer range).
-  // Empty/omitted = the read-out layers.
-  steer_layers?: number[];
-  // Signed steering strength as a fraction of each position's residual norm
-  // (negative suppresses the readout). 0/omitted = no steering.
-  steer_strength?: number;
-  // When true, ablate (project out) the readout direction from the residual
-  // instead of additively steering. Mutually exclusive with steer_strength.
-  steer_ablate?: boolean;
-  // SWAP: when set, replace the source readout (steer_tokens[0]) with this
-  // target readout at every steered layer/position (subtract the source
-  // projection, add it back along the target). Takes precedence over
-  // steer_strength / steer_ablate. `type` should match the source readout.
-  swap_token?: LensSteerToken;
-  // Whether to apply the steer/swap intervention to generated tokens too. When
-  // false (default), only the prompt positions are intervened on; generation
-  // continues from the steered prompt but new positions are left unmodified.
-  steer_generated_tokens?: boolean;
-  // Whether to drop non-word tokens (punctuation/whitespace/symbol/special)
-  // from each position's per-layer read-out BEFORE selecting the top-n, so the
-  // returned tokens are predominantly interesting word tokens. The model's true
-  // top-1 (output) token per layer is always preserved. Probabilities stay the
-  // model's real (full-vocab) probabilities. Defaults to true server-side.
-  filter_non_word_tokens?: boolean;
-  // When true, if the chosen server is already busy with another request, it
-  // returns 429 immediately (instead of queueing) so the caller can fail over
-  // to another server. Set internally by the failover logic in
-  // `lensPromptStream`; not part of the public request surface. Defaults to
-  // false server-side (queue/wait for the lock as before).
-  fail_if_busy?: boolean;
-}
+/**
+ * The lens request as inference declares it, in camelCase.
+ *
+ * Derived from the spec rather than hand-written: this used to be a snake_case duplicate of
+ * the python model, which meant every field existed in three places and the route had to
+ * translate between two of them.
+ *
+ * Every field is optional because the server supplies defaults; `model` and `type` are the
+ * only ones it truly needs, and omitting them surfaces as a 422.
+ */
+export type LensPromptRequest = Partial<components['schemas']['LensPromptRequest']>;
+
+// The streamed NDJSON frames, mirroring the models in apps/inference's lens/prompt.py.
+//
+// Hand-written because NDJSON frames never reach openapi.json, so there is nothing to
+// generate from. They are not renamed on the way through: inference declares these frames on
+// `PublicFrameSchema`, which leaves the field names un-aliased precisely because they are what
+// `/api/lens/prompt` publishes and what the stored share blobs contain. Inference's
+// test_lens_frame_contract.py pins the names, so a change there fails before it reaches here.
 
 // Lens read-out for one (position, lens_type). All token references are
 // decoded STRINGS, never ids.
@@ -156,9 +109,32 @@ export interface LensTypeSlice {
   top_probs: number[][];
 }
 
+// Per-token chat-span metadata (role / channel / section / message index),
+// computed server-side by the engine's tokenize layer (the single source of
+// truth for message boundaries). All fields are null on raw-text / reproduction
+// requests that carry no chat messages, in which case the client renders the
+// tokens plainly. `section` is one of "header" | "content" | "footer" |
+// "scaffold"; `channel` is a harmony channel (analysis/final/commentary) or null.
+export interface LensTokenSpan {
+  message_index?: number | null;
+  role?: string | null;
+  channel?: string | null;
+  section?: string | null;
+}
+
+// True on the 2nd..nth position of a character that is split across tokens (an
+// emoji, typically). The server repeats the whole glyph in `token` at every
+// contributing position so each chip renders it; this flag is what makes that
+// repetition reversible, so anything rebuilding TEXT from tokens must go through
+// `tokensToText` (jlens-chat-format.ts) rather than joining `token`. Optional
+// because runs predating the flag (stored fixtures) simply don't carry it.
+export interface LensCharContinuation {
+  is_char_continuation?: boolean;
+}
+
 // A single chat-formatted prompt token, sent up-front (before inference) so the
 // client can render the conversation structure immediately.
-export interface LensPromptToken {
+export interface LensPromptToken extends LensTokenSpan, LensCharContinuation {
   position: number;
   token: string;
   // Token id, echoed so the client can send it back as `cached_token_ids` on
@@ -194,7 +170,7 @@ export interface LensMetaMessage {
 }
 
 // One per token position: the token plus its per-type lens slices.
-export interface LensTokenMessage {
+export interface LensTokenMessage extends LensTokenSpan, LensCharContinuation {
   kind: 'token';
   position: number;
   token: string;

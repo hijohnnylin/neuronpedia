@@ -1,11 +1,8 @@
+import { ActivationTopkByTokenBatchResponse, ActivationTopkByTokenResponse } from '@/lib/api/inference-types';
 import { getNeuronsForTopkSearcherExplanationOnly } from '@/lib/db/neuron';
 import { assertUserCanAccessModelAndSource } from '@/lib/db/userCanAccess';
 import { getActivationsTopKByToken, SearchTopKResult } from '@/lib/utils/inference';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
-import {
-  ActivationTopkByTokenBatchPost200Response,
-  ActivationTopkByTokenPost200Response,
-} from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 import { boolean, mixed, number, object, string, ValidationError } from 'yup';
 
@@ -70,7 +67,7 @@ const searchWithTopKRequestSchema = object({
  *                 example: 10
  *               ignoreBos:
  *                 type: boolean
- *                 description: Whether to ignore beginning-of-sequence token
+ *                 description: Whether to omit sequence-boundary tokens (beginning-of-sequence and end-of-sequence) and their features from the results
  *                 default: true
  *                 example: true
  *               densityThreshold:
@@ -108,14 +105,19 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     // for batch don't return the neurons
     if (Array.isArray(text)) {
-      const batchResult = result as ActivationTopkByTokenBatchPost200Response;
+      const batchResult = result as ActivationTopkByTokenBatchResponse;
       const toReturn: SearchTopKResult[] = [];
       batchResult.results.forEach((promptResult) => {
         toReturn.push({
           source,
+          // Deliberately not filtered on `isSpecial` the way the single-prompt
+          // path below is. That asymmetry predates the flag — the batch path
+          // never had the EOS filter — so it is left alone here and the flag is
+          // simply passed through for callers to act on.
           results: promptResult.results.map((r) => ({
             position: r.tokenPosition,
             token: r.token,
+            isSpecial: r.isSpecial,
             topFeatures: r.topFeatures.map((f) => ({
               activationValue: f.activationValue,
               featureIndex: f.featureIndex,
@@ -127,7 +129,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       return NextResponse.json({ results: toReturn });
     }
 
-    const singleResult = result as ActivationTopkByTokenPost200Response;
+    const singleResult = result as ActivationTopkByTokenResponse;
 
     const neuronData = await getNeuronsForTopkSearcherExplanationOnly(modelId, source, singleResult, request.user);
 
@@ -137,6 +139,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       results: singleResult.results.map((r) => ({
         position: r.tokenPosition,
         token: r.token,
+        isSpecial: r.isSpecial,
         topFeatures: r.topFeatures.map((f) => ({
           activationValue: f.activationValue,
           featureIndex: f.featureIndex,
@@ -144,6 +147,14 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         })),
       })),
     };
+
+    // The inference server's `ignore_bos` only drops position 0, so a trailing
+    // EOS survives it. `isSpecial` comes from the tokenizer's own special-token
+    // ids, which is how this stays a filter on scaffolding generally rather than
+    // a list of literals that has to grow with every model family.
+    if (ignoreBos) {
+      toReturn.results = toReturn.results.filter((r) => !r.isSpecial);
+    }
 
     // remove all that are below the density threshold
     if (densityThreshold !== -1) {

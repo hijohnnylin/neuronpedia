@@ -4,6 +4,7 @@ import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 // Loaded after driver.css so our theme overrides win on equal specificity.
+import { runWhenIdle } from '@/lib/utils/run-when-idle';
 import {
   NLA_DETAILS_ELEMENT_ID,
   NLA_TOUR_FINISH_CACHE_ID,
@@ -20,7 +21,6 @@ import {
   NLA_TOUR_MODEL_ID,
 } from './nla-tour-constants';
 import './nla-tour.css';
-import { runWhenIdle } from '@/lib/utils/run-when-idle';
 import { NLA_GITHUB_URL, NLA_PAPER_URL } from './nla-urls';
 
 // Module-scoped cleanup for per-step DOM listeners / observers. There is

@@ -26,7 +26,6 @@ export default function HeadActivationsList({
   emptyMessage = 'No sequences for this head.',
   defaultRange = 1,
   defaultShowLineBreaks = true,
-  defaultShowRawTokens = true,
   unbounded = false,
   inferenceEnabled = false,
   defaultCustomText,
@@ -40,7 +39,6 @@ export default function HeadActivationsList({
   emptyMessage?: string;
   defaultRange?: number;
   defaultShowLineBreaks?: boolean;
-  defaultShowRawTokens?: boolean;
   // When true, the list grows to its full height (no internal scroll) and lets the page scroll.
   unbounded?: boolean;
   // When true (model has an inference host), show a custom-text box to run
@@ -52,7 +50,6 @@ export default function HeadActivationsList({
   const { showToastMessage } = useGlobalContext();
   const [selectedRange, setSelectedRange] = useState(defaultRange);
   const [showLineBreaks, setShowLineBreaks] = useState(defaultShowLineBreaks);
-  const [showRawTokens, setShowRawTokens] = useState(defaultShowRawTokens);
   const [maxAttentionMode, setMaxAttentionMode] = useState<'all' | 'keys' | 'queries'>('all');
 
   // Custom-text attention state. Only used when `inferenceEnabled` and we have a
@@ -193,10 +190,6 @@ export default function HeadActivationsList({
     setShowLineBreaks(defaultShowLineBreaks);
   }, [defaultShowLineBreaks]);
 
-  useEffect(() => {
-    setShowRawTokens(defaultShowRawTokens);
-  }, [defaultShowRawTokens]);
-
   const hasLayerHead = layer !== undefined && headIndex !== undefined;
   const ATTENTION_ORANGE_RGB = '251, 146, 60';
 
@@ -232,12 +225,10 @@ export default function HeadActivationsList({
           {customResult && (
             <div className="mt-1 flex w-full flex-col rounded-md border border-slate-200 bg-slate-50 px-3 pb-3 pt-0 sm:px-4">
               <HeadActivationItem
-                key={`custom-${modelId}-${layer}-${headIndex}-${showLineBreaks}-${showRawTokens}-${maxAttentionMode}`}
+                key={`custom-${modelId}-${layer}-${headIndex}-${showLineBreaks}-${maxAttentionMode}`}
                 sequence={customResult}
-                modelId={modelId}
                 tokensToDisplayAroundMaxActToken={100000}
                 showLineBreaks={showLineBreaks}
-                showRawTokens={showRawTokens}
                 enableExpanding={false}
                 overallMaxActivationValueInList={customResult.maxActivation}
                 overrideTextSize="text-[9.5px] sm:text-[11px]"
@@ -273,7 +264,8 @@ export default function HeadActivationsList({
                           <Copy className="h-4 w-4" /> Copied!
                         </div>
                         <div className="mt-1 text-xs">
-                          The link to this head, including this attention test result, has been copied to your clipboard.
+                          The link to this head, including this attention test result, has been copied to your
+                          clipboard.
                         </div>
                       </div>,
                     );
@@ -425,10 +417,8 @@ export default function HeadActivationsList({
                   <HeadActivationItem
                     key={`${ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size}-${idx}-${showLineBreaks}`}
                     sequence={sequence}
-                    modelId={modelId}
                     tokensToDisplayAroundMaxActToken={ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size}
                     showLineBreaks={showLineBreaks}
-                    showRawTokens={showRawTokens}
                     overallMaxActivationValueInList={overallMaxActivation}
                     overrideTextSize="text-[9.5px] sm:text-[11px]"
                     maxAttentionMode={maxAttentionMode}

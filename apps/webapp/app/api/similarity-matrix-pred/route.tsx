@@ -1,8 +1,8 @@
+import { INFERENCE_BASE_PATH } from '@/lib/api/inference-types';
 import { getOneRandomServerHostForSource } from '@/lib/db/inference-host-source';
 import { getTransformerLensModelIdIfExists } from '@/lib/db/model';
 import { INFERENCE_SERVER_SECRET, USE_LOCALHOST_INFERENCE } from '@/lib/env';
 import { withOptionalUser } from '@/lib/with-user';
-import { BASE_PATH } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 
 type RequestBody = {
@@ -45,7 +45,7 @@ export const POST = withOptionalUser(async (request) => {
     const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
     const base = (USE_LOCALHOST_INFERENCE ? undefined : serverHost) || serverHost;
-    const url = `${base}${BASE_PATH}/util/similarity-matrix-pred`;
+    const url = `${base}${INFERENCE_BASE_PATH}/util/similarity-matrix-pred`;
 
     const resp = await fetch(url, {
       method: 'POST',

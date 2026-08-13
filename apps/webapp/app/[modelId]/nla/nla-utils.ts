@@ -1,8 +1,15 @@
 import { CONFIDENCE_THRESHOLD, MAX_TOKENS_TO_EXPLAIN } from '@/lib/nla-constants';
-import { ChatMessage, ChatTokenizerFormat, TokenInfo, TokenMessageGroup } from './nla-types';
+import { ChatMessage, TokenInfo, TokenMessageGroup } from './nla-types';
 
 // Re-exported so existing client modules can keep importing it from here.
 export { MAX_TOKENS_TO_EXPLAIN };
+
+// Stable key identifying "the current tokenList corresponds to these chat
+// turns", replacing the old rendered-template-string comparison (the frontend
+// no longer renders chat templates — the NLA server does).
+export function chatMessagesKey(messages: ChatMessage[]): string {
+  return JSON.stringify(messages.map((m) => [m.role, m.content]));
+}
 
 export function scoreColor(score: number | null): string {
   if (score === null) return 'bg-slate-100';
@@ -37,8 +44,10 @@ export function confidenceLabel(score: number | null): { label: string; color: s
 // denominator (`norm`) is the source's mean MSE for predicting the dataset
 // mean of normed vectors. 0 = perfect reconstruction, 1 = no better than
 // predicting the mean, > 1 = worse than the mean predictor.
-export function computeRelativeMse(mse: number | null, norm: number): number | null {
-  if (mse === null || norm <= 0) return null;
+// `mse` is optional on the wire, not just nullable: the server omits it when no reconstructor is
+// loaded, so callers reading it off an ExplainResult can hand us undefined.
+export function computeRelativeMse(mse: number | null | undefined, norm: number): number | null {
+  if (mse === null || mse === undefined || norm <= 0) return null;
   return mse / norm;
 }
 
@@ -50,138 +59,93 @@ export function cleanPartialText(raw: string): string {
     .trim();
 }
 
-export function groupTokensIntoMessages(
-  tokens: TokenInfo[],
-  fmt: ChatTokenizerFormat,
-): {
+// Which display bucket a token's server-computed `section` maps to. Structural
+// scaffolding + headers render as header chips; turn-end markers as footer
+// chips; everything else (message content / generated text) as content.
+type SectionBucket = 'header' | 'content' | 'footer';
+function sectionBucket(section: string | null | undefined): SectionBucket {
+  if (section === 'footer') return 'footer';
+  if (section === 'header' || section === 'scaffold') return 'header';
+  return 'content';
+}
+
+// Whether any token carries server-computed span metadata. When false, no chat
+// grouping is possible (raw-text) and the caller renders tokens plainly.
+function hasSpans(tokens: TokenInfo[]): boolean {
+  return tokens.some((t) => t.section != null || t.role != null || t.message_index != null);
+}
+
+// Group the flat, span-tagged token stream into per-message bubbles. Purely
+// span-driven (role / section / message_index from the NLA server) — no
+// per-model-family token knowledge. Mirrors the jlens `groupTokensBySpans`.
+//
+// A new group opens when the source message index changes, or (within the
+// generated assistant response) when a new harmony block begins (a header token
+// following a non-header token).
+export function groupTokensIntoMessages(tokens: TokenInfo[]): {
   messages: TokenMessageGroup[];
   hasChatFormat: boolean;
 } {
-  const hasTurnStart = tokens.some((t) => fmt.isSpecialToken(t.token));
-  if (!hasTurnStart) {
+  if (tokens.length === 0 || !hasSpans(tokens)) {
     return { messages: [], hasChatFormat: false };
   }
 
-  const messages: TokenMessageGroup[] = [];
-  let i = 0;
-
-  while (i < tokens.length) {
-    const tok = tokens[i];
-
-    if (tok.token === fmt.turnStartToken) {
-      const headerTokens: TokenInfo[] = [tok];
-      i += 1;
-
-      let role: 'user' | 'assistant' = 'user';
-      while (i < tokens.length) {
-        const t = tokens[i];
-        headerTokens.push(t);
-        if (t.token.includes('user')) role = 'user';
-        if (t.token.includes(fmt.assistantRoleName)) role = 'assistant';
-        i += 1;
-        if (t.token.includes('\n')) break;
-      }
-
-      const contentTokens: TokenInfo[] = [];
-      while (i < tokens.length && tokens[i].token !== fmt.turnEndToken && tokens[i].token !== fmt.turnStartToken) {
-        contentTokens.push(tokens[i]);
-        i += 1;
-      }
-
-      const footerTokens: TokenInfo[] = [];
-      if (i < tokens.length && tokens[i].token === fmt.turnEndToken) {
-        footerTokens.push(tokens[i]);
-        i += 1;
-        while (i < tokens.length && tokens[i].token !== fmt.turnStartToken) {
-          footerTokens.push(tokens[i]);
-          i += 1;
-        }
-      }
-
-      messages.push({ role, headerTokens, contentTokens, footerTokens });
+  const groupIds: number[] = new Array(tokens.length).fill(0);
+  let groupId = -1;
+  let curKey: string | null = null;
+  let prevSection: string | null = null;
+  let genBlock = 0;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const t = tokens[i];
+    const mi = t.message_index ?? null;
+    let key: string;
+    if (mi != null) {
+      key = `msg:${mi}`;
     } else {
-      if (messages.length > 0) {
-        messages[messages.length - 1].contentTokens.push(tok);
+      if (t.section === 'header' && prevSection != null && prevSection !== 'header') {
+        genBlock += 1;
       }
-      i += 1;
+      key = `gen:${genBlock}`;
+    }
+    if (key !== curKey) {
+      groupId += 1;
+      curKey = key;
+    }
+    groupIds[i] = groupId;
+    prevSection = t.section ?? null;
+  }
+
+  const messages: TokenMessageGroup[] = [];
+  let lastId = -1;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const t = tokens[i];
+    if (groupIds[i] !== lastId) {
+      messages.push({ role: 'assistant', headerTokens: [], contentTokens: [], footerTokens: [] });
+      lastId = groupIds[i];
+    }
+    const group = messages[messages.length - 1];
+    const bucket = sectionBucket(t.section);
+    if (bucket === 'header') group.headerTokens.push(t);
+    else if (bucket === 'footer') group.footerTokens.push(t);
+    else group.contentTokens.push(t);
+    if (t.role != null) {
+      group.role = t.role === 'user' ? 'user' : 'assistant';
     }
   }
 
-  return { messages, hasChatFormat: true };
+  return { messages, hasChatFormat: messages.length > 0 };
 }
 
 export function messageAllTokens(msg: TokenMessageGroup): TokenInfo[] {
   return [...msg.headerTokens, ...msg.contentTokens, ...msg.footerTokens];
 }
 
-/**
- * Pre-tokenization chat bubble: header / body / footer segments match
- * `formatSingleTurn` so `renderTokenGroup` can reuse the same newline, ↵,
- * and blank-line rules as real chips. Pass `{ preview: true }`; header/footer
- * tokens then get the same flex wrapper classes as tokenized bubbles
- * (`buildLines` + `renderChip` preview branch).
- */
-export function buildSyntheticUserTurnPreviewGroup(
-  fmt: ChatTokenizerFormat,
-  message: ChatMessage,
-  messageIndex: number,
-  totalMessages: number,
-  positionBase: number,
-): TokenMessageGroup {
-  const isLast = messageIndex === totalMessages - 1;
-  let header: string;
-  let footer: string;
-  if (fmt.id === 'qwen') {
-    header = `<|im_start|>${message.role}\n`;
-    footer = isLast ? '' : '<|im_end|>\n';
-  } else if (fmt.id === 'gemma3') {
-    const roleName = message.role === 'assistant' ? 'model' : message.role;
-    header = `<start_of_turn>${roleName}\n`;
-    footer = isLast ? '' : '<end_of_turn>\n';
-  } else if (fmt.id === 'llama3') {
-    // Real `formatSingleTurn` uses `\n\n` before content; preview uses one `\n` so the
-    // header chip does not show a double line break before the body (inference unchanged).
-    header = `<|start_header_id|>${message.role}<|end_header_id|>\n`;
-    footer = isLast ? '' : '<|eot_id|>';
-  } else {
-    const full = fmt.formatSingleTurn(message, messageIndex, totalMessages);
-    const at = full.indexOf(message.content);
-    if (at < 0) {
-      return {
-        role: message.role,
-        headerTokens: [],
-        contentTokens: [{ token: full, token_id: 0, position: positionBase }],
-        footerTokens: [],
-      };
-    }
-    header = full.slice(0, at);
-    footer = full.slice(at + message.content.length);
-  }
-
-  let pos = positionBase;
-  const headerTokens: TokenInfo[] = header ? [{ token: header, token_id: 0, position: pos++ }] : [];
-  const contentTokens: TokenInfo[] =
-    message.content.length > 0 ? [{ token: message.content, token_id: 0, position: pos++ }] : [];
-  const footerTokens: TokenInfo[] = footer ? [{ token: footer, token_id: 0, position: pos++ }] : [];
-
-  return {
-    role: message.role,
-    headerTokens,
-    contentTokens,
-    footerTokens,
-  };
-}
-
 export function computeLastSelection(tokens: TokenInfo[], maxTokens: number): Set<number> {
   return new Set(tokens.slice(-maxTokens).map((t) => t.position));
 }
 
-export function computeLastUserSelection(
-  tokens: TokenInfo[],
-  fmt: ChatTokenizerFormat,
-  maxTokens: number,
-): Set<number> {
-  const grouped = groupTokensIntoMessages(tokens, fmt);
+export function computeLastUserSelection(tokens: TokenInfo[], maxTokens: number): Set<number> {
+  const grouped = groupTokensIntoMessages(tokens);
   if (!grouped.hasChatFormat) {
     return computeLastSelection(tokens, maxTokens);
   }
@@ -199,12 +163,12 @@ export function computeLastUserSelection(
   return new Set(userTokens.slice(-maxTokens).map((t) => t.position));
 }
 
-export function computeAutoSelection(tokens: TokenInfo[], fmt: ChatTokenizerFormat, maxTokens: number): Set<number> {
+export function computeAutoSelection(tokens: TokenInfo[], maxTokens: number): Set<number> {
   if (tokens.length <= maxTokens) {
     return new Set(tokens.map((t) => t.position));
   }
 
-  const grouped = groupTokensIntoMessages(tokens, fmt);
+  const grouped = groupTokensIntoMessages(tokens);
   if (!grouped.hasChatFormat || grouped.messages.length === 0) {
     return computeLastSelection(tokens, maxTokens);
   }

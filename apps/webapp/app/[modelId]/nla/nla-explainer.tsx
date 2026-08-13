@@ -52,7 +52,7 @@ const NLA_MODEL_TOGGLE_OPTIONS = [
               <strong>Verbalizer:</strong> <code>fp8-quantized</code>
             </li>
             <li>
-              <strong>Reconstructor*:</strong> <code>fp8-quantized</code>
+              <strong>Reconstructor*:</strong> <code>int4-quantized</code>
             </li>
           </ul>
         </p>
@@ -163,7 +163,6 @@ export default function NLAExplainer() {
     isHydratingDemo,
     isEditingMessage,
     chatMessages,
-    tokenizerFormat,
     activeDemoCacheId,
     handleClear,
     loadCacheById,
@@ -513,7 +512,9 @@ export default function NLAExplainer() {
               </div>
             </div>
             {(() => {
-              const len = tokenizerFormat.formatChat(chatMessages).length;
+              // Approximate length by the sum of message contents (the exact
+              // rendered length is enforced server-side after templating).
+              const len = chatMessages.reduce((sum, m) => sum + m.content.length, 0);
               return len > MAX_TEXT_LENGTH ? (
                 <span className="text-xs text-red-500">
                   Text must be {MAX_TEXT_LENGTH} characters or less (currently {len})

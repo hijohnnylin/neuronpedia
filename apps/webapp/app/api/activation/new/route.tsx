@@ -49,6 +49,10 @@ import { NextResponse } from 'next/server';
  *                 description: The custom text to process. Either a single string or an array of strings.
  *                 required: true
  *                 default: Hello world
+ *               ignoreBos:
+ *                 type: boolean
+ *                 description: When true, omits the leading beginning-of-sequence token (and its activation value) from the result.
+ *                 default: false
  *     responses:
  *       200:
  *         description: Successful response, with activation data
@@ -137,7 +141,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Unknown Error' }, { status: 500 });
   }
-  const activation = await getActivationForFeature(neuron, body.customText, request.user);
+  const activation = await getActivationForFeature(neuron, body.customText, request.user, body.ignoreBos === true);
 
   return NextResponse.json(activation);
 });

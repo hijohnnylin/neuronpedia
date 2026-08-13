@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { Activation, Explanation, ExplanationModelType } from '@prisma/client';
-import { AUTOINTERP_SERVER_API } from '../utils/autointerp';
+import { AUTOINTERP_SERVER_API, unwrapAutointerpResponse } from '../utils/autointerp';
 import { AuthenticatedUser } from '../with-user';
 
 const ELEUTHER_EMBEDDING_MODEL_NAME = 'stella_en_400m_v5';
@@ -23,16 +23,20 @@ export const generateScoreEleuther = async (
 
   if (type === 'fuzz' || type === 'detection') {
     const explanationScoreTypeName = `eleuther_${type === 'fuzz' ? 'fuzz' : 'recall'}`;
-    const data = await AUTOINTERP_SERVER_API.scoreFuzzDetectionPost({
-      scoreFuzzDetectionPostRequest: {
-        type: type === 'fuzz' ? 'FUZZ' : 'DETECTION',
-        activations: bareActivations,
-        explanation: explanation.description || '',
-        model: explanationModel.openRouterModelId,
-        openrouterKey: explainerKey,
-      },
-    });
+    const data = await unwrapAutointerpResponse(
+      AUTOINTERP_SERVER_API.POST('/v1/score/fuzz-detection', {
+        body: {
+          type: type === 'fuzz' ? 'FUZZ' : 'DETECTION',
+          activations: bareActivations,
+          explanation: explanation.description || '',
+          model: explanationModel.openRouterModelId,
+          openrouterKey: explainerKey,
+        },
+      }),
+    );
 
+    // Keys here are the stored jsonDetails shape and must stay snake_case: existing
+    // ExplanationScore rows are read back with it. Only the wire reads are camelCase.
     const converted = data.breakdown.map((b) => ({
       text: b.strTokens?.join('') || '',
       distance: b.distance,
@@ -61,12 +65,14 @@ export const generateScoreEleuther = async (
   }
   if (type === 'embedding') {
     const explanationScoreTypeName = 'eleuther_embedding';
-    const data = await AUTOINTERP_SERVER_API.scoreEmbeddingPost({
-      scoreEmbeddingPostRequest: {
-        activations: bareActivations,
-        explanation: explanation.description || '',
-      },
-    });
+    const data = await unwrapAutointerpResponse(
+      AUTOINTERP_SERVER_API.POST('/v1/score/embedding', {
+        body: {
+          activations: bareActivations,
+          explanation: explanation.description || '',
+        },
+      }),
+    );
 
     // for each breakdown, find the corresponding text
     // convert to the format we expect

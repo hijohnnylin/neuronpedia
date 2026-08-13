@@ -2,3 +2,10 @@ yarn.lock
 node_modules
 .next
 .cursor
+
+# Build outputs. `prisma generate` rewrites this on every install, so formatting it would be
+# undone immediately and would fail format:check on a clean checkout.
+prisma/generated
+
+# Static assets and data blobs, not source. Reformatting a fixture only inflates diffs.
+public

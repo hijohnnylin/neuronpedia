@@ -1,3 +1,4 @@
+import type { DescribeResponse, ScoreResponse } from '@/lib/api/nla-types';
 import { prisma } from '@/lib/db';
 import { nlaFetch } from '@/lib/db/nla-source';
 import { getOAIEmbedding } from '@/lib/external/embedding';
@@ -104,7 +105,7 @@ export const generateScoreNlaReconstructor = async (explanation: Explanation, us
     throw new Error(`NLA server error: ${nlaResponse.status} - ${errorText}`);
   }
 
-  const nlaResult = (await nlaResponse.json()) as { mse: number; cosine_similarity: number };
+  const nlaResult = (await nlaResponse.json()) as ScoreResponse;
 
   const jsonDetails = {
     mse: nlaResult.mse,
@@ -154,9 +155,7 @@ async function generateScoreNlaVerbalizerInner(
     throw new Error(`NLA server error: ${describeResponse.status} - ${errorText}`);
   }
 
-  const describeResult = (await describeResponse.json()) as {
-    results: { description: string; mse?: number; cosine_similarity?: number }[];
-  };
+  const describeResult = (await describeResponse.json()) as DescribeResponse;
   const fullNlaExplanation = describeResult.results[0]?.description;
   if (!fullNlaExplanation) {
     throw new Error('NLA server returned no description');

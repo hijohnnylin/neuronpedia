@@ -29,11 +29,12 @@ import JlensAdvanced from './jlens-advanced';
 import { MAX_SELECT } from './jlens-analysis';
 import { JlensAnalysisPanel, JlensProviders } from './jlens-analysis-panel';
 import {
-  detectChatFormat,
-  groupTokensIntoMessages,
-  JlensChatFormat,
+  extractAssistantText,
+  groupTokensBySpans,
   JlensTokenGroup,
+  messageIndicesForGroups,
   toChatPayload,
+  tokensToText,
 } from './jlens-chat-format';
 import { JlensCommentary, useSharedCommentary } from './jlens-commentary';
 import {
@@ -43,12 +44,13 @@ import {
   JlensExportChat,
   JlensExportSteer,
   parseFixture,
+  tokenSpansOf,
 } from './jlens-export';
 import { LensModeSetContext } from './jlens-lens-mode';
 import { JlensShareDialog } from './jlens-share-dialog';
 import { DefaultOutputHeader, SteerOutputHeader } from './jlens-steer-panel';
 import { runLensStream as baseRunLensStream, RunLensStreamParams } from './jlens-stream';
-import JlensTokenChip, { scrollContainerToTokenPositions, TokenBand } from './jlens-token';
+import JlensTokenChip, { JlensTokenRun, scrollContainerToTokenPositions, TokenBand } from './jlens-token';
 import { LayerRange } from './jlens-token-popup';
 import { SteerConfig, useJlensAnalysis } from './use-jlens-analysis';
 
@@ -229,8 +231,6 @@ export default function JlensChat({
     isSteerPanelTourStepRef.current = isSteerPanelTourStep;
   }, [isSteerPanelTourStep]);
 
-  const fmt = useMemo(() => detectChatFormat(modelId), [modelId]);
-
   // Auto-scroll to bottom as content arrives (including the steered output,
   // which now renders inline below the default conversation). Skipped while a
   // shared run's restored selection is still waiting to be scrolled into view.
@@ -272,14 +272,15 @@ export default function JlensChat({
     return () => clearTimeout(t);
   }, [copiedSteerIdx]);
 
-  // Group the token stream into bubbles so every token is hoverable.
+  // Group the token stream into bubbles (using the server's per-token spans) so
+  // every token is hoverable.
   const groupedMessages = useMemo<JlensTokenGroup[] | null>(() => {
     if (tokens.length === 0) {
       return null;
     }
-    const { messages: groups, hasChatFormat } = groupTokensIntoMessages(tokens, fmt);
+    const { messages: groups, hasChatFormat } = groupTokensBySpans(tokens);
     return hasChatFormat ? groups : null;
-  }, [tokens, fmt]);
+  }, [tokens]);
 
   const sendMessage = useCallback(async () => {
     if (!typedText.trim() || streaming || isEditing) {
@@ -315,8 +316,10 @@ export default function JlensChat({
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // Generated tokens accumulated during the stream, used to derive the clean
+    // assistant text from the server's per-token spans once the stream ends.
+    const generatedTokens: LensTokenMessage[] = [];
     try {
-      let completion = '';
       await runLensStream({
         modelId,
         chat: toChatPayload(requestMessages),
@@ -333,13 +336,13 @@ export default function JlensChat({
         },
         onPromptTokens: (p) => {
           setAwaitingFirstResponse(false);
+          // Spread the frame rather than copying its fields: a prompt token is a token
+          // message minus `kind`/`results`, so anything the server adds to the frame
+          // (spans, `is_char_continuation`) arrives without another line here.
           setTokens(
             p.tokens.map((t) => ({
+              ...t,
               kind: 'token' as const,
-              position: t.position,
-              token: t.token,
-              id: t.id,
-              is_generated: t.is_generated,
               results: t.position < reuseLen ? (priorTokens[t.position]?.results ?? []) : [],
             })),
           );
@@ -352,19 +355,18 @@ export default function JlensChat({
             return next;
           });
           if (t.is_generated) {
-            setLiveAssistantText((prev) => prev + t.token);
+            generatedTokens.push(t);
+            // Skip the repeats of a split character, as `tokensToText` does — this text is
+            // read, not rendered as chips.
+            setLiveAssistantText((prev) => (t.is_char_continuation ? prev : prev + t.token));
           }
         },
-        onDone: (d) => {
-          completion = d.completion;
-        },
       });
-      const raw = completion || liveAssistantText;
-      // Harmony (and other custom formats) may need bespoke extraction of the
-      // clean assistant text (e.g. gpt-oss returns analysis + final channels
-      // wrapped in structural tokens); fall back to stripping the turn-end.
-      const generated = fmt.parseCompletion ? fmt.parseCompletion(raw) : stripTurnEnd(raw, fmt.turnEndToken);
-      const assistantText = hasPrefill ? prefill + generated : generated;
+      // Clean assistant text from the generated tokens' spans (the server marks
+      // harmony channels / turn-end tokens, so no client-side parsing is needed).
+      // The prefill goes through the same helper so the seam between it and the
+      // generated continuation keeps its whitespace.
+      const assistantText = extractAssistantText(generatedTokens, hasPrefill ? prefill : '');
       setMessages([...nextMessages, { role: 'assistant', content: assistantText }]);
     } catch (err) {
       setTokens(priorTokens);
@@ -395,8 +397,6 @@ export default function JlensChat({
     temperature,
     numCompletionTokens,
     hideNonWordTokens,
-    liveAssistantText,
-    fmt,
     analysis,
   ]);
 
@@ -457,11 +457,8 @@ export default function JlensChat({
             setAwaitingReanalyze(false);
             setTokens(
               p.tokens.map((t) => ({
+                ...t,
                 kind: 'token' as const,
-                position: t.position,
-                token: t.token,
-                id: t.id,
-                is_generated: t.is_generated,
                 results: t.position < reuseLen ? (priorTokens[t.position]?.results ?? []) : [],
               })),
             );
@@ -634,6 +631,9 @@ export default function JlensChat({
       // trailing assistant message so the steered regeneration continues from
       // the same prefix (otherwise the steered output loses the prefill). The
       // prefill is the leading non-generated content of that assistant turn.
+      // A template's auto-injected <think></think> scaffold is not a prefill, and
+      // is excluded here by `sectionBucket` keeping header/scaffold spans out of
+      // `contentTokens` — so only whitespace has to be screened out below.
       let prefill = '';
       if (convo.length > 0 && convo[convo.length - 1].role === 'assistant') {
         convo.pop();
@@ -642,14 +642,9 @@ export default function JlensChat({
           const firstGen = lastGroup.contentTokens.findIndex((t) => t.is_generated);
           if (firstGen > 0) {
             const prefixTokens = lastGroup.contentTokens.slice(0, firstGen);
-            // Ignore the template's auto-injected <think></think> scaffold — only
-            // a real user prefix should be re-sent as the steered prefill.
-            const isRealPrefill = prefixTokens.some((t, i) => {
-              const prev = i > 0 ? prefixTokens[i - 1].token : undefined;
-              return t.token.trim() !== '' && !isThinkToken(t.token, prev);
-            });
+            const isRealPrefill = prefixTokens.some((t) => t.token.trim() !== '');
             if (isRealPrefill) {
-              prefill = prefixTokens.map((t) => t.token).join('');
+              prefill = tokensToText(prefixTokens);
             }
           }
         }
@@ -678,7 +673,10 @@ export default function JlensChat({
       // deterministic.
       if (isSteerPanelTourStepRef.current) {
         try {
-          const res = await fetch('/qwen-output.json', { cache: 'force-cache' });
+          // Ordinary HTTP caching rather than `force-cache`: the file is still served from cache
+          // between runs, but a revalidation means an updated fixture actually reaches a browser
+          // that already holds the old one.
+          const res = await fetch('/qwen-output.json');
           if (!res.ok) {
             throw new Error(`Failed to load the precached swap result (${res.status}).`);
           }
@@ -725,11 +723,8 @@ export default function JlensChat({
           onPromptTokens: (p) => {
             setSteerTokens(
               p.tokens.map((t) => ({
+                ...t,
                 kind: 'token' as const,
-                position: t.position,
-                token: t.token,
-                id: t.id,
-                is_generated: t.is_generated,
                 results: [],
               })),
             );
@@ -793,10 +788,8 @@ export default function JlensChat({
             // until the fresh (re-filtered) read-outs stream in (no flicker).
             setTokens(
               p.tokens.map((t) => ({
+                ...t,
                 kind: 'token' as const,
-                position: t.position,
-                token: t.token,
-                id: t.id,
                 is_generated: priorTokens[t.position]?.is_generated ?? t.is_generated,
                 results: priorTokens[t.position]?.results ?? [],
               })),
@@ -852,10 +845,8 @@ export default function JlensChat({
             onPromptTokens: (p) => {
               setSteerTokens(
                 p.tokens.map((t) => ({
+                  ...t,
                   kind: 'token' as const,
-                  position: t.position,
-                  token: t.token,
-                  id: t.id,
                   is_generated: priorSteer[t.position]?.is_generated ?? t.is_generated,
                   results: [],
                 })),
@@ -946,48 +937,61 @@ export default function JlensChat({
     if (steerTokens.length === 0) {
       return null;
     }
-    const { messages: groups, hasChatFormat } = groupTokensIntoMessages(steerTokens, fmt);
+    const { messages: groups, hasChatFormat } = groupTokensBySpans(steerTokens);
     return hasChatFormat ? groups : null;
-  }, [steerTokens, fmt]);
+  }, [steerTokens]);
 
   const renderSteerResults = useCallback(
     () => (
       <JlensProviders analysis={steerAnalysis} steering>
         {steerTokens.length > 0 ? (
           <div className="flex flex-col gap-y-2.5 pb-5">
-            {steerGroupedMessages
-              ? steerGroupedMessages.map((group, idx) => {
-                  const content = group.contentTokens.map((t) => t.token).join('');
-                  return (
-                    <GroupBubble
-                      key={idx}
-                      group={group}
-                      streaming={analysis.steerStreaming}
-                      isLast={idx === steerGroupedMessages.length - 1}
-                      layersByType={steerAnalysis.layersByType}
-                      bandsByPosition={steerAnalysis.bandsByPosition}
-                      layerRange={steerAnalysis.effectiveRange}
-                      onTokenHover={steerAnalysis.handleTokenHover}
-                      selectedPositions={steerAnalysis.selectedPositions}
-                      highlightedPosition={steerAnalysis.highlightedPosition}
-                      editControls={
-                        content.length > 0
-                          ? {
-                              idx,
-                              content,
-                              copied: copiedSteerIdx === idx,
-                              canEdit: false,
-                              canCopy: true,
-                              showEdit: false,
-                              onCopy: handleCopySteerMessage,
-                              onEdit: () => {},
-                            }
-                          : undefined
-                      }
-                    />
-                  );
-                })
-              : renderPlainBubbles(messages, false, '')}
+            {steerGroupedMessages ? (
+              steerGroupedMessages.map((group, idx) => {
+                const content = tokensToText(group.contentTokens);
+                return (
+                  <GroupBubble
+                    key={idx}
+                    group={group}
+                    streaming={analysis.steerStreaming}
+                    isLast={idx === steerGroupedMessages.length - 1}
+                    layersByType={steerAnalysis.layersByType}
+                    bandsByPosition={steerAnalysis.bandsByPosition}
+                    layerRange={steerAnalysis.effectiveRange}
+                    onTokenHover={steerAnalysis.handleTokenHover}
+                    selectedPositions={steerAnalysis.selectedPositions}
+                    highlightedPosition={steerAnalysis.highlightedPosition}
+                    editControls={
+                      content.length > 0
+                        ? {
+                            copied: copiedSteerIdx === idx,
+                            canCopy: true,
+                            // The steered transcript is a read-only alternative
+                            // run, so it is copy-only.
+                            canEdit: false,
+                            onCopy: () => handleCopySteerMessage(idx, content),
+                          }
+                        : undefined
+                    }
+                  />
+                );
+              })
+            ) : (
+              // No spans, so there is no bubble structure to draw — but the steered run is
+              // still its own token stream, and must not be replaced by `messages`, which
+              // holds the DEFAULT conversation. Doing that showed the unsteered answer as
+              // though it were the steered one, silently contradicting the whole point of
+              // the column.
+              <JlensTokenRun
+                tokens={steerTokens}
+                layersByType={steerAnalysis.layersByType}
+                bandsByPosition={steerAnalysis.bandsByPosition}
+                layerRange={steerAnalysis.effectiveRange}
+                onTokenHover={steerAnalysis.handleTokenHover}
+                selectedPositions={steerAnalysis.selectedPositions}
+                highlightedPosition={steerAnalysis.highlightedPosition}
+              />
+            )}
           </div>
         ) : (
           <div className="flex min-h-40 items-center justify-center gap-x-2 px-1 text-slate-400">
@@ -1162,23 +1166,23 @@ export default function JlensChat({
 
   const hasConversation = messages.length > 0 || tokens.length > 0;
 
-  // Formats with a custom grouper (gpt-oss harmony) may emit more bubbles than
-  // there are chat messages (an injected system turn, and separate analysis /
-  // final assistant channels), so the group index no longer maps 1:1 onto the
-  // `messages` array. Inline editing (which slices `messages` by that index) is
-  // therefore disabled for such formats; copy still works off the bubble's own
-  // rendered text.
-  const supportsInlineEdit = !fmt.groupTokens;
+  // Bubble -> `messages` index. Editing truncates the conversation at that
+  // index, so it must never be the bubble's own position: a reasoning turn is
+  // two bubbles for one message. `null` leaves a bubble copy-only.
+  const groupMessageIdxs = groupedMessages ? messageIndicesForGroups(groupedMessages, messages) : [];
 
   const defaultMessages = (
     <>
       {groupedMessages &&
         groupedMessages.map((group, idx) => {
-          const content = supportsInlineEdit
-            ? (messages[idx]?.content ?? '')
-            : group.contentTokens.map((t) => t.token).join('');
-          if (supportsInlineEdit && editingIdx === idx) {
-            return (
+          const msgIdx = groupMessageIdxs[idx];
+          // Copy acts on what the bubble actually shows (so the reasoning bubble
+          // copies the reasoning), while editing acts on the clean message text.
+          const copyContent = tokensToText(group.contentTokens);
+          const editContent = msgIdx != null ? (messages[msgIdx]?.content ?? '') : '';
+          if (msgIdx != null && msgIdx === editingIdx) {
+            // A message split across bubbles gets one editor, not one per bubble.
+            return groupMessageIdxs.indexOf(msgIdx) === idx ? (
               <AssistantEditBubble
                 key={idx}
                 value={editingText}
@@ -1186,7 +1190,7 @@ export default function JlensChat({
                 onCancel={handleCancelAssistantEdit}
                 onSave={handleSaveAssistantEdit}
               />
-            );
+            ) : null;
           }
           return (
             <GroupBubble
@@ -1202,16 +1206,19 @@ export default function JlensChat({
               selectedPositions={selectedPositions}
               highlightedPosition={highlightedPosition}
               editControls={
-                content.length > 0
+                copyContent.length > 0
                   ? {
-                      idx,
-                      content,
                       copied: copiedMessageIdx === idx,
-                      canEdit: supportsInlineEdit && !streaming && !steering && !isEditing,
                       canCopy: !isEditing,
-                      showEdit: supportsInlineEdit,
-                      onCopy: handleCopyMessage,
-                      onEdit: group.role === 'user' ? handleEditUserMessage : handleStartAssistantEdit,
+                      canEdit: !streaming && !steering && !isEditing,
+                      onCopy: () => handleCopyMessage(idx, copyContent),
+                      onEdit:
+                        msgIdx == null
+                          ? undefined
+                          : () =>
+                              group.role === 'user'
+                                ? handleEditUserMessage(msgIdx, editContent)
+                                : handleStartAssistantEdit(msgIdx, editContent),
                     }
                   : undefined
               }
@@ -1219,10 +1226,8 @@ export default function JlensChat({
           );
         })}
       {!groupedMessages && !awaitingFirstResponse && renderPlainBubbles(messages, streaming, liveAssistantText)}
-      {awaitingReanalyze && <PendingAssistantBubble fmt={fmt} />}
-      {awaitingFirstResponse && (
-        <PendingTurnBubbles userText={messages[messages.length - 1]?.content ?? ''} fmt={fmt} />
-      )}
+      {awaitingReanalyze && <PendingAssistantBubble />}
+      {awaitingFirstResponse && <PendingTurnBubbles userText={messages[messages.length - 1]?.content ?? ''} />}
     </>
   );
 
@@ -1396,6 +1401,7 @@ export default function JlensChat({
             modelId,
             kind: 'chat',
             inputTokenIds: tokens.map((t) => t.id),
+            spans: tokenSpansOf(tokens),
             messages,
             topN,
             temperature,
@@ -1540,41 +1546,16 @@ export default function JlensChat({
   );
 }
 
-function stripTurnEnd(content: string, turnEndToken: string): string {
-  let out = content;
-  while (out.endsWith(turnEndToken)) {
-    out = out.slice(0, -turnEndToken.length);
-  }
-  return out.replace(/\s+$/, '');
-}
-
-// `<think>` / `</think>` reasoning markers. Rendered inline with the content
-// but in the dim, monospaced special-token style.
-function isThinkToken(token: string, prevToken?: string): boolean {
-  const t = token.trim();
-  if (t === '<think>' || t === '</think>') {
-    return true;
-  }
-  if (token === '\n\n' && prevToken !== undefined) {
-    const p = prevToken.trim();
-    return p === '<think>' || p === '</think>';
-  }
-  return false;
-}
-
 // Per-message copy/edit affordances shown beneath a bubble. Omitted (undefined)
-// when the bubble isn't user-editable (e.g. the steered-output transcript).
+// when the bubble has no content to act on. `onEdit` is omitted when the bubble
+// can't be mapped back to a chat message — the steered-output transcript, or a
+// bubble whose message index is unknown — leaving copy as the only affordance.
 type MessageEditControls = {
-  idx: number;
-  content: string;
   copied: boolean;
-  canEdit: boolean;
   canCopy: boolean;
-  // When false, the edit affordance is omitted entirely (only copy remains) —
-  // used by the steered-output transcript, which can be copied but not edited.
-  showEdit?: boolean;
-  onCopy: (idx: number, content: string) => void;
-  onEdit: (idx: number, content: string) => void;
+  canEdit: boolean;
+  onCopy: () => void;
+  onEdit?: () => void;
 };
 
 // A grouped (tokenized) message bubble: header/footer special tokens render
@@ -1615,17 +1596,14 @@ function GroupBubble({
   // Where generation begins within this bubble's content. Only > 0 when the
   // non-generated prefix is a real user assistant prefill, so the boundary
   // marker is shown only in that case — never at the very start of an assistant
-  // bubble (the bubble already makes that clear). The chat template can
-  // auto-inject an empty `<think></think>` scaffold (non-generated) before
-  // generation; that isn't a prefill, so we ignore think/whitespace-only
-  // prefixes.
+  // bubble (the bubble already makes that clear). A template's auto-injected
+  // `<think></think>` scaffold isn't a prefill; it never reaches `contentTokens`
+  // because `sectionBucket` routes header/scaffold spans elsewhere, leaving only
+  // whitespace-only prefixes to screen out here.
   const firstGeneratedContentIdx = group.contentTokens.findIndex((t) => t.is_generated);
   const hasRealPrefill =
     firstGeneratedContentIdx > 0 &&
-    group.contentTokens.slice(0, firstGeneratedContentIdx).some((t, i, arr) => {
-      const prev = i > 0 ? arr[i - 1].token : undefined;
-      return t.token.trim() !== '' && !isThinkToken(t.token, prev);
-    });
+    group.contentTokens.slice(0, firstGeneratedContentIdx).some((t) => t.token.trim() !== '');
   return (
     <div className={`group flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`relative flex max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
@@ -1657,11 +1635,7 @@ function GroupBubble({
               const prevToken = tokenIdx > 0 ? group.contentTokens[tokenIdx - 1].token : undefined;
               const prevEndsWithLineBreak = tokenIdx === 0 || (prevToken !== undefined && /\n/.test(prevToken));
               const nextStartsNewLine = tokenIdx === group.contentTokens.length - 1;
-              const variant = isThinkToken(token.token, prevToken)
-                ? 'think'
-                : token.is_generated
-                  ? 'generated'
-                  : 'content';
+              const variant = token.is_generated ? 'generated' : 'content';
               return (
                 <span key={token.position}>
                   {tokenIdx === firstGeneratedContentIdx && hasRealPrefill && (
@@ -1726,14 +1700,18 @@ function GroupBubble({
           )}
         </div>
         {editControls && (
+          // The row sits below the bubble (`top-full` + 4px, 20px tall) which is
+          // taller than the 10px gap between bubbles, so it must paint above the
+          // following bubble's opaque background or it would be mostly hidden on
+          // every bubble but the last.
           <div
-            className={`absolute top-full mt-1 hidden h-5 items-center gap-x-1 px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:flex ${
+            className={`absolute top-full z-10 mt-1 hidden h-5 items-center gap-x-1 px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:flex ${
               isUser ? 'right-0 justify-end' : 'left-0 justify-start'
             }`}
           >
             <button
               type="button"
-              onClick={() => editControls.onCopy(editControls.idx, editControls.content)}
+              onClick={editControls.onCopy}
               disabled={!editControls.canCopy}
               title="Copy message"
               aria-label="Copy message"
@@ -1741,10 +1719,10 @@ function GroupBubble({
             >
               {editControls.copied ? <Check className="h-3 w-3 text-sky-600" /> : <Copy className="h-3 w-3" />}
             </button>
-            {editControls.showEdit !== false && (
+            {editControls.onEdit && (
               <button
                 type="button"
-                onClick={() => editControls.onEdit(editControls.idx, editControls.content)}
+                onClick={editControls.onEdit}
                 disabled={!editControls.canEdit}
                 title={isUser ? 'Edit message' : 'Edit assistant message'}
                 aria-label={isUser ? 'Edit message' : 'Edit assistant message'}
@@ -1811,15 +1789,12 @@ function AssistantEditBubble({
 
 // Loading placeholder for a single assistant turn, shown in place of an edited
 // assistant bubble while the re-analysis streams back (the earlier turns stay
-// rendered from their tokens).
-function PendingAssistantBubble({ fmt }: { fmt: JlensChatFormat }) {
+// rendered from their tokens). Structural turn tokens are omitted here — they
+// arrive (with spans) once the server responds and the real bubbles render.
+function PendingAssistantBubble() {
   return (
     <div className="flex w-full justify-start">
       <div className="flex max-w-[90%] flex-col gap-y-0.5 rounded-xl bg-white px-3 py-2 shadow">
-        <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">
-          {fmt.turnStartToken}
-          {fmt.assistantRoleName}
-        </div>
         <div className="whitespace-pre-wrap break-words pl-2 pt-2 font-serif text-[13px] leading-relaxed">
           <span className="inline-flex items-center gap-1 text-slate-400">
             <LoadingSquare size={24} />
@@ -1832,28 +1807,18 @@ function PendingAssistantBubble({ fmt }: { fmt: JlensChatFormat }) {
 
 // Optimistic placeholder shown for the just-submitted turn while we wait for
 // the server's first response.
-function PendingTurnBubbles({ userText, fmt }: { userText: string; fmt: JlensChatFormat }) {
+function PendingTurnBubbles({ userText }: { userText: string }) {
   return (
     <>
       <div className="flex w-full justify-end">
         <div className="flex max-w-[80%] flex-col rounded-xl bg-white px-3 py-2 sm:gap-y-0.5">
-          <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">
-            {fmt.turnStartToken}user
-          </div>
           <div className="whitespace-pre-wrap break-words font-serif text-[10px] leading-relaxed sm:text-[13px] sm:leading-[27.5px]">
             {userText}
-          </div>
-          <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">
-            {fmt.turnEndToken}
           </div>
         </div>
       </div>
       <div className="flex w-full justify-start">
         <div className="flex max-w-[80%] flex-col rounded-xl bg-white px-3 py-2 sm:gap-y-0.5">
-          <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">
-            {fmt.turnStartToken}
-            {fmt.assistantRoleName}
-          </div>
           <div className="whitespace-pre-wrap break-words pl-2 pt-2 font-serif text-[13px] leading-relaxed">
             <span className="inline-flex items-center gap-1 text-slate-400">
               <LoadingSquare size={24} />

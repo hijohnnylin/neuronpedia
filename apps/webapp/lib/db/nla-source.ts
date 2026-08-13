@@ -1,7 +1,7 @@
 import { prisma } from '../db';
-import { NLA_SERVER_SECRET, USE_LOCALHOST_NLA } from '../env';
+import { LOCALHOST_NLA_HOST_OVERRIDE, NLA_SERVER_SECRET, USE_LOCALHOST_NLA } from '../env';
 
-const LOCALHOST_NLA_URL = 'http://localhost:5009';
+const LOCALHOST_NLA_URL = LOCALHOST_NLA_HOST_OVERRIDE || 'http://localhost:5009';
 
 /**
  * All configured NLA inference servers for the given source. Returns the

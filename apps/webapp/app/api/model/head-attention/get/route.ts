@@ -41,9 +41,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       // interval filter (which only shows intervals present in stored data).
       interval: 0,
       tokens: result.tokens,
-      attentionIndices: result.attention_indices,
-      attentionValues: result.attention_values,
-      maxActivation: result.max_activation,
+      attentionIndices: result.attentionIndices,
+      attentionValues: result.attentionValues,
+      maxActivation: result.maxActivation,
     });
   } catch (error) {
     console.error('Error running custom head attention:', error);

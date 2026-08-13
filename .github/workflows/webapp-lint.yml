@@ -1,0 +1,62 @@
+name: Webapp - Lint
+defaults:
+  run:
+    working-directory: ./apps/webapp
+# Deliberately unfiltered by path. This job is wired up as a Vercel Deployment Check, and a
+# check that skips reports nothing at all rather than reporting success -- so a commit touching
+# only apps/inference would leave the production deployment waiting forever on a run that never
+# happens. GitHub branch protection has the same blind spot. Running it on every commit costs a
+# cached npm ci and is the price of the check being trustworthy.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  lint:
+    # Vercel and GitHub both identify a required check by this name, and colliding names across
+    # workflows race against each other, so keep it unique and stable -- renaming it silently
+    # detaches the Deployment Check.
+    name: webapp lint and typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 24 rather than 22 for the npm it ships. npm 10 hard-fails a conflicting *optional* peer
+      # where npm 11 warns, so a lockfile npm 11 writes locally can be one npm 10 refuses to
+      # install -- and `.npmrc`'s min-release-age is npm 11.6+, silently ignored before that.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/webapp/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      # `npm run lint` ends in `tsc --noEmit`, which needs @prisma/client and
+      # prisma/generated/zod. Those are generated rather than committed, so without this the
+      # typecheck fails on missing modules. `generate` reads the schema only, so the dummy
+      # URLs are never dialed -- prisma just requires the datasource env vars to be defined.
+      - name: Generate prisma client
+        env:
+          POSTGRES_PRISMA_URL: postgresql://user:pass@localhost:5432/db
+          POSTGRES_URL_NON_POOLING: postgresql://user:pass@localhost:5432/db
+        run: npx prisma generate
+      # eslint --quiet . && tsc --noEmit. Both are database-free, which is why this job exists
+      # ahead of a build job: it is the whole gate the repo already had and never ran.
+      - name: Lint and typecheck
+        run: npm run lint
+
+      # The three checks below each report independently rather than short-circuiting, so one
+      # formatting nit does not hide a failing test for a whole round trip.
+      #
+      # vitest, unit-only: pure functions, no database and no inference server. Small, but
+      # steer-wire.test.ts is what pins the public steer field names to the inference ones, and
+      # that is a boundary that has already drifted once.
+      - name: Test
+        if: ${{ !cancelled() }}
+        run: npm test
+
+      # eslint-config-prettier only switches off the rules that would fight prettier; it does not
+      # check formatting. Without this step nothing did, and 32 files had drifted.
+      - name: Check formatting
+        if: ${{ !cancelled() }}
+        run: npm run format:check

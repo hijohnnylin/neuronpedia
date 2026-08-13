@@ -2,7 +2,6 @@
 
 import {
   ChatMessage,
-  ChatTokenizerFormat,
   ExplainMeta,
   ExplainResult,
   NlaSourceWithModel,
@@ -10,6 +9,7 @@ import {
   TokenInfo,
 } from '@/app/[modelId]/nla/nla-types';
 import {
+  chatMessagesKey,
   computeAutoSelection,
   groupTokensIntoMessages,
   MAX_TOKENS_TO_EXPLAIN,
@@ -17,6 +17,7 @@ import {
 } from '@/app/[modelId]/nla/nla-utils';
 import {
   DEFAULT_COMPLETION_TOKENS,
+  LEGACY_TEMPLATE_FORMAT,
   MAX_COMMENT_LENGTH,
   MAX_TEXT_LENGTH,
   NLA_FREE_CHAT_DEMO_CACHE_ID,
@@ -38,158 +39,15 @@ import {
 
 const TOKENIZE_PREVIEW_DEBOUNCE_MS = 300;
 
-// ─── Chat tokenizer format abstraction ──────────────────────────────────────
-// To add a new model format, implement ChatTokenizerFormat and add an entry to
-// TOKENIZER_FORMATS below.
-
-const qwenFormat: ChatTokenizerFormat = {
-  id: 'qwen',
-  turnStartToken: '<|im_start|>',
-  turnEndToken: '<|im_end|>',
-  assistantRoleName: 'assistant',
-  formatSingleTurn(message, messageIndex, totalMessages) {
-    const isLast = messageIndex === totalMessages - 1;
-    return `<|im_start|>${message.role}\n${message.content}${isLast ? '' : '<|im_end|>\n'}`;
-  },
-  formatChat(messages) {
-    return messages.map((m, i) => this.formatSingleTurn(m, i, messages.length)).join('');
-  },
-  parseChat(raw) {
-    if (!raw.includes('<|im_start|>')) return null;
-    const parts = raw.split('<|im_start|>').filter(Boolean);
-    const messages: ChatMessage[] = [];
-    let valid = true;
-    parts.forEach((part) => {
-      if (!valid) return;
-      const newlineIdx = part.indexOf('\n');
-      if (newlineIdx === -1) {
-        valid = false;
-        return;
-      }
-      const role = part.slice(0, newlineIdx).trim();
-      if (role !== 'user' && role !== 'assistant') {
-        valid = false;
-        return;
-      }
-      const content = part.slice(newlineIdx + 1).replace(/<\|im_end\|>\n?$/, '');
-      messages.push({ role, content });
-    });
-    if (!valid) return null;
-    return messages.length > 0 ? messages : null;
-  },
-  isSpecialToken: (token) => token === '<|im_start|>' || token === '<|im_end|>',
-};
-
-const gemma3Format: ChatTokenizerFormat = {
-  id: 'gemma3',
-  turnStartToken: '<start_of_turn>',
-  turnEndToken: '<end_of_turn>',
-  assistantRoleName: 'model',
-  formatSingleTurn(message, messageIndex, totalMessages) {
-    const isLast = messageIndex === totalMessages - 1;
-    const roleName = message.role === 'assistant' ? 'model' : message.role;
-    return `<start_of_turn>${roleName}\n${message.content}${isLast ? '' : '<end_of_turn>\n'}`;
-  },
-  formatChat(messages) {
-    return messages.map((m, i) => this.formatSingleTurn(m, i, messages.length)).join('');
-  },
-  parseChat(raw) {
-    if (!raw.includes('<start_of_turn>')) return null;
-    const parts = raw.split('<start_of_turn>').filter(Boolean);
-    const messages: ChatMessage[] = [];
-    let valid = true;
-    parts.forEach((part) => {
-      if (!valid) return;
-      const newlineIdx = part.indexOf('\n');
-      if (newlineIdx === -1) {
-        valid = false;
-        return;
-      }
-      const rawRole = part.slice(0, newlineIdx).trim();
-      let role: 'user' | 'assistant';
-      if (rawRole === 'user') role = 'user';
-      else if (rawRole === 'model') role = 'assistant';
-      else {
-        valid = false;
-        return;
-      }
-      const content = part.slice(newlineIdx + 1).replace(/<end_of_turn>\n?$/, '');
-      messages.push({ role, content });
-    });
-    if (!valid) return null;
-    return messages.length > 0 ? messages : null;
-  },
-  isSpecialToken: (token) => token === '<start_of_turn>' || token === '<end_of_turn>',
-};
-
-// Llama 3.x chat format. Each turn is wrapped as
-//   <|start_header_id|>{role}<|end_header_id|>\n\n{content}<|eot_id|>
-// with the trailing <|eot_id|> omitted on the last turn so the model continues
-// generating. The BOS token <|begin_of_text|> is added automatically by the
-// tokenizer, so we don't include it here. Mirrors Llama 3.3-Instruct's chat
-// template (sans system prompt and tool calling).
-const llama3Format: ChatTokenizerFormat = {
-  id: 'llama3',
-  turnStartToken: '<|start_header_id|>',
-  turnEndToken: '<|eot_id|>',
-  assistantRoleName: 'assistant',
-  formatSingleTurn(message, messageIndex, totalMessages) {
-    const isLast = messageIndex === totalMessages - 1;
-    return `<|start_header_id|>${message.role}<|end_header_id|>\n\n${message.content}${isLast ? '' : '<|eot_id|>'}`;
-  },
-  formatChat(messages) {
-    return messages.map((m, i) => this.formatSingleTurn(m, i, messages.length)).join('');
-  },
-  parseChat(raw) {
-    if (!raw.includes('<|start_header_id|>')) return null;
-    // Strip an optional leading BOS so pasted snippets that include it
-    // still round-trip cleanly.
-    const stripped = raw.replace(/^<\|begin_of_text\|>/, '');
-    const parts = stripped.split('<|start_header_id|>').filter(Boolean);
-    const messages: ChatMessage[] = [];
-    let valid = true;
-    parts.forEach((part) => {
-      if (!valid) return;
-      const headerEndIdx = part.indexOf('<|end_header_id|>');
-      if (headerEndIdx === -1) {
-        valid = false;
-        return;
-      }
-      const role = part.slice(0, headerEndIdx).trim();
-      if (role !== 'user' && role !== 'assistant') {
-        valid = false;
-        return;
-      }
-      let content = part.slice(headerEndIdx + '<|end_header_id|>'.length);
-      content = content.replace(/^\n+/, '');
-      content = content.replace(/<\|eot_id\|>\s*$/, '');
-      messages.push({ role, content });
-    });
-    if (!valid) return null;
-    return messages.length > 0 ? messages : null;
-  },
-  isSpecialToken: (token) =>
-    token === '<|start_header_id|>' ||
-    token === '<|end_header_id|>' ||
-    token === '<|eot_id|>' ||
-    token === '<|begin_of_text|>',
-};
-
-const TOKENIZER_FORMATS: ChatTokenizerFormat[] = [qwenFormat, gemma3Format, llama3Format];
-
-function detectTokenizerFormat(modelId: string): ChatTokenizerFormat {
-  const lower = modelId.toLowerCase();
-  if (lower.includes('gemma')) return gemma3Format;
-  if (lower.includes('llama')) return llama3Format;
-  return qwenFormat;
-}
-
-function parseAnyChat(raw: string): { messages: ChatMessage[]; format: ChatTokenizerFormat } | null {
-  for (const fmt of TOKENIZER_FORMATS) {
-    const parsed = fmt.parseChat(raw);
-    if (parsed) return { messages: parsed, format: fmt };
-  }
-  return null;
+// Reconstruct the editable chat turns from a stored NLA cache row. `resultJson`
+// carries structured `messages` — the single source of truth — for every row the
+// NLA server templated, and the backfill wrote them for the pre-templating ones.
+// A row with none is a raw-`text` caller (the API accepts `text` directly), which
+// has no turns to recover and edits as a single block. No chat templating happens
+// on the frontend — the NLA server owns it.
+function reconstructChatMessages(text: string, storedMessages: ChatMessage[] | undefined): ChatMessage[] {
+  if (Array.isArray(storedMessages) && storedMessages.length > 0) return storedMessages;
+  return [{ role: 'user', content: text }];
 }
 
 type InputMode = 'chat' | 'manual' | 'paste';
@@ -274,7 +132,6 @@ type NLAContextType = {
   modelDisplayMap: Map<string, { displayName: string; owner: string }>;
   filteredSources: NlaSourceWithModel[];
   selectedNlaSource: NlaSourceWithModel | undefined;
-  tokenizerFormat: ChatTokenizerFormat;
   handleModelChange: (newModelId: string) => void;
   handleSourceChange: (newSourceId: string) => void;
 
@@ -549,6 +406,21 @@ export function NLAProvider({
   // prior-aggregate query. Cleared on chat reset.
   const priorCacheIdRef = useRef<string | null>(null);
 
+  // Set while the view is showing a hydrated cache row whose stored prompt
+  // string the model's real chat template cannot reproduce: legacy rows written
+  // before the server owned templating, and rows created from a raw `text` API
+  // call. Explaining more tokens on one of these sends that stored text verbatim
+  // instead of re-rendering the row's `messages`, because the real template
+  // injects turns the stored text never had (a system preamble on Llama, an
+  // empty think block on Qwen) and every token position downstream of the
+  // injection shifts — which would silently attach the row's cached
+  // explanations to tokens they don't describe.
+  //
+  // `messagesKey` is what the stored text corresponds to, so the moment the
+  // conversation differs from it we've left the row behind and a re-render is
+  // unavoidable.
+  const storedPromptRef = useRef<{ text: string; messagesKey: string } | null>(null);
+
   // NLA source selection
   const modelIds = useMemo(() => {
     const ids = [...new Set(nlaSources.map((s) => s.modelId))];
@@ -568,8 +440,6 @@ export function NLAProvider({
 
   const [selectedModelId, setSelectedModelId] = useState<string>(modelId || modelIds[0] || '');
   const [selectedNlaSourceId, setSelectedNlaSourceId] = useState<string>('');
-
-  const tokenizerFormat = useMemo(() => detectTokenizerFormat(selectedModelId), [selectedModelId]);
 
   const resetResults = useCallback(() => {
     abortRef.current?.abort();
@@ -591,6 +461,7 @@ export function NLAProvider({
     setIsShareModalOpen(false);
     setActiveDemoCacheId(null);
     priorCacheIdRef.current = null;
+    storedPromptRef.current = null;
     suppressDerivedAutoSelectionRef.current = false;
     setExplanationSearchNeedle('');
     setExplanationSearchResetNonce((n) => n + 1);
@@ -689,18 +560,15 @@ export function NLAProvider({
     // Loaded from ?id=: keep row selection until user edits (send / paste /
     // manual input tweak). Applies only in auto-style flows (manual clears above).
     if (suppressDerivedAutoSelectionRef.current) return;
-    setSelectedTokenPositions(computeAutoSelection(tokenList, tokenizerFormat, MAX_TOKENS_TO_EXPLAIN));
-  }, [tokenList, tokenizerFormat, isChatStreaming, inputMode, topLevelMode]);
+    setSelectedTokenPositions(computeAutoSelection(tokenList, MAX_TOKENS_TO_EXPLAIN));
+  }, [tokenList, isChatStreaming, inputMode, topLevelMode]);
 
   // Replace the whole selection set. The column applies its own cap-aware
   // logic (so drag-fills can stop at the limit and pulse the counter), and
   // the parent just commits the result + recomputes the mode label.
-  const handleApplySelection = useCallback(
-    (newSet: Set<number>) => {
-      setSelectedTokenPositions(newSet);
-    },
-    [tokenList, tokenizerFormat],
-  );
+  const handleApplySelection = useCallback((newSet: Set<number>) => {
+    setSelectedTokenPositions(newSet);
+  }, []);
 
   // ─── Tokenize preview: populates the results panel with chips for the
   // current chat. Debounced. Skipped in chat mode (the chat panel itself
@@ -711,10 +579,10 @@ export function NLAProvider({
     if (isChatStreaming) return undefined;
     if (inputMode === 'chat') return undefined;
 
-    const anyMessageHasContent = chatMessages.some((m) => m.content.trim().length > 0);
-    const formattedText = tokenizerFormat.formatChat(chatMessages);
+    const messagesWithContent = chatMessages.filter((m) => m.content.trim().length > 0);
+    const totalContentChars = messagesWithContent.reduce((sum, m) => sum + m.content.length, 0);
 
-    if (!anyMessageHasContent || formattedText.length > MAX_TEXT_LENGTH) {
+    if (messagesWithContent.length === 0 || totalContentChars > MAX_TEXT_LENGTH) {
       setIsTokenizingPreview(false);
       setTokenList([]);
       setResultMap(new Map());
@@ -730,11 +598,13 @@ export function NLAProvider({
 
     const timer = setTimeout(async () => {
       try {
+        // Send structured messages; the server applies the chat template and
+        // returns tokens tagged with per-token spans (role/section/channel).
         const res = await fetch('/api/nla/completion', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: formattedText,
+            messages: chatMessages,
             completion_tokens: 0,
             modelId: selectedModelId || undefined,
             nlaSourceId: selectedNlaSource?.id || undefined,
@@ -743,14 +613,14 @@ export function NLAProvider({
         });
 
         if (res.ok) {
-          const data = (await res.json()) as { tokens?: TokenInfo[] };
+          const data = (await res.json()) as { tokens?: TokenInfo[]; text?: string };
           if (data.tokens) {
             setTokenList(data.tokens);
             setResultMap(new Map());
             setPartialMap(new Map());
             setSelectedPosition(null);
             setMeta({ layer_index: 0, total: data.tokens.length, prompt_length: data.tokens.length });
-            setLastTokenizedText(formattedText);
+            setLastTokenizedText(chatMessagesKey(chatMessages));
           }
         }
       } catch {
@@ -771,7 +641,7 @@ export function NLAProvider({
     // isChatStreaming IS in deps: when chat streaming ends we want this
     // effect to fire once and tokenize the just-finished chat.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatMessages, inputMode, isChatStreaming, selectedModelId, selectedNlaSource, tokenizerFormat]);
+  }, [chatMessages, inputMode, isChatStreaming, selectedModelId, selectedNlaSource]);
 
   // Initialize from query params. The only user-facing param is `id`,
   // which fully reproduces the explainer state by hydrating from the stored
@@ -869,6 +739,28 @@ export function NLAProvider({
     // stable refs created via useCallback and would just bloat the deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatMessages, temperature, selectedModelId, selectedNlaSourceId]);
+
+  // The conversation has moved off the stored prompt of the row we hydrated
+  // (the user sent a message, or edited / truncated a turn), so the next
+  // explain must go through the model's real chat template. That render is not
+  // position-compatible with the stored prompt, which makes every explanation
+  // the row arrived with describe a token at some other position — so drop
+  // them here rather than underline the wrong tokens with them. Only reachable
+  // for rows flagged by `storedPromptRef`; new-format rows re-render faithfully
+  // and keep their results across chat extension as before.
+  useEffect(() => {
+    if (isHydratingRef.current) return;
+    const storedPrompt = storedPromptRef.current;
+    if (storedPrompt === null) return;
+    if (storedPrompt.messagesKey === chatMessagesKey(chatMessages)) return;
+    storedPromptRef.current = null;
+    priorCacheIdRef.current = null;
+    setResultMap(new Map());
+    setPartialMap(new Map());
+    setSelectedTokenPositions(new Set());
+    setSelectedPosition(null);
+    setLockedPosition(null);
+  }, [chatMessages]);
 
   // Mirror the locked-token onto the URL as `?position=` so a reload (or
   // a copy-paste of the address bar) re-opens the same details panel.
@@ -980,7 +872,7 @@ export function NLAProvider({
       // Map the kept chat messages back to their token positions. The
       // tokenizer is fed only the with-content messages, so the
       // grouped-messages array lines up 1:1 with that filtered list.
-      const grouped = groupTokensIntoMessages(tokenList, tokenizerFormat);
+      const grouped = groupTokensIntoMessages(tokenList);
       const keptMessagesWithContent = truncated.filter((m) => m.content.length > 0).length;
       let keptPositions: Set<number> | null = null;
       if (grouped.hasChatFormat && keptMessagesWithContent > 0) {
@@ -1040,7 +932,7 @@ export function NLAProvider({
 
       setChatMessages(truncated);
     },
-    [chatMessages, tokenList, tokenizerFormat],
+    [chatMessages, tokenList],
   );
 
   // Stable ref so callers (e.g. the explain-429 handler inside
@@ -1194,7 +1086,6 @@ export function NLAProvider({
 
   const handleSubmit = useCallback(
     async (positionsOverride?: Set<number>) => {
-      const fullText = tokenizerFormat.formatChat(chatMessages);
       // Allow callers (specifically the auto-explain-after-chat effect) to
       // pass a freshly-computed selection set rather than relying on the
       // closure's `selectedTokenPositions`. Without this, the auto-explain
@@ -1204,20 +1095,37 @@ export function NLAProvider({
       // in `resultMap`, so handleSubmit early-returns without explaining
       // the new turn's tokens.
       const effectiveSelection = positionsOverride ?? selectedTokenPositions;
-      if (!fullText.trim() || isLoading) return;
-      if (fullText.length > MAX_TEXT_LENGTH) {
+      const hasContent = chatMessages.some((m) => m.content.trim().length > 0);
+      const totalContentChars = chatMessages.reduce((sum, m) => sum + m.content.length, 0);
+      if (!hasContent || isLoading) return;
+      if (totalContentChars > MAX_TEXT_LENGTH) {
         setError(
           `Max chat character length of ${MAX_TEXT_LENGTH} exceeded. Please start a new chat by clicking "Free Chat".`,
         );
         return;
       }
+      const submitKey = chatMessagesKey(chatMessages);
+
+      // Explaining more tokens on a hydrated row whose prompt string the real
+      // chat template can't reproduce: reuse that exact string, so the cache key
+      // matches the row and its existing explanations are reused instead of the
+      // whole prompt counting as new (which would trip the per-request cap on
+      // new positions). Once the conversation moves off the row this is null and
+      // we fall back to the normal server-templated `messages` path — the effect
+      // above has already dropped the now-mispositioned results, and
+      // `priorResults` covers the case where it hasn't committed yet.
+      const storedPrompt = storedPromptRef.current;
+      const storedPromptText =
+        storedPrompt !== null && storedPrompt.messagesKey === submitKey ? storedPrompt.text : null;
+      const priorResults =
+        storedPrompt !== null && storedPromptText === null ? new Map<number, ExplainResult>() : resultMap;
 
       // Cancel any pending tokenize-preview so it can't clobber state mid-stream.
       tokenizePreviewAbortRef.current?.abort();
       setIsTokenizingPreview(false);
 
       const effectiveSourceId = selectedNlaSource?.id;
-      const tokensReady = lastTokenizedText === fullText && tokenList.length > 0;
+      const tokensReady = lastTokenizedText === submitKey && tokenList.length > 0;
 
       setIsLoading(true);
       // Keep `resultMap`/`partialMap` intact across follow-up Explain runs
@@ -1241,7 +1149,7 @@ export function NLAProvider({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              text: fullText,
+              messages: chatMessages,
               completion_tokens: 0,
               modelId: selectedModelId || undefined,
               nlaSourceId: effectiveSourceId || undefined,
@@ -1259,7 +1167,7 @@ export function NLAProvider({
           const tokenizeData = (await tokenizeRes.json()) as { tokens: TokenInfo[] };
           setTokenList(tokenizeData.tokens);
           setMeta({ layer_index: 0, total: tokenizeData.tokens.length, prompt_length: tokenizeData.tokens.length });
-          setLastTokenizedText(fullText);
+          setLastTokenizedText(submitKey);
           resolvedTokens = tokenizeData.tokens;
         }
 
@@ -1275,7 +1183,7 @@ export function NLAProvider({
         if (effectiveSelection.size > 0) {
           positionSource = Array.from(effectiveSelection);
         } else if (resolvedTokens.length > 0) {
-          const autoSet = computeAutoSelection(resolvedTokens, tokenizerFormat, MAX_TOKENS_TO_EXPLAIN);
+          const autoSet = computeAutoSelection(resolvedTokens, MAX_TOKENS_TO_EXPLAIN);
           positionSource = Array.from(autoSet);
           setSelectedTokenPositions(autoSet);
         } else {
@@ -1286,12 +1194,12 @@ export function NLAProvider({
         // already-explained ones are kept in `resultMap` and reused.
         const pendingSelected = new Set<number>();
         for (const p of positionSource) {
-          if (!resultMap.has(p)) pendingSelected.add(p);
+          if (!priorResults.has(p)) pendingSelected.add(p);
         }
 
         // Nothing new to explain and we already have results — skip the
         // network round trip rather than re-explaining the entire prompt.
-        if (pendingSelected.size === 0 && resultMap.size > 0) {
+        if (pendingSelected.size === 0 && priorResults.size > 0) {
           setIsLoading(false);
           return;
         }
@@ -1313,18 +1221,17 @@ export function NLAProvider({
         // about to explain. The server keys the resulting cache row on
         // this exact set, so the id it returns reflects the full
         // visible state and a `?id=...` reload reproduces it.
-        const cumulative = new Set<number>(resultMap.keys());
+        const cumulative = new Set<number>(priorResults.keys());
         pendingCapped.forEach((p) => cumulative.add(p));
         const positionsArg = Array.from(cumulative).sort((a, b) => a - b);
 
         const priorCacheId = priorCacheIdRef.current;
 
         console.log('[nla-explain] handleSubmit →', {
-          textLength: fullText.length,
-          textHead: fullText.slice(0, 80),
-          textTail: fullText.slice(-80),
+          messageCount: chatMessages.length,
           tokenListLength: resolvedTokens.length,
-          alreadyExplainedPositions: Array.from(resultMap.keys()).sort((a, b) => a - b),
+          alreadyExplainedPositions: Array.from(priorResults.keys()).sort((a, b) => a - b),
+          storedPromptReused: storedPromptText !== null,
           positionSource,
           pendingNewPositions: pendingCapped,
           positionsArgSentToServer: positionsArg,
@@ -1338,7 +1245,7 @@ export function NLAProvider({
         // token was queued. One-shot on explain start — once the user
         // clicks elsewhere, their selection wins and we never auto-revert.
         const explainSet = new Set(pendingCapped);
-        const grouped = groupTokensIntoMessages(resolvedTokens, tokenizerFormat);
+        const grouped = groupTokensIntoMessages(resolvedTokens);
         let defaultFocusPosition: number | null = null;
         for (const msg of grouped.messages) {
           if (msg.role !== 'assistant') continue;
@@ -1370,7 +1277,13 @@ export function NLAProvider({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: fullText,
+            messages: chatMessages,
+            // Takes precedence over `messages` server-side, pinning the prompt
+            // to the exact string a hydrated legacy / raw-text row stored. Sent
+            // with the marker so the row this run writes is itself recognized as
+            // carrying a non-reproducible prompt.
+            text: storedPromptText ?? undefined,
+            templateFormat: storedPromptText !== null ? LEGACY_TEMPLATE_FORMAT : undefined,
             temperature,
             modelId: selectedModelId || undefined,
             nlaSourceId: effectiveSourceId || undefined,
@@ -1385,6 +1298,17 @@ export function NLAProvider({
             // Persisted alongside the cache row so a `?id=...` deep-link
             // can hydrate state without re-tokenizing.
             tokens: resolvedTokens.map((t) => t.token),
+            // Per-token spans persisted on the (new-format) cache row so hydrate
+            // reconstructs the span-grouped token display with no frontend
+            // chat-template parsing. (`messages` is already sent above.)
+            tokenSpans: resolvedTokens.map((t) => ({
+              position: t.position,
+              token: t.token,
+              role: t.role ?? null,
+              section: t.section ?? null,
+              channel: t.channel ?? null,
+              message_index: t.message_index ?? null,
+            })),
             // Lets the server reuse explanations from the prior cache row
             // when the new prompt prefix-extends it (the typical chat
             // continuation case). The route validates model/source/temp
@@ -1555,7 +1479,6 @@ export function NLAProvider({
       chatMessages,
       selectedModelId,
       selectedNlaSource,
-      tokenizerFormat,
       lastTokenizedText,
       tokenList,
       selectedTokenPositions,
@@ -1592,12 +1515,12 @@ export function NLAProvider({
     // (already fully cached in `resultMap`, which would make
     // handleSubmit early-return). Pass the fresh set explicitly so
     // handleSubmit doesn't depend on the stale closure.
-    const freshAutoSet = computeAutoSelection(tokenList, tokenizerFormat, MAX_TOKENS_TO_EXPLAIN);
+    const freshAutoSet = computeAutoSelection(tokenList, MAX_TOKENS_TO_EXPLAIN);
     if (freshAutoSet.size === 0) return;
     autoExplainAfterChatRef.current = false;
     setSelectedTokenPositions(freshAutoSet);
     handleSubmitRef.current(freshAutoSet);
-  }, [isChatStreaming, topLevelMode, tokenList, tokenizerFormat]);
+  }, [isChatStreaming, topLevelMode, tokenList]);
 
   // Switching the top-level toggle.
   const handleTopLevelModeChange = useCallback(
@@ -1610,12 +1533,12 @@ export function NLAProvider({
         // it'll fire handleSubmit on the next render. The pending-
         // selected filter in handleSubmit skips already-explained
         // positions, so this is a no-op when everything's already done.
-        const autoSet = computeAutoSelection(tokenList, tokenizerFormat, MAX_TOKENS_TO_EXPLAIN);
+        const autoSet = computeAutoSelection(tokenList, MAX_TOKENS_TO_EXPLAIN);
         setSelectedTokenPositions(autoSet);
         autoExplainAfterChatRef.current = true;
       }
     },
-    [tokenList, tokenizerFormat],
+    [tokenList],
   );
 
   // Hydrate the explainer directly from a stored cache row — no tokenize
@@ -1661,29 +1584,70 @@ export function NLAProvider({
         }
         setTemperature(cache.temperature);
 
-        const parsedChat = parseAnyChat(cache.text);
-        setChatMessages(parsedChat ? parsedChat.messages : [{ role: 'user', content: cache.text }]);
-
-        // Build the TokenInfo list from the stored token strings. The
-        // cache row doesn't preserve per-token IDs (the chips don't use
-        // them), so 0 is a fine placeholder.
-        const newTokenList: TokenInfo[] = cache.tokens.map((tok, i) => ({
-          token: tok,
-          token_id: 0,
-          position: i,
-        }));
-        setTokenList(newTokenList);
-        setLastTokenizedText(cache.text);
-
-        // Parse the persisted explain payload and rebuild resultMap.
-        let parsedPayload: { results: ExplainResult[]; layer_index?: number; prompt_length?: number } = {
-          results: [],
-        };
+        // Parse the persisted explain payload. New-format rows carry structured
+        // `messages` + per-token `tokenSpans`; legacy rows have neither.
+        let parsedPayload: {
+          results: ExplainResult[];
+          layer_index?: number;
+          prompt_length?: number;
+          messages?: ChatMessage[];
+          tokenSpans?: Array<{
+            position: number;
+            token: string;
+            role?: string | null;
+            section?: string | null;
+            channel?: string | null;
+            message_index?: number | null;
+          }>;
+          templateFormat?: string;
+        } = { results: [] };
         try {
           parsedPayload = JSON.parse(cache.resultJson);
         } catch {
           // ignore — fall through with empty results
         }
+
+        const hydratedMessages = reconstructChatMessages(cache.text, parsedPayload.messages);
+        setChatMessages(hydratedMessages);
+
+        // This row's `text` has to be reused as-is (rather than re-rendered from
+        // the turns above) either because the messages backfill flagged it as
+        // pre-templating, or because it carries no `messages` at all — an
+        // un-backfilled legacy row, or a raw-`text` API row whose text is
+        // canonical exactly as stored.
+        const hasStructuredMessages = Array.isArray(parsedPayload.messages) && parsedPayload.messages.length > 0;
+        storedPromptRef.current =
+          parsedPayload.templateFormat === LEGACY_TEMPLATE_FORMAT || !hasStructuredMessages
+            ? { text: cache.text, messagesKey: chatMessagesKey(hydratedMessages) }
+            : null;
+
+        // Rebuild the TokenInfo list. Prefer the stored per-token spans (new
+        // format) so the chat bubbles render; fall back to the plain token
+        // strings (legacy) which render ungrouped. Per-token IDs aren't stored
+        // (chips don't use them), so 0 is a fine placeholder, and neither are the byte-fragment
+        // counters, so they get the server's own defaults for a token that decodes cleanly.
+        const newTokenList: TokenInfo[] =
+          parsedPayload.tokenSpans && parsedPayload.tokenSpans.length > 0
+            ? parsedPayload.tokenSpans.map((s, i) => ({
+                token: s.token,
+                token_id: 0,
+                position: typeof s.position === 'number' ? s.position : i,
+                fragment_index: 0,
+                fragment_count: 1,
+                role: s.role ?? null,
+                section: s.section ?? null,
+                channel: s.channel ?? null,
+                message_index: s.message_index ?? null,
+              }))
+            : cache.tokens.map((tok, i) => ({
+                token: tok,
+                token_id: 0,
+                position: i,
+                fragment_index: 0,
+                fragment_count: 1,
+              }));
+        setTokenList(newTokenList);
+        setLastTokenizedText(chatMessagesKey(hydratedMessages));
         const newResultMap = new Map<number, ExplainResult>();
         (parsedPayload.results || []).forEach((r) => {
           if (typeof r.position === 'number') newResultMap.set(r.position, r);
@@ -1741,7 +1705,7 @@ export function NLAProvider({
               window.history.replaceState({}, '', url.toString());
             }
           }
-          const grouped = groupTokensIntoMessages(newTokenList, tokenizerFormat);
+          const grouped = groupTokensIntoMessages(newTokenList);
           for (let i = grouped.messages.length - 1; i >= 0; i -= 1) {
             const msg = grouped.messages[i];
             if (msg.role !== 'assistant') continue;
@@ -1797,7 +1761,7 @@ export function NLAProvider({
         }, 50);
       }
     },
-    [nlaSources, tokenizerFormat, setHighlightComment, setHighlightedParagraph, setHighlightedRange],
+    [nlaSources, setHighlightComment, setHighlightedParagraph, setHighlightedRange],
   );
 
   const loadCacheById = useCallback(
@@ -1919,7 +1883,6 @@ export function NLAProvider({
       modelDisplayMap,
       filteredSources,
       selectedNlaSource,
-      tokenizerFormat,
       handleModelChange,
       handleSourceChange,
       chatMessages,
@@ -1991,7 +1954,6 @@ export function NLAProvider({
       modelDisplayMap,
       filteredSources,
       selectedNlaSource,
-      tokenizerFormat,
       handleModelChange,
       handleSourceChange,
       chatMessages,

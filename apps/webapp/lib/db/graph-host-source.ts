@@ -1,9 +1,9 @@
 import { prisma } from '../db';
-import { GRAPH_RUNPOD_SECRET, GRAPH_SERVER_SECRET, IS_DOCKER_COMPOSE, USE_LOCALHOST_GRAPH } from '../env';
+import { GRAPH_RUNPOD_SECRET, GRAPH_SERVER_SECRET, LOCALHOST_GRAPH_HOST_OVERRIDE, USE_LOCALHOST_GRAPH } from '../env';
 import { AuthenticatedUser } from '../with-user';
 import { userCanAccessModelAndSourceSet } from './userCanAccess';
 
-export const LOCALHOST_GRAPH_HOST = IS_DOCKER_COMPOSE ? 'http://graph:5004' : 'http://127.0.0.1:5004';
+export const LOCALHOST_GRAPH_HOST = LOCALHOST_GRAPH_HOST_OVERRIDE || 'http://127.0.0.1:5004';
 
 export const getSourceSetGraphHosts = async (
   modelId: string,

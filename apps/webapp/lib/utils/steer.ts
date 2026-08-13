@@ -1,6 +1,6 @@
+import { NPSteerMethod } from '@/lib/api/inference-types';
 import { NeuronPartial } from '@/prisma/generated/zod';
 import { Model } from '@prisma/client';
-import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '../env';
 
 export const STEER_N_COMPLETION_TOKENS = 256;
@@ -34,12 +34,17 @@ export const STEER_MAX_PROMPT_CHARS = 2048;
 export const STEER_MAX_PROMPT_CHARS_THINKING = 8192;
 export const STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS = 24576; // average 4 tokens = 6144 tokens max per conversation
 export const STEER_SEED = 16;
-export const STEER_METHOD = NPSteerMethod.SimpleAdditive;
-export const STEER_METHOD_ASSISTANT_CAP = NPSteerMethod.ProjectionCap;
+export const STEER_METHOD = NPSteerMethod.SIMPLE_ADDITIVE;
+export const STEER_METHOD_ASSISTANT_CAP = NPSteerMethod.PROJECTION_CAP;
 export const STEER_TOPK_LOGITS = 5;
 export const STEER_TOPK_LOGITS_MAX = 10;
 export const STEER_FREEZE_ATTENTION = true;
 export const STEER_N_LOGPROBS = 5;
+
+// Part of the saved-completion lookup key, so bump this whenever the text we store changes shape --
+// otherwise rows written under the old semantics keep being served as hits. Rows below version 2
+// have the prompt baked into outputText, because inference used to return prompt + generation.
+export const STEER_COMPLETION_VERSION = 2;
 
 export const ERROR_STEER_MAX_PROMPT_CHARS =
   'Total conversation length exceeds the maximum number of characters allowed. Please click Reset to start a new conversation.';
@@ -86,28 +91,3 @@ export type SteerPreset = {
   featurePresets: FeaturePreset[];
   defaultSelectedFeatures: SteerFeature[];
 };
-
-// we only have to do this for old steer outputs. new ones are saved as chat templates.
-export function convertOldSteerOutputToChatMessages(raw: string): ChatMessage[] {
-  let newRaw = raw.replaceAll('<bos>', '');
-  newRaw = newRaw.replaceAll('<eos>', '');
-  // split by message
-  const split = newRaw.split('<end_of_turn>');
-  const toReturn: ChatMessage[] = split.map((s) => {
-    s = s.trimStart();
-    // remove the <start_of_turn>
-
-    s = s.replaceAll('<start_of_turn>', '');
-    const splitByLineBreak = s.split('\n');
-    if (splitByLineBreak.length === 0) {
-      return { content: '', role: 'system' as ChatMessage['role'] };
-    }
-    let role = splitByLineBreak[0].trim();
-    if (role !== 'user' && role !== 'model' && role !== 'assistant') {
-      role = 'system' as ChatMessage['role'];
-    }
-    const content = splitByLineBreak.slice(1).join('\n');
-    return { content, role: role as ChatMessage['role'] };
-  });
-  return toReturn;
-}

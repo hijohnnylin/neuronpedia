@@ -5,7 +5,20 @@
 // without hitting the inference server.
 
 import { JlensShareSteer, JlensShareUiState } from '@/lib/utils/jlens-share';
-import { LensMetaMessage, LensTokenMessage } from '@/lib/utils/lens';
+import { LensMetaMessage, LensTokenMessage, LensTokenSpan } from '@/lib/utils/lens';
+
+// Extract the per-token chat-span metadata (parallel to a token stream) so a
+// share can persist grouping. Shares re-run inference server-side over the exact
+// token ids (no generation), which yields no spans; the client sends these so
+// the route can overlay them back onto the recomputed tokens by position.
+export function tokenSpansOf(tokens: LensTokenMessage[]): LensTokenSpan[] {
+  return tokens.map((t) => ({
+    message_index: t.message_index ?? null,
+    role: t.role ?? null,
+    channel: t.channel ?? null,
+    section: t.section ?? null,
+  }));
+}
 
 export type ChatRole = 'user' | 'assistant';
 
@@ -51,6 +64,9 @@ export type JlensExport = JlensExportCompletion | JlensExportChat;
 // reproduce its read-outs (forced decode, no generation).
 export interface JlensShareSteerRequest extends JlensShareSteer {
   inputTokenIds: number[];
+  // Per-token chat spans (parallel to `inputTokenIds`), overlaid back onto the
+  // server-recomputed steered tokens so the shared steered transcript groups.
+  spans?: LensTokenSpan[];
 }
 
 // Assemble the share-request steer payload from the active steer config + its
@@ -78,6 +94,7 @@ export function buildSteerShareBody(
     swapToken: steer.swapToken ?? '',
     steerGenerated: steer.steerGenerated ?? false,
     inputTokenIds: ids as number[],
+    spans: tokenSpansOf(steerTokens),
   };
 }
 

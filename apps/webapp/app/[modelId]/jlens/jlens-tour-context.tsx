@@ -7,8 +7,8 @@
 // Kept separate from `jlens-tour.tsx` because that module imports
 // `driver.js/dist/driver.css`; here we only need the `DriveStep` *type*
 // (erased at build time), so consumers don't pull in the tour's CSS.
-import { createContext, useContext } from 'react';
 import type { DriveStep } from 'driver.js';
+import { createContext, useContext } from 'react';
 
 // The step driver.js is currently spotlighting, or `null` when no tour is
 // running.

@@ -1,14 +1,24 @@
 // TODO: clean this up
 
+import {
+  NPLogprob,
+  NPSteerChatMessage,
+  NPSteerMethod,
+  SteerAssistantAxis,
+  SteerCompletionChatResponse,
+} from '@/lib/api/inference-types';
 import { prisma } from '@/lib/db';
 import { getModelById } from '@/lib/db/model';
 import { neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { ERROR_NOT_FOUND_MESSAGE } from '@/lib/db/userCanAccess';
 import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
-import { steerCompletionChat } from '@/lib/utils/inference';
+import { InferenceServerError, steerCompletionChat } from '@/lib/utils/inference';
 import {
   ChatMessage,
   ERROR_STEER_MAX_PROMPT_CHARS,
+  STEER_FREQUENCY_PENALTY,
+  STEER_FREQUENCY_PENALTY_MAX,
+  STEER_FREQUENCY_PENALTY_MIN,
   STEER_MAX_PROMPT_CHARS,
   STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS,
   STEER_MAX_PROMPT_CHARS_THINKING,
@@ -22,22 +32,13 @@ import {
   STEER_TEMPERATURE_MAX,
   SteerFeature,
 } from '@/lib/utils/steer';
+import { assistantAxisFromStored, assistantAxisToStored } from '@/lib/utils/steer-wire';
 import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputToNeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { SteerOutputType } from '@prisma/client';
 import { createHash } from 'crypto';
 import { EventSourceMessage } from 'eventsource-parser';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
-import {
-  NPLogprob,
-  NPSteerChatMessage,
-  NPSteerMethod,
-  SteerCompletionChatPost200Response,
-  SteerCompletionChatPost200ResponseAssistantAxisInner,
-  SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON,
-  SteerCompletionChatPost200ResponseAssistantAxisInnerToJSON,
-  SteerCompletionChatPost200ResponseFromJSON,
-} from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 import { array, bool, InferType, number, object, string, ValidationError } from 'yup';
 
@@ -45,7 +46,9 @@ import { array, bool, InferType, number, object, string, ValidationError } from 
 export const maxDuration = 180;
 
 const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
-const STEERING_VERSION = 1;
+// Part of the saved-output lookup key below, so bump this whenever the text or chatTemplate we
+// store changes shape -- otherwise rows written under the old semantics keep being served as hits.
+const STEERING_VERSION = 2;
 
 function sortChatMessages(chatMessages: ChatMessage[]) {
   const toReturn: ChatMessage[] = [];
@@ -65,16 +68,16 @@ async function saveSteerChatOutput(
   steerTypesRan: SteerOutputType[],
   input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null,
   userId: string | undefined,
-  assistantAxisArray?: SteerCompletionChatPost200ResponseAssistantAxisInner[],
+  assistantAxisArray?: SteerAssistantAxis[],
 ) {
   let defaultOutputId = existingDefaultOutputId;
 
-  // Helper to find capMonitorOutput for a given steer type from the assistant_axis array
-  // We use ToJSON to save in snake_case format so FromJSON can correctly load it later
+  // Helper to find capMonitorOutput for a given steer type from the assistant_axis array.
+  // Stored snake_case so rows written before the wire changed stay readable.
   const getCapMonitorOutput = (steerType: SteerOutputType): string | null => {
     if (!assistantAxisArray || !Array.isArray(assistantAxisArray)) return null;
     const axisItem = assistantAxisArray.find((item) => item.type === steerType);
-    return axisItem ? JSON.stringify(SteerCompletionChatPost200ResponseAssistantAxisInnerToJSON(axisItem)) : null;
+    return axisItem ? JSON.stringify(assistantAxisToStored(axisItem)) : null;
   };
 
   for (const steerTypeRan of steerTypesRan) {
@@ -207,7 +210,7 @@ function createStream(generator: AsyncGenerator<SteerResultChat>) {
 
 async function* transformStream(
   stream: ReadableStreamDefaultReader<EventSourceMessage>,
-): AsyncGenerator<SteerCompletionChatPost200Response> {
+): AsyncGenerator<SteerCompletionChatResponse> {
   while (true) {
     // eslint-disable-next-line
     const { done, value } = await stream.read();
@@ -217,8 +220,7 @@ async function* transformStream(
 
     try {
       const parsed = JSON.parse(value.data);
-      // Use the TypeScript client's FromJSON function to transform snake_case to camelCase
-      const toYield = SteerCompletionChatPost200ResponseFromJSON(parsed);
+      const toYield = parsed as SteerCompletionChatResponse;
       yield toYield;
     } catch (error) {
       console.error(error);
@@ -381,6 +383,9 @@ export type SteerResultChat = {
     logprobs: NPLogprob[] | null;
   } | null;
   inputText?: string | null;
+  // Set by /api/steer-load for completions saved before STEER_COMPLETION_VERSION, whose raw text
+  // already starts with inputText. Those must be rendered as-is rather than after the prompt.
+  outputTextIncludesPrompt?: boolean;
   id: string | null;
   shareUrl: string | null | undefined;
   limit: string | null;
@@ -396,7 +401,7 @@ export type SteerResultChat = {
       }
     | undefined;
   features?: SteerOutputToNeuronWithPartialRelations[];
-  assistant_axis?: SteerCompletionChatPost200ResponseAssistantAxisInner[];
+  assistant_axis?: SteerAssistantAxis[];
 };
 
 export type FeatureWithMaxActApprox = {
@@ -440,7 +445,12 @@ const steerSchema = object({
     .required(),
   temperature: number().min(0).max(STEER_TEMPERATURE_MAX).required(),
   n_tokens: number().integer().min(1).required(),
-  freq_penalty: number().min(-2).max(2).required(),
+  // See the note in /api/steer: no backend applies this any more, so it is undocumented and
+  // optional, but it keeps a default because it is part of the saved-output lookup key.
+  freq_penalty: number()
+    .min(STEER_FREQUENCY_PENALTY_MIN)
+    .max(STEER_FREQUENCY_PENALTY_MAX)
+    .default(STEER_FREQUENCY_PENALTY),
   seed: number().min(-100000000).max(100000000).required(),
   strength_multiplier: number().min(0).max(STEER_STRENGTH_MULTIPLIER_MAX).required(),
   steer_special_tokens: bool().required(),
@@ -497,7 +507,6 @@ export type SteerSchemaTypeChat = InferType<typeof steerSchema>;
                 ],
                 "temperature": 0.5,
                 "n_tokens": 48,
-                "freq_penalty": 2,
                 "seed": 16,
                 "strength_multiplier": 4,
                 "steer_special_tokens": true,
@@ -569,9 +578,6 @@ export type SteerSchemaTypeChat = InferType<typeof steerSchema>;
                   "type": "number"
                 },
                 "n_tokens": {
-                  "type": "number"
-                },
-                "freq_penalty": {
                   "type": "number"
                 },
                 "seed": {
@@ -776,8 +782,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       // Set cached capMonitorOutput for assistant_axis
       if (savedSteerDefaultOutput.capMonitorOutput) {
         const cachedAxisItem = JSON.parse(savedSteerDefaultOutput.capMonitorOutput);
-        // Use the TypeScript client's FromJSON function to handle both snake_case and camelCase
-        const transformedItem = SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON(cachedAxisItem);
+        const transformedItem = assistantAxisFromStored(cachedAxisItem);
         if (!toReturnResult.assistant_axis) {
           toReturnResult.assistant_axis = [];
         }
@@ -846,8 +851,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       // Set cached capMonitorOutput for assistant_axis
       if (savedSteerSteeredOutputs[0].capMonitorOutput) {
         const cachedAxisItem = JSON.parse(savedSteerSteeredOutputs[0].capMonitorOutput);
-        // Use the TypeScript client's FromJSON function to handle both snake_case and camelCase
-        const transformedItem = SteerCompletionChatPost200ResponseAssistantAxisInnerFromJSON(cachedAxisItem);
+        const transformedItem = assistantAxisFromStored(cachedAxisItem);
         if (!toReturnResult.assistant_axis) {
           toReturnResult.assistant_axis = [];
         }
@@ -901,7 +905,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       undefined,
       body.isAssistantAxis,
     );
-    steerCompletionResults = steerCompletionResults as SteerCompletionChatPost200Response[];
+    steerCompletionResults = steerCompletionResults as SteerCompletionChatResponse[];
     for (let i = 0; i < steerCompletionResults.length; i += 1) {
       const result = steerCompletionResults[i];
       for (const output of result.outputs) {
@@ -949,6 +953,12 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     if (error instanceof ValidationError) {
       console.log('validation error', error);
       return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+    // The inference server's own message is the actionable one — e.g. that this model
+    // has no chat template and the caller wants /api/steer instead.
+    if (error instanceof InferenceServerError) {
+      console.log('inference error', error.status, error.message);
+      return NextResponse.json({ message: error.message }, { status: error.status });
     }
     console.log('unknown error', error);
     return NextResponse.json({ message: 'Unknown Error' }, { status: 500 });

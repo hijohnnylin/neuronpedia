@@ -1,14 +1,12 @@
 import { prisma } from '@/lib/db';
 import { InferenceEngine, InferenceHostSource, InferenceHostSourceOnSource } from '@prisma/client';
-import { IS_DOCKER_COMPOSE, LOCALHOST_INFERENCE_HOST_OVERRIDE, USE_LOCALHOST_INFERENCE } from '../env';
+import { LOCALHOST_INFERENCE_HOST_OVERRIDE, USE_LOCALHOST_INFERENCE } from '../env';
 import { getSourceSetNameFromSource } from '../utils/source';
 import { AuthenticatedUser } from '../with-user';
 import { getSourceInferenceHosts } from './source';
 import { userCanAccessModelAndSourceSet } from './userCanAccess';
 
-export const LOCALHOST_INFERENCE_HOST = IS_DOCKER_COMPOSE
-  ? 'http://inference:5002'
-  : LOCALHOST_INFERENCE_HOST_OVERRIDE || 'http://127.0.0.1:5002';
+export const LOCALHOST_INFERENCE_HOST = LOCALHOST_INFERENCE_HOST_OVERRIDE || 'http://127.0.0.1:5002';
 
 export const createInferenceHostSource = async (input: InferenceHostSource) =>
   prisma.inferenceHostSource.create({
@@ -94,6 +92,22 @@ export const getAllInstanceHostsForModel = async (
     select: { hostUrl: true },
   });
   return [...new Set(instances.map((instance) => instance.hostUrl))];
+};
+
+// Returns the first instance registered against the model, whatever engine it was
+// registered under. For requests that only need the model loaded — the assistant axis
+// applies a vector, so no SAE and no particular engine is required — the engine-filtered
+// lookups above reject perfectly usable instances.
+export const getFirstInstanceHostForModel = async (modelId: string) => {
+  if (USE_LOCALHOST_INFERENCE) {
+    return LOCALHOST_INFERENCE_HOST;
+  }
+
+  const instance = await prisma.inferenceHostSource.findFirst({
+    where: { modelId },
+    orderBy: { createdAt: 'asc' },
+  });
+  return instance?.hostUrl || null;
 };
 
 export const getOneRandomServerHostForSourceSet = async (

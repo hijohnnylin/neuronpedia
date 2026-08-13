@@ -703,7 +703,7 @@ export function JlensSteerPanel({
                 <Slider.Root
                   value={[numCompletionTokens]}
                   min={0}
-                  max={maxCompletionTokens ?? 256}
+                  max={maxCompletionTokens ?? 1024}
                   step={1}
                   disabled={locked}
                   onValueChange={(v) => setNumCompletionTokens(v[0])}

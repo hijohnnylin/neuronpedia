@@ -29,8 +29,6 @@ export default function ActivationsList({
   overrideLeading,
   overrideTextSize,
   activationItemClassName,
-  // by default we show the actual tokens instead of hiding special tokens (eg for chat / reasoning)
-  defaultShowRawTokens = true,
   showSteerButton = true,
   showTestField = true,
 }: {
@@ -50,7 +48,6 @@ export default function ActivationsList({
   overrideLeading?: string | undefined;
   overrideTextSize?: string | undefined;
   activationItemClassName?: string;
-  defaultShowRawTokens?: boolean;
   showSteerButton?: boolean;
   showTestField?: boolean;
 }) {
@@ -59,7 +56,6 @@ export default function ActivationsList({
   const [selectedRange, setSelectedRange] = useState(defaultRange);
   const [showLineBreaks, setShowLineBreaks] = useState(defaultShowLineBreaks);
   const isConnectedNeuronsModel = CIRCUIT_SPARSITY_MODELS.includes(feature?.modelId || '');
-  const [showRawTokens, setShowRawTokens] = useState(isConnectedNeuronsModel ? true : defaultShowRawTokens);
   const [dfaSplit, setDfaSplit] = useState(true);
   // used to determine colors
   const [overallMaxValue, setOverallMaxValue] = useState<number>(-100);
@@ -326,34 +322,6 @@ export default function ActivationsList({
           <ToggleGroup.Root
             className="mb-1 ml-auto mt-1 inline-flex flex-1 overflow-hidden rounded bg-slate-100 px-0 py-0 sm:rounded-md"
             type="single"
-            defaultValue={showRawTokens ? 'showRawTokens' : 'hideRawTokens'}
-            value={showRawTokens ? 'showRawTokens' : 'hideRawTokens'}
-            onValueChange={(value) => {
-              setShowRawTokens(value === 'showRawTokens');
-            }}
-            aria-label="Show raw or formatted tokens"
-          >
-            <ToggleGroup.Item
-              key="showRawTokens"
-              className="flex-1 items-center rounded px-1 py-1 text-[10px] font-medium text-slate-400 transition-all hover:bg-slate-100 data-[state=on]:bg-slate-200 data-[state=on]:text-slate-600 sm:rounded-md sm:px-4 sm:py-1.5 sm:text-[11px]"
-              value="showRawTokens"
-              aria-label="showRawTokens"
-            >
-              Show Raw Tokens
-            </ToggleGroup.Item>
-
-            <ToggleGroup.Item
-              key="hideRawTokens"
-              className="flex-1 items-center rounded-md px-1 py-1 text-[10px] font-medium text-slate-400 transition-all hover:bg-slate-100 data-[state=on]:bg-slate-200 data-[state=on]:text-slate-600 sm:px-4 sm:py-1.5 sm:text-[11px]"
-              value="hideRawTokens"
-              aria-label="hideRawTokens"
-            >
-              Show Formatted
-            </ToggleGroup.Item>
-          </ToggleGroup.Root>
-          <ToggleGroup.Root
-            className="mb-1 ml-auto mt-1 inline-flex flex-1 overflow-hidden rounded bg-slate-100 px-0 py-0 sm:rounded-md"
-            type="single"
             defaultValue={showLineBreaks ? 'showLineBreaks' : 'hideLineBreaks'}
             value={showLineBreaks ? 'showLineBreaks' : 'hideLineBreaks'}
             onValueChange={(value) => {
@@ -425,7 +393,6 @@ export default function ActivationsList({
                             overrideLeading={overrideLeading}
                             overrideTextSize={overrideTextSize || 'text-[9.5px] sm:text-xs'}
                             className={activationItemClassName}
-                            showRawTokens={showRawTokens}
                           />
                         )}
                       </div>
@@ -468,7 +435,6 @@ export default function ActivationsList({
                             overrideLeading={overrideLeading}
                             overrideTextSize={overrideTextSize || 'text-[9.5px] sm:text-xs'}
                             className={activationItemClassName}
-                            showRawTokens={showRawTokens}
                           />
                         )}
                       </div>
@@ -585,7 +551,6 @@ export default function ActivationsList({
                           overrideLeading={overrideLeading}
                           overrideTextSize={overrideTextSize || 'text-[9.5px] sm:text-xs'}
                           className={activationItemClassName}
-                          showRawTokens={showRawTokens}
                         />
                       )}
                       {showDatasource && activation.dataSource && (

@@ -1,8 +1,8 @@
+import { NPSteerMethod } from '@/lib/api/inference-types';
 import { getModelById } from '@/lib/db/model';
 import { getVectorsForModelAndUser } from '@/lib/db/neuron';
 import { FeaturePreset, SteerFeature, SteerPreset } from '@/lib/utils/steer';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
-import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 import { object, string, ValidationError } from 'yup';
 
@@ -228,7 +228,7 @@ export const FEATURE_PRESETS: {
           strength: -1.984375,
         },
       ],
-      steerMethod: NPSteerMethod.ProjectionCap,
+      steerMethod: NPSteerMethod.PROJECTION_CAP,
       alias: 'assistant-cap',
     },
   ],

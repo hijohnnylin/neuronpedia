@@ -6,6 +6,7 @@ import { Button } from '@/components/shadcn/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import SteerChatMessage from '@/components/steer/chat-message';
 import { LoadingSquare } from '@/components/svg/loading-square';
+import { NPSteerMethod, SteerAssistantAxis } from '@/lib/api/inference-types';
 import { ASSET_BASE_URL, IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { ChatMessage, ERROR_STEER_MAX_PROMPT_CHARS, SteerFeature } from '@/lib/utils/steer';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -26,7 +27,6 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { NPSteerMethod, SteerCompletionChatPost200ResponseAssistantAxisInner } from 'neuronpedia-inference-client';
 import Link from 'next/link';
 import { MutableRefObject, useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
@@ -34,7 +34,7 @@ import AssistantAxisWelcomeModal from './assistant-axis-welcome-modal';
 import PersonaChart, { ChartData } from './persona-chart';
 import { CAP_BLOG_URL, CAP_CONTACT_EMAIL, CAP_GITHUB_URL, CAP_PAPER_URL, CAP_VECTOR_URL, DEMO_BUTTONS } from './shared';
 
-type PersonaCheckResult = SteerCompletionChatPost200ResponseAssistantAxisInner;
+type PersonaCheckResult = SteerAssistantAxis;
 
 export default function AssistantAxisChat({
   isSteering,
@@ -347,6 +347,7 @@ export default function AssistantAxisChat({
         // Track the latest assistant_axis data from streaming chunks (one for each steer type)
         let latestSteeredAxis: PersonaCheckResult | null = null;
         let latestDefaultAxis: PersonaCheckResult | null = null;
+        let axisApplied = false;
 
         while (true) {
           // eslint-disable-next-line
@@ -354,8 +355,9 @@ export default function AssistantAxisChat({
           if (done) {
             readerRef.current = null;
             setIsSteering(false);
-            // Pass the assistant_axis data to the parent after streaming completes
-            if (onAssistantAxisData && (latestSteeredAxis || latestDefaultAxis)) {
+            // Fallback for a run that never produced both lines (e.g. a cached default
+            // saved before cap monitoring, so it carries no axis data of its own).
+            if (onAssistantAxisData && !axisApplied && (latestSteeredAxis || latestDefaultAxis)) {
               onAssistantAxisData(latestSteeredAxis, latestDefaultAxis);
             }
             break;
@@ -381,6 +383,14 @@ export default function AssistantAxisChat({
               } else if (axisItem.type === 'DEFAULT') {
                 latestDefaultAxis = axisItem;
               }
+            }
+            // Both lines are plottable the moment each type has sent its axis frame. What
+            // remains on the stream is the database write and the share URL, so waiting
+            // for it to close (as this used to) held the chart still for that whole round
+            // trip even though the numbers were already here.
+            if (!axisApplied && latestSteeredAxis && latestDefaultAxis && onAssistantAxisData) {
+              axisApplied = true;
+              onAssistantAxisData(latestSteeredAxis, latestDefaultAxis);
             }
           }
           setTypedInText('');

@@ -1,6 +1,6 @@
+import { MAX_TITLE_LENGTH } from '@/app/explorer/explorer-shared';
 import { lookup } from 'node:dns/promises';
 import { isIPv4, isIPv6 } from 'node:net';
-import { MAX_TITLE_LENGTH } from '@/app/explorer/explorer-shared';
 
 export { detectTypeFromUrl } from './problem-url-types';
 

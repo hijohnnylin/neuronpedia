@@ -2,8 +2,6 @@
 
 /* eslint-disable no-var */
 
-export const BOS_TOKENS = ['<bos>', '<|endoftext|>', '<|begin_of_text|>'];
-
 export const LINE_BREAK_REPLACEMENT_CHAR = '↵';
 
 export const ACTIVATION_PRECISION = 4;

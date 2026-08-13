@@ -40,8 +40,8 @@ export default function SearchTopkByTokenSimple({
   const { setFeatureModalFeature, setFeatureModalOpen } = useGlobalContext();
   const [topkResult, setTopkResult] = useState<SearchTopKResult | undefined>();
   const [topkFeatures, setTopkFeatures] = useState<TopKFeature[] | undefined>(undefined);
-  const [hoveredTokenPosition, setHoveredTokenPosition] = useState<number>(-1);
-  const [lockedTokenPosition, setLockedTokenPosition] = useState<number>(-1);
+  const [hoveredTokenIndex, setHoveredTokenIndex] = useState<number>(-1);
+  const [lockedTokenIndex, setLockedTokenIndex] = useState<number>(-1);
   const [hoveredNeuronIndex, setHoveredNeuronIndex] = useState<number>(-1);
   const formRef = useRef<
     FormikProps<{
@@ -58,8 +58,8 @@ export default function SearchTopkByTokenSimple({
 
   async function searchClicked(overrideText?: string) {
     setIsSearching(true);
-    setLockedTokenPosition(-1);
-    setHoveredTokenPosition(-1);
+    setLockedTokenIndex(-1);
+    setHoveredTokenIndex(-1);
     const result = await fetch(`/api/search-topk-by-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -104,9 +104,6 @@ export default function SearchTopkByTokenSimple({
       let toSet: TopKFeature[] = [];
       topkResult.results.forEach((result) => {
         result.topFeatures.forEach((feature) => {
-          if (result.token === '<bos>' || result.token === '<eos>') {
-            return;
-          }
           toSet.push({
             feature: feature.feature as NeuronWithPartialRelations,
             activation_value: feature.activationValue,
@@ -148,7 +145,7 @@ export default function SearchTopkByTokenSimple({
     if (scrollRef.current && windowSize.width && windowSize.width < 640) {
       scrollRef.current.scrollTo(0, 0);
     }
-  }, [topkFeatures, lockedTokenPosition, hoveredTokenPosition]);
+  }, [topkFeatures, lockedTokenIndex, hoveredTokenIndex]);
 
   const [sourceSet, setSourceSet] = useState<string>(getSourceSetNameFromSource(initialLayer));
 
@@ -295,57 +292,50 @@ export default function SearchTopkByTokenSimple({
                 <div className="flex w-full flex-col">
                   <div className="mt-0 flex flex-row flex-wrap items-center justify-start gap-x-1 sm:justify-center">
                     {topkResult.results &&
-                      topkResult.results.map((result, i) => {
-                        if (result.token === '<bos>' || result.token === '<eos>') {
-                          return <div key={i} className="hidden" />;
-                        }
-                        return (
-                          <button
-                            type="button"
-                            onMouseEnter={() => {
-                              setHoveredTokenPosition(result.position);
-                            }}
-                            onMouseLeave={() => {
-                              setHoveredTokenPosition(-1);
-                            }}
-                            onClick={() => {
-                              if (lockedTokenPosition === result.position) {
-                                setLockedTokenPosition(-1);
-                              } else {
-                                setLockedTokenPosition(i);
-                              }
-                            }}
-                            key={result.position}
-                            style={{
-                              backgroundColor:
-                                lockedTokenPosition === result.position
-                                  ? 'rgba(66,133,244,1)'
-                                  : hoveredTokenPosition === result.position
+                      topkResult.results.map((result, i) => (
+                        <button
+                          type="button"
+                          onMouseEnter={() => {
+                            setHoveredTokenIndex(i);
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredTokenIndex(-1);
+                          }}
+                          onClick={() => {
+                            if (lockedTokenIndex === i) {
+                              setLockedTokenIndex(-1);
+                            } else {
+                              setLockedTokenIndex(i);
+                            }
+                          }}
+                          key={result.position}
+                          style={{
+                            backgroundColor:
+                              lockedTokenIndex === i
+                                ? 'rgba(66,133,244,1)'
+                                : hoveredTokenIndex === i
+                                  ? 'rgba(66,133,244, 0.5)'
+                                  : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
                                     ? 'rgba(66,133,244, 0.5)'
-                                    : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
-                                      ? 'rgba(66,133,244, 0.5)'
-                                      : lockedTokenPosition === -1 &&
-                                          hoveredTokenPosition === -1 &&
-                                          hoveredNeuronIndex === -1
-                                        ? `rgba(66,133,244,${
-                                            result.topFeatures && result.topFeatures.length > 0
-                                              ? Math.min((result.topFeatures[0].activationValue / maxAct) ** 2, 0.8)
-                                              : '0'
-                                          })`
-                                        : 'rgba(0,0,0,0)',
-                            }}
-                            className={`mb-0.5 inline-block cursor-pointer select-none rounded px-[5px] py-[5px] text-sm font-normal text-slate-800 transition-all sm:mb-2 sm:text-[20px] ${
-                              lockedTokenPosition === result.position
-                                ? 'text-white'
-                                : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
-                                  ? ''
-                                  : 'hover:text-gBlue'
-                            } ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
-                          >
-                            {result.token.trim().length === 0 ? ' ' : result.token}
-                          </button>
-                        );
-                      })}
+                                    : lockedTokenIndex === -1 && hoveredTokenIndex === -1 && hoveredNeuronIndex === -1
+                                      ? `rgba(66,133,244,${
+                                          result.topFeatures && result.topFeatures.length > 0
+                                            ? Math.min((result.topFeatures[0].activationValue / maxAct) ** 2, 0.8)
+                                            : '0'
+                                        })`
+                                      : 'rgba(0,0,0,0)',
+                          }}
+                          className={`mb-0.5 inline-block cursor-pointer select-none rounded px-[5px] py-[5px] text-sm font-normal text-slate-800 transition-all sm:mb-2 sm:text-[20px] ${
+                            lockedTokenIndex === i
+                              ? 'text-white'
+                              : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
+                                ? ''
+                                : 'hover:text-gBlue'
+                          } ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
+                        >
+                          {result.token.trim().length === 0 ? ' ' : result.token}
+                        </button>
+                      ))}
                   </div>
                 </div>
               )}
@@ -364,7 +354,7 @@ export default function SearchTopkByTokenSimple({
               )}
               {topkResult && !isSearching && (
                 <>
-                  {lockedTokenPosition === -1 && hoveredTokenPosition === -1 ? (
+                  {lockedTokenIndex === -1 && hoveredTokenIndex === -1 ? (
                     <div className="flex h-full flex-1 flex-col items-center justify-center">
                       <div className="mt-0 flex w-full max-w-[480px] flex-col gap-y-2 overflow-y-hidden sm:h-full sm:max-h-full sm:overflow-y-scroll">
                         {topkFeatures?.map((f, i) => (
@@ -403,8 +393,8 @@ export default function SearchTopkByTokenSimple({
                     <div className="flex w-full flex-1 flex-col items-center justify-start">
                       <div className="flex w-full max-w-[480px] flex-col gap-y-2 overflow-y-scroll sm:h-[500px] sm:max-h-[500px]">
                         {topkResult.results[
-                          lockedTokenPosition > -1 ? lockedTokenPosition : hoveredTokenPosition
-                        ].topFeatures.map((f, i) => (
+                          lockedTokenIndex > -1 ? lockedTokenIndex : hoveredTokenIndex
+                        ]?.topFeatures.map((f, i) => (
                           <div
                             key={i}
                             className="group relative flex w-full cursor-default flex-row items-center justify-center gap-x-3 rounded-xl bg-gBlue/5 py-0 pl-5 pr-5 text-gBlue transition-all hover:bg-gBlue/20 sm:py-2.5"

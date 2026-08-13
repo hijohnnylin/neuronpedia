@@ -29,7 +29,7 @@ const MAX_PROMPT_CHARS = 10000;
 const MAX_STEER_STRENGTH = 50;
 // Upper bound on client-supplied token-id arrays (`inputTokenIds` /
 // `cachedTokenIds`). Bounds worst-case compute + buffered response size; well
-// above any realistic prompt (1024 chars) + generated tokens (max 256).
+// above any realistic prompt (1024 chars) + generated tokens (max 1024).
 const MAX_TOKEN_IDS = 4096;
 // Defense-in-depth caps on otherwise-unbounded array/string inputs. Generous
 // relative to real usage; the goal is to reject pathological payloads early.
@@ -182,7 +182,7 @@ const lensPromptRequestSchema = yup.object({
  *                 type: integer
  *                 description: Number of tokens to generate after the prompt. 0 = read out over the input only (no generation).
  *                 minimum: 0
- *                 maximum: 256
+ *                 maximum: 1024
  *                 default: 128
  *               prependBos:
  *                 type: boolean
@@ -326,24 +326,27 @@ export async function POST(request: Request) {
 
     const inferenceResponse = await lensPromptStream(
       validated.modelId,
+      // Field names match inference's one-for-one, so this only picks and narrows -- it is
+      // not a translation. Still listed explicitly rather than spread, so a new field in the
+      // public schema is a deliberate decision to forward rather than an automatic one.
       {
         type: validated.type as LensType[],
         prompt: !hasInputTokenIds && hasPrompt ? validated.prompt : undefined,
         chat: !hasInputTokenIds && hasChat ? (validated.chat as LensChatMessage[]) : undefined,
-        input_token_ids: hasInputTokenIds ? (validated.inputTokenIds as number[]) : undefined,
-        top_n: validated.topN,
+        inputTokenIds: hasInputTokenIds ? (validated.inputTokenIds as number[]) : undefined,
+        topN: validated.topN,
         temperature: validated.temperature,
-        num_completion_tokens: validated.numCompletionTokens,
-        prepend_bos: validated.prependBos,
-        enable_thinking: validated.enableThinking,
-        cached_token_ids: (validated.cachedTokenIds as number[] | undefined) ?? undefined,
-        steer_tokens: (validated.steerTokens as LensSteerToken[] | undefined) ?? undefined,
-        steer_layers: (validated.steerLayers as number[] | undefined) ?? undefined,
-        steer_strength: validated.steerStrength,
-        steer_ablate: validated.steerAblate,
-        swap_token: (validated.swapToken as LensSteerToken | undefined) ?? undefined,
-        steer_generated_tokens: validated.steerGeneratedTokens,
-        filter_non_word_tokens: validated.filterNonWordTokens,
+        numCompletionTokens: validated.numCompletionTokens,
+        prependBos: validated.prependBos,
+        enableThinking: validated.enableThinking,
+        cachedTokenIds: (validated.cachedTokenIds as number[] | undefined) ?? undefined,
+        steerTokens: (validated.steerTokens as LensSteerToken[] | undefined) ?? undefined,
+        steerLayers: (validated.steerLayers as number[] | undefined) ?? undefined,
+        steerStrength: validated.steerStrength,
+        steerAblate: validated.steerAblate,
+        swapToken: (validated.swapToken as LensSteerToken | undefined) ?? undefined,
+        steerGeneratedTokens: validated.steerGeneratedTokens,
+        filterNonWordTokens: validated.filterNonWordTokens,
         stream: true,
       },
       request.signal,
@@ -392,7 +395,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ meta, tokens, done });
     }
 
-    // Pipe the NDJSON stream straight through to the browser.
+    // Pipe the NDJSON stream straight to the browser. Inference emits the frames in the shape
+    // this route publishes, so there is nothing to rewrite on the way past.
     return new Response(inferenceResponse.body, {
       status: 200,
       headers: {

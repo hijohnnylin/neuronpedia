@@ -1,0 +1,36 @@
+[project]
+name = "neuronpedia"
+version = "2.0.0"
+description = "Neuronpedia"
+authors = [{ name = "Decode Research (Neuronpedia)", email = "johnny@neuronpedia.org" }]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  # neuronpedia/types/common/feature.py declares its model with pydantic, so importing
+  # requests/topk_by_token_request.py needs it present rather than only at dev time.
+  "pydantic>=2,<3",
+  "python-dotenv>=1.0.1,<2",
+  "requests>=2.32.3,<3",
+]
+
+[dependency-groups]
+dev = [
+  "ipykernel>=6.29.5,<7",
+  "pytest>=8.0.0,<9",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# The importable package sits at the repo root rather than under src/, which is the
+# layout the backend assumes by default. The distribution is named for the module it
+# ships, so both have to be spelled out.
+module-root = ""
+module-name = "neuronpedia"
+
+[tool.black]
+line-length = 120

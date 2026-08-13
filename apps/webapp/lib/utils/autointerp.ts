@@ -1,20 +1,33 @@
+import type { paths } from '@/lib/api/autointerp';
 import { UserSecretType } from '@prisma/client';
-import { BASE_PATH, Configuration, DefaultApi } from 'neuronpedia-autointerp-client';
-import { AUTOINTERP_SERVER, AUTOINTERP_SERVER_SECRET, IS_DOCKER_COMPOSE, USE_LOCALHOST_AUTOINTERP } from '../env';
+import createClient from 'openapi-fetch';
+import { upstreamError } from '../api-error';
+import { AUTOINTERP_SERVER, AUTOINTERP_SERVER_SECRET, USE_LOCALHOST_AUTOINTERP } from '../env';
 
-export const AUTOINTERP_SERVER_API = new DefaultApi(
-  new Configuration({
-    basePath:
-      (USE_LOCALHOST_AUTOINTERP
-        ? IS_DOCKER_COMPOSE
-          ? 'http://autointerp:5003'
-          : 'http://127.0.0.1:5003'
-        : AUTOINTERP_SERVER) + BASE_PATH,
-    headers: {
-      'X-SECRET-KEY': AUTOINTERP_SERVER_SECRET,
-    },
-  }),
-);
+// The version prefix is part of the paths in the spec, so it is not in the base URL.
+export const AUTOINTERP_SERVER_API = createClient<paths>({
+  baseUrl: USE_LOCALHOST_AUTOINTERP ? 'http://127.0.0.1:5003' : AUTOINTERP_SERVER,
+  headers: {
+    'X-SECRET-KEY': AUTOINTERP_SERVER_SECRET,
+  },
+});
+
+type AutointerpResult<T> = { data?: T; error?: unknown; response: Response };
+
+// openapi-fetch reports a failed request in the result rather than by rejecting, but the API
+// routes that reach these calls report failure by letting an exception reach their catch block.
+// This is the adapter between the two.
+//
+// The upstream body goes in `cause` rather than the message: it is FastAPI's {"detail": str(e)},
+// a raw python exception string that can carry absolute server paths. `upstreamError` keeps that
+// for Sentry and gives the caller a 502 with a message written for them.
+export async function unwrapAutointerpResponse<T>(result: Promise<AutointerpResult<T>>): Promise<T> {
+  const { data, error, response } = await result;
+  if (error !== undefined || data === undefined) {
+    throw upstreamError('autointerp', { status: response.status, body: error ?? response.statusText });
+  }
+  return data;
+}
 
 export const EXPLANATIONTYPE_HUMAN = 'human';
 

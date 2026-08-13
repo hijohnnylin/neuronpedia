@@ -1,11 +1,11 @@
 import CustomTooltip from '@/components/custom-tooltip';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
+import { UtilSaeTopkByDecoderCossimResponse } from '@/lib/api/inference-types';
 import { getSourceSet } from '@/lib/db/source';
 import { NeuronWithPartialRelations, SourceWithPartialRelations } from '@/prisma/generated/zod';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle } from 'lucide-react';
-import { UtilSaeTopkByDecoderCossimPost200Response } from 'neuronpedia-inference-client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { LoadingSquare } from '../svg/loading-square';
@@ -61,7 +61,7 @@ export default function CosSimPane({ currentNeuron }: { currentNeuron: NeuronWit
           }),
         })
           .then((response) => response.json())
-          .then((cosSimResponse: UtilSaeTopkByDecoderCossimPost200Response) => {
+          .then((cosSimResponse: UtilSaeTopkByDecoderCossimResponse) => {
             const featureIndexes: number[] = [];
             if (cosSimResponse.topkDecoderCossimFeatures) {
               cosSimResponse.topkDecoderCossimFeatures.forEach((feature) => {

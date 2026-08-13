@@ -10,7 +10,7 @@ import {
 } from '@/components/provider/inference-activation-all-provider';
 import { Button } from '@/components/shadcn/button';
 import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
-import { BOS_TOKENS, replaceHtmlAnomalies } from '@/lib/utils/activations';
+import { replaceHtmlAnomalies } from '@/lib/utils/activations';
 import {
   getAdditionalInfoFromSource,
   getFirstSourceSetForModel,
@@ -54,16 +54,8 @@ export default function InferenceSearcher({
   showExamples?: boolean;
   filterToRelease?: string | undefined;
 }) {
-  const {
-    exploreState,
-    submitSearchAll,
-    setTokens,
-    tokens,
-    searchSortIndexes,
-    setSearchResults,
-    searchResults,
-    setSearchCounts,
-  } = useInferenceActivationAllContext();
+  const { exploreState, submitSearchAll, setTokens, tokens, searchSortIndexes, setSearchResults, searchResults } =
+    useInferenceActivationAllContext();
   const { getSourcesForSourceSet, getDefaultModel, globalModels } = useGlobalContext();
   const [sortIndexes, setSortIndexes] = useState<number[]>(initialSortIndexes || []);
   const [modelId, setModelId] = useState(initialModelId || DEFAULT_MODELID || getDefaultModel()?.id || DEFAULT_MODELID);
@@ -81,7 +73,6 @@ export default function InferenceSearcher({
   >(null);
   const router = useRouter();
   const loadResultsInNewPage = q === undefined;
-  // const [showTable, setShowTable] = useState(false);
 
   function makeUrl(query: string) {
     return `/${modelId}/?sourceSet=${sourceSet}&selectedLayers=${JSON.stringify(
@@ -93,7 +84,6 @@ export default function InferenceSearcher({
     setSourceSet(newSourceSet);
     setAvailableLayers(getSourcesForSourceSet(modelId, newSourceSet, false, true, false));
     setSelectedLayers([]);
-    setSearchCounts([]);
   };
 
   const modelIdChanged = (newModelId: string) => {
@@ -112,7 +102,6 @@ export default function InferenceSearcher({
       setAvailableLayers([]);
     }
     setSelectedLayers([]);
-    setSearchCounts([]);
   };
 
   useEffect(() => {
@@ -498,15 +487,9 @@ export default function InferenceSearcher({
             )}
             {searchResults
               .filter((result) => {
+                // BOS filtering is applied by /api/search-all (it's sent the
+                // `ignoreBos` flag), so only density is filtered here.
                 if (hideDense && result.neuron && result.neuron?.frac_nonzero > 0.01) {
-                  return false;
-                }
-                if (
-                  ignoreBos &&
-                  result.neuron &&
-                  result.neuron.pos_str.length > 0 &&
-                  BOS_TOKENS.indexOf(result.neuron.pos_str[0]) !== -1
-                ) {
                   return false;
                 }
                 return true;
@@ -530,166 +513,3 @@ export default function InferenceSearcher({
     </div>
   );
 }
-
-// TODO: Old Table counts code that shows how many activations per token per layer
-
-// TODO: this is for table counts, which we may bring back later
-// function makeUrlWithReplacedSelectedLayerAndIndex(query: string, layer: number, index: number) {
-//   const layerString = sourceSet === NEURONS_SOURCESET ? layer.toString() : `${layer.toString()}-${sourceSet}`;
-//   return `/${modelId}/?sourceSet=${sourceSet}&selectedLayers=${JSON.stringify([
-//     layerString,
-//   ])}&sortIndexes=${JSON.stringify([index])}&ignoreBos=${ignoreBos}&q=${query}`;
-// }
-
-/*
-<ToggleGroup.Root
-  className="inline-flex flex-1 overflow-hidden rounded border border-slate-300 bg-slate-300 px-0 py-0 sm:rounded"
-  type="single"
-  defaultValue={showTable ? "show" : "hide"}
-  value={showTable ? "show" : "hide"}
-  onValueChange={(value) => {
-    setShowTable(value === "show");
-  }}
-  aria-label="Show the table with numbers of how many features were activated"
->
-  <ToggleGroup.Item
-    key={"show"}
-    className="flex-auto items-center rounded-l px-1 py-1 text-[10px] font-medium text-slate-500  transition-all hover:bg-slate-100 data-[state=on]:bg-white data-[state=on]:text-slate-600 sm:px-4  sm:text-[11px]"
-    value={"show"}
-    aria-label={"show"}
-  >
-    Show Layers
-  </ToggleGroup.Item>
-  <ToggleGroup.Item
-    key={"hide"}
-    className="flex-auto items-center rounded-r px-1 py-1 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-100 data-[state=on]:bg-white data-[state=on]:text-slate-600 sm:px-4 sm:text-[11px]"
-    value={"hide"}
-    aria-label={"hide"}
-  >
-    Hide Layers
-  </ToggleGroup.Item>
-</ToggleGroup.Root>
-*/
-
-/* {showTable && (
-  <>
-    {getSourcesForSourceSet(modelId, sourceSet, false, true, false).map((layerName, i) => (
-      <tr key={i} className="text-center text-xs">
-        <td className="flex w-[90px] cursor-pointer flex-row items-center gap-x-1 px-0 pr-1 font-sans text-[11px] font-bold leading-none text-slate-500">
-          <Checkbox.Root
-            className="flex h-3.5 w-3.5 appearance-none items-center justify-center rounded bg-white shadow outline-none hover:bg-emerald-200"
-            checked={
-              selectedLayers
-                ? selectedLayers.length === 0
-                  ? true
-                  : selectedLayers?.indexOf(layerName) !== -1
-                : false
-            }
-            onCheckedChange={(e) => {
-              if (e) {
-                if (selectedLayers) {
-                  // if we end up selecting all layers, then set it to []
-                  const newSelectedLayers = [...selectedLayers, layerName];
-                  if (newSelectedLayers.length === availableLayers.length) {
-                    setSelectedLayers([]);
-                  } else {
-                    setSelectedLayers([...selectedLayers, layerName]);
-                  }
-                } else {
-                  setSelectedLayers([layerName]);
-                }
-              } else if (selectedLayers && selectedLayers.length === 0) {
-                // all selected, so filter out clicked
-                setSelectedLayers(availableLayers.filter((l) => l !== layerName));
-              } else {
-                // if unchecking it leads to all unselected, then set selectedlayers to undefined
-                const newSelectedLayers = selectedLayers?.filter((l) => l !== layerName);
-                if (newSelectedLayers?.length === 0) {
-                  setSelectedLayers(undefined);
-                } else {
-                  setSelectedLayers(newSelectedLayers);
-                }
-              }
-            }}
-            id={`layer${i}`}
-          >
-            <Checkbox.Indicator className="text-emerald-700">
-              <Check className="h-2.5 w-2.5" />
-            </Checkbox.Indicator>
-          </Checkbox.Root>
-          <label
-            className="cursor-pointer select-none whitespace-nowrap text-[9px] font-medium uppercase leading-none"
-            htmlFor={`layer${i}`}
-          >
-            Layer {getLayerNumAsStringFromSource(layerName)}
-          </label>
-        </td>
-        {searchCounts &&
-          searchCounts.length > i &&
-          // searchCounts[i].length > tokens.length &&
-          tokens.map((token, tokenIndex) => {
-            let maxResult = 0;
-            searchCounts.forEach((c) => {
-              c.forEach((cc) => {
-                if (cc > maxResult) {
-                  maxResult = cc;
-                }
-              });
-            });
-            const resultsForCell = searchCounts[i][tokenIndex];
-            return (
-              <td key={tokenIndex} className="px-[1px]">
-                <Link
-                  // target="_blank"
-                  rel="noreferrer"
-                  href={makeUrlWithReplacedSelectedLayerAndIndex(
-                    encodeURIComponent(formRef.current?.values.searchQuery || ''),
-                    i,
-                    tokenIndex,
-                  )}
-                  className={`rounded ${
-                    resultsForCell === 0
-                      ? 'bg-slate-100 text-slate-300'
-                      : resultsForCell < 3
-                      ? 'bg-emerald-100 text-slate-600 hover:bg-emerald-200'
-                      : 'bg-emerald-300 text-slate-700 hover:bg-emerald-400'
-                  } px-[3px] font-bold hover:scale-125`}
-                  style={{
-                    backgroundColor: `rgba(52,211,153, ${resultsForCell / maxResult})`,
-                  }}
-                >
-                  {resultsForCell}
-                </Link>
-              </td>
-            );
-          })}
-      </tr>
-    ))}
-    <tr>
-      <td className=" flex cursor-pointer flex-row items-center gap-x-1 px-0 pr-1 font-sans text-[11px] font-bold leading-none text-slate-500">
-        <Checkbox.Root
-          className="flex h-3.5 w-3.5 appearance-none items-center justify-center rounded bg-white shadow outline-none hover:bg-emerald-200"
-          checked={selectedLayers?.length === 0 || selectedLayers?.length === availableLayers.length}
-          onCheckedChange={(e) => {
-            if (e) {
-              setSelectedLayers([]);
-            } else {
-              setSelectedLayers(undefined);
-            }
-          }}
-          id="layerAll"
-        >
-          <Checkbox.Indicator className="text-emerald-700">
-            <Check className="h-2.5 w-2.5" />
-          </Checkbox.Indicator>
-        </Checkbox.Root>
-        <label
-          className="cursor-pointer select-none whitespace-nowrap text-[9px] font-medium uppercase leading-none"
-          htmlFor="layerAll"
-        >
-          ALL LAYERS
-        </label>
-      </td>
-    </tr>
-  </>
-)} */

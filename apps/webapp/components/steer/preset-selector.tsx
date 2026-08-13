@@ -1,8 +1,8 @@
 import { Button } from '@/components/shadcn/button';
+import { NPSteerMethod } from '@/lib/api/inference-types';
 import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { FeaturePreset, SteerFeature } from '@/lib/utils/steer';
 import { X } from 'lucide-react';
-import { NPSteerMethod } from 'neuronpedia-inference-client';
 import { LoadingSquare } from '../svg/loading-square';
 
 export default function SteerPresetSelector({

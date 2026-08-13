@@ -3,6 +3,7 @@
 import FeatureDashboard from '@/app/[modelId]/[layer]/[index]/feature-dashboard';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/shadcn/hover-card';
+import type { TraceNode } from '@/lib/api/sparsity-types';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import * as Select from '@radix-ui/react-select';
@@ -15,16 +16,6 @@ import { LoadingSquare } from '../svg/loading-square';
 type ResidChannel = {
   id: string;
   index: number;
-};
-
-type TraceNode = {
-  layer: number;
-  neuron: number;
-  read_weight: number;
-  via_channel: number;
-  write_weight: number;
-  children?: TraceNode[] | null;
-  parents?: TraceNode[] | null;
 };
 
 type ConnectedNeuron = {

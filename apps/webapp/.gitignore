@@ -5,9 +5,6 @@
 /.pnp
 .pnp.js
 
-# testing
-/coverage
-
 # next.js
 /.next/
 /out/
@@ -32,7 +29,6 @@ yarn-error.log*
 !.env.demo
 !.env.localhost
 !.env.example
-!.env.playwright
 .env.apple.*
 
 # vercel
@@ -68,13 +64,10 @@ firebase-debug.log
 # temp files
 /tmp/
 
-# Playwright
+# nested dependencies
 node_modules/
-/test-results/
-/test-results/*
-/playwright-report/
-/blob-report/
-/playwright/.cache/
+
+/.api-compare/
 
 /public/ignore.json
 /public/ignore2.json

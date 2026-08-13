@@ -33,6 +33,9 @@ import { useEffect, useRef, useState } from 'react';
 
 const MAX_MESSAGE_LENGTH_CHARS = 128;
 
+// Callers embedding this component in a demo may not know the model yet.
+const FALLBACK_MODEL_ID = 'gemma-2-2b-it';
+
 export default function SteererSimple({
   initialModelId,
   cappedHeight,
@@ -44,16 +47,8 @@ export default function SteererSimple({
   showOptionsButton?: boolean;
   excludedPresetNames?: string[];
 }) {
-  const [isInitialPageLoad, setInitialPageLoad] = useState(true); // track this
-
-  const [modelId, setModelId] = useState(initialModelId);
+  const [modelId] = useState(initialModelId || FALLBACK_MODEL_ID);
   const [featurePresets, setFeaturePresets] = useState<FeaturePreset[]>([]);
-
-  // INFO: on pageLoad, will crash if no initial model
-  if (isInitialPageLoad && !initialModelId) {
-    setModelId('gemma-2-2b-it');
-    setInitialPageLoad(false);
-  }
 
   function loadPresets() {
     fetch('/api/steer/presets', {
@@ -124,8 +119,8 @@ export default function SteererSimple({
     })
       .then((response) => {
         if (response.status !== 200) {
-          // INFO: DO NOT alert to user; this error only indicates that the
-          // hardcoded savedSteerOutput did not exist. Messages still work!
+          // A missing saved output is recoverable: the chat still works, so log
+          // it instead of surfacing an error to the user.
           console.error('Error loading saved steer output!');
           return null;
         }
@@ -704,23 +699,6 @@ export default function SteererSimple({
                     }}
                     className="max-w-[80px] flex-1 rounded-md border-amber-400 py-1 text-center text-xs text-amber-800"
                     value={temperature}
-                  />
-                </div>
-                <div className="flex w-full flex-row items-center justify-center gap-x-3">
-                  <div className="w-[100px] text-center text-[12px] font-medium leading-tight text-amber-800">
-                    Freq Penalty
-                  </div>
-                  <input
-                    type="number"
-                    onChange={(e) => {
-                      if (parseFloat(e.target.value) > 2 || parseFloat(e.target.value) < -2) {
-                        alert('Freq penalty must be >= -2 and <= 2');
-                      } else {
-                        setFreqPenalty(parseFloat(e.target.value));
-                      }
-                    }}
-                    className="max-w-[80px] flex-1 rounded-md border-amber-400 py-1 text-center text-xs text-amber-800"
-                    value={freqPenalty}
                   />
                 </div>
                 <div className="flex w-full flex-row items-center justify-center gap-x-3">

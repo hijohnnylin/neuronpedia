@@ -1,18 +1,19 @@
-// Chat formatting + token grouping for the jlens chat interface.
+// Chat token grouping for the jlens chat interface.
 //
-// The inference server applies the model's real chat template server-side
-// (it receives a structured `chat: [{role, content}]` payload). This module
-// owns the *client-side* knowledge needed to:
-//   1. detect which family a model belongs to (by model id), and
-//   2. group the flat per-position token stream the server returns back into
-//      user / assistant message bubbles for display, using each family's
-//      special turn tokens.
+// The inference server is the single source of truth for chat structure: it
+// applies the model's real chat template and returns per-token span metadata
+// (role / channel / section / message index) on every streamed token (see
+// `LensTokenSpan` in `@/lib/utils/lens`). This module just regroups that flat
+// per-position token stream into user / assistant message bubbles for display.
 //
-// To support a new model family, implement a `JlensChatFormat` and add it to
-// `JLENS_CHAT_FORMATS` below (order matters only for `detectChatFormat`, which
-// falls through to the qwen default).
+// There is deliberately NO per-model-family knowledge here anymore (no special
+// turn tokens, no `detectChatFormat`, no harmony state machine): all of that now
+// lives server-side in the engine's tokenize layer, so a new model family needs
+// no frontend change. When the tokens carry no spans (raw-text / reproduction
+// requests, or legacy shared runs saved before spans existed) the caller falls
+// back to a plain, ungrouped render.
 
-import { LensChatMessage, LensTokenMessage } from '@/lib/utils/lens';
+import { LensCharContinuation, LensChatMessage, LensTokenMessage } from '@/lib/utils/lens';
 
 export type ChatRole = 'user' | 'assistant';
 
@@ -21,331 +22,220 @@ export interface JlensTokenGroup {
   headerTokens: LensTokenMessage[];
   contentTokens: LensTokenMessage[];
   footerTokens: LensTokenMessage[];
-  // Optional raw role label (e.g. `system`, `developer`) for formats that
-  // surface more roles than the `user`/`assistant` display split. `role` above
-  // is the display side (user = right, everything else = left); `roleLabel`
-  // preserves the true role so callers can map bubbles back to chat messages.
+  // The true role label (e.g. `system`, `developer`) for formats that surface
+  // more roles than the `user`/`assistant` display split. `role` above is the
+  // display side (user = right, everything else = left); `roleLabel` preserves
+  // the real role so callers can map bubbles back to chat messages.
   roleLabel?: string;
-  // Optional harmony channel (`analysis` / `final` / `commentary`) for models
-  // whose assistant turns are split into channels (gpt-oss). Undefined for
-  // simple ChatML/Gemma turns.
+  // The channel (`analysis` / `final` / `commentary`) for assistant turns split
+  // into channels — harmony's named channels (gpt-oss) and reasoning-tag models'
+  // `<think>` blocks both land here. Undefined for simple turns.
   channel?: string;
-}
-
-export interface JlensChatFormat {
-  id: string;
-  // Substrings of the model id that select this format (lower-cased match).
-  matchModelId: (lowerModelId: string) => boolean;
-  // The token string that opens a turn (e.g. `<|im_start|>`).
-  turnStartToken: string;
-  // The token string that closes a turn (e.g. `<|im_end|>`).
-  turnEndToken: string;
-  // The role label this family uses for the assistant in its header
-  // (e.g. gemma uses `model`).
-  assistantRoleName: string;
-  // Whether a decoded token is one of this family's structural/special tokens.
-  isSpecialToken: (token: string) => boolean;
-  // Optional format-specific grouping. When present it fully replaces the
-  // default turn-start/turn-end grouping — used by families whose structure the
-  // default state machine can't express (gpt-oss harmony: channels + multiple
-  // end markers). Groups produced this way may not map 1:1 to chat messages
-  // (e.g. an injected system turn), so inline message editing is disabled for
-  // such formats (see `jlens-chat.tsx`).
-  groupTokens?: (tokens: LensTokenMessage[]) => { messages: JlensTokenGroup[]; hasChatFormat: boolean };
-  // Optional extractor for the clean, human-readable assistant text from a raw
-  // completion string (used to store the assistant turn for re-send / copy).
-  // Defaults to stripping trailing `turnEndToken`s. Harmony overrides this to
-  // pull out just the `final` channel content.
-  parseCompletion?: (completion: string) => string;
-}
-
-// Qwen / ChatML family. Used by Qwen3 (incl. Qwen3.6) and the generic
-// ChatML fallback.
-const qwenFormat: JlensChatFormat = {
-  id: 'qwen',
-  matchModelId: (id) => id.includes('qwen') || id.includes('chatml'),
-  turnStartToken: '<|im_start|>',
-  turnEndToken: '<|im_end|>',
-  assistantRoleName: 'assistant',
-  isSpecialToken: (token) => token === '<|im_start|>' || token === '<|im_end|>' || token === '<|endoftext|>',
-};
-
-// Gemma 3 family.
-const gemma3Format: JlensChatFormat = {
-  id: 'gemma3',
-  matchModelId: (id) => id.includes('gemma'),
-  turnStartToken: '<start_of_turn>',
-  turnEndToken: '<end_of_turn>',
-  assistantRoleName: 'model',
-  isSpecialToken: (token) =>
-    token === '<start_of_turn>' || token === '<end_of_turn>' || token === '<bos>' || token === '<eos>',
-};
-
-// Llama 3.x family. Each turn is wrapped as
-//   <|start_header_id|>{role}<|end_header_id|>\n\n{content}<|eot_id|>
-// with the leading <|begin_of_text|> BOS added by the tokenizer. The header
-// runs `<|start_header_id|>` `{role}` `<|end_header_id|>` `\n\n`, so the default
-// turn-start/turn-end grouping (which reads the header up to the first newline)
-// picks up the role and closes the header on the `\n\n` token.
-const llama3Format: JlensChatFormat = {
-  id: 'llama3',
-  matchModelId: (id) => id.includes('llama'),
-  turnStartToken: '<|start_header_id|>',
-  turnEndToken: '<|eot_id|>',
-  assistantRoleName: 'assistant',
-  isSpecialToken: (token) =>
-    token === '<|start_header_id|>' ||
-    token === '<|end_header_id|>' ||
-    token === '<|eot_id|>' ||
-    token === '<|begin_of_text|>' ||
-    token === '<|end_of_text|>',
-};
-
-// --------------------------------------------------------------------------
-// gpt-oss (OpenAI Harmony) family.
-//
-// Harmony is structurally different from ChatML/Gemma: a message opens with
-// `<|start|>`, carries a role then an optional `<|channel|>` + channel name,
-// then `<|message|>`, its content, and closes with `<|end|>` (intermediate) or
-// `<|return|>` (the final assistant reply) / `<|call|>` (a tool call). A single
-// assistant response is emitted as SEPARATE messages per channel, e.g.:
-//   <|start|>assistant<|channel|>analysis<|message|>…reasoning…<|end|>
-//   <|start|>assistant<|channel|>final<|message|>…answer…<|return|>
-// so the default single-turn state machine can't group it. `groupHarmonyTokens`
-// walks this structure directly.
-// --------------------------------------------------------------------------
-const HARMONY_START = '<|start|>';
-const HARMONY_END = '<|end|>';
-const HARMONY_MESSAGE = '<|message|>';
-const HARMONY_CHANNEL = '<|channel|>';
-const HARMONY_RETURN = '<|return|>';
-const HARMONY_CALL = '<|call|>';
-// Tokens that close a harmony message (any of these ends the current turn's
-// content). `<|start|>` also implicitly ends the previous turn.
-const HARMONY_END_TOKENS = new Set([HARMONY_END, HARMONY_RETURN, HARMONY_CALL]);
-
-const gptOssFormat: JlensChatFormat = {
-  id: 'gpt-oss',
-  matchModelId: (id) => id.includes('gpt-oss'),
-  turnStartToken: HARMONY_START,
-  // The generic "turn end"; harmony actually uses several (see END_TOKENS).
-  turnEndToken: HARMONY_END,
-  assistantRoleName: 'assistant',
-  isSpecialToken: (token) => {
-    const t = token.trim();
-    return (
-      t === HARMONY_START ||
-      t === HARMONY_END ||
-      t === HARMONY_MESSAGE ||
-      t === HARMONY_CHANNEL ||
-      t === HARMONY_RETURN ||
-      t === HARMONY_CALL ||
-      t === '<|endoftext|>'
-    );
-  },
-  groupTokens: (tokens) => groupHarmonyTokens(tokens),
-  parseCompletion: (completion) => parseHarmonyCompletion(completion),
-};
-
-// Group a harmony token stream into per-message bubbles. Everything from
-// `<|start|>` through `<|message|>` (role + optional channel markers) becomes
-// the dim header; the message body is content; the closing end marker (plus any
-// stray trailing tokens before the next turn) is the footer.
-function groupHarmonyTokens(tokens: LensTokenMessage[]): { messages: JlensTokenGroup[]; hasChatFormat: boolean } {
-  const hasTurnStart = tokens.some((t) => t.token.trim() === HARMONY_START);
-  if (!hasTurnStart) {
-    return { messages: [], hasChatFormat: false };
-  }
-
-  const messages: JlensTokenGroup[] = [];
-  let i = 0;
-
-  // Tokens before the first `<|start|>` (rare for harmony) → prepend to the
-  // first header so they still render and stay hoverable.
-  const leading: LensTokenMessage[] = [];
-  while (i < tokens.length && tokens[i].token.trim() !== HARMONY_START) {
-    leading.push(tokens[i]);
-    i += 1;
-  }
-
-  let isFirstTurn = true;
-  while (i < tokens.length) {
-    if (tokens[i].token.trim() !== HARMONY_START) {
-      // Stray token outside a turn: attach to the current bubble's content.
-      if (messages.length > 0) {
-        messages[messages.length - 1].contentTokens.push(tokens[i]);
-      }
-      i += 1;
-      continue;
-    }
-
-    const headerTokens: LensTokenMessage[] = isFirstTurn && leading.length > 0 ? [...leading, tokens[i]] : [tokens[i]];
-    isFirstTurn = false;
-    i += 1;
-
-    // Header: role text, then (optionally) `<|channel|>` + channel name, up to
-    // and including `<|message|>`.
-    let roleText = '';
-    let channelText = '';
-    let sawChannel = false;
-    while (i < tokens.length) {
-      const t = tokens[i];
-      const trimmed = t.token.trim();
-      // A malformed turn (no `<|message|>`): bail before consuming the marker.
-      if (trimmed === HARMONY_START || HARMONY_END_TOKENS.has(trimmed)) {
-        break;
-      }
-      headerTokens.push(t);
-      i += 1;
-      if (trimmed === HARMONY_MESSAGE) {
-        break;
-      }
-      if (trimmed === HARMONY_CHANNEL) {
-        sawChannel = true;
-      } else if (sawChannel) {
-        channelText += t.token;
-      } else {
-        roleText += t.token;
-      }
-    }
-
-    const roleLabel = roleText.trim();
-    const role: ChatRole = roleLabel === 'user' ? 'user' : 'assistant';
-    const channel = channelText.trim();
-
-    const contentTokens: LensTokenMessage[] = [];
-    while (
-      i < tokens.length &&
-      !HARMONY_END_TOKENS.has(tokens[i].token.trim()) &&
-      tokens[i].token.trim() !== HARMONY_START
-    ) {
-      contentTokens.push(tokens[i]);
-      i += 1;
-    }
-
-    const footerTokens: LensTokenMessage[] = [];
-    if (i < tokens.length && HARMONY_END_TOKENS.has(tokens[i].token.trim())) {
-      footerTokens.push(tokens[i]);
-      i += 1;
-    }
-
-    messages.push({ role, roleLabel, channel, headerTokens, contentTokens, footerTokens });
-  }
-
-  return { messages, hasChatFormat: true };
-}
-
-// Pull the clean assistant answer out of a raw harmony completion: the `final`
-// channel's message content (the analysis/reasoning channel is dropped, which
-// matches harmony's own behavior of stripping prior reasoning from history).
-// While streaming (before `final` arrives) fall back to the text after the last
-// `<|message|>`, with any leftover harmony markers stripped.
-function parseHarmonyCompletion(completion: string): string {
-  const finalMatch = completion.match(
-    /<\|channel\|>final<\|message\|>([\s\S]*?)(?:<\|return\|>|<\|end\|>|<\|call\|>|$)/,
-  );
-  if (finalMatch) {
-    return finalMatch[1].trim();
-  }
-  const lastMsg = completion.lastIndexOf(HARMONY_MESSAGE);
-  const tail = lastMsg >= 0 ? completion.slice(lastMsg + HARMONY_MESSAGE.length) : completion;
-  return tail.replace(/<\|[^|]*\|>/g, '').trim();
-}
-
-// Ordered list of known formats. `detectChatFormat` returns the first match,
-// falling back to the qwen/ChatML default.
-export const JLENS_CHAT_FORMATS: JlensChatFormat[] = [gemma3Format, gptOssFormat, llama3Format, qwenFormat];
-
-export function detectChatFormat(modelId: string): JlensChatFormat {
-  const lower = (modelId || '').toLowerCase();
-  for (const fmt of JLENS_CHAT_FORMATS) {
-    if (fmt.matchModelId(lower)) {
-      return fmt;
-    }
-  }
-  return qwenFormat;
+  // The source chat-message index for input turns (from the server spans), or
+  // undefined for generated turns / turns without a 1:1 message mapping. Used to
+  // decide whether inline message editing is safe (see `jlens-chat.tsx`).
+  messageIndex?: number;
 }
 
 export function toChatPayload(messages: { role: ChatRole; content: string }[]): LensChatMessage[] {
   return messages.map((m) => ({ role: m.role, content: m.content }));
 }
 
-// Group the flat per-position token stream into message bubbles using the
-// family's turn tokens. Mirrors the NLA chat grouping: a turn opens at
-// `turnStartToken`, its header runs to the first newline (carrying the role
-// label), content runs until the next turn-end / turn-start, and the footer
-// captures the closing turn-end (plus any trailing tokens before the next
-// turn). Tokens before the first turn (e.g. a leading BOS) are attached to a
-// synthetic leading group so they still render and remain hoverable.
+// The text a run of tokens spells out. This is NOT `tokens.map(t => t.token).join('')`: a
+// character split across tokens (an emoji, usually) has its whole glyph repeated in every
+// contributing position's `token`, deliberately, so each chip renders the emoji instead of a
+// row of `. Joining those strings emits the emoji once per token — which is how an assistant
+// turn stored for the next request came back with its emoji doubled, retokenizing the whole
+// turn differently. `is_char_continuation` marks the repeats, so text drops them.
 //
-// Formats that need bespoke structure (e.g. gpt-oss harmony) supply their own
-// `groupTokens`, which fully replaces the logic below.
-export function groupTokensIntoMessages(
-  tokens: LensTokenMessage[],
-  fmt: JlensChatFormat,
-): { messages: JlensTokenGroup[]; hasChatFormat: boolean } {
-  if (fmt.groupTokens) {
-    return fmt.groupTokens(tokens);
-  }
-  const hasTurnStart = tokens.some((t) => t.token === fmt.turnStartToken);
-  if (!hasTurnStart) {
+// Every path that turns tokens back into text goes through here: the stored assistant message,
+// the copy buttons, and the prefill a steered re-run continues from.
+export function tokensToText(tokens: readonly (LensCharContinuation & { token: string })[]): string {
+  return tokens
+    .filter((t) => !t.is_char_continuation)
+    .map((t) => t.token)
+    .join('');
+}
+
+// Which `messages` entry each bubble belongs to, or `null` when a bubble can't be
+// mapped (template scaffolding, or a turn not yet in `messages`).
+//
+// Bubbles are NOT 1:1 with messages, so a bubble's own position is never a valid
+// message index: a reasoning model splits one assistant message into `analysis`
+// and `final` bubbles, and harmony can split it further. Callers that act on a
+// message (editing truncates the conversation at it) must go through this.
+//
+// Input turns use the server's span message index, which is authoritative: it
+// counts the request's messages rather than the template's, so a
+// template-injected system preamble doesn't shift it. The trailing generated
+// turn carries no index, so it maps to the final assistant message — and only
+// once that message exists, which it doesn't mid-stream.
+export function messageIndicesForGroups(
+  groups: JlensTokenGroup[],
+  messages: readonly { role: string }[],
+): (number | null)[] {
+  const lastIdx = messages.length - 1;
+  const generatedIdx = messages[lastIdx]?.role === 'assistant' ? lastIdx : null;
+  return groups.map((group) => {
+    if (group.messageIndex != null) {
+      return group.messageIndex <= lastIdx ? group.messageIndex : null;
+    }
+    return group.role === 'assistant' ? generatedIdx : null;
+  });
+}
+
+// Whether any token carries server-computed span metadata. When false the caller
+// should render the tokens plainly (no chat grouping is possible).
+function hasSpans(tokens: LensTokenMessage[]): boolean {
+  return tokens.some((t) => t.section != null || t.role != null || t.message_index != null);
+}
+
+// Which display bucket a token's `section` maps to. Structural scaffolding and
+// headers render as dim header chips; turn-end markers as dim footer chips;
+// everything else (message content, generated text) as hoverable lens chips.
+function sectionBucket(section: string | null | undefined): 'header' | 'content' | 'footer' {
+  if (section === 'footer') return 'footer';
+  if (section === 'header' || section === 'scaffold') return 'header';
+  return 'content';
+}
+
+// Group the flat, span-tagged token stream into per-message bubbles.
+//
+// A new group opens when the logical turn changes: the source message index
+// changes, or (within the generated assistant response) a new block begins. A
+// new block is signalled either structurally — a `header` token following a
+// non-header token, as harmony's `<|end|>` -> `<|start|>` does — or by the
+// channel switching between two named channels, which is how a reasoning-tag
+// model moves from `analysis` to `final` (`</think>` closes the reasoning block
+// and the answer follows with no header of its own). Leading scaffolding with no
+// role (e.g. a BOS before the first turn) is folded into the first real group's
+// header so it still renders and stays hoverable.
+export function groupTokensBySpans(tokens: LensTokenMessage[]): {
+  messages: JlensTokenGroup[];
+  hasChatFormat: boolean;
+} {
+  if (tokens.length === 0 || !hasSpans(tokens)) {
     return { messages: [], hasChatFormat: false };
   }
 
-  const messages: JlensTokenGroup[] = [];
-  let i = 0;
-
-  // Leading tokens before the first turn (BOS etc.) → prepend to the first
-  // header once we open it.
-  const leading: LensTokenMessage[] = [];
-  while (i < tokens.length && tokens[i].token !== fmt.turnStartToken) {
-    leading.push(tokens[i]);
-    i += 1;
+  // Pass 1: assign a group id to each token.
+  const groupIds: number[] = new Array(tokens.length).fill(0);
+  let groupId = -1;
+  let curKey: string | null = null;
+  let prevSection: string | null = null;
+  let prevChannel: string | null = null;
+  let genBlock = 0;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const t = tokens[i];
+    const mi = t.message_index ?? null;
+    const channel = t.channel ?? null;
+    let key: string;
+    if (mi != null) {
+      key = `msg:${mi}`;
+    } else {
+      // Generated / scaffold token. A new harmony block starts when a header
+      // token follows a non-header token (e.g. `<|end|>` then `<|start|>`).
+      const startsHeaderBlock = t.section === 'header' && prevSection != null && prevSection !== 'header';
+      // ...and a reasoning-tag block ends without one, so a switch between two
+      // named channels (`analysis` -> `final`) opens a block too. Both sides must
+      // be named: harmony's structural markers sit at `null` before their channel
+      // name is parsed, and splitting on that would break a single harmony block.
+      const switchesChannel = prevChannel != null && channel != null && channel !== prevChannel;
+      if (startsHeaderBlock || switchesChannel) {
+        genBlock += 1;
+      }
+      key = `gen:${genBlock}`;
+    }
+    if (key !== curKey) {
+      groupId += 1;
+      curKey = key;
+    }
+    groupIds[i] = groupId;
+    prevSection = t.section ?? null;
+    prevChannel = channel;
   }
 
-  let isFirstTurn = true;
-  while (i < tokens.length) {
-    const tok = tokens[i];
-
-    if (tok.token === fmt.turnStartToken) {
-      const headerTokens: LensTokenMessage[] = isFirstTurn && leading.length > 0 ? [...leading, tok] : [tok];
-      isFirstTurn = false;
-      i += 1;
-
-      let role: ChatRole = 'user';
-      while (i < tokens.length) {
-        const t = tokens[i];
-        headerTokens.push(t);
-        if (t.token.includes('user')) role = 'user';
-        if (t.token.includes(fmt.assistantRoleName)) role = 'assistant';
-        i += 1;
-        if (t.token.includes('\n')) break;
-      }
-
-      const contentTokens: LensTokenMessage[] = [];
-      while (i < tokens.length && tokens[i].token !== fmt.turnEndToken && tokens[i].token !== fmt.turnStartToken) {
-        contentTokens.push(tokens[i]);
-        i += 1;
-      }
-
-      const footerTokens: LensTokenMessage[] = [];
-      if (i < tokens.length && tokens[i].token === fmt.turnEndToken) {
-        footerTokens.push(tokens[i]);
-        i += 1;
-        while (i < tokens.length && tokens[i].token !== fmt.turnStartToken) {
-          footerTokens.push(tokens[i]);
-          i += 1;
-        }
-      }
-
-      messages.push({ role, roleLabel: role, headerTokens, contentTokens, footerTokens });
-    } else {
-      if (messages.length > 0) {
-        messages[messages.length - 1].contentTokens.push(tok);
-      }
-      i += 1;
+  // Pass 2: build the groups.
+  const raw: JlensTokenGroup[] = [];
+  let lastId = -1;
+  for (let i = 0; i < tokens.length; i += 1) {
+    const t = tokens[i];
+    if (groupIds[i] !== lastId) {
+      raw.push({ role: 'assistant', headerTokens: [], contentTokens: [], footerTokens: [] });
+      lastId = groupIds[i];
+    }
+    const group = raw[raw.length - 1];
+    const bucket = sectionBucket(t.section);
+    if (bucket === 'header') group.headerTokens.push(t);
+    else if (bucket === 'footer') group.footerTokens.push(t);
+    else group.contentTokens.push(t);
+    if (t.role != null && group.roleLabel === undefined) {
+      group.roleLabel = t.role;
+      group.role = t.role === 'user' ? 'user' : 'assistant';
+    }
+    if (t.channel && group.channel === undefined) {
+      group.channel = t.channel;
+    }
+    if (t.message_index != null && group.messageIndex === undefined) {
+      group.messageIndex = t.message_index;
     }
   }
 
-  return { messages, hasChatFormat: true };
+  // Fold a leading role-less scaffold group (e.g. a lone BOS) into the next
+  // group's header so it renders without producing a stray empty bubble.
+  if (
+    raw.length > 1 &&
+    raw[0].roleLabel === undefined &&
+    raw[0].contentTokens.length === 0 &&
+    raw[0].footerTokens.length === 0
+  ) {
+    const leading = raw.shift() as JlensTokenGroup;
+    raw[0].headerTokens = [...leading.headerTokens, ...raw[0].headerTokens];
+  }
+
+  return { messages: raw, hasChatFormat: raw.length > 0 };
+}
+
+// Extract the clean, human-readable assistant text from the generated tokens of
+// a completed turn (for storing the assistant message for re-send / copy).
+//
+// When the response is split into harmony channels, only the `final` channel's
+// content is kept (the analysis / reasoning channel is dropped, matching
+// harmony's own behavior of stripping prior reasoning from history). While the
+// `final` channel hasn't arrived yet (streaming), fall back to the content of
+// whatever channel is present. For plain turns, all generated content is kept.
+//
+// `prefill` is the assistant prefill the turn continued from, and is joined on
+// here rather than by the caller because the seam between the two must survive
+// verbatim: the first generated token normally carries the leading space, so
+// trimming the generated side turned a "hi" prefill continued by " how are
+// you?" into "hihow are you?" — which then retokenized differently on the next
+// turn, silently changing the analyzed prompt.
+export function extractAssistantText(tokens: LensTokenMessage[], prefill = ''): string {
+  const generated = tokens.filter((t) => t.is_generated);
+  if (generated.length === 0) {
+    return prefill;
+  }
+  const spanned = generated.some((t) => t.section != null || t.channel != null);
+  if (!spanned) {
+    // No spans (legacy / raw): best-effort strip of any residual markers.
+    return joinPrefill(prefill, tokensToText(generated).replace(/<\|[^|]*\|>/g, ''));
+  }
+  const hasChannels = generated.some((t) => t.channel);
+  let picked: LensTokenMessage[];
+  if (hasChannels) {
+    const finalContent = generated.filter((t) => t.channel === 'final' && sectionBucket(t.section) === 'content');
+    picked = finalContent.length > 0 ? finalContent : generated.filter((t) => sectionBucket(t.section) === 'content');
+  } else {
+    picked = generated.filter((t) => sectionBucket(t.section) === 'content');
+  }
+  return joinPrefill(prefill, tokensToText(picked));
+}
+
+// Trailing whitespace is always dropped (the chat template re-adds its own
+// newline before the turn-end token, so keeping it would double up). Leading
+// whitespace is only dropped when the generated text starts the message —
+// after a prefill it is part of the message.
+function joinPrefill(prefill: string, generated: string): string {
+  return prefill.length > 0 ? prefill + generated.trimEnd() : generated.trim();
 }

@@ -7,12 +7,12 @@ import ModelSelector from '@/components/feature-selector/model-selector';
 import NewVectorForm from '@/components/new-vector-form';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
+import { NPLogprob, NPSteerMethod } from '@/lib/api/inference-types';
 import { useIsMount } from '@/lib/hooks/use-is-mount';
 import { SearchExplanationsType } from '@/lib/utils/general';
 import { getFirstSourceSetForModel } from '@/lib/utils/source';
 import {
   ChatMessage,
-  convertOldSteerOutputToChatMessages,
   FeaturePreset,
   replaceSteerModelIdIfNeeded,
   STEER_FREQUENCY_PENALTY,
@@ -30,7 +30,6 @@ import {
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { Model, Visibility } from '@prisma/client';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { NPLogprob, NPSteerMethod } from 'neuronpedia-inference-client';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import SteerAdvancedSettings from './advanced-settings';
@@ -84,6 +83,8 @@ export default function Steerer({
   const [typedInText, setTypedInText] = useState('');
   const [defaultChatMessages, setDefaultChatMessages] = useState<ChatMessage[]>([]);
   const [steeredChatMessages, setSteeredChatMessages] = useState<ChatMessage[]>([]);
+  // the prompt that produced the current completions - shown before the outputs so they read as continuations
+  const [completionPrompt, setCompletionPrompt] = useState('');
   const [defaultCompletionText, setDefaultCompletionText] = useState('');
   const [defaultCompletionLogProbs, setDefaultCompletionLogProbs] = useState<NPLogprob[] | null>(null);
   const [steeredCompletionText, setSteeredCompletionText] = useState('');
@@ -140,6 +141,7 @@ export default function Steerer({
   function reset() {
     setDefaultChatMessages([]);
     setSteeredChatMessages([]);
+    setCompletionPrompt('');
     setDefaultCompletionText('');
     setSteeredCompletionText('');
     setDefaultCompletionLogProbs(null);
@@ -218,6 +220,7 @@ export default function Steerer({
       .then((resp: SteerResultChat | null) => {
         if (resp === null) {
           setIsSteering(false);
+          setCompletionPrompt('');
           setDefaultCompletionText('');
           setSteeredCompletionText('');
           setDefaultCompletionLogProbs(null);
@@ -242,22 +245,14 @@ export default function Steerer({
           setDefaultCompletionLogProbs(resp.DEFAULT?.logprobs || null);
           setSteeredCompletionLogProbs(resp.STEERED?.logprobs || null);
           setTypedInText(resp.inputText || '');
+          // Old saved completions already contain the prompt in their text, so prepending it here
+          // would show it twice.
+          setCompletionPrompt(resp.outputTextIncludesPrompt ? '' : resp.inputText || '');
         } else {
-          // if chat template is null, we need to convert it (it's an older form of steering)
-
-          if (resp.DEFAULT?.chatTemplate) {
-            setDefaultChatMessages(resp.DEFAULT?.chatTemplate || []);
-            setSteeredChatMessages(resp.STEERED?.chatTemplate || []);
-            setDefaultCompletionLogProbs(resp.DEFAULT?.logprobs || null);
-            setSteeredCompletionLogProbs(resp.STEERED?.logprobs || null);
-          } else {
-            const defaultRaw = resp.DEFAULT?.raw;
-            const steeredRaw = resp.STEERED?.raw;
-            if (defaultRaw && steeredRaw) {
-              setDefaultChatMessages(convertOldSteerOutputToChatMessages(defaultRaw));
-              setSteeredChatMessages(convertOldSteerOutputToChatMessages(steeredRaw));
-            }
-          }
+          setDefaultChatMessages(resp.DEFAULT?.chatTemplate || []);
+          setSteeredChatMessages(resp.STEERED?.chatTemplate || []);
+          setDefaultCompletionLogProbs(resp.DEFAULT?.logprobs || null);
+          setSteeredCompletionLogProbs(resp.STEERED?.logprobs || null);
         }
         const features = resp.features?.map((f) => ({
           modelId: f.modelId,
@@ -688,8 +683,6 @@ export default function Steerer({
             setSteerTokens={setSteerTokens}
             temperature={temperature}
             setTemperature={setTemperature}
-            freqPenalty={freqPenalty}
-            setFreqPenalty={setFreqPenalty}
             strMultiple={strMultiple}
             setStrMultiple={setStrMultiple}
             seed={seed}
@@ -725,6 +718,8 @@ export default function Steerer({
         <SteerCompletion
           showSettingsOnMobile={showSettingsOnMobile}
           isSteering={isSteering}
+          completionPrompt={completionPrompt}
+          setCompletionPrompt={setCompletionPrompt}
           defaultCompletionText={defaultCompletionText}
           defaultCompletionLogProbs={defaultCompletionLogProbs}
           setDefaultCompletionLogProbs={setDefaultCompletionLogProbs}

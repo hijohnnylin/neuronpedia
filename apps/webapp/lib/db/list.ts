@@ -2,22 +2,27 @@ import { prisma } from '@/lib/db';
 import { getActivationForFeature } from '@/lib/utils/inference';
 import { ListWithPartialRelations } from '@/prisma/generated/zod';
 import { Activation } from '@prisma/client';
+import { forbidden, notFound } from '../api-error';
 import { ListNeuronToAdd, MAX_LIST_FEATURES_FOR_TEST_TEXT, MAX_LIST_TEST_TEXT_LENGTH_CHARS } from '../utils/list';
 import { AuthenticatedUser } from '../with-user';
 import { AllowUnlistedFor, assertUserCanAccessModelAndSourceSet, userCanAccessClause } from './userCanAccess';
 
 export const assertUserOwnsList = async (listId: string, user: AuthenticatedUser) => {
-  const list = await prisma.list.findUniqueOrThrow({
+  // findUnique rather than findUniqueOrThrow: prisma's P2025 message names the source file and
+  // line it was thrown from, and a missing list is the caller's problem, not a server fault.
+  const list = await prisma.list.findUnique({
     where: {
       id: listId,
     },
   });
 
-  if (list.userId !== user.id) {
-    throw new Error('User does not own list');
-  } else {
-    return list;
+  if (!list) {
+    throw notFound('List not found.');
   }
+  if (list.userId !== user.id) {
+    throw forbidden('You do not own this list.');
+  }
+  return list;
 };
 
 export const newList = async (name: string, description: string, user: AuthenticatedUser) =>
