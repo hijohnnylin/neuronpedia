@@ -283,7 +283,7 @@ const formatTopActivatingTexts = (activations: Activation[]): string => {
       ...tokens.slice(maxActivationIndex + 1, endIndex),
     ];
 
-    const trimmedText = trimmedTokens.join('').replace('\n', '  ');
+    const trimmedText = trimmedTokens.join('').replace(/\n/g, '  ');
     formattedTexts.push(trimmedText);
   }
 

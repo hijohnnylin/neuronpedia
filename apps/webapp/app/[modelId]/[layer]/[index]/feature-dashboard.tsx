@@ -16,6 +16,7 @@ import { useGlobalContext } from '@/components/provider/global-provider';
 import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
 import VectorItem from '@/components/vector-item';
 import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
+import { getFeaturePath } from '@/lib/utils/neuron-identifier';
 import { neuronHasVectorInDatabase, shouldHideBreadcrumbsAndSelectorForNeuronVector } from '@/lib/utils/neuron-vector';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { Download } from 'lucide-react';
@@ -309,7 +310,7 @@ export default function FeatureDashboard({
               )}
               <a
                 className="mr-1.5 flex shrink-0 flex-row items-center gap-x-1 whitespace-nowrap rounded-md bg-slate-200 px-[8px] py-[6px] text-[9px] font-medium leading-none text-slate-700 hover:bg-sky-200 hover:text-sky-700 sm:mr-0 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
-                href={`/${currentNeuron?.modelId}/${currentNeuron?.layer}/${currentNeuron?.index}`}
+                href={getFeaturePath(currentNeuron?.modelId, currentNeuron?.layer, currentNeuron?.index)}
                 target="_blank"
                 rel="noreferrer"
               >

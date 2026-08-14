@@ -25,3 +25,14 @@ export class NeuronIdentifier {
 export function getExplanationNeuronIdentifier(exp: ExplanationWithPartialRelations) {
   return new NeuronIdentifier(exp.modelId, exp.layer, exp.index);
 }
+
+// Path to a feature dashboard. Each segment is encoded: some of these ids come from
+// user-supplied JSON (the manual dashboard) or from an API response, and an unencoded
+// segment could otherwise carry its own path, query string or `javascript:` scheme.
+export function getFeaturePath(
+  modelId: string | undefined,
+  layer: string | undefined,
+  index: string | number | undefined,
+) {
+  return `/${encodeURIComponent(modelId ?? '')}/${encodeURIComponent(layer ?? '')}/${encodeURIComponent(index ?? '')}`;
+}

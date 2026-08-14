@@ -233,8 +233,14 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       validatedData.slug.trim().length < GRAPH_SLUG_MIN
     ) {
       // if slug doesn't exist, generate one based on the prompt
-      // first remove all <> and \n (estimated to be special tokens)
-      const promptReplaced = validatedData.prompt.replace(/<[^>]*>|\n/g, '');
+      // first remove all <> and \n (estimated to be special tokens). Looped because a single
+      // pass can splice two leftover fragments into a fresh <...> (e.g. `<a<b>c>`).
+      let promptReplaced = validatedData.prompt;
+      let beforeReplace = '';
+      while (promptReplaced !== beforeReplace) {
+        beforeReplace = promptReplaced;
+        promptReplaced = promptReplaced.replace(/<[^>]*>|\n/g, '');
+      }
       // remove "user" and "assistant", and "system"
       const promptReplaced2 = promptReplaced.replace(/user|assistant|system/g, '');
       // keeping only alphanumeric characters, and keeping only the first 16 characters

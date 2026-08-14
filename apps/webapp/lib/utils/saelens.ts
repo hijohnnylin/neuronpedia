@@ -48,6 +48,20 @@ function rawToFloat(buf: ArrayBuffer, dtype: string): number[] {
   return Array.from(new Float64Array(buf));
 }
 
+// One component of a HuggingFace repo id or of a path inside it. Deliberately narrow: `repo`
+// and `path` reach here straight from request input, and a segment like `..` or one carrying a
+// `?`/`#` would let a caller point the fetch below at something other than an SAE checkpoint —
+// with our HF_TOKEN attached.
+const HF_PATH_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+function encodeHfPath(value: string, label: string): string {
+  const segments = value.split('/');
+  if (!segments.every((segment) => HF_PATH_SEGMENT.test(segment))) {
+    throw new Error(`${label} may only contain letters, digits, '.', '_', '-' and '/'`);
+  }
+  return segments.map(encodeURIComponent).join('/');
+}
+
 async function fetchRange(url: string, start: number, end: number): Promise<Response> {
   const headers: HeadersInit = { Range: `bytes=${start}-${end}` };
   if (HF_TOKEN) {
@@ -140,7 +154,7 @@ export async function fetchDecoderLatent(
 
   const { decoderTensorKey } = getSAEFormatConfig(format);
 
-  const fileUrl = `https://huggingface.co/${repo}/resolve/main/${path}`;
+  const fileUrl = `https://huggingface.co/${encodeHfPath(repo, 'repo')}/resolve/main/${encodeHfPath(path, 'path')}`;
 
   // Fetch the 8-byte header length prefix
   const sizeRes = await fetchRange(fileUrl, 0, 7);

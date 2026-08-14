@@ -260,7 +260,13 @@ export default function NavBarButtons() {
         defaultValue="saes"
         value="saes"
         onValueChange={(newVal) => {
-          router.push(`/${newVal.replace('|', '/')}`);
+          // Item values are `${modelId}|${sourceSetName}`; the placeholder item has no delimiter.
+          const [modelId, sourceSetName] = newVal.split('|');
+          router.push(
+            sourceSetName
+              ? `/${encodeURIComponent(modelId)}/${encodeURIComponent(sourceSetName)}`
+              : `/${encodeURIComponent(modelId)}`,
+          );
         }}
       >
         <Select.Trigger className="hidden w-full flex-1 select-none flex-row items-center justify-center gap-x-1 whitespace-pre rounded px-0 text-[13px] hover:text-sky-700 hover:underline focus:outline-none sm:pl-1 sm:uppercase">

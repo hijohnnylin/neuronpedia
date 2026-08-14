@@ -6,14 +6,19 @@ export { detectTypeFromUrl } from './problem-url-types';
 
 // ─── URL Metadata Fetching ─────────────────────────────────────────────────
 
+const HTML_ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&#x27;': "'",
+};
+
+// One pass, not a chain of replaces: decoding `&amp;` before the others would turn
+// `&amp;lt;` into `&lt;` and then into `<`, so a doubly-escaped tag would survive.
 function decodeEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'");
+  return str.replace(/&(?:amp|lt|gt|quot|#39|#x27);/g, (entity) => HTML_ENTITIES[entity]);
 }
 
 function ipv4IsBlocked(ip: string): boolean {

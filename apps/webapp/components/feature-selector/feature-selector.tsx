@@ -1,6 +1,7 @@
 'use client';
 
 import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
+import { getFeaturePath } from '@/lib/utils/neuron-identifier';
 import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDownIcon, ChevronLeft, ChevronRight, Search } from 'lucide-react';
@@ -235,7 +236,7 @@ export default function FeatureSelector({
               className={`group hidden h-10 min-h-[40px] select-none flex-col items-center justify-center px-1.5 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white sm:flex ${
                 parseInt(defaultIndex, 10) > 0 ? '' : 'pointer-events-none opacity-50'
               }`}
-              href={`/${modelId}/${source}/${parseInt(defaultIndex, 10) - 1}`}
+              href={getFeaturePath(modelId, source, parseInt(defaultIndex, 10) - 1)}
             >
               <ChevronLeft className="h-4 w-4" />
               <div className="mt-0.5 text-center text-[8px] font-medium uppercase leading-none text-slate-400 group-hover:text-white">
@@ -247,7 +248,7 @@ export default function FeatureSelector({
               className={`group hidden h-10 min-h-[40px] select-none flex-col items-center justify-center px-1.5 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white sm:flex ${
                 parseInt(defaultIndex, 10) > 0 ? '' : ''
               }`}
-              href={`/${modelId}/${source}/${parseInt(defaultIndex, 10) + 1}`}
+              href={getFeaturePath(modelId, source, parseInt(defaultIndex, 10) + 1)}
             >
               <ChevronRight className="h-4 w-4" />
               <div className="mt-0.5 text-center text-[8px] font-medium uppercase leading-none text-slate-400 group-hover:text-white">
