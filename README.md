@@ -79,6 +79,11 @@ https://github.com/user-attachments/assets/d7fbb46e-8522-4f98-aa08-21c6529424af
 
 #### Steps
 
+1. Init your local environment
+   ```
+   make init-env
+   ```
+
 1. Build the webapp
    ```
    make webapp-localhost-build
