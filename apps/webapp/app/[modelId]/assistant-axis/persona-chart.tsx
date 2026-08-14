@@ -1,7 +1,7 @@
-import { SteerCompletionChatPost200ResponseAssistantAxisInner } from 'neuronpedia-inference-client';
+import { SteerAssistantAxis } from '@/lib/api/inference-types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-type PersonaCheckResult = SteerCompletionChatPost200ResponseAssistantAxisInner;
+type PersonaCheckResult = SteerAssistantAxis;
 
 // Color palette for PC lines (Steered)
 const PC_COLORS = [
@@ -277,7 +277,10 @@ export default function PersonaChart({
       return;
     }
 
-    if (!loading && !isSteering) {
+    // Gated on `loading` alone, not on `isSteering`: chart data is only ever set with a
+    // complete turn (both lines), and the stream stays open past that point for the
+    // database write, so waiting for steering to end delayed the line by that write.
+    if (!loading) {
       // Skip animation if requested (e.g., when loading saved data)
       if (skipAnimationRef?.current) {
         skipAnimationRef.current = false;
@@ -362,7 +365,7 @@ export default function PersonaChart({
         cancelAnimationFrame(animationStateRef.current.frameId);
       }
     };
-  }, [data, loading, isSteering, xScale, yScale, runAnimation]);
+  }, [data, loading, xScale, yScale, runAnimation]);
 
   const handleMouseEnter = (e: React.MouseEvent, pcName: string, turn: number, similarity: number, snippet: string) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -434,7 +437,7 @@ export default function PersonaChart({
   const pendingAnimationInfo = useMemo(() => {
     // If animation is already running via refs, don't recalculate
     if (animationStateRef.current.isAnimating) return null;
-    if (!data || loading || isSteering) return null;
+    if (!data || loading) return null;
     // Skip if animation should be skipped (e.g., loading saved data)
     if (skipAnimationRef?.current) return null;
 
@@ -488,7 +491,7 @@ export default function PersonaChart({
     });
 
     return info.size > 0 ? info : null;
-  }, [data, loading, isSteering, xScale, yScale]);
+  }, [data, loading, xScale, yScale]);
 
   return (
     <div className="relative" style={{ width, height }}>

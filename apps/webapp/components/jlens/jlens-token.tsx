@@ -514,7 +514,7 @@ function JlensTokenChipInner({
   nextStartsNewLine = false,
 }: {
   token: LensTokenMessage;
-  variant?: 'content' | 'special' | 'generated' | 'think';
+  variant?: 'content' | 'special' | 'generated';
   // Highlight background bands (one per selected sidebar token), driven by the
   // sidebar selection/hover.
   bands?: TokenBand[];
@@ -545,7 +545,7 @@ function JlensTokenChipInner({
   const actions = useContext(JlensPopupActionsContext);
   const isMobile = useIsLensMobile();
   const hasLens = token.results.length > 0;
-  const showAnnotations = hasLens && variant !== 'special' && variant !== 'think';
+  const showAnnotations = hasLens && variant !== 'special';
   // Whether this chip's popup is the active one — drives its active outline. The
   // coordinator flips this (and the previously-active chip's) so only the two
   // involved chips re-render on a hover swap.
@@ -561,14 +561,8 @@ function JlensTokenChipInner({
     [actions, hasLens],
   );
 
-  // `think` tokens (<think>/</think>) are rendered inline with the content but
-  // share the dim, monospaced look of the structural special tokens.
   const colorClass =
-    variant === 'special'
-      ? 'text-slate-400 text-[7px] sm:text-[9px]'
-      : variant === 'think'
-        ? 'font-mono text-slate-400 text-[7px]'
-        : 'text-slate-700 text-[10px] sm:text-[13px]';
+    variant === 'special' ? 'text-slate-400 text-[7px] sm:text-[9px]' : 'text-slate-700 text-[10px] sm:text-[13px]';
 
   const bg = bandsGradient(bands);
   // Hovering a NON-selected sidebar token previews it as a full-opacity border
@@ -647,10 +641,9 @@ function JlensTokenChipInner({
   // (the annotations row is added only once lens results exist) so their line
   // height stays constant whether or not read-outs have streamed in yet —
   // otherwise the line spacing visibly grows per token as results arrive.
-  // Structural tokens (special/think) render bare so the dim, small header/
-  // footer rows stay compact.
-  const isStructural = variant === 'special' || variant === 'think';
-  return isStructural ? (
+  // Structural (special) tokens render bare so the dim, small header/footer
+  // rows stay compact.
+  return variant === 'special' ? (
     glyph
   ) : (
     <span className="inline-flex flex-col items-center align-bottom">
@@ -662,3 +655,74 @@ function JlensTokenChipInner({
 
 const JlensTokenChip = memo(JlensTokenChipInner);
 export default JlensTokenChip;
+
+// A flat run of lens chips: the prompt tokens followed by the generated
+// continuation, every token hoverable and selectable, with a bar marking the
+// prompt -> generated boundary. Always monospaced, since there is no message
+// structure to dress it up as. This is what a completion run looks like, and it
+// is also the honest render for a chat stream whose tokens carry no spans — the
+// structure is unknown, but the tokens and their read-outs are not.
+export function JlensTokenRun({
+  tokens,
+  layersByType,
+  bandsByPosition,
+  layerRange,
+  onTokenHover,
+  selectedPositions,
+  highlightedPosition,
+}: {
+  tokens: LensTokenMessage[];
+  layersByType: Record<string, number[]>;
+  bandsByPosition: Map<number, TokenBand[]>;
+  layerRange: LayerRange | null;
+  onTokenHover: (token: LensTokenMessage, open: boolean) => void;
+  selectedPositions: Set<number>;
+  highlightedPosition: number | null;
+}) {
+  // Only meaningful when there's a prompt before it (> 0); -1 means nothing was generated.
+  const firstGeneratedIdx = tokens.findIndex((t) => t.is_generated);
+  return (
+    <div className="select-text whitespace-pre-wrap break-words font-mono text-[13px] leading-relaxed">
+      {tokens.map((token, tokenIdx) => {
+        const newlineCount = (token.token.match(/\n/g) || []).length;
+        const prevToken = tokenIdx > 0 ? tokens[tokenIdx - 1].token : undefined;
+        const prevEndsWithLineBreak = tokenIdx === 0 || (prevToken !== undefined && /\n/.test(prevToken));
+        const nextStartsNewLine = tokenIdx === tokens.length - 1;
+        return (
+          <span key={token.position}>
+            {tokenIdx === firstGeneratedIdx && firstGeneratedIdx > 0 && (
+              // Zero-width inline anchor so the (absolutely positioned) bar can
+              // extend beyond the line height without growing the line box.
+              <span
+                className="relative mt-0 inline-block w-0 bg-slate-600 align-middle sm:-mt-[7px]"
+                aria-hidden="true"
+              >
+                <span
+                  className="absolute left-0 top-1/2 h-[1.6em] w-[2px] -translate-y-1/2 border-l-2 border-dotted border-slate-400 sm:h-[2.2em]"
+                  aria-hidden="true"
+                />
+              </span>
+            )}
+            <JlensTokenChip
+              token={token}
+              layersByType={layersByType}
+              variant={token.is_generated ? 'generated' : 'content'}
+              bands={bandsByPosition.get(token.position)}
+              layerRange={layerRange}
+              onHoverChange={onTokenHover}
+              positionSelected={highlightedPosition == null && selectedPositions.has(token.position)}
+              prevSelected={highlightedPosition == null && selectedPositions.has(token.position - 1)}
+              nextSelected={highlightedPosition == null && selectedPositions.has(token.position + 1)}
+              highlighted={highlightedPosition === token.position}
+              prevEndsWithLineBreak={prevEndsWithLineBreak}
+              nextStartsNewLine={nextStartsNewLine}
+            />
+            {Array.from({ length: newlineCount }).map((_, i) => (
+              <div key={i} className="h-1 max-h-1 leading-[0em]" />
+            ))}
+          </span>
+        );
+      })}
+    </div>
+  );
+}

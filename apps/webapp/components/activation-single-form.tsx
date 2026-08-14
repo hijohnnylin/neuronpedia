@@ -2,7 +2,6 @@
 
 import ActivationItem from '@/components/activation-item';
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { BOS_TOKENS } from '@/lib/utils/activations';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { Activation } from '@prisma/client';
 import { MagnifyingGlassIcon } from '@radix-ui/react-icons';
@@ -75,6 +74,7 @@ export default function ActivationSingleForm({
       body: JSON.stringify({
         customText: text,
         neuron,
+        ignoreBos: hideBos,
       }),
     })
       .then(async (response) => {
@@ -90,21 +90,8 @@ export default function ActivationSingleForm({
       })
       .then((newActivation) => {
         if (newActivation !== null) {
+          // `ignoreBos` is applied server-side, so nothing to post-process here.
           const actToSet = newActivation;
-          if (hideBos) {
-            // TODO: do this in the inference instance instead
-            if (newActivation.tokens.length > 0 && BOS_TOKENS.includes(newActivation.tokens[0])) {
-              actToSet.tokens.shift();
-              actToSet.values.shift();
-              actToSet.maxValue = Math.max(...actToSet.values);
-              actToSet.maxValueTokenIndex = actToSet.values.indexOf(actToSet.maxValue);
-              if (newActivation.dfaValues !== undefined) {
-                actToSet.dfaValues.shift();
-                actToSet.dfaMaxValue = Math.max(...actToSet.dfaValues);
-                actToSet.dfaTargetIndex = actToSet.values.indexOf(actToSet.dfaMaxValue);
-              }
-            }
-          }
           setActivationResult(actToSet);
           const currentUrl = new URL(window.location.href);
           currentUrl.searchParams.set('defaulttesttext', actToSet.tokens.join(''));

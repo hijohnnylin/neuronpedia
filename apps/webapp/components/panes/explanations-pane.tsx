@@ -2,6 +2,7 @@ import CustomTooltip from '@/components/custom-tooltip';
 import { useExplanationScoreDetailContext } from '@/components/provider/explanation-score-detail-provider';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
+import type { DescriptionResult } from '@/lib/api/nla-types';
 import {
   ERROR_NO_AUTOINTERP_KEY,
   ERROR_RECALL_ALT_FAILED,
@@ -79,7 +80,7 @@ export default function ExplanationsPane({
   const [nlaPopoverOpen, setNlaPopoverOpen] = useState(false);
   const [nlaLoading, setNlaLoading] = useState(false);
   const [nlaPartialText, setNlaPartialText] = useState('');
-  const [nlaResult, setNlaResult] = useState<{ description: string; cosine_similarity: number | null } | null>(null);
+  const [nlaResult, setNlaResult] = useState<DescriptionResult | null>(null);
   const [nlaError, setNlaError] = useState<string | null>(null);
   const nlaAbortRef = useRef<AbortController | null>(null);
 

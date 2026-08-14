@@ -627,7 +627,7 @@ export default function GraphValidator() {
                   </a>{' '}
                   or{' '}
                   <a
-                    href="https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/new-model.ipynb"
+                    href="https://github.com/hijohnnylin/neuronpedia/blob/main/webapp-python-client/neuronpedia/examples/new-model.ipynb"
                     target="_blank"
                     rel="noreferrer"
                     className="text-sky-700 underline hover:text-sky-800"
@@ -902,7 +902,7 @@ export default function GraphValidator() {
                     <strong>
                       Use {`Neuronpedia's`} feature dashboards (or{' '}
                       <a
-                        href="https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/upload_features.ipynb"
+                        href="https://github.com/hijohnnylin/neuronpedia/blob/main/webapp-python-client/neuronpedia/examples/upload_features.ipynb"
                         target="_blank"
                         rel="noreferrer"
                         className="text-sky-700 underline hover:text-sky-800"
@@ -918,7 +918,7 @@ export default function GraphValidator() {
                     </code>{' '}
                     to use {`Neuronpedia's`} feature dashboards, if it already exists on Neuronpedia, or if you have{' '}
                     <a
-                      href="https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/upload_features.ipynb"
+                      href="https://github.com/hijohnnylin/neuronpedia/blob/main/webapp-python-client/neuronpedia/examples/upload_features.ipynb"
                       target="_blank"
                       rel="noreferrer"
                       className="text-sky-700 underline hover:text-sky-800"

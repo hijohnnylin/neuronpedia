@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { AuthenticatedUser } from '@/lib/with-user';
 import { Visibility } from '@prisma/client';
+import { notFound } from '../api-error';
 import { NEXT_PUBLIC_URL } from '../env';
 
 export const ERROR_NOT_FOUND_MESSAGE = `The model, source, or feature you specified is not available. Check available public models/sources (including which ones have inference enabled) at ${NEXT_PUBLIC_URL}/available-resources`;
@@ -163,7 +164,7 @@ export const userCanAccessModelAndSourceSet = async (
 export const assertUserCanAccessRelease = async (releaseName: string, user: AuthenticatedUser | null = null) => {
   const permitted = await userCanAccessRelease(releaseName, user);
   if (!permitted) {
-    throw new Error(ERROR_NOT_FOUND_MESSAGE);
+    throw notFound(ERROR_NOT_FOUND_MESSAGE);
   }
   return true;
 };
@@ -175,7 +176,7 @@ export const assertUserCanAccessModelAndSource = async (
 ) => {
   const permitted = await userCanAccessModelAndSourceSet(modelId, getSourceSetNameFromSource(layer), user, true);
   if (!permitted) {
-    throw new Error(ERROR_NOT_FOUND_MESSAGE);
+    throw notFound(ERROR_NOT_FOUND_MESSAGE);
   }
   return true;
 };
@@ -183,7 +184,7 @@ export const assertUserCanAccessModelAndSource = async (
 export const assertUserCanAccessModel = async (modelId: string, user: AuthenticatedUser | null = null) => {
   const permitted = await userCanAccessModel(modelId, user, true);
   if (!permitted) {
-    throw new Error(ERROR_NOT_FOUND_MESSAGE);
+    throw notFound(ERROR_NOT_FOUND_MESSAGE);
   }
   return true;
 };
@@ -195,7 +196,7 @@ export const assertUserCanAccessModelAndSourceSet = async (
 ) => {
   const permitted = await userCanAccessModelAndSourceSet(modelId, sourceSet, user, true);
   if (!permitted) {
-    throw new Error(ERROR_NOT_FOUND_MESSAGE);
+    throw notFound(ERROR_NOT_FOUND_MESSAGE);
   }
   return true;
 };
@@ -250,7 +251,7 @@ export const userCanWriteModelAndSourceSet = async (
 export const assertUserCanWriteModelAndSource = async (modelId: string, layer: string, user: AuthenticatedUser) => {
   const permitted = await userCanWriteModelAndSourceSet(modelId, getSourceSetNameFromSource(layer), user);
   if (!permitted) {
-    throw new Error(ERROR_NOT_FOUND_MESSAGE);
+    throw notFound(ERROR_NOT_FOUND_MESSAGE);
   }
   return true;
 };

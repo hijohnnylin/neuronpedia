@@ -43,6 +43,7 @@ import {
   GRAPH_QKTOPK_DEFAULT,
   GRAPH_QKTOPK_MAX,
   GRAPH_QKTOPK_MIN,
+  GraphChatMessage,
   graphGenerateSchemaClient,
   GraphTokenizeResponse,
   LORSA_MAX_TOKENS,
@@ -113,24 +114,65 @@ interface GenerateGraphResponse {
   numLinks: number;
 }
 
-// Helper component to observe Formik values and trigger tokenization
+// these are used for custom UI elements for instruct models
+const GRAPH_INSTRUCT_QWEN = ['qwen3-4b'];
+const GRAPH_INSTRUCT_GEMMA_3 = ['gemma-3-4b-it'];
+const SLOWER_MODELS = ['gemma-3-4b-it', 'qwen3-1.7b'];
+
+const isInstructModel = (id: string) => GRAPH_INSTRUCT_QWEN.includes(id) || GRAPH_INSTRUCT_GEMMA_3.includes(id);
+
+// The chat turns to send to the graph server, or null when this isn't a chat.
+//
+// A trailing EMPTY assistant turn is deliberate and must survive: it leaves the
+// model's turn open, which is what makes the graph show how the model answers.
+// Drop it and the prompt ends on the user's turn, so the graph shows the model
+// predicting what the user says next instead. Blank turns anywhere else are just
+// half-finished edits.
+const messagesToSend = (modelId: string, chatPrompts: ChatMessage[]): ChatMessage[] | null => {
+  if (!isInstructModel(modelId) || chatPrompts.length === 0) {
+    return null;
+  }
+  const lastIndex = chatPrompts.length - 1;
+  const kept = chatPrompts.filter((m, i) => m.content.trim().length > 0 || (i === lastIndex && m.role === 'assistant'));
+  // An open turn is only meaningful after something to continue from, so a chat
+  // the user hasn't typed anything into yet is still "nothing to send".
+  return kept.some((m) => m.content.trim().length > 0) ? kept : null;
+};
+
+// Helper component to observe Formik values and trigger tokenization. For
+// instruct models it passes structured `messages` (the graph server renders the
+// chat template); otherwise it passes the raw `prompt` string.
 const FormikValuesObserver: React.FC<{
   prompt: string;
   modelId: string;
   sourceSetName: string;
   maxNLogits: number;
   desiredLogitProb: number;
-  debouncedTokenize: (
-    modelId: string,
-    prompt: string,
-    sourceSetName: string,
-    maxNLogits: number,
-    desiredLogitProb: number,
-  ) => void;
-}> = ({ prompt, modelId, sourceSetName, maxNLogits, desiredLogitProb, debouncedTokenize }) => {
+  messages: GraphChatMessage[] | null;
+  // Set while we still don't know what to tokenize (see `awaitingPromptParse`).
+  paused: boolean;
+  debouncedTokenize: _.DebouncedFunc<
+    (
+      modelId: string,
+      prompt: string,
+      sourceSetName: string,
+      maxNLogits: number,
+      desiredLogitProb: number,
+      messages: GraphChatMessage[] | null,
+    ) => void
+  >;
+}> = ({ prompt, modelId, sourceSetName, maxNLogits, desiredLogitProb, messages, paused, debouncedTokenize }) => {
+  const messagesKey = messages ? JSON.stringify(messages) : '';
   useEffect(() => {
-    debouncedTokenize(modelId, prompt, sourceSetName, maxNLogits, desiredLogitProb);
-  }, [prompt, modelId, maxNLogits, desiredLogitProb, debouncedTokenize]);
+    if (paused) {
+      // Also drop anything already queued against the pre-parse prompt.
+      debouncedTokenize.cancel();
+      return;
+    }
+    debouncedTokenize(modelId, prompt, sourceSetName, maxNLogits, desiredLogitProb, messages);
+    // messagesKey stands in for `messages` (stable string) in the dep list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prompt, modelId, maxNLogits, desiredLogitProb, messagesKey, paused, debouncedTokenize]);
 
   return null;
 };
@@ -166,6 +208,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [chatPrompts, setChatPrompts] = useState<ChatMessage[]>([]);
   const [tokenizeError, setTokenizeError] = useState<string | null>(null);
+  const [parsedChatKey, setParsedChatKey] = useState<string | null>(null);
 
   const session = useSession();
   const { setSignInModalOpen, getHasGraphsSourceSetsForModelId } = useGlobalContext();
@@ -191,128 +234,88 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     slug: '',
   };
 
-  // these are used for custom UI elements for instruct models
-  const GRAPH_INSTRUCT_QWEN = ['qwen3-4b'];
-  const GRAPH_INSTRUCT_GEMMA_3 = ['gemma-3-4b-it'];
-  const SLOWER_MODELS = ['gemma-3-4b-it', 'qwen3-1.7b'];
+  // Identifies the parse below, so a render can tell whether `chatPrompts` is
+  // already caught up with the prompt Remix seeded. Null when there's nothing to
+  // parse (a from-scratch graph starts with an empty prompt).
+  const chatParseKey =
+    generateGraphModalPrompt && selectedModelId
+      ? JSON.stringify([selectedModelId, selectedSourceSetName ?? '', generateGraphModalPrompt])
+      : null;
 
-  const convertPromptToChatPromptsQwen = (prompt: string): ChatMessage[] => {
-    const prompts: ChatMessage[] = [];
+  // The parse rewrites what we'd tokenize either way, so tokenizing before it
+  // lands means two requests for one answer: on a chat model we send the turns
+  // it recovers rather than the rendered string, and on a base model we adopt
+  // the BOS-stripped prompt it echoes back. Only ever true for a Remix seed —
+  // a from-scratch graph has no prompt to parse, so typing isn't held up.
+  const awaitingPromptParse = chatParseKey !== null && chatParseKey !== parsedChatKey;
 
-    // Split by the start tokens to find each message
-    const parts = prompt.split(/<\|im_start\|>/);
-
-    for (let i = 1; i < parts.length; i += 1) {
-      // Skip first empty part
-      const part = parts[i];
-
-      // Find the role and content
-      const lines = part.split('\n');
-      if (lines.length < 2) {
-        continue;
-      }
-
-      const role = lines[0].trim();
-      const contentLines = lines.slice(1);
-
-      // Remove <|im_end|> if present at the end
-      let content = contentLines.join('\n');
-      if (content.endsWith('<|im_end|>')) {
-        content = content.slice(0, -10); // Remove '<|im_end|>'
-      }
-
-      if (role === 'system' || role === 'user' || role === 'assistant') {
-        prompts.push({
-          role: role as ChatMessage['role'],
-          content: content.trim(),
-        });
-      }
-    }
-
-    return prompts;
-  };
-
-  // Gemma 3 format: <bos><start_of_turn>user\n{content}<end_of_turn>\n<start_of_turn>model\n{content}<end_of_turn>
-  // Note: Gemma 3 does NOT have system prompts, and uses "model" instead of "assistant"
-  const convertPromptToChatPromptsGemma3 = (prompt: string): ChatMessage[] => {
-    const prompts: ChatMessage[] = [];
-
-    // Remove <bos> if present at the start
-    let cleanedPrompt = prompt;
-    if (cleanedPrompt.startsWith('<bos>')) {
-      cleanedPrompt = cleanedPrompt.slice(5);
-    }
-
-    // Split by <start_of_turn> to find each message
-    const parts = cleanedPrompt.split(/<start_of_turn>/);
-
-    for (let i = 1; i < parts.length; i += 1) {
-      // Skip first empty part
-      const part = parts[i];
-
-      // Find the role and content
-      const lines = part.split('\n');
-      if (lines.length < 2) {
-        continue;
-      }
-
-      const role = lines[0].trim();
-      const contentLines = lines.slice(1);
-
-      // Remove <end_of_turn> if present at the end
-      let content = contentLines.join('\n');
-      if (content.endsWith('<end_of_turn>')) {
-        content = content.slice(0, -13); // Remove '<end_of_turn>'
-      }
-      // Also handle trailing newline after <end_of_turn>
-      content = content.replace(/<end_of_turn>\n?$/, '');
-
-      // Gemma 3 uses "model" for assistant role
-      if (role === 'user') {
-        prompts.push({
-          role: 'user',
-          content: content.trim(),
-        });
-      } else if (role === 'model') {
-        prompts.push({
-          role: 'assistant',
-          content: content.trim(),
-        });
-      }
-    }
-
-    return prompts;
-  };
-
+  // Remix flow: an existing graph's stored prompt is an already-rendered template
+  // string, so it has to be turned back into editable chat turns. The graph
+  // server does that against the model's own chat template, which is why no
+  // per-family token knowledge lives here. A base model (or a plain-text prompt)
+  // comes back as `messages: null`, leaving the raw prompt field in charge — but
+  // still with the BOS-stripped string, which is the other half of the same job.
   useEffect(() => {
-    if (generateGraphModalPrompt) {
-      let prompts: ChatMessage[] = [];
-      if (GRAPH_INSTRUCT_QWEN.includes(selectedModelId)) {
-        prompts = convertPromptToChatPromptsQwen(generateGraphModalPrompt);
-      } else if (GRAPH_INSTRUCT_GEMMA_3.includes(selectedModelId)) {
-        prompts = convertPromptToChatPromptsGemma3(generateGraphModalPrompt);
-      }
-      setChatPrompts(prompts);
-    } else {
+    if (!generateGraphModalPrompt || !selectedModelId) {
       setChatPrompts([]);
+      return undefined;
     }
-  }, [generateGraphModalPrompt]);
-
-  const isInstructAndDoesntStartWithSpecialToken = (modelId: string, prompt: string) => {
-    if (GRAPH_INSTRUCT_GEMMA_3.includes(modelId)) {
-      return !prompt.startsWith('<bos>') && !prompt.startsWith('<start_of_turn>');
-    }
-    if (GRAPH_INSTRUCT_QWEN.includes(modelId)) {
-      return !prompt.startsWith('<|im_start|>');
-    }
-    return false;
-  };
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch('/api/graph/parse-chat-prompt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: generateGraphModalPrompt,
+            modelId: selectedModelId,
+            sourceSetName: selectedSourceSetName || undefined,
+          }),
+        });
+        if (cancelled) return;
+        if (!response.ok) {
+          setChatPrompts([]);
+          return;
+        }
+        const json = await response.json();
+        if (cancelled) return;
+        setChatPrompts(Array.isArray(json.messages) ? (json.messages as ChatMessage[]) : []);
+        // On a base model the raw textarea IS the prompt, and Remix seeded it
+        // with the stored string, BOS and all. The server echoes that string
+        // back stripped against the model's own tokenizer, so adopt it — unless
+        // the user got a keystroke in first, in which case their edit wins.
+        if (
+          !isInstructModel(selectedModelId) &&
+          typeof json.prompt === 'string' &&
+          formikRef.current?.values.prompt === generateGraphModalPrompt
+        ) {
+          formikRef.current.setFieldValue('prompt', json.prompt);
+        }
+      } catch {
+        if (!cancelled) setChatPrompts([]);
+      } finally {
+        // Every outcome, including a failed parse, releases the tokenize hold.
+        if (!cancelled) setParsedChatKey(chatParseKey);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [generateGraphModalPrompt, selectedModelId, selectedSourceSetName, chatParseKey]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedTokenize = useCallback(
     _.debounce(
-      async (modelId: string, prompt: string, sourceSetName: string, maxNLogits: number, desiredLogitProb: number) => {
-        if (!prompt.trim() || !modelId) {
+      async (
+        modelId: string,
+        prompt: string,
+        sourceSetName: string,
+        maxNLogits: number,
+        desiredLogitProb: number,
+        messages: GraphChatMessage[] | null,
+      ) => {
+        const hasMessages = !!messages && messages.length > 0;
+        if ((!prompt.trim() && !hasMessages) || !modelId) {
           setGraphTokenizeResponse(null);
           setEstimatedTime(null);
           setTokenizeError(null);
@@ -327,7 +330,9 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               modelId,
-              prompt,
+              // Instruct models send structured messages (server templates);
+              // base models send the raw prompt string.
+              ...(hasMessages ? { messages } : { prompt }),
               sourceSetName,
               maxNLogits,
               desiredLogitProb,
@@ -347,12 +352,10 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
             }
             throw new Error(errorMessage);
           }
-          if (prompt.endsWith(' ')) {
-            setEndsWithSpace(true);
-          } else {
-            setEndsWithSpace(false);
-          }
           const data = (await response.json()) as GraphTokenizeResponse;
+          // Use the server-rendered prompt for the trailing-space check (for
+          // instruct models the frontend no longer has the rendered string).
+          setEndsWithSpace((data.prompt ?? prompt).endsWith(' '));
           setGraphTokenizeResponse(data);
           if (data.input_tokens) {
             setEstimatedTime(
@@ -425,12 +428,18 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     url.searchParams.delete('generate');
     window.history.replaceState({}, '', url.toString());
 
+    // Instruct models send structured chat turns; the graph server renders the
+    // prompt string via the model's real chat template. `values.prompt` is a
+    // plain-text mirror kept only for validation and is ignored server-side.
+    const submitMessages = messagesToSend(values.modelId, chatPrompts);
+
     try {
       const response = await fetch('/api/graph/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...values,
+          ...(submitMessages ? { messages: submitMessages } : {}),
         }),
       });
 
@@ -500,62 +509,20 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
     setIsGenerateGraphModalOpen(open);
   };
 
-  // Convert chat prompts to model-specific formatted string and update values.prompt
+  // Mirror the chat turns into the hidden Formik `prompt` field as a PLAIN
+  // concatenation of message contents (no chat-template tokens). This only
+  // satisfies the required/char-length validation and gives a stable value for
+  // the tokenize observer to react to — the actual chat template is rendered
+  // server-side from the structured `messages` we send, so this string is
+  // ignored by the backend.
+  //
+  // Only chat mode owns the field. On a base model it IS the visible textarea,
+  // so mirroring an empty turn list into it would wipe whatever seeded it —
+  // which is what Remix does, moments before the parse resolves with no turns.
   useEffect(() => {
-    if (chatPrompts.length === 0) {
-      if (formikRef.current) {
-        formikRef.current.setFieldValue('prompt', '');
-      }
-      return;
-    }
-
-    const formatChatToQwen3 = (messages: ChatMessage[]): string => {
-      let formatted = '';
-      for (let i = 0; i < messages.length; i += 1) {
-        const message = messages[i];
-        const isLast = i === messages.length - 1;
-
-        if (message.role === 'system') {
-          formatted += `<|im_start|>system\n${message.content}${isLast ? '' : '<|im_end|>\n'}`;
-        } else if (message.role === 'user') {
-          formatted += `<|im_start|>user\n${message.content}${isLast ? '' : '<|im_end|>\n'}`;
-        } else if (message.role === 'assistant') {
-          formatted += `<|im_start|>assistant\n${message.content}${isLast ? '' : '<|im_end|>\n'}`;
-        }
-      }
-      return formatted;
-    };
-
-    // Gemma 3 format: <bos><start_of_turn>user\n{content}<end_of_turn>\n<start_of_turn>model\n{content}
-    // Note: Gemma 3 does NOT have system prompts, uses "model" instead of "assistant"
-    const formatChatToGemma3 = (messages: ChatMessage[]): string => {
-      // no need to start with BOS, the backend adds it automatically
-      let formatted = '';
-      for (let i = 0; i < messages.length; i += 1) {
-        const message = messages[i];
-        const isLast = i === messages.length - 1;
-
-        if (message.role === 'user') {
-          formatted += `<start_of_turn>user\n${message.content}${isLast ? '' : '<end_of_turn>\n'}`;
-        } else if (message.role === 'assistant') {
-          // Gemma 3 uses "model" for assistant messages
-          formatted += `<start_of_turn>model\n${message.content}${isLast ? '' : '<end_of_turn>\n'}`;
-        }
-      }
-      return formatted;
-    };
-
-    const currentModelId = formikRef.current?.values.modelId || '';
-    let formattedPrompt = '';
-    if (GRAPH_INSTRUCT_QWEN.includes(currentModelId)) {
-      formattedPrompt = formatChatToQwen3(chatPrompts);
-    } else if (GRAPH_INSTRUCT_GEMMA_3.includes(currentModelId)) {
-      formattedPrompt = formatChatToGemma3(chatPrompts);
-    }
-
-    if (formikRef.current) {
-      formikRef.current.setFieldValue('prompt', formattedPrompt);
-    }
+    if (!formikRef.current || !isInstructModel(formikRef.current.values.modelId)) return;
+    const plain = chatPrompts.length === 0 ? '' : chatPrompts.map((m) => m.content).join('\n');
+    formikRef.current.setFieldValue('prompt', plain);
   }, [chatPrompts]);
 
   return (
@@ -608,6 +575,8 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                   sourceSetName={values.sourceSetName}
                   maxNLogits={values.maxNLogits}
                   desiredLogitProb={values.desiredLogitProb}
+                  messages={messagesToSend(values.modelId, chatPrompts)}
+                  paused={awaitingPromptParse}
                   debouncedTokenize={debouncedTokenize}
                 />
 
@@ -1399,7 +1368,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                           {tokenizeError}
                         </div>
                       )}
-                      {isTokenizing ? (
+                      {isTokenizing || awaitingPromptParse ? (
                         <div className="mt-1.5 flex w-full flex-row items-center justify-start gap-x-0.5 pb-2 text-xs text-sky-700">
                           <LoadingSquare className="mr-1 h-5 w-5" size={20} />
                           <div className="flex items-center justify-start">Tokenizing...</div>
@@ -1510,7 +1479,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
                             {LORSA_MODELS.includes(values.modelId) ? LORSA_MAX_TOKENS : GRAPH_MAX_TOKENS}.
                           </p>
                         )}
-                      {isInstructAndDoesntStartWithSpecialToken(values.modelId, values.prompt) && (
+                      {isInstructModel(values.modelId) && chatPrompts.length === 0 && !awaitingPromptParse && (
                         <div className="mb-1.5 mt-0 text-xs text-amber-600">
                           {GRAPH_INSTRUCT_QWEN.includes(values.modelId) ? (
                             <>Click &quot;+ System&quot; or &quot;+ User&quot; to start creating a chat.</>

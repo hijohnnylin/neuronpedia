@@ -1,25 +1,8 @@
+import type { NeuronConnectionsResponse, TraceNode } from '@/lib/api/sparsity-types';
 import { prisma } from '@/lib/db';
 import { SPARSITY_SERVER, SPARSITY_SERVER_SECRET, USE_LOCALHOST_SPARSITY } from '@/lib/env';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
-
-// Types matching the sparsity server response
-type TraceNode = {
-  layer: number;
-  neuron: number;
-  read_weight: number;
-  via_channel: number;
-  write_weight: number;
-  children?: TraceNode[] | null;
-  parents?: TraceNode[] | null;
-};
-
-type SparsityResponse = {
-  layer: number;
-  neuron: number;
-  trace_forward: TraceNode[];
-  trace_backward: TraceNode[];
-};
 
 // Explanation type for the response
 type ExplanationInfo = {
@@ -321,7 +304,7 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
       );
     }
 
-    const sparsityData: SparsityResponse = await sparsityResponse.json();
+    const sparsityData: NeuronConnectionsResponse = await sparsityResponse.json();
 
     // Extract all neurons from trace data
     const allNeurons = extractAllNeurons(sparsityData.trace_forward, sparsityData.trace_backward);

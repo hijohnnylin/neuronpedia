@@ -1,6 +1,6 @@
+import { ActivationAllResponse, ActivationTopkByTokenResponse } from '@/lib/api/inference-types';
 import { prisma } from '@/lib/db';
 import { Neuron } from '@prisma/client';
-import { ActivationAllPost200Response, ActivationTopkByTokenPost200Response } from 'neuronpedia-inference-client';
 import { NeuronWithPartialRelations } from 'prisma/generated/zod';
 import { PUBLIC_ACTIVATIONS_USER_IDS } from '../env';
 import { EXPLANATIONTYPE_HUMAN } from '../utils/autointerp';
@@ -344,7 +344,7 @@ export const deleteNeuron = async (modelId: string, layer: string, index: string
 export const getNeuronsForSearcher = async (
   modelId: string,
   sourceSet: string,
-  result: ActivationAllPost200Response,
+  result: ActivationAllResponse,
   user: AuthenticatedUser | null = null,
 ) => {
   // we already checked at /search-all, but check here again anyway in case someone tries to use this method directly
@@ -390,7 +390,7 @@ export const getNeuronsForSearcher = async (
 export const getNeuronsForTopkSearcherExplanationOnly = async (
   modelId: string,
   source: string,
-  result: ActivationTopkByTokenPost200Response,
+  result: ActivationTopkByTokenResponse,
   user: AuthenticatedUser | null = null,
 ) => {
   // we already checked at /search-all, but check here again anyway in case someone tries to use this method directly

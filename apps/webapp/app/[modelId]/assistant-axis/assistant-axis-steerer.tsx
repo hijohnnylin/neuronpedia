@@ -2,6 +2,7 @@
 
 import { SteerResultChat } from '@/app/api/steer-chat/route';
 import { useGlobalContext } from '@/components/provider/global-provider';
+import { NPSteerMethod, SteerAssistantAxis } from '@/lib/api/inference-types';
 import { useIsMount } from '@/lib/hooks/use-is-mount';
 import {
   ChatMessage,
@@ -14,13 +15,12 @@ import {
   STEER_TEMPERATURE,
   SteerFeature,
 } from '@/lib/utils/steer';
-import { NPSteerMethod, SteerCompletionChatPost200ResponseAssistantAxisInner } from 'neuronpedia-inference-client';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AssistantAxisChat from './assistant-axis-chat';
 import { ChartData, buildChartData, combineChartData } from './persona-chart';
 
-type PersonaCheckResult = SteerCompletionChatPost200ResponseAssistantAxisInner;
+type PersonaCheckResult = SteerAssistantAxis;
 
 const PERSONA_MODELS = ['llama3.3-70b-it'];
 

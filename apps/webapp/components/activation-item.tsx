@@ -19,15 +19,6 @@ const DFA_SOURCE_TOKEN_CLASSNAME = 'border-2 border-emerald-400';
 const REGULAR_TOKEN_CLASSNAME = 'border-2 border-transparent hover:bg-slate-200';
 export const CENTER_ME_CLASSNAME = 'center-me';
 
-// TODO: support more types
-const START_TOKEN = ['<|start|>', '<|begin_of_text|>', '<|start_header_id|>', '<start_of_turn>', '<|im_start|>'];
-const END_TOKEN = ['<|end|>', '<|eot_id|>', '<|im_end|>', '<end_of_turn>'];
-const MESSAGE_TOKEN = ['<|message|>', '<|end_header_id|>'];
-const CHANNEL_TOKEN = '<|channel|>';
-const BOS_TOKEN = ['<bos>'];
-
-const CHAT_ROLE_NAMES = ['system', 'user', 'assistant'];
-
 const BOTTOM_ACTIVATION_DATA_SOURCE = 'bottom';
 
 export default function ActivationItem({
@@ -49,7 +40,6 @@ export default function ActivationItem({
   overrideLeading = 'leading-none sm:leading-tight',
   overrideTextColor = 'text-slate-600',
   className,
-  showRawTokens = true,
 }: {
   activation: ActivationPartialWithRelations;
   overallMaxActivationValueInList?: number;
@@ -66,7 +56,6 @@ export default function ActivationItem({
   overrideLeading?: string;
   overrideTextColor?: string;
   className?: string;
-  showRawTokens?: boolean;
 }) {
   const [currentRange, setCurrentRange] = useState(tokensToDisplayAroundMaxActToken);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -90,8 +79,6 @@ export default function ActivationItem({
 
   // For bottom activations, center around the most negative value; otherwise center around max
   const anchorTokenIndex = isBottomActivation ? minActivationTokenIndex : maxActivationTokenIndex;
-
-  const hasImStartToken = activation.tokens?.some((t) => t === '<|im_start|>') || false;
 
   let firstTokenShown = -1;
 
@@ -147,45 +134,6 @@ export default function ActivationItem({
     return tokenIndex > maxIndex - currentRange && tokenIndex < maxIndex + currentRange;
   }
 
-  function hasNextToken(tokenIndex: number) {
-    return tokenIndex < (activation.tokens?.length || 0) - 1;
-  }
-
-  function nextTokenIsMessageEndOrChannelToken(tokenIndex: number) {
-    return (
-      hasNextToken(tokenIndex) &&
-      (MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
-        END_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || ''))
-    );
-  }
-
-  function tokenIsRoleToken(tokenIndex: number) {
-    const modelId = activation.modelId || '';
-    const isGemmaInstruct = modelId.startsWith('gemma-2-') || modelId.startsWith('gemma-3-');
-    // Qwen format can start with a bare role name (e.g. "system") without a preceding <|im_start|>
-    if (
-      hasImStartToken &&
-      tokenIndex === 0 &&
-      CHAT_ROLE_NAMES.includes(activation.tokens?.[0] || '') &&
-      activation.tokens?.[1] === '\n'
-    ) {
-      return true;
-    }
-    return (
-      tokenIndex > 0 &&
-      START_TOKEN.includes(activation.tokens?.[tokenIndex - 1] || '') &&
-      (END_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
-        MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex + 1] || '') ||
-        (isGemmaInstruct && activation.tokens?.[tokenIndex + 1] === '\n') ||
-        (hasImStartToken && activation.tokens?.[tokenIndex + 1] === '\n') ||
-        CHANNEL_TOKEN === activation.tokens?.[tokenIndex + 1])
-    );
-  }
-
-  function prevTokenIsChannelToken(tokenIndex: number) {
-    return tokenIndex > 0 && activation.tokens?.[tokenIndex - 1] === CHANNEL_TOKEN;
-  }
-
   function shouldShowToken(tokenIndex: number) {
     if (!activation.tokens) {
       return false;
@@ -212,19 +160,6 @@ export default function ActivationItem({
     }
     if (toReturn === true && firstTokenShown === -1) {
       firstTokenShown = tokenIndex;
-    }
-
-    // if we're not showing raw tokens (eg we should hide special tokens for chat/etc), then hide depending on what token this is and what tokens are around it
-    if (!showRawTokens) {
-      if (
-        START_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
-        END_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
-        MESSAGE_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
-        BOS_TOKEN.includes(activation.tokens?.[tokenIndex] || '') ||
-        activation.tokens?.[tokenIndex] === CHANNEL_TOKEN
-      ) {
-        return false;
-      }
     }
 
     return toReturn;
@@ -270,7 +205,7 @@ export default function ActivationItem({
           dfaSplit === true &&
           currentRange === ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[0].size &&
           'flex w-full flex-row items-center overflow-hidden'
-        } ${!showRawTokens && 'sm:ml-2.5'} ${overrideLeading}`}
+        } ${overrideLeading}`}
         onClick={() => {
           if (enableExpanding) {
             setIsExpanded(!isExpanded);
@@ -311,7 +246,7 @@ export default function ActivationItem({
                                 : activation.lossValues[tokenIndex] < 0
                                   ? 'border-b-blue-400'
                                   : '')
-                            } ${!showRawTokens && tokenIsRoleToken(tokenIndex) && '-ml-2 mr-1 mt-1 rounded bg-slate-300'} ${!showRawTokens && prevTokenIsChannelToken(tokenIndex) && 'mt-1 rounded bg-slate-200'} ${overrideTextColor} ${overrideTextSize} `}
+                            } ${overrideTextColor} ${overrideTextSize} `}
                             style={{
                               backgroundImage: dfaSplit
                                 ? makeActivationBackgroundColorWithDFA(
@@ -338,9 +273,8 @@ export default function ActivationItem({
                           dfaMaxIndex={dfaMaxIndex}
                         />
                       </Tooltip.Root>
-                      {((!showRawTokens && nextTokenIsMessageEndOrChannelToken(tokenIndex)) ||
-                        ((token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
-                          showLineBreaks)) && <br />}
+                      {(token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
+                        showLineBreaks && <br />}
                     </Tooltip.Provider>
                   </span>
                 );
@@ -416,7 +350,7 @@ export default function ActivationItem({
                               : activation.lossValues[tokenIndex] < 0
                                 ? 'border-b-blue-400'
                                 : '')
-                          } ${!showRawTokens && tokenIsRoleToken(tokenIndex) && '-ml-2 mr-1 mt-1 rounded bg-slate-300'} ${!showRawTokens && prevTokenIsChannelToken(tokenIndex) && 'mt-1 rounded bg-slate-200'} ${overrideTextColor} ${overrideTextSize} `}
+                          } ${overrideTextColor} ${overrideTextSize} `}
                           style={{
                             backgroundImage: (() => {
                               const tokenValue = activation.values ? activation.values[tokenIndex] : 0;
@@ -465,9 +399,8 @@ export default function ActivationItem({
                         dfaMaxIndex={dfaMaxIndex}
                       />
                     </Tooltip.Root>
-                    {((!showRawTokens && nextTokenIsMessageEndOrChannelToken(tokenIndex)) ||
-                      ((token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
-                        showLineBreaks)) && <br />}
+                    {(token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
+                      showLineBreaks && <br />}
                   </Tooltip.Provider>
                 </span>
               );

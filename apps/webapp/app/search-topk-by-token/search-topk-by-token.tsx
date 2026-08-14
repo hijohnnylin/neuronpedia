@@ -64,8 +64,8 @@ export default function SearchTopkByToken({
   const [searchQuery, setSearchQuery] = useState<string>(initialText || '');
   const [topkResult, setTopkResult] = useState<SearchTopKResult | undefined>();
   const [topkFeatures, setTopkFeatures] = useState<TopKFeature[] | undefined>(undefined);
-  const [hoveredTokenPosition, setHoveredTokenPosition] = useState<number>(-1);
-  const [lockedTokenPosition, setLockedTokenPosition] = useState<number>(-1);
+  const [hoveredTokenIndex, setHoveredTokenIndex] = useState<number>(-1);
+  const [lockedTokenIndex, setLockedTokenIndex] = useState<number>(-1);
   const [hoveredNeuronIndex, setHoveredNeuronIndex] = useState<number>(-1);
   const [isSearching, setIsSearching] = useState(false);
   const [needsReloadSearch, setNeedsReloadSearch] = useState(false);
@@ -95,8 +95,8 @@ export default function SearchTopkByToken({
     }
     setIsSearching(true);
     setNeedsReloadSearch(false);
-    setLockedTokenPosition(-1);
-    setHoveredTokenPosition(-1);
+    setLockedTokenIndex(-1);
+    setHoveredTokenIndex(-1);
     setSearchQuery(textToUse);
     if (textToUse.length > NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH) {
       alert(
@@ -190,7 +190,7 @@ export default function SearchTopkByToken({
     if (scrollRef.current && windowSize.width && windowSize.width < 640) {
       scrollRef.current.scrollTo(0, 0);
     }
-  }, [topkFeatures, lockedTokenPosition, hoveredTokenPosition]);
+  }, [topkFeatures, lockedTokenIndex, hoveredTokenIndex]);
 
   const sourceSetChangedCallback = (newSourceSet: string) => {
     setSourceSet(newSourceSet);
@@ -529,28 +529,28 @@ export default function SearchTopkByToken({
                   <button
                     type="button"
                     onMouseEnter={() => {
-                      setHoveredTokenPosition(result.position);
+                      setHoveredTokenIndex(i);
                     }}
                     onMouseLeave={() => {
-                      setHoveredTokenPosition(-1);
+                      setHoveredTokenIndex(-1);
                     }}
                     onClick={() => {
-                      if (lockedTokenPosition === result.position) {
-                        setLockedTokenPosition(-1);
+                      if (lockedTokenIndex === i) {
+                        setLockedTokenIndex(-1);
                       } else {
-                        setLockedTokenPosition(i);
+                        setLockedTokenIndex(i);
                       }
                     }}
                     key={result.position}
                     style={{
                       backgroundColor:
-                        lockedTokenPosition === result.position
+                        lockedTokenIndex === i
                           ? 'rgba(2,132,199,1)'
-                          : hoveredTokenPosition === result.position
+                          : hoveredTokenIndex === i
                             ? 'rgba(2,132,199, 0.5)'
                             : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
                               ? 'rgba(2,132,199, 0.5)'
-                              : lockedTokenPosition === -1 && hoveredTokenPosition === -1 && hoveredNeuronIndex === -1
+                              : lockedTokenIndex === -1 && hoveredTokenIndex === -1 && hoveredNeuronIndex === -1
                                 ? `rgba(2,132,199,${
                                     result.topFeatures && result.topFeatures.length > 0
                                       ? Math.min((result.topFeatures[0].activationValue / maxAct) ** 2, 0.8)
@@ -558,14 +558,14 @@ export default function SearchTopkByToken({
                                   })`
                                 : 'rgba(0,0,0,0)',
                       borderColor:
-                        lockedTokenPosition === result.position
+                        lockedTokenIndex === i
                           ? 'rgba(2,132,199,1)'
-                          : hoveredTokenPosition === result.position
+                          : hoveredTokenIndex === i
                             ? 'rgba(2,132,199, 0.5)'
                             : 'rgba(2,132,199, 0.25',
                     }}
                     className={`mb-[2px] inline-block cursor-pointer select-none rounded border px-[5px] py-[1px] text-sm font-normal text-slate-800 transition-all sm:mb-1 ${
-                      lockedTokenPosition === result.position
+                      lockedTokenIndex === i
                         ? 'text-white'
                         : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
                           ? ''
@@ -582,7 +582,7 @@ export default function SearchTopkByToken({
           {topkResult && !isSearching && (
             <div className="flex w-full flex-1 flex-col items-center justify-center sm:h-full sm:max-h-full">
               <div className="mt-0 flex w-full flex-col gap-y-2 pb-24 sm:h-full sm:max-h-full sm:overflow-y-scroll">
-                {lockedTokenPosition === -1 && hoveredTokenPosition === -1
+                {lockedTokenIndex === -1 && hoveredTokenIndex === -1
                   ? topkFeatures?.map((f, i) => (
                       <button
                         key={i}
@@ -624,35 +624,35 @@ export default function SearchTopkByToken({
                         </div>
                       </button>
                     ))
-                  : topkResult.results[
-                      lockedTokenPosition > -1 ? lockedTokenPosition : hoveredTokenPosition
-                    ].topFeatures.map((f, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => {
-                          setFeatureModalFeature(f.feature as NeuronWithPartialRelations);
-                          setFeatureModalOpen(true);
-                        }}
-                        className="group relative flex w-full flex-row items-center justify-center gap-x-3 rounded-xl bg-sky-700/5 py-0 pl-5 pr-5 text-sky-800 transition-all hover:bg-sky-700/20 sm:py-2.5"
-                      >
-                        <div className="flex flex-1 flex-col items-start justify-start py-1">
-                          <div className="w-full text-left text-[13px] font-semibold transition-all group-hover:text-sky-700 sm:text-[13px]">
-                            {f.feature &&
-                              f.feature.explanations &&
-                              f.feature.explanations.length > 0 &&
-                              f.feature.explanations[0].description}
+                  : topkResult.results[lockedTokenIndex > -1 ? lockedTokenIndex : hoveredTokenIndex]?.topFeatures.map(
+                      (f, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setFeatureModalFeature(f.feature as NeuronWithPartialRelations);
+                            setFeatureModalOpen(true);
+                          }}
+                          className="group relative flex w-full flex-row items-center justify-center gap-x-3 rounded-xl bg-sky-700/5 py-0 pl-5 pr-5 text-sky-800 transition-all hover:bg-sky-700/20 sm:py-2.5"
+                        >
+                          <div className="flex flex-1 flex-col items-start justify-start py-1">
+                            <div className="w-full text-left text-[13px] font-semibold transition-all group-hover:text-sky-700 sm:text-[13px]">
+                              {f.feature &&
+                                f.feature.explanations &&
+                                f.feature.explanations.length > 0 &&
+                                f.feature.explanations[0].description}
+                            </div>
+                            <span className="mb-0 rounded-md pt-1 text-left text-[10px] font-bold uppercase text-slate-400">
+                              {f.feature?.layer}:{f.feature?.index}
+                            </span>
                           </div>
-                          <span className="mb-0 rounded-md pt-1 text-left text-[10px] font-bold uppercase text-slate-400">
-                            {f.feature?.layer}:{f.feature?.index}
-                          </span>
-                        </div>
-                        <div className="ml-1 flex w-11 flex-col items-center justify-center gap-y-0 overflow-visible py-2 font-mono text-xs font-bold text-slate-600">
-                          {f.activationValue.toFixed(2)}
-                          <div className="font-sans text-[8px] text-slate-400">MAX ACT</div>
-                        </div>
-                      </button>
-                    ))}
+                          <div className="ml-1 flex w-11 flex-col items-center justify-center gap-y-0 overflow-visible py-2 font-mono text-xs font-bold text-slate-600">
+                            {f.activationValue.toFixed(2)}
+                            <div className="font-sans text-[8px] text-slate-400">MAX ACT</div>
+                          </div>
+                        </button>
+                      ),
+                    )}
               </div>
             </div>
           )}

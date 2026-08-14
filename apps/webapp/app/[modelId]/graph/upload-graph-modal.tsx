@@ -229,7 +229,7 @@ export default function UploadGraphModal() {
               </a>
               . There are also notebooks for{' '}
               <a
-                href="https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/upload_graph.ipynb"
+                href="https://github.com/hijohnnylin/neuronpedia/blob/main/webapp-python-client/neuronpedia/examples/upload_graph.ipynb"
                 target="_blank"
                 rel="noreferrer"
                 className="text-sky-600 hover:underline"
@@ -238,7 +238,7 @@ export default function UploadGraphModal() {
               </a>{' '}
               and{' '}
               <a
-                href="https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/upload_features.ipynb"
+                href="https://github.com/hijohnnylin/neuronpedia/blob/main/webapp-python-client/neuronpedia/examples/upload_features.ipynb"
                 target="_blank"
                 rel="noreferrer"
                 className="text-sky-600 hover:underline"
@@ -313,7 +313,7 @@ export default function UploadGraphModal() {
                       </Button>
                     </a>
                     <a
-                      href="https://github.com/hijohnnylin/neuronpedia/blob/main/packages/python/neuronpedia-webapp-client/neuronpedia/examples/new-model.ipynb"
+                      href="https://github.com/hijohnnylin/neuronpedia/blob/main/webapp-python-client/neuronpedia/examples/new-model.ipynb"
                       target="_blank"
                       rel="noreferrer"
                       className="block"

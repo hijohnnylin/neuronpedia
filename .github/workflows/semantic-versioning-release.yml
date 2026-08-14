@@ -6,11 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: "Release type (major, minor, patch)"
+        description: "Release type (auto detects from commit messages)"
         required: true
-        default: "patch"
+        default: "auto"
         type: choice
         options:
+          - auto
           - major
           - minor
           - patch
@@ -38,22 +39,59 @@ jobs:
       - name: Get latest version from tags
         id: get_version
         run: |
-          # Get the latest tag or default to v1.0.0 if none exist
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
-          # Remove 'v' prefix
-          VERSION=${LATEST_TAG#v}
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            # No tags yet: start from 1.0.0 and consider the whole history
+            VERSION="1.0.0"
+            RANGE="HEAD"
+          else
+            VERSION=${LATEST_TAG#v}
+            RANGE="${LATEST_TAG}..HEAD"
+          fi
+          echo "Latest tag: ${LATEST_TAG:-(none)} / commit range: $RANGE"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "range=$RANGE" >> $GITHUB_OUTPUT
 
       - name: Determine release type
         id: release_type
+        env:
+          REQUESTED_TYPE: ${{ github.event.inputs.release_type }}
+          RANGE: ${{ steps.get_version.outputs.range }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # Use the manually selected release type
-            echo "type=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
-          else
-            # Default to patch for automatic releases on push to main
-            echo "type=patch" >> $GITHUB_OUTPUT
+          # A manual dispatch can force a specific bump, bypassing commit parsing
+          if [ -n "$REQUESTED_TYPE" ] && [ "$REQUESTED_TYPE" != "auto" ]; then
+            echo "Release type forced by workflow_dispatch: $REQUESTED_TYPE"
+            echo "type=$REQUESTED_TYPE" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          # Scan every commit added since the last tag and keep the highest bump.
+          # Anything unrecognized falls through to patch, so untagged commit
+          # styles keep releasing exactly as they did before.
+          TYPE="patch"
+          for SHA in $(git log --format=%H "$RANGE"); do
+            SUBJECT=$(git log -1 --format=%s "$SHA")
+            BODY=$(git log -1 --format=%b "$SHA")
+
+            # major: [major], a conventional-commit "!" marker, or a BREAKING CHANGE footer
+            if printf '%s\n%s' "$SUBJECT" "$BODY" | grep -Eiq '\[major\]' \
+              || printf '%s' "$SUBJECT" | grep -Eq '^[a-zA-Z]+(\([^)]*\))?!:' \
+              || printf '%s' "$BODY" | grep -Eq '^BREAKING[ -]CHANGE:'; then
+              echo "major <- $SHA $SUBJECT"
+              TYPE="major"
+              break
+            fi
+
+            # minor: [minor] or a feat: commit
+            if printf '%s\n%s' "$SUBJECT" "$BODY" | grep -Eiq '\[minor\]' \
+              || printf '%s' "$SUBJECT" | grep -Eq '^feat(\([^)]*\))?:'; then
+              echo "minor <- $SHA $SUBJECT"
+              TYPE="minor"
+            fi
+          done
+
+          echo "Detected release type: $TYPE"
+          echo "type=$TYPE" >> $GITHUB_OUTPUT
 
       - name: Bump version
         id: bump_version
@@ -79,13 +117,17 @@ jobs:
           git push origin "v${{ steps.bump_version.outputs.new_version }}"
 
       - name: Generate release notes with commits
+        env:
+          RANGE: ${{ steps.get_version.outputs.range }}
+          RELEASE_TYPE: ${{ steps.release_type.outputs.type }}
         run: |
-          # Get the previous tag or go back to the beginning if no tags exist
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo $(git rev-list --max-parents=0 HEAD))
-
-          # Generate release notes directly to a file
-          echo "## Commits in this release" > release_notes.md
-          git log ${PREV_TAG}..HEAD --pretty=format:"* %h - %s (%an)" >> release_notes.md
+          echo "## Commits in this release (${RELEASE_TYPE})" > release_notes.md
+          if [ -n "$(git log "$RANGE" --oneline)" ]; then
+            git log "$RANGE" --pretty=format:"* %h - %s (%an)" >> release_notes.md
+          else
+            # Possible on a manual dispatch with no new commits since the last tag
+            echo "* No new commits since the previous release." >> release_notes.md
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1

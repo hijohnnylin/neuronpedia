@@ -15,6 +15,7 @@ import FeatureTooltip from './feature-tooltip';
 
 const SEARCHER_TOPK_MAX_CHAR_LENGTH = 250;
 const DOGS_INDEX = 14838;
+const TOO_HIGH_ACTIVATION = 8573;
 
 export default function TabMicroscope({
   modelId,
@@ -35,8 +36,8 @@ export default function TabMicroscope({
     frequency: number;
   };
   const [topkFeatures, setTopkFeatures] = useState<TopKFeature[] | undefined>(undefined);
-  const [hoveredTokenPosition, setHoveredTokenPosition] = useState<number>(-1);
-  const [lockedTokenPosition, setLockedTokenPosition] = useState<number>(-1);
+  const [hoveredTokenIndex, setHoveredTokenIndex] = useState<number>(-1);
+  const [lockedTokenIndex, setLockedTokenIndex] = useState<number>(-1);
   const [hoveredNeuronIndex, setHoveredNeuronIndex] = useState<number>(-1);
   const formRef = useRef<
     FormikProps<{
@@ -53,8 +54,8 @@ export default function TabMicroscope({
 
   async function searchClicked(overrideText?: string) {
     setIsSearching(true);
-    setLockedTokenPosition(-1);
-    setHoveredTokenPosition(-1);
+    setLockedTokenIndex(-1);
+    setHoveredTokenIndex(-1);
     setSearchQuery(overrideText || formRef.current?.values.searchQuery || '');
     const result = await fetch(`/api/search-topk-by-token`, {
       method: 'POST',
@@ -75,7 +76,7 @@ export default function TabMicroscope({
       // filter out boring indexes and ones with act desnsity > 1%
       resultData.results = resultData.results.map((resultDataResult) => {
         resultDataResult.topFeatures = resultDataResult.topFeatures.filter(
-          (feature) => feature.feature?.frac_nonzero !== undefined,
+          (feature) => feature.feature?.frac_nonzero !== undefined && feature.featureIndex !== TOO_HIGH_ACTIVATION,
         );
         return resultDataResult;
       });
@@ -116,9 +117,6 @@ export default function TabMicroscope({
       let toSet: TopKFeature[] = [];
       topkResult.results.forEach((result) => {
         result.topFeatures.forEach((feature) => {
-          if (result.token === '<bos>' || result.token === '<eos>') {
-            return;
-          }
           toSet.push({
             feature: feature.feature as NeuronWithPartialRelations,
             activation_value: feature.activationValue,
@@ -360,39 +358,34 @@ export default function TabMicroscope({
                     </div>
                     <div className="flex flex-row flex-wrap items-start justify-start gap-x-1">
                       {topkResult.results &&
-                        topkResult.results.map((result, i) => {
-                          if (result.token === '<bos>' || result.token === '<eos>') {
-                            return <div key={i} className="hidden" />;
-                          }
-                          return (
-                            <button
-                              type="button"
-                              onMouseEnter={() => {
-                                setHoveredTokenPosition(result.position);
-                              }}
-                              onMouseLeave={() => {
-                                setHoveredTokenPosition(-1);
-                              }}
-                              onClick={() => {
-                                if (lockedTokenPosition === result.position) {
-                                  setLockedTokenPosition(-1);
-                                } else {
-                                  setLockedTokenPosition(i);
-                                }
-                              }}
-                              key={result.position}
-                              className={`mb-1 inline-block cursor-pointer select-none rounded font-mono text-xs transition-all sm:text-sm ${
-                                lockedTokenPosition === result.position
-                                  ? 'bg-emerald-600 text-white'
-                                  : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
-                                    ? 'bg-emerald-200'
-                                    : 'bg-slate-100 hover:bg-emerald-200 hover:text-emerald-700'
-                              } ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
-                            >
-                              {result.token.trim().length === 0 ? ' ' : result.token}
-                            </button>
-                          );
-                        })}
+                        topkResult.results.map((result, i) => (
+                          <button
+                            type="button"
+                            onMouseEnter={() => {
+                              setHoveredTokenIndex(i);
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredTokenIndex(-1);
+                            }}
+                            onClick={() => {
+                              if (lockedTokenIndex === i) {
+                                setLockedTokenIndex(-1);
+                              } else {
+                                setLockedTokenIndex(i);
+                              }
+                            }}
+                            key={result.position}
+                            className={`mb-1 inline-block cursor-pointer select-none rounded font-mono text-xs transition-all sm:text-sm ${
+                              lockedTokenIndex === i
+                                ? 'bg-emerald-600 text-white'
+                                : result.topFeatures.filter((f) => f.featureIndex === hoveredNeuronIndex).length > 0
+                                  ? 'bg-emerald-200'
+                                  : 'bg-slate-100 hover:bg-emerald-200 hover:text-emerald-700'
+                            } ${result.token.endsWith(' ') && result.token.length > 1 ? 'pr-2' : ''} ${result.token.startsWith(' ') && result.token.length > 1 ? 'pl-2' : ''}`}
+                          >
+                            {result.token.trim().length === 0 ? ' ' : result.token}
+                          </button>
+                        ))}
                     </div>
                   </div>
                 )}
@@ -406,7 +399,7 @@ export default function TabMicroscope({
                 )}
                 {topkResult && !isSearching && (
                   <>
-                    {lockedTokenPosition === -1 && hoveredTokenPosition === -1 ? (
+                    {lockedTokenIndex === -1 && hoveredTokenIndex === -1 ? (
                       <div className="flex flex-1 flex-col">
                         <div className="mb-0 flex flex-row items-center justify-between">
                           <div className="flex flex-1 flex-col justify-center">
@@ -499,19 +492,18 @@ export default function TabMicroscope({
                             <span className="rounded bg-emerald-200 px-1 py-0.5 font-mono text-[12px] leading-none text-emerald-700">
                               {`${
                                 topkResult.results[
-                                  lockedTokenPosition > -1 ? lockedTokenPosition : hoveredTokenPosition
-                                ].token.trim().length === 0
+                                  lockedTokenIndex > -1 ? lockedTokenIndex : hoveredTokenIndex
+                                ]?.token.trim().length === 0
                                   ? ' '
-                                  : topkResult.results[
-                                      lockedTokenPosition > -1 ? lockedTokenPosition : hoveredTokenPosition
-                                    ].token
+                                  : topkResult.results[lockedTokenIndex > -1 ? lockedTokenIndex : hoveredTokenIndex]
+                                      ?.token
                               }`}
                             </span>
-                            {lockedTokenPosition > -1 && (
+                            {lockedTokenIndex > -1 && (
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setLockedTokenPosition(-1);
+                                  setLockedTokenIndex(-1);
                                 }}
                                 className="flex cursor-pointer flex-row items-center justify-center gap-x-0.5 text-[8px] font-bold uppercase leading-none text-red-400 hover:text-red-600"
                               >
@@ -523,8 +515,8 @@ export default function TabMicroscope({
                         </div>
                         <div className="flex h-[280px] max-h-[280px] w-full flex-col gap-y-1 overflow-y-scroll">
                           {topkResult.results[
-                            lockedTokenPosition > -1 ? lockedTokenPosition : hoveredTokenPosition
-                          ].topFeatures.map((f, i) => (
+                            lockedTokenIndex > -1 ? lockedTokenIndex : hoveredTokenIndex
+                          ]?.topFeatures.map((f, i) => (
                             <div
                               key={i}
                               className="group relative flex w-full cursor-default flex-row items-center justify-center gap-x-3 rounded-xl bg-emerald-100 py-1 pl-5 pr-3 text-emerald-800 transition-all hover:bg-emerald-200"

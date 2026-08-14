@@ -53,17 +53,8 @@ function formatChipToken(raw: string | undefined) {
   return text;
 }
 
-const START_TOKEN = ['<|start|>', '<|begin_of_text|>', '<|start_header_id|>', '<start_of_turn>', '<|im_start|>'];
-const END_TOKEN = ['<|end|>', '<|eot_id|>', '<|im_end|>', '<end_of_turn>'];
-const MESSAGE_TOKEN = ['<|message|>', '<|end_header_id|>'];
-const CHANNEL_TOKEN = '<|channel|>';
-const BOS_TOKEN = ['<bos>'];
-
-const CHAT_ROLE_NAMES = ['system', 'user', 'assistant'];
-
 export default function HeadActivationItem({
   sequence,
-  modelId,
   overallMaxActivationValueInList = sequence.maxActivation,
   tokensToDisplayAroundMaxActToken = 10000,
   showLineBreaks = false,
@@ -72,12 +63,10 @@ export default function HeadActivationItem({
   overrideLeading = 'leading-none sm:leading-none ',
   overrideTextColor = 'text-slate-700',
   className,
-  showRawTokens = true,
   maxAttentionMode = 'all',
   onCopyRemix,
 }: {
   sequence: HeadSequenceData;
-  modelId?: string;
   overallMaxActivationValueInList?: number;
   tokensToDisplayAroundMaxActToken?: number;
   showLineBreaks?: boolean;
@@ -86,7 +75,6 @@ export default function HeadActivationItem({
   overrideLeading?: string;
   overrideTextColor?: string;
   className?: string;
-  showRawTokens?: boolean;
   maxAttentionMode?: 'all' | 'keys' | 'queries';
   // When provided, renders a Copy/Remix button that hands the row's text (joined
   // tokens, truncated around the max-attention token) back to the parent so it
@@ -304,65 +292,13 @@ export default function HeadActivationItem({
     };
   }, [hoveredTokenIndex, hoveredOutgoing, hoveredIncoming, hoveredOutgoingMax, hoveredIncomingMax, currentRange]);
 
-  const hasImStartToken = sequence.tokens.some((t) => t === '<|im_start|>');
-
   useEffect(() => {
     setCurrentRange(isExpanded ? 10000 : tokensToDisplayAroundMaxActToken);
   }, [isExpanded, tokensToDisplayAroundMaxActToken]);
 
-  function hasNextToken(tokenIndex: number) {
-    return tokenIndex < sequence.tokens.length - 1;
-  }
-
-  function nextTokenIsMessageEndOrChannelToken(tokenIndex: number) {
-    return (
-      hasNextToken(tokenIndex) &&
-      (MESSAGE_TOKEN.includes(sequence.tokens[tokenIndex + 1] || '') ||
-        END_TOKEN.includes(sequence.tokens[tokenIndex + 1] || ''))
-    );
-  }
-
-  function tokenIsRoleToken(tokenIndex: number) {
-    const isGemmaInstruct = (modelId || '').startsWith('gemma-2-') || (modelId || '').startsWith('gemma-3-');
-    if (
-      hasImStartToken &&
-      tokenIndex === 0 &&
-      CHAT_ROLE_NAMES.includes(sequence.tokens[0] || '') &&
-      sequence.tokens[1] === '\n'
-    ) {
-      return true;
-    }
-    return (
-      tokenIndex > 0 &&
-      START_TOKEN.includes(sequence.tokens[tokenIndex - 1] || '') &&
-      (END_TOKEN.includes(sequence.tokens[tokenIndex + 1] || '') ||
-        MESSAGE_TOKEN.includes(sequence.tokens[tokenIndex + 1] || '') ||
-        (isGemmaInstruct && sequence.tokens[tokenIndex + 1] === '\n') ||
-        (hasImStartToken && sequence.tokens[tokenIndex + 1] === '\n') ||
-        CHANNEL_TOKEN === sequence.tokens[tokenIndex + 1])
-    );
-  }
-
-  function prevTokenIsChannelToken(tokenIndex: number) {
-    return tokenIndex > 0 && sequence.tokens[tokenIndex - 1] === CHANNEL_TOKEN;
-  }
-
   function shouldShowToken(tokenIndex: number) {
     const isInMaxActBuffer =
       tokenIndex > maxActivationTokenIndex - currentRange && tokenIndex < maxActivationTokenIndex + currentRange;
-
-    if (!showRawTokens) {
-      const token = sequence.tokens[tokenIndex] || '';
-      if (
-        START_TOKEN.includes(token) ||
-        END_TOKEN.includes(token) ||
-        MESSAGE_TOKEN.includes(token) ||
-        BOS_TOKEN.includes(token) ||
-        token === CHANNEL_TOKEN
-      ) {
-        return false;
-      }
-    }
 
     return isInMaxActBuffer;
   }
@@ -391,9 +327,7 @@ export default function HeadActivationItem({
     >
       <div
         ref={sequenceRef}
-        className={`relative flex-1 ${!showRawTokens ? 'sm:ml-2.5' : ''} ${overrideLeading} ${
-          showExpandIndicator ? 'cursor-pointer' : ''
-        }`}
+        className={`relative flex-1 ${overrideLeading} ${showExpandIndicator ? 'cursor-pointer' : ''}`}
         onClick={() => {
           if (enableExpanding) {
             setIsExpanded(!isExpanded);
@@ -580,10 +514,8 @@ export default function HeadActivationItem({
                 }}
                 className={`inline-block cursor-default whitespace-nowrap bg-origin-border py-0.5 font-mono ${
                   isHoveredQuery ? HOVERED_QUERY_TOKEN_CLASSNAME : REGULAR_TOKEN_CLASSNAME
-                } ${tokenEndsWithSpace ? 'pr-1' : ''} ${tokenStartsWithSpace ? 'pl-1' : ''} ${
-                  !showRawTokens && tokenIsRoleToken(tokenIndex) ? '-ml-2 mr-1 mt-1 rounded bg-slate-300' : ''
-                } ${
-                  !showRawTokens && prevTokenIsChannelToken(tokenIndex) ? 'mt-1 rounded bg-slate-200' : ''
+                } ${tokenEndsWithSpace ? 'pr-1' : ''} ${
+                  tokenStartsWithSpace ? 'pl-1' : ''
                 } ${overrideTextColor} ${overrideTextSize}`}
                 style={{
                   backgroundImage: tokenBackgroundImage,
@@ -595,9 +527,8 @@ export default function HeadActivationItem({
               >
                 {displayContent}
               </span>
-              {((!showRawTokens && nextTokenIsMessageEndOrChannelToken(tokenIndex)) ||
-                ((token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
-                  showLineBreaks)) && <br />}
+              {(token.indexOf('\n') !== -1 || tokenWithReplacedAnomalies === LINE_BREAK_REPLACEMENT_CHAR) &&
+                showLineBreaks && <br />}
             </span>
           );
         })}

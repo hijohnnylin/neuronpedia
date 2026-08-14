@@ -109,6 +109,7 @@ export const AUTOINTERP_SERVER_SECRET = process.env.AUTOINTERP_SERVER_SECRET || 
 // If USE_LOCALHOST_GRAPH is true, it will always use the localhost graph server.
 // Else it will check for the server in GraphHostSource table, and use the Runpod server if it exists, otherwise use the regular hostUrl.
 export const USE_LOCALHOST_GRAPH = process.env.USE_LOCALHOST_GRAPH === 'true';
+export const LOCALHOST_GRAPH_HOST_OVERRIDE = process.env.LOCALHOST_GRAPH_HOST_OVERRIDE || '';
 export const GRAPH_SERVER_SECRET = process.env.GRAPH_SERVER_SECRET || '';
 
 // Sparsity Server
@@ -118,11 +119,8 @@ export const SPARSITY_SERVER_SECRET = process.env.SPARSITY_SERVER_SECRET || '';
 
 // NLA Server
 export const USE_LOCALHOST_NLA = process.env.USE_LOCALHOST_NLA === 'true';
+export const LOCALHOST_NLA_HOST_OVERRIDE = process.env.LOCALHOST_NLA_HOST_OVERRIDE || '';
 export const NLA_SERVER_SECRET = process.env.NLA_SERVER_SECRET || '';
-
-// Activations Server
-export const ACTIVATIONS_SERVER = process.env.ACTIVATIONS_SERVER || 'http://localhost:5010';
-export const ACTIVATIONS_SERVER_SECRET = process.env.ACTIVATIONS_SERVER_SECRET || '';
 
 // Runpod Graph
 // export const USE_RUNPOD_GRAPH = process.env.USE_RUNPOD_GRAPH === 'true';
@@ -153,7 +151,6 @@ export const IS_ACTUALLY_NEURONPEDIA_ORG =
 
 // Misc
 export const NODE_ENV = process.env.NODE_ENV || '';
-export const IS_DOCKER_COMPOSE = process.env.IS_DOCKER_COMPOSE === 'true';
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' || IS_ONE_CLICK_VERCEL_DEPLOY;
 export const ASSET_BASE_URL = 'https://neuronpedia.s3.us-east-1.amazonaws.com/site-assets';
 export const GRAPH_ADMIN_BROWSE_KEY = process.env.GRAPH_ADMIN_BROWSE_KEY || '';

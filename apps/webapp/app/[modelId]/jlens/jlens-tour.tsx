@@ -4,6 +4,7 @@ import { driver, type DriveStep } from 'driver.js';
 import 'driver.js/dist/driver.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 // Loaded after driver.css so our theme overrides win on equal specificity.
+import { runWhenIdle } from '@/lib/utils/run-when-idle';
 import {
   JLENS_CHAT_ID,
   JLENS_DEMOS_BAR_ID,
@@ -19,7 +20,6 @@ import {
   JLENS_VERBAL_REPORT_SHARE_ID,
 } from './jlens-tour-constants';
 import './jlens-tour.css';
-import { runWhenIdle } from '@/lib/utils/run-when-idle';
 import { JLENS_BLOG_URL, JLENS_GITHUB_URL, JLENS_HF_URL, JLENS_PAPER_URL } from './jlens-urls';
 
 // Module-scoped cleanup for a per-step DOM listener (the spider step's

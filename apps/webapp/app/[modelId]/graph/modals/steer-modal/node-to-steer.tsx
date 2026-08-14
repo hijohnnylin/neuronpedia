@@ -1,5 +1,4 @@
 import { Button } from '@/components/shadcn/button';
-import { BOS_TOKENS } from '@/lib/utils/activations';
 import { SteerLogitFeature, SteeredPositionIdentifier } from '@/lib/utils/graph';
 import {
   STEER_MULTIPLIER_STEP,
@@ -38,6 +37,7 @@ export default function NodeToSteer({
   setAllTokensDelta,
   isSteering,
   lastChangedTokenPosition,
+  unsteerablePositions,
 }: {
   node: CLTGraphNode;
   sourceId: string;
@@ -65,6 +65,9 @@ export default function NodeToSteer({
   setAllTokensDelta: (nodeSteerIdentifier: SteeredPositionIdentifier, delta: number) => void;
   isSteering: boolean;
   lastChangedTokenPosition?: number;
+  // Positions the graph server won't steer, so their sliders are hidden rather
+  // than rendered as controls that silently do nothing.
+  unsteerablePositions: ReadonlySet<number>;
 }) {
   const scrollIntoViewRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -215,7 +218,7 @@ export default function NodeToSteer({
                       scrollIntoViewRefs.current[i] = el;
                     }}
                     className={`mx-1.5 min-w-fit flex-col items-center justify-center gap-y-1 ${
-                      BOS_TOKENS.includes(token) ? 'hidden' : 'flex'
+                      unsteerablePositions.has(i) ? 'hidden' : 'flex'
                     }`}
                   >
                     <Slider.Root

@@ -26,6 +26,33 @@ export const MAX_COMMENT_LENGTH = 512;
 /** Sentinel `activeDemoCacheId` when the user picks the header "Free Chat" demo (not a real cache row). */
 export const NLA_FREE_CHAT_DEMO_CACHE_ID = '__nla_free_chat__';
 
+/**
+ * Forwarded as `enable_thinking` on every NLA payload that carries `messages`.
+ *
+ * Qwen3.x templates treat an absent `enable_thinking` as *on*, ending the prompt
+ * in an unclosed `<think>` — which would put every explained token in a reasoning
+ * context. `/api/lens/prompt` already defaults it off, so this keeps the two
+ * surfaces from disagreeing about the same model.
+ */
+export const NLA_ENABLE_THINKING = false;
+
+/**
+ * Value of `NlaExplainCache.resultJson.templateFormat` marking a row whose stored
+ * `text` is NOT reproducible by the model's real chat template.
+ *
+ * Explaining more tokens on such a row has to send that stored text verbatim
+ * rather than re-rendering the row's `messages`: the real templates inject turns
+ * the stored text never had (a system preamble on Llama, an empty think block on
+ * Qwen), which shifts every token position and detaches the row's cached
+ * explanations from the tokens they describe.
+ *
+ * Written by `scripts/backfill-nla-chat-messages.ts`, because giving such a row
+ * `messages` is precisely what makes it otherwise indistinguishable from a
+ * new-format one. Rows with no `messages` at all need no marker — their absence
+ * says the same thing.
+ */
+export const LEGACY_TEMPLATE_FORMAT = 'legacy';
+
 // Relative-MSE cutoff used to bucket explanations into confidence levels.
 // Scores below this are considered medium-or-better; at/above is "low"
 // (i.e. the AR's reconstruction is no better than predicting the mean).

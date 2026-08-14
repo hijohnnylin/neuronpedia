@@ -1,10 +1,13 @@
+import { NPLogprob, NPSteerMethod, SteerCompletionResponse } from '@/lib/api/inference-types';
 import { prisma } from '@/lib/db';
 import { getModelById } from '@/lib/db/model';
 import { neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { ERROR_NOT_FOUND_MESSAGE } from '@/lib/db/userCanAccess';
 import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
-import { steerCompletion } from '@/lib/utils/inference';
+import { InferenceServerError, steerCompletion } from '@/lib/utils/inference';
 import {
+  STEER_COMPLETION_VERSION,
+  STEER_FREQUENCY_PENALTY,
   STEER_FREQUENCY_PENALTY_MAX,
   STEER_FREQUENCY_PENALTY_MIN,
   STEER_MAX_PROMPT_CHARS,
@@ -19,12 +22,10 @@ import { AuthenticatedUser, RequestOptionalUser, withOptionalUser } from '@/lib/
 import { SteerOutputType } from '@prisma/client';
 import { createHash } from 'crypto';
 import { EventSourceMessage, EventSourceParserStream } from 'eventsource-parser/stream';
-import { NPLogprob, NPSteerMethod, SteerCompletionPost200Response } from 'neuronpedia-inference-client';
 import { NextResponse } from 'next/server';
 import { array, bool, InferType, number, object, string, ValidationError } from 'yup';
 
 const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
-const STEERING_VERSION = 1;
 const MAX_PROMPT_CHARS = STEER_MAX_PROMPT_CHARS;
 
 function createStream(generator: AsyncGenerator<SteerResult>) {
@@ -42,7 +43,7 @@ function createStream(generator: AsyncGenerator<SteerResult>) {
 
 async function* transformStream(
   stream: ReadableStreamDefaultReader<EventSourceMessage>,
-): AsyncGenerator<SteerCompletionPost200Response> {
+): AsyncGenerator<SteerCompletionResponse> {
   while (true) {
     // eslint-disable-next-line
     const { done, value } = await stream.read();
@@ -52,7 +53,7 @@ async function* transformStream(
     const parsed = JSON.parse(value.data);
     try {
       // we manually process because we aren't using the typescript client :(
-      const toYield: SteerCompletionPost200Response = {
+      const toYield: SteerCompletionResponse = {
         outputs: parsed.outputs.map((output: any) => {
           const op = {
             type: output.type,
@@ -90,32 +91,72 @@ async function* generateResponse(
 ): AsyncGenerator<SteerResult> {
   // NOW: always return the SteerResult modified to what we have so far
 
-  for (const steerType of steerTypesToRun) {
-    // eslint-disable-next-line
-    const steerCompletionResult = (await steerCompletion(
-      body.modelId,
-      [steerType],
-      body.prompt,
-      body.strength_multiplier,
-      body.n_tokens,
-      body.temperature,
-      body.freq_penalty,
-      body.seed,
-      features,
-      hasVector,
-      user,
-      body.steer_method,
-      true,
-    )) as ReadableStream<any>;
+  // Kick off every steer type at once so default and steered generate simultaneously,
+  // rather than the second one waiting for the first to finish streaming.
+  const steerCompletionResults = (await Promise.all(
+    steerTypesToRun.map((steerType) =>
+      steerCompletion(
+        body.modelId,
+        [steerType],
+        body.prompt,
+        body.strength_multiplier,
+        body.n_tokens,
+        body.temperature,
+        body.freq_penalty,
+        body.seed,
+        features,
+        hasVector,
+        user,
+        body.steer_method,
+        true,
+      ),
+    ),
+  )) as ReadableStream<any>[];
 
-    const streamReader = steerCompletionResult
-      .pipeThrough(new TextDecoderStream())
-      .pipeThrough(new EventSourceParserStream())
-      .getReader();
+  const streamProcessors = steerCompletionResults.map((steerCompletionResult, index) => ({
+    steerType: steerTypesToRun[index],
+    done: false,
+    generator: transformStream(
+      steerCompletionResult.pipeThrough(new TextDecoderStream()).pipeThrough(new EventSourceParserStream()).getReader(),
+    ),
+    pendingPromise: null as Promise<{
+      processorIndex: number;
+      value: SteerCompletionResponse;
+      done: boolean;
+    }> | null,
+  }));
+
+  const createReadPromise = (processor: (typeof streamProcessors)[0], processorIndex: number) =>
+    processor.generator.next().then(({ value, done }) => ({
+      processorIndex,
+      value,
+      done: done || false,
+    }));
+
+  streamProcessors.forEach((processor, index) => {
+    processor.pendingPromise = createReadPromise(processor, index);
+  });
+
+  // Read from whichever stream has data next, so both outputs stream in as they arrive
+  while (streamProcessors.some((processor) => !processor.done)) {
+    const activePromises = streamProcessors
+      .filter((processor) => !processor.done && processor.pendingPromise)
+      .map((processor) => processor.pendingPromise!);
+
+    if (activePromises.length === 0) {
+      break;
+    }
+
     // eslint-disable-next-line no-await-in-loop
-    for await (const completionChunk of transformStream(streamReader)) {
-      // find the output for the steerType
-      const output = completionChunk.outputs.find((out) => out.type === steerType);
+    const result = await Promise.race(activePromises);
+    const processor = streamProcessors[result.processorIndex];
+
+    if (result.done) {
+      processor.done = true;
+      processor.pendingPromise = null;
+    } else {
+      const { steerType } = processor;
+      const output = result.value.outputs.find((out) => out.type === steerType);
       if (!output) {
         throw new Error(`No output found for steerType: ${steerType}`);
       }
@@ -126,6 +167,9 @@ async function* generateResponse(
       } else {
         toReturnResult.defaultLogProbs = output.logprobs ? output.logprobs : null;
       }
+
+      processor.pendingPromise = createReadPromise(processor, result.processorIndex);
+
       yield toReturnResult;
     }
   }
@@ -167,7 +211,13 @@ const steerSchema = object({
     .required(),
   temperature: number().min(0).max(STEER_TEMPERATURE_MAX).required(),
   n_tokens: number().integer().min(1).max(STEER_N_COMPLETION_TOKENS_MAX).required(),
-  freq_penalty: number().min(STEER_FREQUENCY_PENALTY_MIN).max(STEER_FREQUENCY_PENALTY_MAX).required(),
+  // No backend applies this any more, so it is undocumented and optional. It stays part of the
+  // saved-output lookup key, so it keeps a default rather than being dropped: changing what we
+  // store for it would miss every existing row.
+  freq_penalty: number()
+    .min(STEER_FREQUENCY_PENALTY_MIN)
+    .max(STEER_FREQUENCY_PENALTY_MAX)
+    .default(STEER_FREQUENCY_PENALTY),
   seed: number().min(-100000000).max(100000000).required(),
   strength_multiplier: number().min(0).max(STEER_STRENGTH_MULTIPLIER_MAX).required(),
   stream: bool().default(false),
@@ -203,7 +253,7 @@ async function saveSteerOutput(
         seed: body.seed,
         strengthMultiplier: body.strength_multiplier,
         steerMethod: body.steer_method,
-        version: STEERING_VERSION,
+        version: STEER_COMPLETION_VERSION,
         logprobs:
           type === SteerOutputType.STEERED
             ? JSON.stringify(toReturnResult.steeredLogProbs)
@@ -279,7 +329,6 @@ async function saveSteerOutput(
                 ],
                 "temperature": 0.5,
                 "n_tokens": 48,
-                "freq_penalty": 2,
                 "seed": 16,
                 "strength_multiplier": 4,
                 "steer_method": "SIMPLE_ADDITIVE"
@@ -321,9 +370,6 @@ async function saveSteerOutput(
                   "type": "number"
                 },
                 "n_tokens": {
-                  "type": "number"
-                },
-                "freq_penalty": {
                   "type": "number"
                 },
                 "seed": {
@@ -423,7 +469,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         seed: body.seed,
         strengthMultiplier: body.strength_multiplier,
         steerMethod: body.steer_method,
-        version: STEERING_VERSION,
+        version: STEER_COMPLETION_VERSION,
       },
       include: {
         toNeurons: true,
@@ -509,7 +555,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       body.steer_method,
       false, // non-streaming
     );
-    steerCompletionResult = steerCompletionResult as SteerCompletionPost200Response;
+    steerCompletionResult = steerCompletionResult as SteerCompletionResponse;
     const steeredCompletionResult = steerCompletionResult.outputs.find(
       (output) => output.type === SteerOutputType.STEERED,
     );
@@ -559,6 +605,13 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   } catch (error) {
     if (error instanceof ValidationError) {
       return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+    // Forward what inference actually said rather than collapsing it to "Unknown Error";
+    // this route's failures (no valid steering layers, prompt too long) are all diagnosable
+    // from the upstream message.
+    if (error instanceof InferenceServerError) {
+      console.log('inference error', error.status, error.message);
+      return NextResponse.json({ message: error.message }, { status: error.status });
     }
     console.log('unknown error', error);
     return NextResponse.json({ message: 'Unknown Error' }, { status: 500 });

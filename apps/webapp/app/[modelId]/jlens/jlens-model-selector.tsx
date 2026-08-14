@@ -60,12 +60,17 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
   {
     modelId: 'gpt-oss-20b',
     displayName: 'GPT-OSS 20B',
-    demos: [{ shareId: 'cmrehmfir0000t32x8pr1be5q', displayName: '🕷️ Multi-Hop Reasoning' }],
+    demos: [{ shareId: 'cmsqi0iyh0000an2x4ysk1ct8', displayName: '🕷️ Multi-Hop Reasoning' }],
   },
   {
     modelId: 'llama3.1-8b-it',
     displayName: 'Llama 3.1 8B IT',
     demos: [{ shareId: 'cmreirhmk0000vc2xfq1697b7', displayName: '🕷️ Multi-Hop Reasoning' }],
+  },
+  {
+    modelId: 'llama3.3-70b-it',
+    displayName: 'Llama 3.3 70B IT',
+    demos: [{ shareId: 'cmsr81qce0000fd2x7mbn7wby', displayName: '🤕 Confused Capital' }],
   },
 ] as const satisfies readonly {
   modelId: string;
@@ -135,15 +140,13 @@ export default function JlensModelSelector({
   // Show every inference-enabled model in the dropdown, but surface the pinned
   // models at the top as "Featured" (same treatment as the releases dropdown)
   // rather than hiding them.
-  const dropdownModelIds = getInferenceEnabledModels()
-    .filter((mId) => mId !== 'llama3.3-70b-it' && mId !== 'gemma3-27b-it')
-    .sort((a, b) => {
-      const aIsFeatured = FEATURED_MODEL_IDS.includes(a);
-      const bIsFeatured = FEATURED_MODEL_IDS.includes(b);
-      if (aIsFeatured && !bIsFeatured) return -1;
-      if (!aIsFeatured && bIsFeatured) return 1;
-      return compareModelIdsBySize(a, b);
-    });
+  const dropdownModelIds = [...getInferenceEnabledModels()].sort((a, b) => {
+    const aIsFeatured = FEATURED_MODEL_IDS.includes(a);
+    const bIsFeatured = FEATURED_MODEL_IDS.includes(b);
+    if (aIsFeatured && !bIsFeatured) return -1;
+    if (!aIsFeatured && bIsFeatured) return 1;
+    return compareModelIdsBySize(a, b);
+  });
 
   // When switching to a demo, horizontally scroll the active demo button into
   // view within its own scroll container only (no ancestor scrolling, which is

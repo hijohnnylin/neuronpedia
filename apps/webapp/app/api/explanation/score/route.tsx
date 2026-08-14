@@ -1,3 +1,4 @@
+import { toErrorResponse } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
 import { getAutoInterpKeyToUse } from '@/lib/db/userSecret';
 import { generateScoreEleuther } from '@/lib/external/autointerp-scorer-eleuther';
@@ -15,7 +16,7 @@ import {
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { UserSecretType } from '@prisma/client';
 import { NextResponse } from 'next/server';
-import { object, string, ValidationError } from 'yup';
+import { object, string } from 'yup';
 import { getUserByName } from '../../../../lib/db/user';
 
 // Hobby plans don't support > 60 seconds
@@ -295,10 +296,8 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     }
     return NextResponse.json({ message: 'Unsupported explanation score type' }, { status: 400 });
   } catch (error) {
-    if (error instanceof ValidationError) {
-      return NextResponse.json({ message: error.message }, { status: 400 });
-    }
-    console.error('/api/explanation/score error:', error);
-    return NextResponse.json({ message: error instanceof Error ? error.message : 'Unknown Error' }, { status: 500 });
+    // Defer to the shared contract rather than echoing error.message, which published the
+    // autointerp server's raw python exception -- and any prisma error -- to the caller.
+    return toErrorResponse(error, request);
   }
 });

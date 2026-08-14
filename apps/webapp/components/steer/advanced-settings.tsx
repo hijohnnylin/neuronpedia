@@ -1,8 +1,6 @@
 import { Button } from '@/components/shadcn/button';
+import { NPSteerMethod, STEER_METHOD_LABELS } from '@/lib/api/inference-types';
 import {
-  STEER_FREQUENCY_PENALTY,
-  STEER_FREQUENCY_PENALTY_MAX,
-  STEER_FREQUENCY_PENALTY_MIN,
   STEER_N_COMPLETION_TOKENS,
   STEER_N_COMPLETION_TOKENS_MAX,
   STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
@@ -17,12 +15,11 @@ import {
 import * as Popover from '@radix-ui/react-popover';
 import * as Select from '@radix-ui/react-select';
 import { ChevronDown, HelpCircle } from 'lucide-react';
-import { NPSteerMethod } from 'neuronpedia-inference-client';
 
 export const STEER_METHODS_ALLOWED = [
-  NPSteerMethod.SimpleAdditive,
-  NPSteerMethod.OrthogonalDecomp,
-  NPSteerMethod.ProjectionCap,
+  NPSteerMethod.SIMPLE_ADDITIVE,
+  NPSteerMethod.ORTHOGONAL_DECOMP,
+  NPSteerMethod.PROJECTION_CAP,
 ];
 
 export default function SteerAdvancedSettings({
@@ -33,8 +30,6 @@ export default function SteerAdvancedSettings({
   setSteerTokens,
   temperature,
   setTemperature,
-  freqPenalty,
-  setFreqPenalty,
   strMultiple,
   setStrMultiple,
   seed,
@@ -53,8 +48,6 @@ export default function SteerAdvancedSettings({
   setSteerTokens: (tokens: number) => void;
   temperature: number;
   setTemperature: (temperature: number) => void;
-  freqPenalty: number;
-  setFreqPenalty: (freqPenalty: number) => void;
   strMultiple: number;
   setStrMultiple: (strMultiple: number) => void;
   seed: number;
@@ -115,27 +108,6 @@ export default function SteerAdvancedSettings({
             }}
             className="max-w-[80px] flex-1 rounded-md border-slate-300 py-1 text-center text-xs text-slate-700"
             value={temperature}
-          />
-        </div>
-        <div className="flex w-full flex-row items-center justify-start gap-x-3">
-          <div className="w-[70px] text-right text-[10px] font-medium uppercase leading-tight text-slate-400">
-            Freq Penalty
-          </div>
-          <input
-            type="number"
-            onChange={(e) => {
-              if (
-                parseFloat(e.target.value) > STEER_FREQUENCY_PENALTY_MAX ||
-                parseFloat(e.target.value) < STEER_FREQUENCY_PENALTY_MIN
-              ) {
-                alert(`Freq penalty must be >= ${STEER_FREQUENCY_PENALTY_MIN} and <= ${STEER_FREQUENCY_PENALTY_MAX}`);
-              } else {
-                setFreqPenalty(parseFloat(e.target.value));
-              }
-            }}
-            className="max-w-[80px] flex-1 rounded-md border-slate-300 py-1 text-center text-xs text-slate-700 disabled:bg-slate-200 disabled:text-slate-400"
-            value={freqPenalty}
-            disabled={isNnSightModel}
           />
         </div>
         <div className="flex w-full flex-row items-center justify-start gap-x-3">
@@ -207,9 +179,7 @@ export default function SteerAdvancedSettings({
                         value={value}
                         className="relative flex cursor-pointer items-center px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none"
                       >
-                        <Select.ItemText className="flex-1 text-center">
-                          {key.replace(/([A-Z])/g, ' $1').trim()}
-                        </Select.ItemText>
+                        <Select.ItemText className="flex-1 text-center">{STEER_METHOD_LABELS[value]}</Select.ItemText>
                       </Select.Item>
                     ))}
                 </Select.Viewport>
@@ -266,7 +236,6 @@ export default function SteerAdvancedSettings({
             onClick={() => {
               setSteerTokens(STEER_N_COMPLETION_TOKENS);
               setTemperature(STEER_TEMPERATURE);
-              setFreqPenalty(STEER_FREQUENCY_PENALTY);
               setStrMultiple(STEER_STRENGTH_MULTIPLIER);
               setSeed(STEER_SEED);
               setRandomSeed(false);

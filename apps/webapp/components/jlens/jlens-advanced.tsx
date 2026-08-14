@@ -4,7 +4,7 @@ import * as Slider from '@radix-ui/react-slider';
 import { HelpCircle } from 'lucide-react';
 import CustomTooltip from '../custom-tooltip';
 
-const DEFAULT_MAX_COMPLETION_TOKENS = 256;
+const DEFAULT_MAX_COMPLETION_TOKENS = 1024;
 
 type Props = {
   isBusy: boolean;
@@ -14,7 +14,7 @@ type Props = {
   setNumCompletionTokens: (n: number) => void;
   topN: number;
   setTopN: (n: number) => void;
-  // Upper bound for the "Generated Tokens" slider. Defaults to 256 (chat);
+  // Upper bound for the "Generated Tokens" slider. Defaults to 1024 (chat);
   // the completion interface passes 128.
   maxCompletionTokens?: number;
   // Completion runs always generate; the chat interface also always generates.

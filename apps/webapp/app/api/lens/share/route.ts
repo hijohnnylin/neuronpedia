@@ -47,6 +47,18 @@ const chatMessageSchema = yup.object({
   content: yup.string().max(MAX_MESSAGE_CHARS).required(),
 });
 
+// Per-token chat-span metadata (parallel to the token-id sequence). Shares are
+// re-run server-side over exact ids with generation disabled, which returns no
+// spans; the client sends these so we can overlay them back by position and the
+// reloaded run still groups into bubbles. Pure display metadata (not trusted
+// numerics), so accepting the caller's values is safe.
+const tokenSpanSchema = yup.object({
+  message_index: yup.number().integer().nullable().optional(),
+  role: yup.string().max(64).nullable().optional(),
+  channel: yup.string().max(64).nullable().optional(),
+  section: yup.string().max(32).nullable().optional(),
+});
+
 const lockedTokenSchema = yup.object({
   key: yup.string().max(MAX_LOCKED_TOKEN_KEY_CHARS).required(),
   type: yup
@@ -73,6 +85,7 @@ const shareSteerSchema = yup.object({
   // Whether the intervention was applied to generated tokens too.
   steerGenerated: yup.boolean().default(false),
   inputTokenIds: yup.array().of(yup.number().integer().required()).min(1).max(MAX_TOKEN_IDS).required(),
+  spans: yup.array().of(tokenSpanSchema).max(MAX_TOKEN_IDS).optional(),
 });
 
 const shareRequestSchema = yup.object({
@@ -108,10 +121,38 @@ const shareRequestSchema = yup.object({
   lockedTokens: yup.array().of(lockedTokenSchema).max(MAX_LOCKED_TOKENS).default([]),
   selectedPositions: yup.array().of(yup.number().integer().min(0).required()).max(MAX_SELECTED_POSITIONS).default([]),
   description: yup.string().max(MAX_JLENS_SHARE_DESCRIPTION_LENGTH).optional(),
+  // Per-token chat spans (parallel to `inputTokenIds`), overlaid onto the
+  // recomputed tokens so a reloaded chat run groups into message bubbles.
+  spans: yup.array().of(tokenSpanSchema).max(MAX_TOKEN_IDS).optional(),
   steer: shareSteerSchema.default(undefined),
 });
 
+// Overlay caller-supplied chat spans onto server-recomputed tokens by position
+// (both cover the same token-id sequence in the same order). No-op when the
+// spans are absent or their length doesn't match.
+function overlaySpans<T extends LensTokenMessage>(
+  tokens: T[],
+  spans:
+    | { message_index?: number | null; role?: string | null; channel?: string | null; section?: string | null }[]
+    | undefined,
+): T[] {
+  if (!spans || spans.length !== tokens.length) {
+    return tokens;
+  }
+  return tokens.map((t, i) => ({
+    ...t,
+    message_index: spans[i].message_index ?? null,
+    role: spans[i].role ?? null,
+    channel: spans[i].channel ?? null,
+    section: spans[i].section ?? null,
+  }));
+}
+
 // Consume the inference NDJSON stream (buffered) into meta + tokens.
+//
+// These go verbatim into the stored share blob, so the frames must already be in the shape
+// existing viewers read. That is why inference declares them on `PublicFrameSchema` and leaves
+// the names alone rather than aliasing them and expecting each consumer to rename them back.
 async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | null; tokens: LensTokenMessage[] }> {
   let meta: LensMetaMessage | null = null;
   const tokens: LensTokenMessage[] = [];
@@ -419,22 +460,22 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       hasInputTokenIds
         ? {
             type: LENS_TYPE_ORDER,
-            input_token_ids: body.inputTokenIds,
-            top_n: body.topN,
-            num_completion_tokens: 0,
+            inputTokenIds: body.inputTokenIds,
+            topN: body.topN,
+            numCompletionTokens: 0,
             // Capture the run with the sharer's non-word filter applied, so the
             // stored blob matches what they were viewing (the share is a frozen
             // snapshot for this filter; viewers toggle by re-running live).
-            filter_non_word_tokens: body.hideNonWordTokens,
+            filterNonWordTokens: body.hideNonWordTokens,
           }
         : {
             type: LENS_TYPE_ORDER,
             prompt: hasChat ? undefined : body.prompt,
             chat: hasChat ? (body.chat as LensChatMessage[]) : undefined,
-            top_n: body.topN,
+            topN: body.topN,
             temperature: body.temperature,
-            num_completion_tokens: body.numCompletionTokens,
-            filter_non_word_tokens: body.hideNonWordTokens,
+            numCompletionTokens: body.numCompletionTokens,
+            filterNonWordTokens: body.hideNonWordTokens,
           },
     );
     if (!inferenceResponse.ok || !inferenceResponse.body) {
@@ -446,6 +487,11 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
     const text = await inferenceResponse.text();
     ({ meta, tokens } = await parseLensNdjson(text));
+    // The reproduction path (input token ids) returns no spans; overlay the
+    // client's spans so the reloaded chat run groups into message bubbles.
+    if (hasInputTokenIds) {
+      tokens = overlaySpans(tokens, body.spans);
+    }
   } catch (error) {
     console.error('Error re-running lens for share:', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
@@ -465,16 +511,16 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       const isSwap = body.steer.mode === 'swap' && !!body.steer.swapToken.trim();
       const steerResponse = await lensPromptStream(body.modelId, {
         type: LENS_TYPE_ORDER,
-        input_token_ids: body.steer.inputTokenIds,
-        top_n: body.topN,
-        num_completion_tokens: 0,
-        steer_tokens: [{ token: body.steer.token, type: body.steer.type as LensType }],
-        steer_layers: body.steer.layers,
-        steer_strength: body.steer.strength,
-        steer_ablate: body.steer.ablate,
-        swap_token: isSwap ? { token: body.steer.swapToken, type: body.steer.type as LensType } : undefined,
-        steer_generated_tokens: body.steer.steerGenerated,
-        filter_non_word_tokens: body.hideNonWordTokens,
+        inputTokenIds: body.steer.inputTokenIds,
+        topN: body.topN,
+        numCompletionTokens: 0,
+        steerTokens: [{ token: body.steer.token, type: body.steer.type as LensType }],
+        steerLayers: body.steer.layers,
+        steerStrength: body.steer.strength,
+        steerAblate: body.steer.ablate,
+        swapToken: isSwap ? { token: body.steer.swapToken, type: body.steer.type as LensType } : undefined,
+        steerGeneratedTokens: body.steer.steerGenerated,
+        filterNonWordTokens: body.hideNonWordTokens,
       });
       if (!steerResponse.ok || !steerResponse.body) {
         const errorBody = await steerResponse.json().catch(() => ({ error: steerResponse.statusText }));
@@ -484,10 +530,11 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         );
       }
       const steerText = await steerResponse.text();
-      const { meta: steerMeta, tokens: steerTokens } = await parseLensNdjson(steerText);
-      if (!steerMeta || steerTokens.length === 0) {
+      const { meta: steerMeta, tokens: steerTokensRaw } = await parseLensNdjson(steerText);
+      if (!steerMeta || steerTokensRaw.length === 0) {
         return NextResponse.json({ error: 'Steered lens re-run produced no data' }, { status: 500 });
       }
+      const steerTokens = overlaySpans(steerTokensRaw, body.steer.spans);
       steerExport = {
         config: {
           token: body.steer.token,

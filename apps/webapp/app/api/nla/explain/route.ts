@@ -1,7 +1,13 @@
 import { prisma } from '@/lib/db';
 import { nlaFetch } from '@/lib/db/nla-source';
-import { formatChatForModel, isChatMessageArray } from '@/lib/nla-chat-template';
-import { EXPLAIN_MAX_NEW_TOKENS, MAX_TEXT_LENGTH, MAX_TOKENS_TO_EXPLAIN } from '@/lib/nla-constants';
+import { ChatMessage, isChatMessageArray } from '@/lib/nla-chat-template';
+import {
+  EXPLAIN_MAX_NEW_TOKENS,
+  LEGACY_TEMPLATE_FORMAT,
+  MAX_TEXT_LENGTH,
+  MAX_TOKENS_TO_EXPLAIN,
+  NLA_ENABLE_THINKING,
+} from '@/lib/nla-constants';
 import { nlaExplainTextHash } from '@/lib/nla-explain-cache-hash';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
@@ -9,6 +15,17 @@ import { NextResponse } from 'next/server';
 type SseMeta = { layer_index?: number; total?: number; prompt_length?: number };
 
 type ExplainResultRecord = Record<string, unknown> & { position?: number };
+
+// Per-token span metadata persisted on new cache rows so hydrate can render the
+// span-grouped token display without any frontend chat-template knowledge.
+type TokenSpanRecord = {
+  position: number;
+  token: string;
+  role?: string | null;
+  section?: string | null;
+  channel?: string | null;
+  message_index?: number | null;
+};
 
 type ParsedExplainPayload = {
   results: ExplainResultRecord[];
@@ -18,6 +35,30 @@ type ParsedExplainPayload = {
 
 function sortPositions(xs: number[]): number[] {
   return [...xs].sort((a, b) => a - b);
+}
+
+// Obtain the canonical chat-templated string from the NLA server (which applies
+// the model's real chat template). Used when a caller sends structured
+// `messages` instead of a pre-rendered `text` — the webapp never builds chat
+// templates itself. `add_generation_prompt` defaults based on whether the last
+// turn is an already-completed assistant message.
+async function renderTextFromMessages(
+  modelId: string,
+  nlaSourceId: string | undefined,
+  messages: ChatMessage[],
+  addGenerationPrompt?: boolean,
+): Promise<string> {
+  const agp = addGenerationPrompt ?? messages[messages.length - 1]?.role !== 'assistant';
+  const res = await nlaFetch(modelId, nlaSourceId, '/tokenize', {
+    method: 'POST',
+    body: JSON.stringify({ messages, add_generation_prompt: agp, enable_thinking: NLA_ENABLE_THINKING }),
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`NLA tokenize error: ${res.status} - ${errorText}`);
+  }
+  const data = (await res.json()) as { text: string };
+  return data.text;
 }
 
 function parseSseLines(lines: string[]): { results: ExplainResultRecord[]; meta: SseMeta | null } {
@@ -153,12 +194,26 @@ async function upsertUnionRow(args: {
   results: ExplainResultRecord[];
   layerIndex: number;
   promptLength: number;
+  // Structured chat turns + per-token spans persisted so a `?id=` hydrate can
+  // reconstruct the editable conversation + span-grouped token display without
+  // any frontend chat-template parsing. Presence of `messages` marks a row as
+  // the new (post-server-templating) format; legacy rows lack it.
+  messages?: ChatMessage[];
+  tokenSpans?: TokenSpanRecord[];
+  // Carried over from the request when the prompt came from a row whose stored
+  // text the real chat template can't reproduce. Without it the row we write
+  // here would look new-format, and the next hydrate would re-render from
+  // `messages` and shift every position out from under these results.
+  templateFormat?: string;
 }) {
   const textHash = nlaExplainTextHash(args.text);
   const resultJson = JSON.stringify({
     results: args.results,
     layer_index: args.layerIndex,
     prompt_length: args.promptLength,
+    ...(args.messages ? { messages: args.messages } : {}),
+    ...(args.tokenSpans ? { tokenSpans: args.tokenSpans } : {}),
+    ...(args.templateFormat ? { templateFormat: args.templateFormat } : {}),
   });
   const existing = await prisma.nlaExplainCache.findFirst({
     where: {
@@ -393,8 +448,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     nlaSourceId,
     positions,
     tokens,
+    tokenSpans,
     priorCacheId,
     stream,
+    templateFormat,
   } = body as {
     text?: string;
     messages?: unknown;
@@ -403,13 +460,23 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     nlaSourceId?: string;
     positions?: number[];
     tokens?: string[];
+    tokenSpans?: TokenSpanRecord[];
     priorCacheId?: string;
     stream?: boolean;
+    templateFormat?: string;
   };
 
-  // Render server-side when the caller passes `messages` instead of a
-  // pre-templated `text`. We prefer `text` if both are supplied so the
-  // frontend (which always sends the rendered string) is unaffected.
+  // Structured turns + per-token spans to persist on the (new-format) cache row.
+  const structuredMessages: ChatMessage[] | undefined = isChatMessageArray(messages) ? messages : undefined;
+  const structuredTokenSpans: TokenSpanRecord[] | undefined = Array.isArray(tokenSpans) ? tokenSpans : undefined;
+  // Only the one known marker is honored, so a caller can't invent formats.
+  const storedTemplateFormat = templateFormat === LEGACY_TEMPLATE_FORMAT ? LEGACY_TEMPLATE_FORMAT : undefined;
+
+  // The chat template is applied by the NLA server (single source of truth).
+  // Callers send structured `messages`; the server renders the canonical string
+  // (used as the cache key + forwarded to the upstream /explain). A pre-rendered
+  // `text` is still accepted for legacy/direct callers.
+  const addGenerationPrompt = typeof body.add_generation_prompt === 'boolean' ? body.add_generation_prompt : undefined;
   let text: string | undefined = typeof rawText === 'string' ? rawText : undefined;
   if (!text && isChatMessageArray(messages)) {
     if (!modelId) {
@@ -418,7 +485,14 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         { status: 400 },
       );
     }
-    text = formatChatForModel(modelId, messages);
+    try {
+      text = await renderTextFromMessages(modelId, nlaSourceId, messages, addGenerationPrompt);
+    } catch (err) {
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : 'Failed to render chat template' },
+        { status: 502 },
+      );
+    }
   }
 
   if (!text || typeof text !== 'string') {
@@ -585,6 +659,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       results,
       layerIndex,
       promptLength,
+      messages: structuredMessages,
+      tokenSpans: structuredTokenSpans,
+      templateFormat: storedTemplateFormat,
     });
     return NextResponse.json({ results, layer_index: layerIndex, prompt_length: promptLength, cacheId: row.id });
   }
@@ -643,6 +720,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           results: orderedResults,
           layerIndex,
           promptLength,
+          messages: structuredMessages,
+          tokenSpans: structuredTokenSpans,
+          templateFormat: storedTemplateFormat,
         });
         cacheId = row.id;
       } catch (err) {
@@ -685,6 +765,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         results: orderedResults,
         layerIndex,
         promptLength,
+        messages: structuredMessages,
+        tokenSpans: structuredTokenSpans,
+        templateFormat: storedTemplateFormat,
       });
       return row.id;
     })

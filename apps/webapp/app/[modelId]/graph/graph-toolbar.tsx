@@ -637,7 +637,10 @@ export default function GraphToolbar() {
               size="sm"
               className="flex h-12 items-center justify-center gap-x-1 whitespace-nowrap border-emerald-500 bg-emerald-50 text-xs font-medium leading-none text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700"
               onClick={() => {
-                setIsGenerateGraphModalOpen(true, selectedMetadataGraph?.prompt.replaceAll('<bos>', '') || '');
+                // Seeded with the stored prompt verbatim. The modal parses it
+                // against the model's own tokenizer, which is what strips the
+                // BOS and splits out chat turns.
+                setIsGenerateGraphModalOpen(true, selectedMetadataGraph?.prompt || '');
               }}
               title="Modify the prompt or use a different transcoder set."
               disabled={selectedMetadataGraph === null || !selectedGraph}
