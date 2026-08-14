@@ -6,7 +6,7 @@ The Jacobian lens reads out an early-layer residual ``h_ℓ`` by linearly
 transporting it into the final-layer basis with the average input–output
 Jacobian, then decoding with the model's own unembedding::
 
-    lens_ℓ(h)  =  unembed( J̄_ℓ @ h )
+    lens_ℓ(h)  =  unembed( J_bar_ℓ @ h )
 
 The estimator implemented here (see :func:`jacobian_for_prompt`) sums the
 cotangent over **all valid target positions at once** and then averages the
@@ -17,7 +17,7 @@ the paper; it makes a single backward pass yield one full row of ``J_ℓ`` per
 batch element, and empirically the cross-position bleed is small (the
 same-position term dominates). A reader implementing the per-position
 ``∂h_final[p] / ∂h_ℓ[p]`` and averaging over ``p`` separately will get a
-slightly different ``J̄`` — both work as a lens.
+slightly different ``J_bar`` — both work as a lens.
 
 On Qwen 3.6-27B (64 layers, ``d_model=5120``) this is ~5 minutes per prompt on
 2× H100; the paper figures use 1000 prompts. Host-RAM footprint is roughly
@@ -54,7 +54,7 @@ class FitProgress:
     Frobenius change of the running-mean Jacobian contributed by *this* prompt,
     averaged over the fitted layers::
 
-        δ_n = mean_ℓ ‖J̄_ℓ(n) − J̄_ℓ(n−1)‖_F / ‖J̄_ℓ(n)‖_F
+        δ_n = mean_ℓ ‖J_bar_ℓ(n) − J_bar_ℓ(n−1)‖_F / ‖J_bar_ℓ(n)‖_F
 
     For an i.i.d. running mean this decays like ``~1/n``; watch for the prompt
     count where it flattens below a small threshold (e.g. ~1e-3). That is the
@@ -67,7 +67,7 @@ class FitProgress:
         seq_len: Tokenized length of this prompt.
         n_valid_positions: Source positions averaged over for this prompt.
         elapsed_s: Wall-clock seconds spent on this prompt.
-        identity_distance: ``‖J̄_late − I‖_F / √d`` for the highest fitted layer.
+        identity_distance: ``‖J_bar_late − I‖_F / √d`` for the highest fitted layer.
         mean_rel_change: Convergence metric above. ``nan`` for the first prompt
             (no previous mean to compare against).
     """
@@ -138,7 +138,7 @@ def jacobian_for_prompt(
         target_layer: Layer to take gradients with respect to. Defaults to the
             final layer (``n_layers - 1``). For models with heavy late-layer
             scaling (e.g. Gemma 4's ``layer_scalar``), targeting ``n_layers - 2``
-            can give a better-conditioned ``J̄``.
+            can give a better-conditioned ``J_bar``.
         dim_batch: Output dimensions computed per backward pass. Higher uses
             more GPU memory (the prompt is replicated this many times in the
             forward); per-prompt time is nearly invariant since the total
@@ -247,7 +247,7 @@ def fit(
     resume: bool = True,
     metrics_callback: Callable[[FitProgress], bool | None] | None = None,
 ) -> JacobianLens:
-    """Fit ``J̄_ℓ`` over a list of prompts and return a :class:`JacobianLens`.
+    """Fit ``J_bar_ℓ`` over a list of prompts and return a :class:`JacobianLens`.
 
     The per-prompt Jacobians from :func:`jacobian_for_prompt` are accumulated as
     a running mean. If ``checkpoint_path`` is set, the running sum is saved
@@ -257,7 +257,7 @@ def fit(
         model: The model to fit on.
         prompts: Text prompts to average over. The paper uses ~1000 paragraphs
             of generic web text; 100–200 is enough for a recognisable lens.
-        source_layers: Layers to fit ``J̄_ℓ`` at. Defaults to every layer below
+        source_layers: Layers to fit ``J_bar_ℓ`` at. Defaults to every layer below
             ``target_layer``.
         target_layer: See :func:`jacobian_for_prompt`. Defaults to the final
             layer; negative values index from the end.
@@ -355,7 +355,7 @@ def fit(
             continue
         # Relative change of the running mean contributed by this prompt,
         # averaged over fitted layers — the "is it still moving?" signal.
-        # Welford: J̄(m) − J̄(m−1) = (Xₘ − J̄(m−1)) / m, so we never need a copy
+        # Welford: J_bar(m) − J_bar(m−1) = (Xₘ − J_bar(m−1)) / m, so we never need a copy
         # of the previous mean. ``m`` is the prompt count after this one.
         m = n_done + 1
         rel_changes: list[float] = []
@@ -379,7 +379,7 @@ def fit(
         ).norm().item() / math.sqrt(d_model)
         elapsed_s = time.perf_counter() - start_time
         logger.info(
-            "  prompt %d/%d  seq_len=%d n_valid=%d  %.0fs  ||J̄_%d − I||_F/√d=%.3f  Δmean=%.2e",
+            "  prompt %d/%d  seq_len=%d n_valid=%d  %.0fs  ||J_bar_%d − I||_F/√d=%.3f  Δmean=%.2e",
             prompt_idx + 1,
             len(prompts),
             seq_len,

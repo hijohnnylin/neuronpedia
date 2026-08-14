@@ -13,7 +13,7 @@ declare module 'next-auth' {
       email: string;
       image: string;
       name: string;
-      country: string?;
+      country?: string;
     };
   }
 }

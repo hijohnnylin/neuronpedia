@@ -1,11 +1,11 @@
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
-"""The Jacobian lens: applying a fitted ``J̄`` to read out early-layer residuals.
+"""The Jacobian lens: applying a fitted ``J_bar`` to read out early-layer residuals.
 
-A :class:`JacobianLens` holds the per-layer average Jacobians ``J̄_ℓ`` produced by
+A :class:`JacobianLens` holds the per-layer average Jacobians ``J_bar_ℓ`` produced by
 :func:`jlens.fitting.fit`. Applying it is a single matrix multiply per layer::
 
-    lens_ℓ(h)  =  unembed( J̄_ℓ @ h )
+    lens_ℓ(h)  =  unembed( J_bar_ℓ @ h )
 
 where ``h`` is the residual at layer ``ℓ`` and ``unembed`` is the model's own
 final-norm + LM-head. The class is independent of the model that was used to fit
@@ -25,13 +25,13 @@ from jlens.protocol import LensModel
 
 
 class JacobianLens:
-    """A fitted Jacobian lens — per-layer ``J̄_ℓ`` matrices and the readout method.
+    """A fitted Jacobian lens — per-layer ``J_bar_ℓ`` matrices and the readout method.
 
     Construct directly with the Jacobian dict (as returned by
     :func:`jlens.fitting.fit`), or load from disk with :meth:`load`.
 
     Attributes:
-        jacobians: ``{layer_index: Tensor[d_model, d_model]}``. Each ``J̄_ℓ`` maps
+        jacobians: ``{layer_index: Tensor[d_model, d_model]}``. Each ``J_bar_ℓ`` maps
             the residual at layer ``ℓ`` into the final-layer basis.
         source_layers: Sorted list of fitted layer indices (the keys of
             :attr:`jacobians`).
@@ -91,7 +91,7 @@ class JacobianLens:
 
         This is how sharded fits are aggregated: each machine runs
         :func:`jlens.fitting.fit` on its slice of the prompt corpus, saves the
-        result, and one machine merges. The merged ``J̄_ℓ`` is the
+        result, and one machine merges. The merged ``J_bar_ℓ`` is the
         ``n_prompts``-weighted mean of the inputs.
 
         Args:
@@ -118,7 +118,7 @@ class JacobianLens:
         return cls(jacobians=merged, n_prompts=n_total, d_model=first.d_model)
 
     def transport(self, residual: torch.Tensor, layer: int) -> torch.Tensor:
-        """Map a residual at ``layer`` into the final-layer basis: ``J̄_ℓ @ h``.
+        """Map a residual at ``layer`` into the final-layer basis: ``J_bar_ℓ @ h``.
 
         Args:
             residual: Tensor of shape ``[..., d_model]``.
@@ -152,7 +152,7 @@ class JacobianLens:
             position: Token position to read out (Python indexing into the
                 sequence; ``-1`` is the last token).
             max_seq_len: Truncate the prompt to this many tokens.
-            use_jacobian: If ``False``, skip the ``J̄`` transport — this is the
+            use_jacobian: If ``False``, skip the ``J_bar`` transport — this is the
                 vanilla logit-lens baseline.
 
         Returns:

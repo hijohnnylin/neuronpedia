@@ -17,7 +17,7 @@ The Jacobian lens reads out an early-layer residual ``h_ℓ`` by linearly
 transporting it into the final-layer basis with the average input–output
 Jacobian, then decoding with the model's own unembedding::
 
-    lens_ℓ(h)  =  unembed( J̄_ℓ @ h )
+    lens_ℓ(h)  =  unembed( J_bar_ℓ @ h )
 
 See the *Verbalizable Workspace* paper for background and the ``demo/``
 directory for an end-to-end walkthrough.
