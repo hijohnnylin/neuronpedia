@@ -142,3 +142,7 @@ dist
 .secrets*
 
 CLAUDE.local.md
+
+plans/*
+
+.playwright-mcp/*
