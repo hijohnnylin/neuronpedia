@@ -6,15 +6,21 @@ import * as Sentry from '@sentry/nextjs';
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
+// Must be NEXT_PUBLIC_: this file is bundled for the browser, and Next only inlines env vars
+// carrying that prefix. Reading the bare `SENTRY_DSN` here leaves `dsn` undefined in every
+// browser, which is why nothing client-side has ever reached Sentry. A DSN is a public
+// identifier, not a secret, so exposing it in the bundle is how it is meant to be shipped.
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  enabled: process.env.SENTRY_DSN !== undefined,
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Add optional integrations for additional features
   // integrations: [Sentry.replayIntegration()],
 
-  // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
-  tracesSampleRate: 1,
+  // Matches the 25% the server and edge runtimes sample at (see lib/sentry-sampling.ts). A flat
+  // rate rather than that sampler because its route exclusions are server-side routes, and
+  // because the env var it reads is not exposed to the browser.
+  tracesSampleRate: 0.25,
 
   // // Define how likely Replay events are sampled.
   // // This sets the sample rate to be 10%. You may want this to be 100% while

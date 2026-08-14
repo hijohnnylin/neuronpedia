@@ -3,14 +3,16 @@
 // Note that this config is unrelated to the Vercel Edge Runtime and is also required when running locally.
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
+import { tracesSampler } from '@/lib/sentry-sampling';
 import * as Sentry from '@sentry/nextjs';
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-  enabled: process.env.SENTRY_DSN !== undefined,
+  // `!== undefined` treats an env var that is present but empty as configured, which starts the
+  // SDK with no DSN instead of leaving it off.
+  enabled: !!process.env.SENTRY_DSN,
 
-  // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
-  tracesSampleRate: 1,
+  tracesSampler,
 
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,

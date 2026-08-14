@@ -22,6 +22,7 @@ import {
 import { AuthenticatedUser } from '@/lib/with-user';
 import { NeuronPartial, NeuronPartialWithRelations } from '@/prisma/generated/zod';
 import { InferenceEngine, SteerOutputType } from '@prisma/client';
+import * as Sentry from '@sentry/nextjs';
 import createClient from 'openapi-fetch';
 import {
   getAllInstanceHostsForModel,
@@ -313,6 +314,17 @@ export const getActivationForFeature = async (
   if (!feature.modelId || !feature.layer || !feature.index) {
     throw new Error('Invalid feature');
   }
+
+  // Inference failures here name a model internal and nothing else — "hook
+  // 'blocks.19.ln2.hook_normalized' has no canonical point" says which hook was rejected but not
+  // which feature asked for it, and Sentry receives no request body for App Router routes, so
+  // without this the report is unactionable. These three fields are enough to find the neuron, and
+  // deliberately exclude the caller's text.
+  Sentry.setContext('feature', {
+    modelId: feature.modelId,
+    source: feature.layer,
+    index: feature.index,
+  });
 
   // get if it's a feature/vector first
   const result = await getNeuronOnly(feature.modelId, feature.layer, feature.index);
