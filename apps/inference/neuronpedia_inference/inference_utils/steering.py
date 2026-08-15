@@ -8,7 +8,6 @@ from transformers import PreTrainedTokenizerBase
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import request_lock
 
 # Regex to match Llama 3's auto-injected knowledge cutoff preamble in system messages
 # This preamble is added by apply_chat_template and looks like:
@@ -29,20 +28,6 @@ def _strip_llama3_system_preamble(content: str) -> str:
     """Strip Llama 3's auto-injected knowledge cutoff preamble and assistant axis system prompt addition from system message content."""
     content = _LLAMA3_SYSTEM_PREAMBLE_PATTERN.sub("", content)
     return content.strip()
-
-
-async def stream_lock(is_stream: bool):
-    if is_stream:
-        return request_lock
-
-    class DummyLock:
-        async def __aenter__(self):
-            pass
-
-        async def __aexit__(self, *args):  # type: ignore
-            pass
-
-    return DummyLock()
 
 
 def format_sse_message(data: str) -> str:

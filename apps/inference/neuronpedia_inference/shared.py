@@ -31,40 +31,53 @@ REQUEST_LOCK_TIMEOUT = float(
 )  # 5 min default
 
 
+async def acquire_request_lock() -> None:
+    """Acquire the global request lock with timeout and logging.
+
+    For streaming endpoints the lock must be released in the generator's
+    ``finally`` (Starlette iterates a StreamingResponse body after the handler
+    returns, so a decorator-scoped lock would be released before generation
+    even runs).  Call this function directly in the handler and release via
+    ``request_lock.release()`` when generation completes.
+
+    Raises ``TimeoutError`` if the lock cannot be acquired within
+    ``REQUEST_LOCK_TIMEOUT`` seconds.
+    """
+    wait_start = time.time()
+
+    if request_lock.locked():
+        logger.warning(
+            "[LOCK] Request waiting for lock (another request in progress)..."
+        )
+
+    if REQUEST_LOCK_TIMEOUT > 0:
+        await asyncio.wait_for(request_lock.acquire(), timeout=REQUEST_LOCK_TIMEOUT)
+    else:
+        await request_lock.acquire()
+
+    wait_time = time.time() - wait_start
+    if wait_time > 0.1:
+        logger.info(f"[LOCK] Acquired lock after {wait_time:.2f}s wait")
+
+
 def with_request_lock():
     def decorator(func):  # type: ignore
         @wraps(func)
         async def wrapper(*args, **kwargs):  # type: ignore
-            wait_start = time.time()
-
-            if request_lock.locked():
-                logger.warning(
-                    "[LOCK] Request waiting for lock (another request in progress)..."
-                )
-
             try:
-                if REQUEST_LOCK_TIMEOUT > 0:
-                    # Use wait_for with timeout
-                    await asyncio.wait_for(
-                        request_lock.acquire(), timeout=REQUEST_LOCK_TIMEOUT
-                    )
-                else:
-                    await request_lock.acquire()
-
-                wait_time = time.time() - wait_start
-                if wait_time > 0.1:  # Only log if waited more than 100ms
-                    logger.info(f"[LOCK] Acquired lock after {wait_time:.2f}s wait")
-
+                await acquire_request_lock()
                 try:
                     return await func(*args, **kwargs)
                 finally:
                     request_lock.release()
-
             except asyncio.TimeoutError:
-                wait_time = time.time() - wait_start
-                logger.error(f"[LOCK] Timeout waiting for lock after {wait_time:.2f}s")
+                logger.error(
+                    "[LOCK] Timeout waiting for lock after %.2fs",
+                    REQUEST_LOCK_TIMEOUT,
+                )
                 raise TimeoutError(
-                    f"Request timed out waiting for lock after {wait_time:.2f}s"
+                    f"Request timed out waiting for lock after "
+                    f"{REQUEST_LOCK_TIMEOUT:.2f}s"
                 )
 
         return wrapper
