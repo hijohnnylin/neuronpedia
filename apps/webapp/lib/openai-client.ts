@@ -6,12 +6,14 @@ import {
   NEXT_PUBLIC_URL,
   OPENAI_API_KEY,
   OPENROUTER_API_KEY,
+  ORCAROUTER_API_KEY,
   SITE_NAME_VERCEL_DEPLOY,
 } from './env';
 
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const ORCAROUTER_BASE_URL = 'https://api.orcarouter.ai/v1';
 
-export type Provider = 'openai' | 'azure' | 'openrouter';
+export type Provider = 'openai' | 'azure' | 'openrouter' | 'orcarouter';
 
 export interface OpenAIClientConfig {
   provider?: Provider;
@@ -40,6 +42,8 @@ export class OpenAIClientFactory {
         return OpenAIClientFactory.createAzureClient(config);
       case 'openrouter':
         return OpenAIClientFactory.createOpenRouterClient(config);
+      case 'orcarouter':
+        return OpenAIClientFactory.createOrcaRouterClient(config);
       case 'openai':
       default:
         return OpenAIClientFactory.createOpenAIClient(config);
@@ -85,6 +89,22 @@ export class OpenAIClientFactory {
 
     return new OpenAI({
       baseURL: OPENROUTER_BASE_URL,
+      apiKey,
+      defaultHeaders: {
+        'HTTP-Referer': NEXT_PUBLIC_URL || '',
+        'X-Title': SITE_NAME_VERCEL_DEPLOY || 'Neuronpedia',
+      },
+    });
+  }
+
+  private static createOrcaRouterClient(config?: OpenAIClientConfig): OpenAI {
+    const apiKey = config?.apiKey || ORCAROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('OrcaRouter API key not found. Set ORCAROUTER_API_KEY in env.ts.');
+    }
+
+    return new OpenAI({
+      baseURL: ORCAROUTER_BASE_URL,
       apiKey,
       defaultHeaders: {
         'HTTP-Referer': NEXT_PUBLIC_URL || '',

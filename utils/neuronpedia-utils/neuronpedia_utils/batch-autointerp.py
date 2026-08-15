@@ -82,7 +82,7 @@ VALID_EXPLAINER_TYPE_NAMES = [
     "python-code",
 ]
 
-VALID_API_PROVIDERS = ["openai", "openrouter", "gemini"]
+VALID_API_PROVIDERS = ["openai", "openrouter", "orcarouter", "gemini"]
 
 # Activation selection mode: top (default) or bottom
 # top: use highest activations (standard behavior)
@@ -114,6 +114,10 @@ OPENAI_BASE_URL = "https://api.openai.com/v1"
 # OPENROUTER SUPPORT
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+# ORCAROUTER SUPPORT
+ORCAROUTER_API_KEY = os.getenv("ORCAROUTER_API_KEY")
+ORCAROUTER_BASE_URL = "https://api.orcarouter.ai/v1"
 
 # GEMINI SUPPORT
 GEMINI_MODEL_NAMES = [
@@ -297,6 +301,10 @@ async def call_autointerp_openai_for_activations(
         model_name = EXPLAINER_MODEL_NAME
         base_api_url = OPENROUTER_BASE_URL
         override_api_key = OPENROUTER_API_KEY
+    elif API_PROVIDER == "orcarouter":
+        model_name = EXPLAINER_MODEL_NAME
+        base_api_url = ORCAROUTER_BASE_URL
+        override_api_key = ORCAROUTER_API_KEY
     elif API_PROVIDER == "gemini":
         # only needed for vertex
         if GEMINI_VERTEX:
@@ -311,7 +319,7 @@ async def call_autointerp_openai_for_activations(
         override_api_key = GEMINI_API_KEY
     else:
         raise ValueError(
-            f"Invalid API_PROVIDER: {API_PROVIDER}. Must be 'openai', 'openrouter', or 'gemini'."
+            f"Invalid API_PROVIDER: {API_PROVIDER}. Must be 'openai', 'openrouter', 'orcarouter', or 'gemini'."
         )
 
     global FAILED_FEATURE_INDEXES_OUTPUT
@@ -874,6 +882,11 @@ def main(
             raise ValueError(
                 "OPENROUTER_API_KEY is not set even though API_PROVIDER is 'openrouter'"
             )
+    elif API_PROVIDER == "orcarouter":
+        if ORCAROUTER_API_KEY is None:
+            raise ValueError(
+                "ORCAROUTER_API_KEY is not set even though API_PROVIDER is 'orcarouter'"
+            )
     elif API_PROVIDER == "gemini":
         if is_gemini_model(explainer_model_name) and GEMINI_API_KEY is None:
             raise ValueError(
@@ -881,7 +894,7 @@ def main(
             )
     else:
         raise ValueError(
-            f"Invalid API_PROVIDER: {API_PROVIDER}. Must be 'openai', 'openrouter', or 'gemini'."
+            f"Invalid API_PROVIDER: {API_PROVIDER}. Must be 'openai', 'openrouter', 'orcarouter', or 'gemini'."
         )
 
     global \

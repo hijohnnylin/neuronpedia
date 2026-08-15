@@ -70,12 +70,13 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+export const ORCAROUTER_API_KEY = process.env.ORCAROUTER_API_KEY || '';
 export const HF_TOKEN = process.env.HF_TOKEN || '';
 
-// These keys are used to use OpenAI embedding via OpenAI, Azure, or OpenRouter. By default we use OpenAI directly and the AZURE fields can be kept blank.
+// These keys are used to use OpenAI embedding via OpenAI, Azure, OpenRouter, or OrcaRouter. By default we use OpenAI directly and the AZURE fields can be kept blank.
 export const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || '';
 export const AZURE_OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT || '';
-const EmbeddingProviderSchema = z.enum(['openai', 'azure', 'openrouter']);
+const EmbeddingProviderSchema = z.enum(['openai', 'azure', 'openrouter', 'orcarouter']);
 export const EMBEDDING_PROVIDER = EmbeddingProviderSchema.parse(process.env.EMBEDDING_PROVIDER || 'openai');
 
 // Sentry (Crash Reporting - Used by Sentry, not by us directly)
