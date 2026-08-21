@@ -18,8 +18,8 @@ import {
   LensMetaMessage,
   LensTokenMessage,
   LensType,
-  maxLensCompletionTokens,
   MAX_LENS_STEER_STRENGTH,
+  maxLensCompletionTokens,
 } from '@/lib/utils/lens';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';

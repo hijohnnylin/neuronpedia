@@ -10,9 +10,9 @@ import {
   LensSteerToken,
   LensTokenMessage,
   LensType,
-  maxLensCompletionTokens,
   MAX_LENS_CHAT_USER_CHARS,
   MAX_LENS_COMPLETION_PROMPT_CHARS,
+  maxLensCompletionTokens,
 } from '@/lib/utils/lens';
 import { NextResponse } from 'next/server';
 import * as yup from 'yup';
