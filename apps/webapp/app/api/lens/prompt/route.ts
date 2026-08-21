@@ -10,9 +10,9 @@ import {
   LensSteerToken,
   LensTokenMessage,
   LensType,
+  maxLensCompletionTokens,
   MAX_LENS_CHAT_USER_CHARS,
   MAX_LENS_COMPLETION_PROMPT_CHARS,
-  MAX_LENS_COMPLETION_TOKENS,
 } from '@/lib/utils/lens';
 import { NextResponse } from 'next/server';
 import * as yup from 'yup';
@@ -74,11 +74,13 @@ const lensPromptRequestSchema = yup.object({
     .default([...LENS_TYPES]),
   topN: yup.number().integer().min(1).max(8).default(DEFAULT_LENS_TOP_N),
   temperature: yup.number().min(0).max(2).default(DEFAULT_LENS_TEMPERATURE),
+  // The generation ceiling is per model (see `maxLensCompletionTokens`), so the
+  // bound is resolved from the request's `modelId` rather than being fixed.
   numCompletionTokens: yup
     .number()
     .integer()
     .min(0)
-    .max(MAX_LENS_COMPLETION_TOKENS)
+    .when('modelId', ([modelId], schema) => schema.max(maxLensCompletionTokens(modelId ?? '')))
     .default(DEFAULT_LENS_COMPLETION_TOKENS),
   prependBos: yup.boolean().default(true),
   enableThinking: yup.boolean().default(false),
@@ -187,7 +189,7 @@ const lensPromptRequestSchema = yup.object({
  *                 default: 0
  *               numCompletionTokens:
  *                 type: integer
- *                 description: Number of tokens to generate after the prompt. 0 = read out over the input only (no generation).
+ *                 description: Number of tokens to generate after the prompt. 0 = read out over the input only (no generation). The maximum depends on the model — 2048 for deepseek-v4-flash, 1024 for every other model.
  *                 minimum: 0
  *                 maximum: 2048
  *                 default: 128

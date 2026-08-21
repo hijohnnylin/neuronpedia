@@ -21,6 +21,7 @@ import {
   LensType,
   MAX_LENS_CHAT_PREFILL_CHARS,
   MAX_LENS_CHAT_USER_CHARS,
+  maxLensCompletionTokens,
 } from '@/lib/utils/lens';
 import { ArrowUp, Check, Copy, Download, Pencil, Settings, Share2, Trash2, X } from 'lucide-react';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -149,6 +150,7 @@ export default function JlensChat({
 
   const [temperature, setTemperature] = useState(DEFAULT_LENS_TEMPERATURE);
   const [numCompletionTokens, setNumCompletionTokens] = useState(DEFAULT_LENS_COMPLETION_TOKENS);
+  const maxCompletionTokens = maxLensCompletionTokens(modelId);
   const [topN, setTopN] = useState(DEFAULT_LENS_TOP_N);
 
   const [meta, setMeta] = useState<LensMetaMessage | null>(null);
@@ -1100,7 +1102,9 @@ export default function JlensChat({
       setTopN(ui.topN);
       setHideNonWordTokens(ui.hideNonWordTokens);
       setTemperature(ui.temperature);
-      setNumCompletionTokens(ui.numCompletionTokens);
+      // Shares predating a model's current cap can carry more than the slider
+      // now offers, so keep the restored value within it.
+      setNumCompletionTokens(Math.min(ui.numCompletionTokens, maxCompletionTokens));
       pendingScrollSelectionRef.current = ui.selectedPositions.length > 0 ? ui.selectedPositions : null;
       if (
         ui.activeLensModeTab === LensMode.JACOBIAN_LENS ||
@@ -1347,6 +1351,7 @@ export default function JlensChat({
           setTemperature={setTemperature}
           numCompletionTokens={numCompletionTokens}
           setNumCompletionTokens={setNumCompletionTokens}
+          maxCompletionTokens={maxCompletionTokens}
           topN={topN}
           setTopN={setTopN}
           hideNonWordTokens={hideNonWordTokens}
@@ -1533,6 +1538,7 @@ export default function JlensChat({
           tokens={tokens}
           numCompletionTokens={numCompletionTokens}
           setNumCompletionTokens={setNumCompletionTokens}
+          maxCompletionTokens={maxCompletionTokens}
           onShare={() => setShareOpen(true)}
           canShare={canShare}
           shareDisabled={streaming}

@@ -1,6 +1,5 @@
 'use client';
 
-import { MAX_LENS_COMPLETION_TOKENS } from '@/lib/utils/lens';
 import * as Slider from '@radix-ui/react-slider';
 import { HelpCircle } from 'lucide-react';
 import CustomTooltip from '../custom-tooltip';
@@ -13,9 +12,9 @@ type Props = {
   setNumCompletionTokens: (n: number) => void;
   topN: number;
   setTopN: (n: number) => void;
-  // Upper bound for the "Generated Tokens" slider. Defaults to the chat
-  // ceiling; the completion interface passes its own, lower cap.
-  maxCompletionTokens?: number;
+  // Upper bound for the "Generated Tokens" slider. The chat interface passes
+  // its per-model cap; the completion interface passes its own, lower cap.
+  maxCompletionTokens: number;
   // Completion runs always generate; the chat interface also always generates.
   // `showCompletionTokens` lets a caller hide the slider if generation is
   // fixed for that interface.
@@ -76,7 +75,7 @@ export default function JlensAdvanced({
   setNumCompletionTokens,
   topN,
   setTopN,
-  maxCompletionTokens = MAX_LENS_COMPLETION_TOKENS,
+  maxCompletionTokens,
   showCompletionTokens = true,
   hideNonWordTokens,
   setHideNonWordTokens,

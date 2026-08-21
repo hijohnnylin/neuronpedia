@@ -12,7 +12,12 @@ import {
   JLENS_STEER_PANEL_ID,
 } from '@/app/[modelId]/jlens/jlens-tour-constants';
 import { useJlensTourStep } from '@/app/[modelId]/jlens/jlens-tour-context';
-import { LENS_STEER_STRENGTH_STEP, LensType, MAX_LENS_STEER_STRENGTH } from '@/lib/utils/lens';
+import {
+  DEFAULT_MAX_LENS_COMPLETION_TOKENS,
+  LENS_STEER_STRENGTH_STEP,
+  LensType,
+  MAX_LENS_STEER_STRENGTH,
+} from '@/lib/utils/lens';
 import * as Slider from '@radix-ui/react-slider';
 import { ArrowLeft, ArrowRight, Download, PlayIcon, Settings, Share2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -703,7 +708,7 @@ export function JlensSteerPanel({
                 <Slider.Root
                   value={[numCompletionTokens]}
                   min={0}
-                  max={maxCompletionTokens ?? 1024}
+                  max={maxCompletionTokens ?? DEFAULT_MAX_LENS_COMPLETION_TOKENS}
                   step={1}
                   disabled={locked}
                   onValueChange={(v) => setNumCompletionTokens(v[0])}

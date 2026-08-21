@@ -41,11 +41,19 @@ export const JLENS_METADATA_PATH = '/jlens/jlens.jpg';
 export const DEFAULT_LENS_TOP_N = 8;
 export const DEFAULT_LENS_TEMPERATURE = 0;
 export const DEFAULT_LENS_COMPLETION_TOKENS = 128;
-// Ceiling on generated tokens: the chat interface's slider maximum, and the
-// bound both `/api/lens/prompt` and `/api/lens/share` validate against. All
-// three have to agree — a run the UI lets you generate must be one the prompt
-// endpoint accepts and the share endpoint can then store.
+// Ceiling on generated tokens, per model: the chat interface's slider maximum,
+// and the bound both `/api/lens/prompt` and `/api/lens/share` validate against.
+// All three have to agree — a run the UI lets you generate must be one the
+// prompt endpoint accepts and the share endpoint can then store. Only the models
+// listed below get the highest ceiling; the rest stop at the lower default.
 export const MAX_LENS_COMPLETION_TOKENS = 2048;
+export const DEFAULT_MAX_LENS_COMPLETION_TOKENS = 1024;
+const MAX_LENS_COMPLETION_TOKENS_BY_MODEL: Record<string, number> = {
+  'deepseek-v4-flash': MAX_LENS_COMPLETION_TOKENS,
+};
+export function maxLensCompletionTokens(modelId: string): number {
+  return MAX_LENS_COMPLETION_TOKENS_BY_MODEL[modelId] ?? DEFAULT_MAX_LENS_COMPLETION_TOKENS;
+}
 // The single-shot completion interface caps generation lower than chat.
 export const MAX_LENS_COMPLETION_TOKENS_COMPLETION = 128;
 // Default number of generated tokens for the completion interface (lower than

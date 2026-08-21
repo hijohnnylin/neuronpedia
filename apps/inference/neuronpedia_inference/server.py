@@ -17,6 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from interp_engine import (
+    Address,
     VLLMModel,
     check_cuda_driver,
     load_model,
@@ -65,6 +66,7 @@ from neuronpedia_inference.endpoints.lens.prompt import (
     router as lens_prompt_router,
 )
 from neuronpedia_inference.endpoints.lens.prompt import warmup_lens
+from neuronpedia_inference.endpoints.lens.residual_spec import block_output_point
 from neuronpedia_inference.endpoints.steer.completion import (
     router as steer_completion_router,
 )
@@ -154,11 +156,19 @@ def _graph_compilation_config() -> dict[str, list[int]]:
 
 
 def _vllm_max_num_batched_tokens() -> int | None:
-    """``MAX_NUM_BATCHED_TOKENS``: the prefill chunk size. Unset leaves the choice to the engine.
+    """``MAX_NUM_BATCHED_TOKENS``: the prefill chunk size. Unset lands on vLLM's 2048, not 8192.
 
     On a static pod this is also what sizes the static buffers, which are one static row per
     batched token at every static site. The engine already picks the largest value whose buffers
     fit and refuses to start when none do, so most pods want that default.
+
+    Read "the engine's default" carefully, though, because it is only half the story: the fit
+    reasons about an ASSUMED 8192 and writes the value back only when it has to LOWER it. A set
+    that fits 8192 therefore leaves the kwarg unset and vLLM chooses, and vLLM chooses 2048 --
+    ``AsyncLLM.from_engine_args`` defaults ``usage_context`` to ``ENGINE_CONTEXT``, which appears
+    in neither branch of vLLM's ``get_batch_defaults``, so it falls through to
+    ``SchedulerConfig.DEFAULT_MAX_NUM_BATCHED_TOKENS``. So the fit over-budgets buffers 4x on
+    every pod it does not lower, and pinning is also how a pod stops depending on that fallback.
 
     What it cannot see is that the fit is GREEDY: it spends the pool on buffers before graphs, so
     where the weights leave little room the largest size that fits can leave CUDA-graph capture
@@ -194,8 +204,24 @@ def _engine_context_len(token_limit: int, lens_token_limit: int) -> int:
     return max(int(token_limit), int(lens_token_limit))
 
 
+#: ``STATIC_POINTS`` values whose sites are not known until the SAEs have loaded. Such a pod is
+#: built hooked and promoted by ``configure_static`` before warmup, so it reaches the engine
+#: constructor with no tap set at all -- see :func:`_vllm_engine_backend`.
+_SAE_RESOLVED_MODES = ("sae", "sae+auto")
+
+
 def _parse_static_points(raw: str | None) -> Any:
-    """``STATIC_POINTS``: unset, ``auto``, ``sae``, or a JSON list of addresses.
+    """``STATIC_POINTS``: unset, ``auto``, ``sae``, ``sae+auto``, or a JSON list of addresses.
+
+    ``sae+auto`` is the union of the other two named modes: the SAE hook sites AND the residual
+    point at every layer, reads and writes. It exists because those are two different questions and
+    one pod needs both answered. An SAE set covers the layers its SAEs were trained at, which for
+    `gemmascope-mlp-16k` + `gemmascope-transcoder-16k` is `mlp_out_post` and `resid_mid`
+    everywhere and a residual point on 13 layers of 26 -- and a lens read-out asks for the residual
+    point at ALL of them, final layer included (``endpoints/lens/prompt._select_layers``). So `sae`
+    alone serves the sources and refuses the lens, while `auto` alone serves the lens and takes the
+    transcoder and MLP sources down with it. Neither is the pod, and an explicit JSON list is not
+    either: a list declares no writes, so it would trade every steer for the lens.
 
     An empty list used to be how a pod asked for graphs with no taps. That mode now has a name of
     its own -- ``backend="vllm-generate"``, reached through ``GENERATION_ONLY`` -- so the empty list
@@ -203,21 +229,61 @@ def _parse_static_points(raw: str | None) -> Any:
     """
     if raw is None or raw == "":
         return None
-    if raw in ("auto", "sae"):
+    if raw in ("auto", *_SAE_RESOLVED_MODES):
         return raw
     try:
         points = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise ValueError(
-            f"STATIC_POINTS={raw!r} is not 'auto', 'sae', or JSON (e.g. 'auto' or [[\"resid_post\", 7]])."
+            f"STATIC_POINTS={raw!r} is not 'auto', 'sae', 'sae+auto', or JSON "
+            '(e.g. \'auto\' or [["resid_post", 7]]).'
         ) from exc
     if isinstance(points, list) and not points:
         raise ValueError(
             "STATIC_POINTS=[] declares no taps, so it asks for a graph-mode pod that cannot "
             "capture anything. Set GENERATION_ONLY=true for that pod, or name the sites to "
-            "declare (STATIC_POINTS=auto, sae, or a JSON list of addresses)."
+            "declare (STATIC_POINTS=auto, sae, sae+auto, or a JSON list of addresses)."
         )
     return points
+
+
+def _with_residual_set(
+    model: Any,
+    reads: list[Address],
+    writes: list[Address],
+    num_layers: int,
+) -> tuple[list[Address], list[Address]]:
+    """Add the lens's point at every layer to a resolved SAE set (``STATIC_POINTS=sae+auto``).
+
+    The point is asked of ``block_output_point``, which is what ``/lens/prompt`` itself reads
+    through, rather than spelled ``resid_post`` here: that name is wrong on a hyper-connection
+    trunk, where the engine refuses it outright and the block output is ``resid_streams``. Asking
+    the endpoint's own resolver is what keeps this declaration and that read-out from drifting
+    apart -- a set declared under one name and read under the other is a 400 on a pod that
+    declared exactly what was wanted.
+
+    Written as reads AND writes, for the reason ``resolve_static_points`` fills the write set in
+    behind ``auto``: a read tap alone serves the read-out and then refuses every steer, ablation
+    and swap derived from it, which on `/lens/*` is half the endpoint. The SAE writes keep their
+    own mapping (``resid_pre[L]`` steers at ``resid_post[L-1]``) and are not touched.
+
+    Deduplicated on the address, so the layers an SAE already covers cost nothing twice -- the
+    13-of-26 overlap on `inference-gemma-2-2b-b-static` is the case this is for. Order is the SAE
+    sites first, which keeps the log line and any refusal reading as "the SAE set, plus the
+    residual set it was missing".
+    """
+    point = block_output_point(model)
+    read_keys = {str(address) for address in reads}
+    write_keys = {str(address) for address in writes}
+    merged_reads = list(reads)
+    merged_writes = list(writes)
+    for layer in range(int(num_layers)):
+        address = Address(point, layer)
+        if str(address) not in read_keys:
+            merged_reads.append(address)
+        if str(address) not in write_keys:
+            merged_writes.append(address)
+    return merged_reads, merged_writes
 
 
 def _vllm_engine_backend(*, generation_only: bool, static_points: Any) -> str:
@@ -226,9 +292,9 @@ def _vllm_engine_backend(*, generation_only: bool, static_points: Any) -> str:
     The engine takes the mode as ``backend=`` rather than inferring it from a tap set, so the
     mapping happens once, here, instead of being spread over the kwargs a caller happens to pass.
 
-    ``STATIC_POINTS=sae`` is not a case: its sites are not known until the SAEs have loaded, so
-    that pod is built hooked and promoted by ``configure_static`` before warmup, and arrives here
-    with ``static_points=None``.
+    ``STATIC_POINTS=sae`` and ``sae+auto`` are not cases: their sites are not known until the SAEs
+    have loaded, so such a pod is built hooked and promoted by ``configure_static`` before warmup,
+    and arrives here with ``static_points=None``.
     """
     if generation_only:
         return "vllm-generate"
@@ -649,8 +715,11 @@ async def initialize(
                 "site is already reachable and there is nothing to declare. Omit STATIC_POINTS, or "
                 "force vLLM with --force-vllm."
             )
-        if static_mode == "sae" and not args_sae_sets:
-            raise ValueError("STATIC_POINTS=sae needs SAE_SETS so there are hook sites to declare.")
+        if static_mode in _SAE_RESOLVED_MODES and not args_sae_sets:
+            raise ValueError(
+                f"STATIC_POINTS={static_mode} needs SAE_SETS so there are hook sites to declare. "
+                "Use STATIC_POINTS=auto for the residual set alone."
+            )
         num_gpus = max(1, int(getattr(args, "num_gpus", 1) or 1))
         if num_gpus > 1:
             logger.info("Multi-GPU: sharding across %d GPUs (%s)", num_gpus, args.backend)
@@ -690,7 +759,7 @@ async def initialize(
             # The engine splits vLLM into three backends by what the pod declares up front, so
             # resolve which one these flags mean. config.backend stays the family name, because
             # what the rest of the server asks is "vLLM or eager".
-            load_points = None if static_mode == "sae" else static_mode
+            load_points = None if static_mode in _SAE_RESOLVED_MODES else static_mode
             engine_backend = _vllm_engine_backend(generation_only=config.generation_only, static_points=load_points)
             logger.info("Loading model with engine-owned vLLM backend (%s)...", engine_backend)
             # Lightweight construct (tokenizer + config); the vLLM engine (with native
@@ -708,8 +777,11 @@ async def initialize(
                     "attention and the lens endpoints are unavailable and report so at "
                     "/capabilities."
                 )
-            elif static_mode == "sae":
-                logger.info("STATIC_POINTS=sae: will bind static wraps after SAE load, before engine warmup.")
+            elif static_mode in _SAE_RESOLVED_MODES:
+                logger.info(
+                    "STATIC_POINTS=%s: will bind static wraps after SAE load, before engine warmup.",
+                    static_mode,
+                )
         else:
             engine_backend = "eager"
             logger.info("Loading model with interp-engine (raw HF, eager PyTorch)...")
@@ -796,12 +868,15 @@ async def initialize(
         )
         SAEManager._instance.load_saes()
 
-        if is_vllm and static_mode == "sae":
+        if is_vllm and static_mode in _SAE_RESOLVED_MODES:
             from neuronpedia_inference.engine_adapter import sae_static_addresses
 
             reads, writes = sae_static_addresses(SAEManager._instance)
+            if static_mode == "sae+auto":
+                reads, writes = _with_residual_set(model, reads, writes, num_layers)
             logger.info(
-                "STATIC_POINTS=sae: freezing %d read site(s) and %d write site(s)",
+                "STATIC_POINTS=%s: freezing %d read site(s) and %d write site(s)",
+                static_mode,
                 len(reads),
                 len(writes),
             )

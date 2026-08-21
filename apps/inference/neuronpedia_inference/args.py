@@ -62,8 +62,10 @@ def parse_env_and_args():
     # the CUDA graphs and cuts holes in them at these sites only. Unset keeps the hooked vLLM, where
     # every site is reachable and none are fast. "auto" declares resid_post at every layer
     # (resid_streams on a hyper-connection trunk); "sae" declares the SAE hook sites once those SAEs
-    # load; a JSON list of [name, layer] pairs is an explicit set. Declare attn at a layer to keep
-    # attention/DFA. Anything not declared 400s, so this is a routing decision, not a tuning knob.
+    # load; "sae+auto" declares both, for a pod whose SAEs read points auto does not and whose lens
+    # needs layers the SAEs do not cover; a JSON list of [name, layer] pairs is an explicit set.
+    # Declare attn at a layer to keep attention/DFA. Anything not declared 400s, so this is a
+    # routing decision, not a tuning knob.
     args.static_points = os.getenv("STATIC_POINTS")
     # Renamed in interp-engine 1.3 along with the backend it drives. Refused rather than aliased,
     # because a deploy that sets the old name is asking for a tap set and would otherwise get a
