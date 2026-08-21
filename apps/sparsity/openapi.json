@@ -1,0 +1,460 @@
+{
+  "components": {
+    "schemas": {
+      "ChannelConnectionsResponse": {
+        "description": "Every neuron touching one residual channel, grouped by layer.\n\nThe ``*_by_layer`` keys are layer indices. They are ints in python but JSON object keys are\nalways strings, so they arrive as ``\"0\"``, ``\"1\"`` and so on.",
+        "properties": {
+          "channel_id": {
+            "title": "Channel Id",
+            "type": "integer"
+          },
+          "readers_by_layer": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/ChannelNeuron"
+              },
+              "type": "array"
+            },
+            "title": "Readers By Layer",
+            "type": "object"
+          },
+          "writers_by_layer": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/ChannelNeuron"
+              },
+              "type": "array"
+            },
+            "title": "Writers By Layer",
+            "type": "object"
+          }
+        },
+        "required": [
+          "channel_id",
+          "readers_by_layer",
+          "writers_by_layer"
+        ],
+        "title": "ChannelConnectionsResponse",
+        "type": "object"
+      },
+      "ChannelNeuron": {
+        "description": "A neuron reading from or writing to a residual channel, with its weight.",
+        "properties": {
+          "neuron_id": {
+            "title": "Neuron Id",
+            "type": "integer"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "neuron_id",
+          "weight"
+        ],
+        "title": "ChannelNeuron",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Liveness plus the dimensions needed to bounds-check a request.",
+        "properties": {
+          "d_model": {
+            "title": "D Model",
+            "type": "integer"
+          },
+          "mlp_size": {
+            "title": "Mlp Size",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "num_layers": {
+            "title": "Num Layers",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "model",
+          "num_layers",
+          "mlp_size",
+          "d_model"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "NeuronConnectionsResponse": {
+        "description": "Circuit traces downstream and upstream of one MLP neuron.",
+        "properties": {
+          "layer": {
+            "title": "Layer",
+            "type": "integer"
+          },
+          "neuron": {
+            "title": "Neuron",
+            "type": "integer"
+          },
+          "trace_backward": {
+            "items": {
+              "$ref": "#/components/schemas/TraceNode"
+            },
+            "title": "Trace Backward",
+            "type": "array"
+          },
+          "trace_forward": {
+            "items": {
+              "$ref": "#/components/schemas/TraceNode"
+            },
+            "title": "Trace Forward",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layer",
+          "neuron",
+          "trace_forward",
+          "trace_backward"
+        ],
+        "title": "NeuronConnectionsResponse",
+        "type": "object"
+      },
+      "TraceNode": {
+        "description": "One hop in a circuit trace: a neuron reached through a residual channel.\n\n``children`` and ``parents`` are the same relationship in opposite directions -- a node in\n``trace_forward`` carries ``children``, one in ``trace_backward`` carries ``parents``, and\nnever both. They are modelled on one type because every consumer walks the two traces with\nthe same code.",
+        "properties": {
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceNode"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "integer"
+          },
+          "neuron": {
+            "title": "Neuron",
+            "type": "integer"
+          },
+          "parents": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceNode"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parents"
+          },
+          "read_weight": {
+            "description": "Weight with which this neuron reads the channel",
+            "title": "Read Weight",
+            "type": "number"
+          },
+          "via_channel": {
+            "description": "Residual channel connecting this neuron to the previous hop",
+            "title": "Via Channel",
+            "type": "integer"
+          },
+          "write_weight": {
+            "description": "Weight with which the previous hop writes the channel",
+            "title": "Write Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "layer",
+          "neuron",
+          "read_weight",
+          "via_channel",
+          "write_weight"
+        ],
+        "title": "TraceNode",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Analyze MLP neuron connections in sparse circuit models",
+    "title": "Sparse Circuit Analyzer",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "description": "Health check and model info.",
+        "operationId": "root__get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Root"
+      }
+    },
+    "/channel/{channel_id}": {
+      "get": {
+        "description": "Get all neurons that read from or write to a specific residual channel.",
+        "operationId": "get_channel_connections_channel__channel_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_id",
+            "required": true,
+            "schema": {
+              "title": "Channel Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of top neurons to return per layer",
+            "in": "query",
+            "name": "top_k",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "description": "Number of top neurons to return per layer",
+              "title": "Top K",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelConnectionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Channel Connections"
+      }
+    },
+    "/neuron/{layer}/{neuron}": {
+      "get": {
+        "description": "Get circuit traces for a specific MLP neuron.\n\nReturns forward trace (downstream neurons) and backward trace (upstream neurons).",
+        "operationId": "get_neuron_connections_neuron__layer___neuron__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "layer",
+            "required": true,
+            "schema": {
+              "title": "Layer",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "neuron",
+            "required": true,
+            "schema": {
+              "title": "Neuron",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Depth of circuit trace",
+            "in": "query",
+            "name": "trace_depth",
+            "required": false,
+            "schema": {
+              "default": 2,
+              "description": "Depth of circuit trace",
+              "title": "Trace Depth",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Top K channels/neurons per step in trace",
+            "in": "query",
+            "name": "trace_k",
+            "required": false,
+            "schema": {
+              "default": 3,
+              "description": "Top K channels/neurons per step in trace",
+              "title": "Trace K",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NeuronConnectionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Neuron Connections"
+      }
+    }
+  }
+}

@@ -1,0 +1,119 @@
+name: Graph, NLA, Sparsity - Tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/graph/**"
+      - "apps/nla/**"
+      - "apps/sparsity/**"
+      # graph and nla depend on the engine as an editable path, so a change there is live in
+      # their venvs and can break these suites without touching apps/.
+      - ".github/workflows/graph-nla-sparsity-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/graph/**"
+      - "apps/nla/**"
+      - "apps/sparsity/**"
+      - ".github/workflows/graph-nla-sparsity-tests.yml"
+
+# These three had no test job at all, which left a specific hole rather than a vague one:
+# openapi-drift.yml owns only the openapi.json -> lib/api/*.d.ts link and delegates the
+# models -> openapi.json link to "each service's own test job". With no such job, nothing checked
+# that their committed specs still described their pydantic models, and their two hand-written
+# contract guards -- test_field_names_stay_snake_case in all three, and nla's test_frame_contract,
+# which pins the exact key set of SSE frames five webapp files read by hand -- never ran anywhere
+# but on a developer's machine.
+#
+# One workflow rather than three files, because the three share a reason for existing. The cost is
+# that touching one app runs the other two; they run in parallel, so it costs runner minutes rather
+# than wall clock.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/${{ matrix.app }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Each of the three imports torch at module scope, so "just dump the spec" still needs a
+          # real install -- there is no cheap tier here. What each one can skip differs:
+          #
+          # Every row is `--locked`. A bare `uv sync` re-resolves when uv.lock disagrees with
+          # pyproject.toml and installs the result, so the job would test a resolution the
+          # repository does not record and say nothing about it. That is not hypothetical: graph's
+          # circuit-tracer pin and its lock sat one commit apart for long enough that the venv and
+          # the pin had drifted apart locally too. `--locked` fails instead, and the fix is to run
+          # `uv lock` in that app and commit it.
+          #
+          # graph hard-imports circuit_tracer at module scope under the default ATTRIBUTION_ENGINE,
+          # so the extra is mandatory: without it tests/test_openapi.py cannot import the server at
+          # all. It used to skip in that case, which would have made this job green while checking
+          # nothing; it now fails when CI is set.
+          - app: graph
+            sync: uv sync --locked --extra circuit-tracer
+          # nla declares interp-engine[vllm], but nothing it imports at module scope reaches vLLM,
+          # so the suite passes without it. Verified by blocking the import, not assumed.
+          - app: nla
+            sync: uv sync --locked --no-install-package vllm
+          # sparsity depends on a git checkout of openai/circuit_sparsity that no test imports.
+          - app: sparsity
+            sync: uv sync --locked --no-install-package circuit-sparsity
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # Left off deliberately. setup-uv caches on GitHub-hosted runners by default, and a
+          # torch-sized cache per app would crowd a 10GB repo-wide budget that inference-tests and
+          # autointerp-tests already draw on, evicting warm caches to save a download that is not
+          # the slow part here.
+          enable-cache: false
+
+      # 3.12 satisfies all three: graph is pinned >=3.12,<3.13, nla >=3.11,<3.14, sparsity >=3.10.
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        id: install
+        run: ${{ matrix.sync }}
+
+      # Ruff is not run here: python-lint.yml owns the lint gate for every apps/* project and gets
+      # the same verdict in seconds.
+      #
+      # `--no-sync` is load-bearing, not tidiness. A bare `uv run` syncs the environment to the
+      # lockfile first, which reinstalls precisely the package the step above skipped -- so without
+      # it the `--no-install-package` flags achieve nothing and vLLM lands anyway.
+      - name: Run tests
+        run: uv run --no-sync pytest -v
+
+      # Pyright reports here but does not gate, unlike the inference and autointerp jobs. The
+      # installs above are deliberately partial, so this venv is not the one a developer has, and a
+      # diagnostic that follows from an omitted package should not stand between a correct change
+      # and a merge. All three set reportMissingImports = "none" for exactly that reason, so what
+      # is left is real -- it is worth seeing, just not worth blocking on.
+      #
+      # `!cancelled()` so a failing test still gets a type report in the same run, but gated on the
+      # install: with no venv pyright fails for a reason that has nothing to do with types, and the
+      # annotation below then points at code that is fine. The first graph run did exactly that.
+      - name: Pyright
+        id: pyright
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        continue-on-error: true
+        run: uv run --no-sync pyright .
+
+      # continue-on-error alone leaves a green check and a failure buried in the log. This puts it
+      # on the run summary, where it is visible without going looking.
+      # `!cancelled()` again: a failing test step would otherwise skip this and swallow the report.
+      - name: Report pyright failure
+        if: ${{ !cancelled() && steps.pyright.outcome == 'failure' }}
+        run: |
+          echo "::warning title=pyright (${{ matrix.app }})::Type errors in apps/${{ matrix.app }}. Reproduce with: cd apps/${{ matrix.app }} && uv run pyright ."

@@ -1,0 +1,70 @@
+name: OpenAPI - Drift
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/*/openapi.json"
+      - "apps/webapp/lib/api/**"
+      - "apps/webapp/package.json"
+      - ".github/scripts/check_openapi_specs.py"
+      - ".github/workflows/openapi-drift.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/*/openapi.json"
+      - "apps/webapp/lib/api/**"
+      - "apps/webapp/package.json"
+      - ".github/scripts/check_openapi_specs.py"
+      - ".github/workflows/openapi-drift.yml"
+
+# The wire format is a chain of generated artifacts -- pydantic models -> openapi.json ->
+# lib/api/*.d.ts -- and each link needs a guard, but they do not both belong here.
+#
+# The models -> openapi.json link is covered by test_openapi.py in each service's own test job,
+# which has the app's dependencies installed anyway. Re-checking it here would mean installing
+# torch and vLLM purely to dump a spec, which is the cross-language coupling this whole design
+# removes. That delegation only became true once graph, nla and sparsity got a test job of their
+# own; before that it pointed at jobs that did not exist.
+#
+# So the first job here owns exactly the second link: given the committed openapi.json, are the
+# committed typescript types the ones it produces? That needs node and nothing else.
+jobs:
+  types-match-spec:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/webapp
+    steps:
+      - uses: actions/checkout@v4
+      # Keep in step with webapp-lint.yml, which explains why this is 24 and not 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/webapp/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Regenerate types from the committed specs
+        run: npm run openapi
+      - name: Fail if the committed types are stale
+        run: |
+          if ! git diff --quiet -- lib/api/; then
+            echo "::error::apps/webapp/lib/api/*.d.ts is out of date with apps/*/openapi.json."
+            echo "Run 'make webapp-openapi' and commit the result. Diff:"
+            git diff -- lib/api/
+            exit 1
+          fi
+
+  # The rules in the chain that are properties of the committed spec itself: which services alias
+  # to camelCase and which stay snake_case, no number/integer unions for the generated SDKs to
+  # mangle, readable operationIds. Each is also asserted by the owning app's test_openapi.py
+  # against a freshly rendered spec, but those jobs are filtered to their own app's paths and need
+  # the app installed. This needs nothing but a python3 that is already on the runner, so it can
+  # check all five whenever a spec changes -- including one edited by hand, which is the case no
+  # amount of regeneration downstream would catch.
+  spec-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the committed specs
+        run: python3 .github/scripts/check_openapi_specs.py

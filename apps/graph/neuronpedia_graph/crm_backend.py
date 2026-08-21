@@ -6,47 +6,35 @@ import gzip
 import json
 import os
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import requests as http_requests
 import torch
 from llamascopium.backend.attribution import AttributionResult, prune_attribution
-from llamascopium.backend.language_model import (
-    LanguageModelConfig,
-    TransformerLensLanguageModel,
-)
 from llamascopium.models.sparse_dictionary import SparseDictionary
 
 from .format_converter import _build_sae_metadata, convert_to_neuronpedia_graph
+from .runtime_env import get_device, get_model_dtype, get_model_engine
+from .schemas import ForwardPassResponse, GraphGenerationResponse, SalientLogit
+
+if TYPE_CHECKING:
+    from llamascopium.backend.language_model import TransformerLensLanguageModel
+
+    from .crm_interp_engine import InterpEngineLanguageModel
+
+# Either implementation of the model the CRM attributes through. They are not related by
+# inheritance -- one is a `HookedTransformer`, the other wraps a HuggingFace model --
+# but the attribution only ever calls the handful of methods both provide. Each is imported in
+# the branch that picks it, purely to keep the two symmetric: llamascopium depends on
+# transformer-lens unconditionally, so this does not avoid importing TransformerLens.
+type CRMModel = TransformerLensLanguageModel | InterpEngineLanguageModel
 
 NP_MODEL_ID = os.getenv("NP_MODEL_ID", "qwen3-1.7b")
 NP_TRANSCODER_SOURCE_SET = os.getenv("NP_TRANSCODER_SOURCE_SET")
 NP_LORSA_SOURCE_SET = os.getenv("NP_LORSA_SOURCE_SET")
 
 
-def get_device() -> torch.device:
-    device_env = os.environ.get("DEVICE")
-    if device_env:
-        return torch.device(device_env)
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
-
-
-def get_model_dtype() -> torch.dtype:
-    mapping = {
-        "bfloat16": torch.bfloat16,
-        "float16": torch.float16,
-        "float32": torch.float32,
-    }
-    return mapping.get(os.environ.get("MODEL_DTYPE", "bfloat16"), torch.bfloat16)
-
-
-def load_crm_model() -> tuple[
-    TransformerLensLanguageModel, list[SparseDictionary], dict[str, dict[str, Any]]
-]:
+def load_crm_model() -> tuple[CRMModel, list[SparseDictionary], dict[str, dict[str, Any]]]:
     """Load the CRM model and all SAE/Lorsa replacement modules. Returns (model, replacement_modules, sae_metadata)."""
     model_id = os.getenv("MODEL_ID")
     sae_repo = os.getenv("SAE_REPO", "OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B")
@@ -55,19 +43,43 @@ def load_crm_model() -> tuple[
 
     device = get_device()
     model_dtype = get_model_dtype()
+    model_engine = get_model_engine()
 
-    print(f"[CRM] Loading model: {model_id} on {device} with dtype {model_dtype}")
-    cfg = LanguageModelConfig(
-        model_name=model_id, dtype=model_dtype, device=str(device)
-    )
-    model = TransformerLensLanguageModel(cfg)
+    print(f"[CRM] Loading model: {model_id} on {device} with dtype {model_dtype} via {model_engine}")
+
+    # `interp_engine` (the default) hooks the HuggingFace model in place, so it reaches any
+    # `AutoModelForCausalLM`; `transformerlens` converts the weights into TransformerLens'
+    # convention, so it only reaches architectures TransformerLens has a conversion for. The two
+    # are measured to agree to a few parts per million in float32
+    # (`tests/test_crm_backend_parity.py`), which is what makes interp_engine safe to default to.
+    # See `crm_interp_engine` for what the two do and do not share. `runtime_env` has already
+    # rejected anything outside the three engines; the third is turned away below.
+    model: CRMModel
+    if model_engine == "interp_engine":
+        from .crm_interp_engine import InterpEngineLanguageModel
+
+        assert model_id is not None, "MODEL_ID must be set."
+        model = InterpEngineLanguageModel(model_id, dtype=model_dtype, device=device)
+    elif model_engine == "transformerlens":
+        from llamascopium.backend.language_model import (
+            LanguageModelConfig,
+            TransformerLensLanguageModel,
+        )
+
+        cfg = LanguageModelConfig(model_name=model_id, dtype=model_dtype, device=str(device))
+        model = TransformerLensLanguageModel(cfg)
+    else:
+        raise ValueError(
+            f"--model-engine {model_engine!r} is not available for the lm-saes-crm attribution "
+            "engine; it accepts 'interp_engine' or 'transformerlens'. (nnsight is circuit-tracer "
+            "only: llamascopium's attribution reaches the model through methods nnsight's proxies "
+            "do not provide.)"
+        )
 
     n_layers = model.cfg.n_layers
     print(f"[CRM] Model loaded: {n_layers} layers")
 
-    print(
-        f"[CRM] Loading SAEs from {sae_repo} ({sae_expansion}/{sae_topk}) for {n_layers} layers..."
-    )
+    print(f"[CRM] Loading SAEs from {sae_repo} ({sae_expansion}/{sae_topk}) for {n_layers} layers...")
     replacement_modules: list[SparseDictionary] = []
 
     for layer_idx in range(n_layers):
@@ -84,16 +96,14 @@ def load_crm_model() -> tuple[
         replacement_modules.append(lorsa)
 
     sae_metadata = _build_sae_metadata(replacement_modules)
-    print(
-        f"[CRM] Loaded {len(replacement_modules)} replacement modules ({len(replacement_modules) // 2} layers x 2)"
-    )
+    print(f"[CRM] Loaded {len(replacement_modules)} replacement modules ({len(replacement_modules) // 2} layers x 2)")
 
     return model, replacement_modules, sae_metadata
 
 
 def generate_graph_crm(
     prompt: str,
-    model: TransformerLensLanguageModel,
+    model: CRMModel,
     replacement_modules: list[SparseDictionary],
     sae_metadata: dict[str, dict[str, Any]],
     *,
@@ -110,8 +120,12 @@ def generate_graph_crm(
     enable_qk_tracing: bool = False,
     qk_top_fraction: float = 0.6,
     qk_topk: int = 10,
-) -> dict[str, Any]:
-    """Run CRM attribution, prune, convert to Neuronpedia format, and optionally upload to S3."""
+) -> GraphGenerationResponse | dict[str, Any]:
+    """Run CRM attribution, prune, convert to Neuronpedia format, and optionally upload to S3.
+
+    Returns an upload receipt, or -- when no ``signed_url`` is given -- the graph document
+    itself, whose keys are the published graph-schema.json shape rather than a model of ours.
+    """
     total_start = time.time()
 
     attribution_start = time.time()
@@ -190,23 +204,21 @@ def generate_graph_crm(
     upload_ms = (time.time() - upload_start) * 1000
 
     if response.status_code != 200:
-        return {"error": "Failed to upload file"}
+        return GraphGenerationResponse(error="Failed to upload file")
 
     total_ms = (time.time() - total_start) * 1000
-    print(
-        f"[CRM] Upload complete: {len(data_to_upload)} bytes in {upload_ms:.0f}ms (total {total_ms:.0f}ms)"
-    )
+    print(f"[CRM] Upload complete: {len(data_to_upload)} bytes in {upload_ms:.0f}ms (total {total_ms:.0f}ms)")
 
-    return {"success": f"Graph uploaded successfully to url: {signed_url}"}
+    return GraphGenerationResponse(success=f"Graph uploaded successfully to url: {signed_url}")
 
 
 def forward_pass_crm(
     prompt: str,
-    model: TransformerLensLanguageModel,
+    model: CRMModel,
     *,
     max_n_logits: int = 10,
     desired_logit_prob: float = 0.95,
-) -> dict[str, Any]:
+) -> ForwardPassResponse:
     """Run a forward pass and return salient logits."""
     device = get_device()
     tokens = model.tokenizer.encode(prompt, add_special_tokens=True)
@@ -214,33 +226,26 @@ def forward_pass_crm(
 
     with torch.no_grad():
         output = model(input_ids)
-        if hasattr(output, "logits"):
-            output = output.logits
-        logits = output[0, -1, :]
+        # The interp_engine path returns a HuggingFace ModelOutput; the TransformerLens path
+        # returns the logits tensor directly.
+        all_logits: torch.Tensor = getattr(output, "logits", output)
+        logits = all_logits[0, -1, :]
         probs = torch.softmax(logits, dim=-1)
 
-        topk_probs, topk_indices = torch.topk(
-            probs, min(max_n_logits * 3, probs.shape[0])
-        )
+        topk_probs, topk_indices = torch.topk(probs, min(max_n_logits * 3, probs.shape[0]))
 
-        results = []
+        results: list[SalientLogit] = []
         cumulative = 0.0
         for idx, prob in zip(topk_indices.tolist(), topk_probs.tolist()):
-            results.append(
-                {
-                    "token": model.tokenizer.decode([idx]),
-                    "token_id": idx,
-                    "probability": prob,
-                }
-            )
+            results.append(SalientLogit(token=model.tokenizer.decode([idx]), token_id=idx, probability=prob))
             cumulative += prob
             if cumulative >= desired_logit_prob and len(results) >= max_n_logits:
                 break
 
-    return {
-        "prompt": prompt,
-        "input_tokens": [model.tokenizer.decode([t]) for t in tokens],
-        "salient_logits": results,
-        "total_salient_tokens": len(results),
-        "cumulative_probability": cumulative,
-    }
+    return ForwardPassResponse(
+        prompt=prompt,
+        input_tokens=[model.tokenizer.decode([t]) for t in tokens],
+        salient_logits=results,
+        total_salient_tokens=len(results),
+        cumulative_probability=cumulative,
+    )

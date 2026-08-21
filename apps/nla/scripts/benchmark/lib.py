@@ -20,7 +20,6 @@ from dataclasses import dataclass
 
 import httpx
 
-
 # ─── VRAM monitor ──────────────────────────────────────────────────────────
 
 

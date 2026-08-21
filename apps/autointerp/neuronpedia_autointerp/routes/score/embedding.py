@@ -2,22 +2,22 @@ import traceback
 
 import torch
 from fastapi import HTTPException
-from neuronpedia_autointerp.utils import (
-    convert_embedding_output_to_score_embedding_output,
-    per_feature_scores_embedding,
-)
-from neuronpedia_autointerp_client.models.score_embedding_post200_response import (
-    ScoreEmbeddingPost200Response,
-)
-from neuronpedia_autointerp_client.models.score_embedding_post_request import (
-    ScoreEmbeddingPostRequest,
-)
 from sae_auto_interp.features import Example, Feature, FeatureRecord
 from sae_auto_interp.scorers import EmbeddingScorer
 from sae_auto_interp.scorers.scorer import ScorerResult
 
+from neuronpedia_autointerp.schemas import (
+    ScoreEmbeddingRequest,
+    ScoreEmbeddingResponse,
+)
+from neuronpedia_autointerp.utils import (
+    ScoringInputError,
+    convert_embedding_output_to_score_embedding_output,
+    per_feature_scores_embedding,
+)
 
-async def generate_score_embedding(request: ScoreEmbeddingPostRequest, model):  # type: ignore
+
+async def generate_score_embedding(request: ScoreEmbeddingRequest, model) -> ScoreEmbeddingResponse:  # type: ignore
     """
     Generate a score for a given set of activations and explanation. This endpoint expects:
 
@@ -50,13 +50,12 @@ async def generate_score_embedding(request: ScoreEmbeddingPostRequest, model):  
         scorer = EmbeddingScorer(model)
         result: ScorerResult = await scorer.__call__(feature_record)  # type: ignore
         score = per_feature_scores_embedding(result.score)
-        breakdown = [
-            convert_embedding_output_to_score_embedding_output(item)
-            for item in result.score
-        ]
+        breakdown = [convert_embedding_output_to_score_embedding_output(item) for item in result.score]
 
-        return ScoreEmbeddingPost200Response(score=score, breakdown=breakdown)
+        return ScoreEmbeddingResponse(score=score, breakdown=breakdown)
 
+    except ScoringInputError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

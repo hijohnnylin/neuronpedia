@@ -1,1 +1,0 @@
-# Neuronpedia activations server package.

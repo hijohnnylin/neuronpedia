@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "prepare": "node ../../.githooks/install.js || exit 0",
     "dev": "prisma generate && next dev --turbopack",
     "dev:localhost": "node scripts/dev-with-env.js .env.localhost",
     "dev:remote": "node scripts/dev-with-env.js .env.remote",

@@ -1,0 +1,1605 @@
+{
+  "components": {
+    "schemas": {
+      "ChatMessageInput": {
+        "properties": {
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional harmony channel (analysis/final/commentary) for assistant turns.",
+            "title": "Channel"
+          },
+          "content": {
+            "default": "",
+            "description": "Message text",
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "description": "Chat role, e.g. user / assistant / system",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "ChatMessageInput",
+        "type": "object"
+      },
+      "CompareRequest": {
+        "properties": {
+          "activation_a": {
+            "description": "First activation vector",
+            "items": {
+              "type": "number"
+            },
+            "title": "Activation A",
+            "type": "array"
+          },
+          "activation_b": {
+            "description": "Second activation vector",
+            "items": {
+              "type": "number"
+            },
+            "title": "Activation B",
+            "type": "array"
+          },
+          "max_new_tokens": {
+            "default": 200,
+            "exclusiveMinimum": 0.0,
+            "maximum": 4096.0,
+            "title": "Max New Tokens",
+            "type": "integer"
+          },
+          "temperature": {
+            "default": 0.7,
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "activation_a",
+          "activation_b"
+        ],
+        "title": "CompareRequest",
+        "type": "object"
+      },
+      "CompareResponse": {
+        "properties": {
+          "cosine_similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cosine Similarity"
+          },
+          "description": {
+            "description": "Description of the difference vector (a - b)",
+            "title": "Description",
+            "type": "string"
+          },
+          "diff_norm": {
+            "description": "L2 norm of the difference vector",
+            "title": "Diff Norm",
+            "type": "number"
+          },
+          "mse": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mse"
+          }
+        },
+        "required": [
+          "description",
+          "diff_norm"
+        ],
+        "title": "CompareResponse",
+        "type": "object"
+      },
+      "CompletionRequest": {
+        "properties": {
+          "add_generation_prompt": {
+            "default": true,
+            "title": "Add Generation Prompt",
+            "type": "boolean"
+          },
+          "completion_tokens": {
+            "default": 16,
+            "description": "Number of tokens to generate as continuation (clamped server-side to 1-512).",
+            "minimum": 1.0,
+            "title": "Completion Tokens",
+            "type": "integer"
+          },
+          "continue_final_message": {
+            "default": false,
+            "title": "Continue Final Message",
+            "type": "boolean"
+          },
+          "enable_thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable Thinking"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatMessageInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured chat messages. When set, the server applies the model's chat template (ignoring `text`) and returns per-token spans.",
+            "title": "Messages"
+          },
+          "stream": {
+            "default": false,
+            "description": "If true, stream tokens as SSE events instead of returning the full response.",
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.7,
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 65536,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Prompt text to extend (or provide `messages`).",
+            "title": "Text"
+          }
+        },
+        "title": "CompletionRequest",
+        "type": "object"
+      },
+      "DescribeRequest": {
+        "properties": {
+          "activations": {
+            "description": "List of activation vectors, each of length d_model",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "maxItems": 512,
+            "minItems": 1,
+            "title": "Activations",
+            "type": "array"
+          },
+          "max_new_tokens": {
+            "default": 200,
+            "exclusiveMinimum": 0.0,
+            "maximum": 4096.0,
+            "title": "Max New Tokens",
+            "type": "integer"
+          },
+          "stream": {
+            "default": false,
+            "description": "Stream results as SSE events",
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.7,
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "activations"
+        ],
+        "title": "DescribeRequest",
+        "type": "object"
+      },
+      "DescribeResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/DescriptionResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "DescribeResponse",
+        "type": "object"
+      },
+      "DescriptionResult": {
+        "properties": {
+          "cosine_similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Cosine similarity (if reconstructor available)",
+            "title": "Cosine Similarity"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "mse": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reconstruction MSE (if reconstructor available)",
+            "title": "Mse"
+          }
+        },
+        "required": [
+          "description"
+        ],
+        "title": "DescriptionResult",
+        "type": "object"
+      },
+      "ExplainRequest": {
+        "properties": {
+          "add_generation_prompt": {
+            "default": true,
+            "title": "Add Generation Prompt",
+            "type": "boolean"
+          },
+          "continue_final_message": {
+            "default": false,
+            "title": "Continue Final Message",
+            "type": "boolean"
+          },
+          "enable_thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable Thinking"
+          },
+          "max_new_tokens": {
+            "default": 200,
+            "description": "Max tokens for NLA verbalizer explanation",
+            "exclusiveMinimum": 0.0,
+            "maximum": 4096.0,
+            "title": "Max New Tokens",
+            "type": "integer"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatMessageInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured chat messages. When set, the server applies the model's chat template (ignoring `text`) and returns per-token spans.",
+            "title": "Messages"
+          },
+          "positions": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 512,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Token positions to describe (Python-style indexing, e.g. [-1] for last). If omitted or empty, all positions are described.",
+            "title": "Positions"
+          },
+          "reverse": {
+            "default": true,
+            "description": "Process token positions in reverse order (last to first)",
+            "title": "Reverse",
+            "type": "boolean"
+          },
+          "stream": {
+            "default": false,
+            "description": "Stream results as SSE events",
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "temperature": {
+            "default": 0.7,
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 65536,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Input text to extract activations from (or provide `messages`).",
+            "title": "Text"
+          }
+        },
+        "title": "ExplainRequest",
+        "type": "object"
+      },
+      "ExplainResponse": {
+        "properties": {
+          "layer_index": {
+            "title": "Layer Index",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ExplainResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layer_index",
+          "results"
+        ],
+        "title": "ExplainResponse",
+        "type": "object"
+      },
+      "ExplainResult": {
+        "properties": {
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "cosine_similarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cosine Similarity"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "fragment_count": {
+            "default": 1,
+            "title": "Fragment Count",
+            "type": "integer"
+          },
+          "fragment_index": {
+            "default": 0,
+            "title": "Fragment Index",
+            "type": "integer"
+          },
+          "generated": {
+            "default": false,
+            "description": "True if this token was generated (not from original input)",
+            "title": "Generated",
+            "type": "boolean"
+          },
+          "l2_norm": {
+            "title": "L2 Norm",
+            "type": "number"
+          },
+          "message_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Index"
+          },
+          "mse": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mse"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "token_id": {
+            "title": "Token Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "token_id",
+          "position",
+          "l2_norm",
+          "description"
+        ],
+        "title": "ExplainResult",
+        "type": "object"
+      },
+      "ExtractRequest": {
+        "properties": {
+          "add_generation_prompt": {
+            "default": true,
+            "title": "Add Generation Prompt",
+            "type": "boolean"
+          },
+          "continue_final_message": {
+            "default": false,
+            "title": "Continue Final Message",
+            "type": "boolean"
+          },
+          "enable_thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable Thinking"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatMessageInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured chat messages. When set, the server applies the model's chat template (ignoring `text`) and returns per-token spans.",
+            "title": "Messages"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 65536,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Input text to extract activations from (or provide `messages`).",
+            "title": "Text"
+          }
+        },
+        "title": "ExtractRequest",
+        "type": "object"
+      },
+      "ExtractResponse": {
+        "properties": {
+          "layer_index": {
+            "title": "Layer Index",
+            "type": "integer"
+          },
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/TokenActivation"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layer_index",
+          "tokens"
+        ],
+        "title": "ExtractResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthLimits": {
+        "description": "The request caps this process was configured with, so a client can pre-validate.",
+        "properties": {
+          "max_completion_tokens": {
+            "title": "Max Completion Tokens",
+            "type": "integer"
+          },
+          "max_describe_batch": {
+            "title": "Max Describe Batch",
+            "type": "integer"
+          },
+          "max_description_chars": {
+            "title": "Max Description Chars",
+            "type": "integer"
+          },
+          "max_input_chars": {
+            "title": "Max Input Chars",
+            "type": "integer"
+          },
+          "max_new_tokens": {
+            "title": "Max New Tokens",
+            "type": "integer"
+          },
+          "max_positions_per_request": {
+            "title": "Max Positions Per Request",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_input_chars",
+          "max_positions_per_request",
+          "max_new_tokens",
+          "max_describe_batch",
+          "max_description_chars",
+          "max_completion_tokens"
+        ],
+        "title": "HealthLimits",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Liveness plus which components loaded and how they were configured.\n\nMost fields are null until the lifespan finishes, and stay null for whichever of the\nverbalizer / reconstructor / source model this process did not load.",
+        "properties": {
+          "completion_available": {
+            "title": "Completion Available",
+            "type": "boolean"
+          },
+          "d_model": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D Model"
+          },
+          "extraction_layer": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Layer"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/HealthLimits"
+          },
+          "max_concurrent": {
+            "title": "Max Concurrent",
+            "type": "integer"
+          },
+          "max_concurrent_explains": {
+            "title": "Max Concurrent Explains",
+            "type": "integer"
+          },
+          "max_describe_requests": {
+            "title": "Max Describe Requests",
+            "type": "integer"
+          },
+          "num_cuda_devices": {
+            "title": "Num Cuda Devices",
+            "type": "integer"
+          },
+          "reconstructor_available": {
+            "title": "Reconstructor Available",
+            "type": "boolean"
+          },
+          "reconstructor_device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructor Device"
+          },
+          "reconstructor_fp8": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructor Fp8"
+          },
+          "reconstructor_int4": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconstructor Int4"
+          },
+          "reconstructor_max_concurrent": {
+            "title": "Reconstructor Max Concurrent",
+            "type": "integer"
+          },
+          "source_device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Device"
+          },
+          "source_fp8": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Fp8"
+          },
+          "source_max_concurrent": {
+            "title": "Source Max Concurrent",
+            "type": "integer"
+          },
+          "source_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Model"
+          },
+          "source_truncated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Truncated"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "verbalizer_cuda_graph_max_bs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbalizer Cuda Graph Max Bs"
+          },
+          "verbalizer_device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbalizer Device"
+          },
+          "verbalizer_kv_cache_dtype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbalizer Kv Cache Dtype"
+          },
+          "verbalizer_model": {
+            "title": "Verbalizer Model",
+            "type": "string"
+          },
+          "verbalizer_quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbalizer Quantization"
+          },
+          "verbalizer_torch_compile": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbalizer Torch Compile"
+          }
+        },
+        "required": [
+          "status",
+          "verbalizer_model",
+          "reconstructor_available",
+          "completion_available",
+          "num_cuda_devices",
+          "max_concurrent",
+          "max_concurrent_explains",
+          "source_max_concurrent",
+          "reconstructor_max_concurrent",
+          "max_describe_requests",
+          "limits"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "ScoreRequest": {
+        "properties": {
+          "activation": {
+            "description": "Original activation vector",
+            "items": {
+              "type": "number"
+            },
+            "title": "Activation",
+            "type": "array"
+          },
+          "description": {
+            "description": "Text description to score",
+            "maxLength": 8192,
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "description",
+          "activation"
+        ],
+        "title": "ScoreRequest",
+        "type": "object"
+      },
+      "ScoreResponse": {
+        "properties": {
+          "cosine_similarity": {
+            "title": "Cosine Similarity",
+            "type": "number"
+          },
+          "mse": {
+            "description": "Reconstruction MSE, range [0, 4]. ~0.2 good, ~1 mediocre, 2 orthogonal",
+            "title": "Mse",
+            "type": "number"
+          }
+        },
+        "required": [
+          "mse",
+          "cosine_similarity"
+        ],
+        "title": "ScoreResponse",
+        "type": "object"
+      },
+      "TokenActivation": {
+        "properties": {
+          "activation": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Activation",
+            "type": "array"
+          },
+          "l2_norm": {
+            "title": "L2 Norm",
+            "type": "number"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "token_id": {
+            "title": "Token Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "token_id",
+          "position",
+          "activation",
+          "l2_norm"
+        ],
+        "title": "TokenActivation",
+        "type": "object"
+      },
+      "TokenInfo": {
+        "properties": {
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "fragment_count": {
+            "default": 1,
+            "description": "Total number of tokens in this byte-fragment run (1 for tokens that decode cleanly on their own). When >1, the `token` string is the merged glyph and is identical for every token in the run.",
+            "title": "Fragment Count",
+            "type": "integer"
+          },
+          "fragment_index": {
+            "default": 0,
+            "description": "0-based index within a multi-token byte fragment run. 0 for tokens that decode cleanly on their own.",
+            "title": "Fragment Index",
+            "type": "integer"
+          },
+          "message_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Index"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "\"header\" | \"content\" | \"footer\" | \"scaffold\"",
+            "title": "Section"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "token_id": {
+            "title": "Token Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "token_id",
+          "position"
+        ],
+        "title": "TokenInfo",
+        "type": "object"
+      },
+      "TokenizeRequest": {
+        "properties": {
+          "add_generation_prompt": {
+            "default": true,
+            "title": "Add Generation Prompt",
+            "type": "boolean"
+          },
+          "continue_final_message": {
+            "default": false,
+            "title": "Continue Final Message",
+            "type": "boolean"
+          },
+          "enable_thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enable Thinking"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatMessageInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured chat messages. When set, the server applies the model's chat template (ignoring `text`) and returns per-token spans.",
+            "title": "Messages"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "maxLength": 65536,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Input text to tokenize (or provide `messages`).",
+            "title": "Text"
+          }
+        },
+        "title": "TokenizeRequest",
+        "type": "object"
+      },
+      "TokenizeResponse": {
+        "properties": {
+          "prompt_length": {
+            "description": "Number of tokens from the original input text",
+            "title": "Prompt Length",
+            "type": "integer"
+          },
+          "text": {
+            "description": "Full text (original + any generated completion)",
+            "title": "Text",
+            "type": "string"
+          },
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/TokenInfo"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tokens",
+          "prompt_length",
+          "text"
+        ],
+        "title": "TokenizeResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Natural Language Autoencoder \u2014 activation vector <-> text",
+    "title": "NLA Inference Server",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "description": "Health check.",
+        "operationId": "root__get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Root"
+      }
+    },
+    "/compare": {
+      "post": {
+        "description": "Describe the difference between two activation vectors (a - b).",
+        "operationId": "compare_compare_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compare"
+      }
+    },
+    "/completion": {
+      "post": {
+        "description": "Generate a continuation for the prompt and return tokens for the\nfull (prompt + completion) text. Set `stream=true` to receive tokens\nincrementally as SSE events.",
+        "operationId": "completion_completion_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenizeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Completion"
+      }
+    },
+    "/describe": {
+      "post": {
+        "description": "Describe activation vector(s) in natural language, with optional MSE scores.\n\nSet stream=true to receive partial text updates as SSE events.\nStreaming events:\n  - Partial: {\"index\": i, \"text\": \"partial...\", \"done\": false}\n  - Final:   {\"index\": i, \"description\": \"...\", \"mse\": ..., \"cosine_similarity\": ...}\n  - End:     [DONE]",
+        "operationId": "describe_describe_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DescribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescribeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Describe"
+      }
+    },
+    "/explain": {
+      "post": {
+        "description": "Extract activations and describe them in natural language.\n\nIf positions is omitted, all token positions are described.\nPositions use Python-style indexing (negative values count from end).\nSet stream=true to receive results as SSE events.\n\nUp to NLA_MAX_CONCURRENT_EXPLAINS requests run in parallel; the\n(N+1)th request gets HTTP 429 (fail-fast, no queueing). Verbalizer\nfan-out across all parallel /explains is bounded by NLA_MAX_CONCURRENT\nvia a server-wide semaphore, so KV-pool occupancy stays capped.",
+        "operationId": "explain_explain_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Explain"
+      }
+    },
+    "/extract": {
+      "post": {
+        "description": "Extract per-token activation vectors from the source model.",
+        "operationId": "extract_extract_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Extract"
+      }
+    },
+    "/score": {
+      "post": {
+        "description": "Score an existing text description against the original activation vector.\n\nThe reconstructor forward pass is blocking torch work, so we run it on\na thread-pool executor (via run_in_executor) to keep the FastAPI event\nloop responsive \u2014 otherwise concurrent /describe streams, /health,\netc. would all stall while a /score is in flight. Concurrency is\ncapped by NLA_RECONSTRUCTOR_MAX_CONCURRENT to bound VRAM and keep the\nexecutor pool from drowning.",
+        "operationId": "score_score_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Score"
+      }
+    },
+    "/tokenize": {
+      "post": {
+        "description": "Tokenize text (or structured chat `messages`) using the source model's\ntokenizer. When `messages` is provided, the model's chat template is applied\nserver-side and per-token span metadata is returned.",
+        "operationId": "tokenize_tokenize_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenizeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tokenize"
+      }
+    }
+  }
+}

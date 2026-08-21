@@ -2,11 +2,17 @@
 # It is often easier to pass in arguments than to set environment variables
 # But environment variables will always override the passed in arguments
 
+# Two independent choices, and they are easy to confuse:
+#   --attribution-engine  which algorithm builds the graph, so what the graph contains
+#   --model-engine        which implementation executes the model, which changes nothing in the graph
+#
 # Example usages:
-# Circuit-tracer backend (default):
+# circuit-tracer attribution (default):
 #   python start.py --model_id google/gemma-2-2b --transcoder_set gemma
-# CRM backend (lm-saes with Lorsa + Transcoders):
-#   python start.py --backend lm-saes-crm --model_id Qwen/Qwen3-1.7B --sae_repo OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B --sae_expansion 8x --sae_topk k64
+# CRM attribution (lm-saes with Lorsa + Transcoders):
+#   python start.py --attribution-engine lm-saes-crm --model_id Qwen/Qwen3-1.7B --sae_repo OpenMOSS-Team/Llama-Scope-2-Qwen3-1.7B --sae_expansion 8x --sae_topk k64
+# Either of the above, on a different model engine:
+#   python start.py --model_id google/gemma-2-2b --transcoder_set gemma --model-engine transformerlens
 
 import argparse
 import os
@@ -15,16 +21,19 @@ import sys
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Initialize server configuration for Graph Server."
-    )
+    parser = argparse.ArgumentParser(description="Initialize server configuration for Graph Server.")
 
     # Backend selection
     parser.add_argument(
-        "--backend",
+        "--attribution-engine",
         default="circuit-tracer",
         choices=["circuit-tracer", "lm-saes-crm"],
-        help="Attribution backend: circuit-tracer (default) or lm-saes-crm (CRM with Lorsa + Transcoders)",
+        help=(
+            "Which attribution algorithm builds the graph, and so what the graph contains: "
+            "circuit-tracer (default) decomposes MLPs with transcoders; lm-saes-crm additionally "
+            "decomposes attention with Lorsa. Separate from --model-engine, which only picks what "
+            "executes the model."
+        ),
     )
 
     # Server configuration
@@ -62,8 +71,30 @@ def parse_args():
         "--device",
         help="Device to run the model(s) on.",
     )
+    parser.add_argument(
+        "--model-engine",
+        default="interp_engine",
+        choices=["interp_engine", "transformerlens", "nnsight"],
+        help=(
+            "Which implementation executes the model, for either attribution engine. This does "
+            "not change what the graph contains. interp_engine (default) hooks the HuggingFace "
+            "model in place, reaching any AutoModelForCausalLM; transformerlens converts the "
+            "weights, so it only reaches architectures it has a conversion for; nnsight is "
+            "circuit-tracer only. Values are underscored to match the libraries' own literals."
+        ),
+    )
+    parser.add_argument(
+        "--lazy-encoder",
+        action="store_true",
+        help=(
+            "Load transcoder encoder weights only when needed, trading speed for VRAM. Unrelated "
+            "to --model-engine: it is passed to the transcoder loader, not the model. Ignored "
+            "with a warning for GemmaScope2-format sets (mwhanna/gemma-scope-2-*), whose key "
+            "names the lazy path cannot read."
+        ),
+    )
 
-    # Transcoders configuration (circuit-tracer backend)
+    # Transcoders configuration (circuit-tracer attribution engine)
     parser.add_argument(
         "--transcoder_set",
         help="Either HF repo ID eg mwhanna/qwen3-4b-transcoders or shortcuts 'gemma' and 'llama'",
@@ -140,8 +171,14 @@ def main():
     args = parse_args()
 
     # Only set environment variables if they don't already exist
-    if "BACKEND" not in os.environ:
-        os.environ["BACKEND"] = args.backend
+    if "ATTRIBUTION_ENGINE" not in os.environ:
+        os.environ["ATTRIBUTION_ENGINE"] = args.attribution_engine
+
+    if "MODEL_ENGINE" not in os.environ:
+        os.environ["MODEL_ENGINE"] = args.model_engine
+
+    if "LAZY_ENCODER" not in os.environ and args.lazy_encoder:
+        os.environ["LAZY_ENCODER"] = "1"
 
     if "MODEL_ID" not in os.environ:
         os.environ["MODEL_ID"] = args.model_id
@@ -177,6 +214,12 @@ def main():
         os.environ["NP_TRANSCODER_SOURCE_SET"] = args.np_transcoder_source_set
     if "NP_LORSA_SOURCE_SET" not in os.environ and args.np_lorsa_source_set is not None:
         os.environ["NP_LORSA_SOURCE_SET"] = args.np_lorsa_source_set
+
+    # Expose bind address to the server module for the LOADING COMPLETE banner.
+    if "SERVER_HOST" not in os.environ:
+        os.environ["SERVER_HOST"] = args.host
+    if "SERVER_PORT" not in os.environ:
+        os.environ["SERVER_PORT"] = str(args.port)
 
     # Build uvicorn command
     uvicorn_args = [

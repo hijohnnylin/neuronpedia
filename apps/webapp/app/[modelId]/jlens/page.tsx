@@ -7,6 +7,9 @@ import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import JlensPageClient, { JlensShareData } from './jlens-page-client';
 
+// Usernames credited with no attribution line, like the default creator's shares.
+const HIDDEN_ATTRIBUTION_USERNAMES = new Set(['johnny']);
+
 export async function generateMetadata({ params }: { params: Promise<{ modelId: string }> }): Promise<Metadata> {
   const { modelId } = await params;
   const model = await prisma.model.findUnique({ where: { id: modelId }, select: { displayName: true } });
@@ -81,11 +84,16 @@ export default async function Page({
 
     // Attribution line shown beneath the description. The default creator's
     // shares show the description with no attribution; everyone else is credited
-    // (by username if logged in, otherwise as an anonymous sharer).
+    // (by username if logged in, otherwise as an anonymous sharer), except for
+    // the usernames above.
     let descriptionAttribution: string | null = null;
     if (row.description && row.userId !== DEFAULT_CREATOR_USER_ID) {
       const sharerName = row.userId ? row.user?.name : null;
-      descriptionAttribution = sharerName ? `@${sharerName}` : 'Anonymous';
+      if (!sharerName) {
+        descriptionAttribution = 'Anonymous';
+      } else if (!HIDDEN_ATTRIBUTION_USERNAMES.has(sharerName.toLowerCase())) {
+        descriptionAttribution = `@${sharerName}`;
+      }
     }
 
     share = {

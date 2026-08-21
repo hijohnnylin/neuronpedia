@@ -3,7 +3,7 @@ name = "neuronpedia-graph"
 version = "0.1.0"
 description = "Based on Circuit Tracer by Piotrowski & Hanna. Server for generating and pruning circuit graphs from prompts."
 authors = [{ name = "Johnny Lin", email = "johnny@neuronpedia.org" }]
-license = "MIT"
+license = "Apache-2.0"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -12,13 +12,34 @@ dependencies = [
   "pydantic>=2.11.4",
   "torch>=2.11.0",
   "transformers>=4.57.1",
-  "circuit-tracer",
+  "interp-engine==1.3.3",
   "python-dotenv>=1.1.0,<2",
   "hf-transfer>=0.1.9,<0.2",
+  "psutil>=7.0,<8",
+  "sentry-sdk[fastapi]>=2.24.1,<3",
 ]
 
+# One extra per attribution backend. They share no code -- `--backend circuit-tracer` imports no
+# llamascopium and `--backend lm-saes-crm` imports no circuit_tracer -- so neither needs the other
+# installed, and a deployment installs only the one it serves. Pick one:
+#   uv sync --extra circuit-tracer   # the default backend
+#   uv sync --extra crm              # Lorsa + transcoders
 [project.optional-dependencies]
+circuit-tracer = ["circuit-tracer[interp-engine]"]
 crm = ["llamascopium"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff>=0.16.2,<0.17",
+    "pyright>=1.1.411,<1.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `uv` doesn't install this project (it's an app, not a package), so tests need
+# this directory on sys.path to import `neuronpedia_graph.*`.
+pythonpath = ["."]
 
 [tool.uv]
 # This is an application, not a distributable package (was poetry's
@@ -30,10 +51,78 @@ package = false
 # needs a newer NVIDIA driver than our GPU pods provide (they cap at CUDA 12.8).
 # Pin torch to PyTorch's CUDA 12.8 wheel index so it runs on those drivers.
 torch = { index = "pytorch-cu128" }
-circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.5.1" }
-llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", tag = "v2.0.0b34" }
-
+# Temporarily a branch, for its `interp_engine` backend (`--model_backend`), which the v0.5.1 tag
+# does not have. Swap back to the tag below once that branch merges to main and is tagged.
+# circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.5.1" }
+circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", rev = "3f0965b6701f96ca498128c7226cb3e13d3c0d5e" }
+llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", rev = "cfd202b18b22007f3a293670b7bbac972bd62093" }
 [[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[tool.ruff]
+line-length = 120
+# target-version is inferred from project.requires-python above.
+# `*.md`: ruff 0.16 formats Python code blocks in Markdown by default. Every workflow that runs
+# this gate filters Markdown out of its `paths:`, so a docs-only change cannot run the check and
+# the failure lands on the next unrelated Python edit instead. Doc examples are also aligned by
+# hand for reading, which the formatter collapses. Keep the two decisions together: re-enabling
+# this means dropping those `!**/*.md` filters as well.
+extend-exclude = ["*.ipynb", "*.md"]
+
+[tool.ruff.lint]
+# pyflakes + pycodestyle errors (F/E) as the floor, plus the rule families that catch defects
+# rather than taste: isort (I), pyupgrade (UP), bugbear (B), comprehensions (C4), simplify (SIM),
+# return (RET), logging (LOG), and tidy-imports (TID) for the banned typing aliases below.
+# Deliberately NOT selected: ANN/D (annotation and docstring mandates), ARG (unused arguments,
+# which fire on every framework-required signature), and T20 (bans `print`, which several of
+# these servers use as their logging).
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RET", "LOG", "TID"]
+ignore = [
+  # Line length is the formatter's job. E501 would only fire on the strings, URLs and comments
+  # the formatter cannot split, i.e. exactly the cases where wrapping is not an improvement.
+  "E501",
+  # zip-without-explicit-strict. The correct fix is usually `strict=True`, but that changes
+  # behaviour at each of the ~30 call sites in this repo, and a blanket `strict=False` only
+  # restates the default while adding noise. Off until someone audits them for real.
+  "B905",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# B008 (function call in a default argument) is the FastAPI dependency-injection idiom, not the
+# mutable-default bug the rule is aimed at: `def route(x: int = Query(...))` is how the framework
+# is meant to be used.
+extend-immutable-calls = [
+  "fastapi.Body",
+  "fastapi.Depends",
+  "fastapi.File",
+  "fastapi.Form",
+  "fastapi.Header",
+  "fastapi.Path",
+  "fastapi.Query",
+  "fastapi.Security",
+]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Union".msg = "Use `|` instead"
+"typing.Optional".msg = "Use `| None` instead"
+"typing.Dict".msg = "Use `dict` instead"
+"typing.List".msg = "Use `list` instead"
+
+[tool.pyright]
+# "standard" rather than "strict": strict additionally demands annotations on every parameter and
+# type arguments on every generic, which flags hundreds of sites across these apps without catching
+# real defects. Standard still runs the checks that find bugs (None-safety, wrong argument types,
+# unreachable code).
+typeCheckingMode = "standard"
+# torch, transformers and vLLM ship no stubs for large parts of their surface, so this report is
+# noise about our dependencies rather than about this code.
+reportMissingTypeStubs = "none"
+# Per-app deviation: the two attribution backends are optional extras (`--extra circuit-tracer`,
+# `--extra crm`), so a plain `uv sync` installs NEITHER `circuit_tracer` nor `llamascopium` and every
+# import of them is unresolved. Gating on that would just report which extra happened to be synced.
+reportMissingImports = "none"
+# `exclude` REPLACES pyright's defaults, so the three default patterns have to be repeated. `**/.*`
+# is the load-bearing one: without it pyright walks `.venv` (torch/transformers) and never finishes.
+exclude = ["**/node_modules", "**/__pycache__", "**/.*"]

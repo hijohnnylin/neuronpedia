@@ -1,15 +1,23 @@
 import logging
 
-import nnsight
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
-from nnterp import StandardizedTransformer
-from nnterp.rename_utils import RenamingError
-from pydantic import BaseModel
-from transformer_lens import HookedTransformer
+from interp_engine import (
+    EagerModel,
+    VLLMModel,
+    is_linear_attention_layer,
+    run_with_cache,
+)
 
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.engine_adapter import vllm_attention_unsupported_reason
+from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
+from neuronpedia_inference.memory_cost import attention_cost
+from neuronpedia_inference.schemas import (
+    ActivationAttentionRequest,
+    ActivationAttentionResponse,
+)
 from neuronpedia_inference.shared import Model, with_request_lock
 
 logger = logging.getLogger(__name__)
@@ -24,58 +32,82 @@ SPARSE_THRESHOLD = 0.005
 VALUE_DECIMALS = 4
 
 
-class ActivationAttentionPostRequest(BaseModel):
-    prompt: str
-    model: str
-    # Integer layer + head. Attention heads are not SAE/source-based, so we index
-    # the model's attention layers/query-heads directly.
-    layer: int
-    head: int
-
-
-@router.post("/activation/attention")
-@with_request_lock()
+@router.post("/activation/attention", responses={200: {"model": ActivationAttentionResponse}})
+@with_request_lock(exclusive=False, cost=attention_cost)
 async def activation_attention(
-    request: ActivationAttentionPostRequest = Body(
+    request: ActivationAttentionRequest = Body(
         ...,
-        example={
-            "prompt": "When Mary and John went to the store, John gave a drink to Mary.",
-            "model": "gpt2-small",
-            "layer": 5,
-            "head": 1,
-        },
+        examples=[
+            {
+                "prompt": "When Mary and John went to the store, John gave a drink to Mary.",
+                "model": "gpt2-small",
+                "layer": 5,
+                "head": 1,
+            }
+        ],
     ),
 ):
     model = Model.get_instance()
     config = Config.get_instance()
 
-    # Resolve layer/head counts for validation.
-    if isinstance(model, StandardizedTransformer):
-        num_layers = model.num_layers
-        num_heads = model.num_heads
-    elif isinstance(model, HookedTransformer):
-        num_layers = model.cfg.n_layers
-        num_heads = model.cfg.n_heads
-    else:
+    # Resolve layer/head counts and the per-layer attention kind for validation. Both
+    # backends read the same `layer_types` config field, so the linear-attention guard
+    # below covers them equally -- it used to sit inside the EagerModel branch, which left
+    # the vLLM path to reconstruct a softmax for layers that have none.
+    if not isinstance(model, EagerModel | VLLMModel):
         return JSONResponse(
-            content={
-                "error": "Attention patterns are only supported on TransformerLens and NNsight engines."
-            },
+            content={"error": "Attention patterns are only supported on the interp-engine and vLLM backends."},
             status_code=400,
         )
+    num_layers = model.n_layers
+    if isinstance(model, EagerModel):
+        num_heads = model.n_heads
+        is_linear = model.arch.is_linear_attention_layer(request.layer)
+        # Eager reads the real softmax out of the model, so no config quirk can be missed.
+        unsupported: tuple[str, ...] = ()
+    else:
+        num_heads = model._attn_dims["n_heads"]
+        is_linear = is_linear_attention_layer(model._attn_dims, request.layer)
+        unsupported = model._attn_dims.get("unsupported", ())
 
     if not (0 <= request.layer < num_layers):
         return JSONResponse(
-            content={
-                "error": f"Invalid layer: {request.layer}. Must be in [0, {num_layers})."
-            },
+            content={"error": f"Invalid layer: {request.layer}. Must be in [0, {num_layers})."},
             status_code=400,
         )
     if num_heads is not None and not (0 <= request.head < num_heads):
         return JSONResponse(
+            content={"error": f"Invalid head: {request.head}. Must be in [0, {num_heads})."},
+            status_code=400,
+        )
+    if is_linear:
+        return JSONResponse(
+            content={"error": f"Layer {request.layer} is a linear-attention layer with no softmax attention pattern."},
+            status_code=400,
+        )
+    # The vLLM path rebuilds the softmax from captured q/k, so a config term it cannot
+    # reproduce yields a plausible-looking pattern that is not the model's. Refusing is the
+    # only honest answer; returning the wrong numbers is what this check exists to prevent.
+    if unsupported:
+        logger.error(
+            "Refusing attention for %s: unsupported config for off-kernel recompute: %s",
+            request.model,
+            "; ".join(unsupported),
+        )
+        return JSONResponse(
             content={
-                "error": f"Invalid head: {request.head}. Must be in [0, {num_heads})."
+                "error": "Attention patterns are not supported for this model on the vLLM "
+                "backend: " + "; ".join(unsupported)
             },
+            status_code=400,
+        )
+    # Same reasoning, but about the deployment rather than the model: a sharded pod has no
+    # rank holding every head, so there is no pattern to return.
+    sharding_reason = vllm_attention_unsupported_reason(model) if isinstance(model, VLLMModel) else None
+    if sharding_reason is not None:
+        logger.error("Refusing attention for %s: %s", request.model, sharding_reason)
+        return JSONResponse(
+            content={"error": f"Attention patterns are not available on this instance: {sharding_reason}."},
             status_code=400,
         )
 
@@ -88,73 +120,50 @@ async def activation_attention(
     if bos_token is not None and not prompt.startswith(bos_token):
         prompt = bos_token + prompt
 
-    if isinstance(model, StandardizedTransformer):
-        tokens = model.tokenizer(prompt, add_special_tokens=False, return_tensors="pt")[
-            "input_ids"
-        ][0]
-    else:
-        tokens = model.to_tokens(prompt, prepend_bos=prepend_bos, truncate=False)[0]
+    tokens = model.to_tokens(prompt, prepend_bos=prepend_bos, truncate=False)[0]
 
-    if len(tokens) > config.token_limit:
-        logger.error(
-            "Text too long: %s tokens, max is %s",
-            len(tokens),
-            config.token_limit,
-        )
-        return JSONResponse(
-            content={
-                "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
-            },
-            status_code=400,
-        )
+    too_long = reject_if_over_token_limit(len(tokens), config.activation_token_limit)
+    if too_long is not None:
+        return too_long
 
-    if isinstance(model, StandardizedTransformer):
-        tokenizer = model.tokenizer
-        str_tokens: list[str] = tokenizer.tokenize(prompt)
-        str_tokens = [tokenizer.convert_tokens_to_string([t]) for t in str_tokens]
-    else:
-        str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
+    str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
 
-    # Extract the [q, k] attention pattern for the requested (layer, head).
-    if isinstance(model, StandardizedTransformer):
-        if not model.attn_probs_available:
+    # Extract the [q, k] attention pattern for the requested (layer, head). Attention-sink models
+    # (gpt-oss) intentionally do not sum to 1 across keys; we never renormalize.
+    #
+    # `capture_attention` would serve both backends in one call, and is deliberately not used: it
+    # returns the whole triple, so the eager arm would also rebuild the pre-softmax scores through
+    # the re-dispatched attention -- another [heads, q, q] per layer that this endpoint discards.
+    # The vLLM arm has no such choice, since one off-kernel recompute produces all three.
+    if isinstance(model, EagerModel):
+        ids = tokens.unsqueeze(0) if tokens.ndim == 1 else tokens
+        cache = run_with_cache(model, ids, [("attn_probs", request.layer)])
+        attn = cache.get("attn_probs", request.layer)
+        if attn is None:
             return JSONResponse(
-                content={
-                    "error": "Attention probabilities are not available for this NNsight model."
-                },
+                content={"error": f"No attention probabilities for layer {request.layer}."},
                 status_code=400,
             )
-        try:
-            with model.trace(tokens):
-                saved = nnsight.save(model.attention_probabilities[request.layer])
-        except RenamingError as exc:
-            # Hybrid models (e.g. Qwen3.6) only have softmax attention on their
-            # full-attention layers; the interleaved linear-attention layers
-            # have no attention pattern to return.
-            return JSONResponse(
-                content={
-                    "error": f"No attention probabilities for layer {request.layer}: {exc}"
-                },
-                status_code=400,
-            )
-        # (batch, n_heads, q, k) -> (q, k)
-        attention = saved[0, request.head].float().detach().cpu()
+        # (batch, n_heads, q, k) -> (q, k).
+        attention = attn[0, request.head].float().detach().cpu()
     else:
-        _, cache = model.run_with_cache(tokens)
-        # cache["pattern", layer] -> (batch, n_heads, dest/q, src/k)
-        attention = cache["pattern", request.layer][0, request.head].float().detach().cpu()
+        # Off-kernel recompute of probs from post-rope q/k, with the sliding-window band and any
+        # attention sinks reapplied (the fused kernel's, not ours).
+        token_ids = tokens.tolist() if tokens.ndim == 1 else tokens[0].tolist()
+        res = await model.capture_attention(token_ids, [request.layer])
+        # [n_heads, q, k] -> (q, k) for the requested head.
+        attention = res[request.layer]["probs"][request.head].float().detach().cpu()
 
-    result = _sparsify_attention(attention)
-    result["tokens"] = str_tokens
+    sparse = _sparsify_attention(attention)
 
     logger.info(
         "Returning attention for layer %s head %s (%s tokens, %s nonzero)",
         request.layer,
         request.head,
-        result["seq_len"],
-        len(result["attention_values"]),
+        sparse["seq_len"],
+        len(sparse["attention_values"]),
     )
-    return JSONResponse(content=result)
+    return ActivationAttentionResponse(tokens=str_tokens, **sparse)
 
 
 def _sparsify_attention(attention: torch.Tensor) -> dict:

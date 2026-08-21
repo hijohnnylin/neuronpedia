@@ -1,0 +1,92 @@
+name: Python - Lint
+
+# The ruff lint/format gate for every Python service under apps/. It is the SOLE owner of that
+# gate for those projects: inference-tests.yml and autointerp-tests.yml deliberately no longer run
+# ruff, because this workflow gets the same verdict in seconds without installing torch. Type
+# checking stays in those workflows, since pyright needs the full dependency set.
+#
+# interp-engine used to be in the matrix and in the config-parity job below. It is now its own
+# repository (decoderesearch/interp-engine) and lints itself there, against a copy of the same
+# shared block. Nothing here can check that copy any more, so keeping the two in step is a
+# convention rather than a gate -- see the note in that repo's root pyproject.toml.
+
+# The two `paths` lists are duplicated because GitHub Actions does not support YAML anchors.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "!apps/**/*.md"
+      - "!apps/webapp/**"
+      - ".github/scripts/check_lint_config_parity.py"
+      - ".github/scripts/check_no_local_path_deps.py"
+      - ".github/workflows/python-lint.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/**"
+      - "!apps/**/*.md"
+      - "!apps/webapp/**"
+      - ".github/scripts/check_lint_config_parity.py"
+      - ".github/scripts/check_no_local_path_deps.py"
+      - ".github/workflows/python-lint.yml"
+
+concurrency:
+  group: python-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    name: ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One app's lint failure should not hide the others'.
+      fail-fast: false
+      matrix:
+        app: [autointerp, graph, inference, nla, sparsity]
+    defaults:
+      run:
+        working-directory: ./apps/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # `--only-dev` installs the dev group and NOT the project's own dependencies, so this is a
+      # couple of seconds rather than the several minutes torch/vLLM would cost. `--frozen` pins it
+      # to the app's uv.lock, so CI lints with the exact ruff the lockfile records -- and fails
+      # loudly if someone edits a pyproject without re-locking.
+      - name: Install the dev group (ruff, from this app's uv.lock)
+        run: uv sync --only-dev --frozen
+
+      - name: Check linting
+        run: uv run --no-sync ruff check .
+
+      - name: Check formatting
+        run: uv run --no-sync ruff format --check .
+
+  config-parity:
+    # The shared ruff/pyright block is copied into each pyproject.toml, because neither tool can
+    # inherit config from outside its own project directory. This job is what stops the copies
+    # from silently diverging again.
+    name: shared config parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare the shared lint/type block across projects
+        run: python3 .github/scripts/check_lint_config_parity.py
+
+  no-local-path-deps:
+    # interp-engine is worked on in its own repository, so pointing an app at a local checkout is a
+    # routine mid-change thing to do. `make engine-link` does it without touching anything tracked;
+    # editing [tool.uv.sources] by hand does it in a way that breaks every other checkout. This job
+    # is what tells the two apart. It reads the committed files only, so it needs no venv.
+    name: no local path deps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for local path dependencies in pyproject.toml / uv.lock
+        run: python3 .github/scripts/check_no_local_path_deps.py

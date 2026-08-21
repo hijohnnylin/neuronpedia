@@ -3,43 +3,28 @@ import gc
 import json
 import logging
 import os
-import sys
+import time
 import traceback
-from collections.abc import Awaitable
-from typing import Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 import sentry_sdk
 import torch
 from dotenv import load_dotenv
-
-# vLLM only available on Linux
-try:
-    from chatspace.generation import VLLMSteeringConfig, VLLMSteerModel
-
-    VLLM_AVAILABLE = True
-except ImportError:
-    VLLMSteeringConfig = None  # type: ignore[misc, assignment]
-    VLLMSteerModel = None  # type: ignore[misc, assignment]
-    VLLM_AVAILABLE = False
 from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
-from nnterp import StandardizedTransformer
-from nnterp.rename_utils import AttnProbFunction, RenameConfig, RenamingError
-from transformer_lens import HookedTransformer
-from transformer_lens.hook_points import HookPoint
+from interp_engine import (
+    VLLMModel,
+    check_cuda_driver,
+    load_model,
+    select_backend,
+)
 
-# from transformer_lens.model_bridge.sources.transformers import boot
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
-
-if VLLM_AVAILABLE:
-    from vllm import SamplingParams
-else:
-    SamplingParams = None  # type: ignore[misc, assignment]
-
-from neuronpedia_inference.args import list_available_options, parse_env_and_args
-from neuronpedia_inference.config import Config, get_saelens_neuronpedia_directory_df
+from neuronpedia_inference.args import parse_env_and_args
+from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.activation.all import (
     router as activation_all_router,
 )
@@ -48,6 +33,9 @@ from neuronpedia_inference.endpoints.activation.all_batch import (
 )
 from neuronpedia_inference.endpoints.activation.attention import (
     router as activation_attention_router,
+)
+from neuronpedia_inference.endpoints.activation.raw import (
+    router as activation_raw_router,
 )
 from neuronpedia_inference.endpoints.activation.single import (
     router as activation_single_router,
@@ -64,17 +52,19 @@ from neuronpedia_inference.endpoints.activation.topk_by_token import (
 from neuronpedia_inference.endpoints.activation.topk_by_token_batch import (
     router as activation_topk_by_token_batch_router,
 )
+from neuronpedia_inference.endpoints.capabilities import router as capabilities_router
+from neuronpedia_inference.endpoints.chat_template import (
+    router as chat_template_router,
+)
 from neuronpedia_inference.endpoints.lens.lens_loader import (
     load_jacobian_lens_at_startup,
+    place_jacobian_lens_on_device,
+    place_jacobian_lens_on_worker,
 )
 from neuronpedia_inference.endpoints.lens.prompt import (
     router as lens_prompt_router,
 )
 from neuronpedia_inference.endpoints.lens.prompt import warmup_lens
-from neuronpedia_inference.endpoints.persona.monitor import (
-    router as persona_monitor_router,
-)
-from neuronpedia_inference.endpoints.persona.utils import initialize_persona_data
 from neuronpedia_inference.endpoints.steer.completion import (
     router as steer_completion_router,
 )
@@ -89,26 +79,243 @@ from neuronpedia_inference.endpoints.util.sae_vector import router as sae_vector
 from neuronpedia_inference.endpoints.util.similarity_matrix_pred import (
     router as similarity_matrix_pred_router,
 )
+from neuronpedia_inference.inference_utils.persona import initialize_persona_data
 from neuronpedia_inference.logging import initialize_logging
-from neuronpedia_inference.nnsight_health import (
-    detect_and_mark,
-    get_nnsight_health,
+from neuronpedia_inference.operation_ids import sdk_operation_id
+from neuronpedia_inference.resilience import (
+    is_fatal_cuda_error,
+    probe_cuda_or_die,
+    terminate_for_restart,
 )
+from neuronpedia_inference.sae_cache import sae_cache
 from neuronpedia_inference.sae_manager import SAEManager  # noqa: F401
+from neuronpedia_inference.schemas import HealthResponse
 from neuronpedia_inference.shared import (  # noqa: F401
     STR_TO_DTYPE,
     Model,
-    replace_tlens_model_id_with_hf_model_id,
+    RecoverableOutOfMemory,
+    RequestTooLarge,
+    configure_budget,
+    configure_limiter,
+)
+from neuronpedia_inference.startup_memory import (
+    ModelMemoryInfo,
+    compute_activation_token_limit,
+    compute_serving_limits,
+    measure_pinnable_host_bytes,
+    measure_transient_budget,
+    resolve_sae_gpu_budget_bytes,
 )
 from neuronpedia_inference.utils import checkCudaError
-
-# Chatspace Consts
-# llama 3.3 70b awq (quantized) = 1 H200, 0.9
-CHATSPACE_NUM_GPUS = 1
-CHATSPACE_GPU_MEMORY_UTILIZATION = 0.9
+from neuronpedia_inference.vllm_optional import VLLM_AVAILABLE
 
 # How long to wait before retrying after a HuggingFace 429 (Too Many Requests).
 HF_429_RETRY_WAIT_SECONDS = 60
+
+
+def _vllm_gpu_memory_utilization() -> float:
+    """Read ``VLLM_GPU_MEMORY_UTILIZATION`` at call time (default 0.9).
+
+    Must not be a module-level constant: tests (and ops) set the env var after the
+    server module is imported, and a frozen import-time value would ignore them.
+    """
+    return float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.9"))
+
+
+#: Powers of two through 256. Decode uses 1; a 200-token prompt pads to 256.
+#: vLLM's default is every 8 tokens to 256 (~35 graphs). On DeepSeek-V4 that
+#: ladder profiles at ~47 GiB and leaves no KV; this list is 9 graphs.
+_DEFAULT_CUDAGRAPH_CAPTURE_SIZES = (1, 2, 4, 8, 16, 32, 64, 128, 256)
+
+
+def _vllm_cudagraph_capture_sizes() -> list[int]:
+    """CUDA-graph batch sizes for static / generation-only pods.
+
+    ``VLLM_CUDAGRAPH_CAPTURE_SIZES`` is a comma-separated list. Unset uses
+    :data:`_DEFAULT_CUDAGRAPH_CAPTURE_SIZES`. Hooked vLLM ignores this (no graphs).
+    """
+    raw = os.getenv("VLLM_CUDAGRAPH_CAPTURE_SIZES")
+    if raw is None or raw.strip() == "":
+        return list(_DEFAULT_CUDAGRAPH_CAPTURE_SIZES)
+    try:
+        sizes = [int(part.strip()) for part in raw.split(",") if part.strip()]
+    except ValueError as exc:
+        raise ValueError(
+            f"VLLM_CUDAGRAPH_CAPTURE_SIZES={raw!r} must be a comma-separated list of integers "
+            "(e.g. 1,2,4,8,16,32,64,128,256)."
+        ) from exc
+    if not sizes or any(n < 1 for n in sizes):
+        raise ValueError(f"VLLM_CUDAGRAPH_CAPTURE_SIZES={raw!r} needs at least one integer >= 1.")
+    return sorted(set(sizes))
+
+
+def _graph_compilation_config() -> dict[str, list[int]]:
+    return {"cudagraph_capture_sizes": _vllm_cudagraph_capture_sizes()}
+
+
+def _vllm_max_num_batched_tokens() -> int | None:
+    """``MAX_NUM_BATCHED_TOKENS``: the prefill chunk size. Unset leaves the choice to the engine.
+
+    On a static pod this is also what sizes the static buffers, which are one static row per
+    batched token at every static site. The engine already picks the largest value whose buffers
+    fit and refuses to start when none do, so most pods want that default.
+
+    What it cannot see is that the fit is GREEDY: it spends the pool on buffers before graphs, so
+    where the weights leave little room the largest size that fits can leave CUDA-graph capture
+    too little and vLLM then starts with no KV blocks. Pinning it is how such a pod buys graphs
+    and KV instead of buffer rows no request reaches. A pinned value is kept when it fits, so this
+    only ever lowers the ceiling; it never asks for more than the engine would allow.
+    """
+    raw = os.getenv("MAX_NUM_BATCHED_TOKENS")
+    if raw is None or raw.strip() == "":
+        return None
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"MAX_NUM_BATCHED_TOKENS={raw!r} must be an integer.") from exc
+    if value < 1:
+        raise ValueError(f"MAX_NUM_BATCHED_TOKENS={raw!r} must be an integer >= 1.")
+    return value
+
+
+def _engine_context_len(token_limit: int, lens_token_limit: int) -> int:
+    """The context the engine has to be built with, given both per-endpoint prompt caps.
+
+    ``token_limit`` bounds completion/steer/tokenize and ``lens_token_limit`` bounds the lens
+    endpoints, and the latter is deliberately allowed to be the higher of the two -- that is the
+    whole point of it being a separate knob. The engine, though, has exactly one context, so it
+    has to be sized from whichever cap is larger.
+
+    Sizing it from ``token_limit`` alone is what made a lens conversation between the two caps
+    fail the wrong way: it passed the endpoint's own length check (against ``lens_token_limit``)
+    and then died inside vLLM with a raw "maximum context length is N tokens" error, on a pod
+    where the lens limit was 1024 and the engine had been built for 256.
+    """
+    return max(int(token_limit), int(lens_token_limit))
+
+
+def _parse_static_points(raw: str | None) -> Any:
+    """``STATIC_POINTS``: unset, ``auto``, ``sae``, or a JSON list of addresses.
+
+    An empty list used to be how a pod asked for graphs with no taps. That mode now has a name of
+    its own -- ``backend="vllm-generate"``, reached through ``GENERATION_ONLY`` -- so the empty list
+    is refused rather than quietly routed there, which keeps one spelling per mode.
+    """
+    if raw is None or raw == "":
+        return None
+    if raw in ("auto", "sae"):
+        return raw
+    try:
+        points = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"STATIC_POINTS={raw!r} is not 'auto', 'sae', or JSON (e.g. 'auto' or [[\"resid_post\", 7]])."
+        ) from exc
+    if isinstance(points, list) and not points:
+        raise ValueError(
+            "STATIC_POINTS=[] declares no taps, so it asks for a graph-mode pod that cannot "
+            "capture anything. Set GENERATION_ONLY=true for that pod, or name the sites to "
+            "declare (STATIC_POINTS=auto, sae, or a JSON list of addresses)."
+        )
+    return points
+
+
+def _vllm_engine_backend(*, generation_only: bool, static_points: Any) -> str:
+    """Which of interp-engine's three vLLM backends this pod's two flags ask for.
+
+    The engine takes the mode as ``backend=`` rather than inferring it from a tap set, so the
+    mapping happens once, here, instead of being spread over the kwargs a caller happens to pass.
+
+    ``STATIC_POINTS=sae`` is not a case: its sites are not known until the SAEs have loaded, so
+    that pod is built hooked and promoted by ``configure_static`` before warmup, and arrives here
+    with ``static_points=None``.
+    """
+    if generation_only:
+        return "vllm-generate"
+    if static_points is not None:
+        return "vllm-static"
+    return "vllm"
+
+
+def _vllm_backend_kwargs(
+    max_model_len: int,
+    *,
+    backend: str,
+    static_points: Any = None,
+) -> dict[str, Any]:
+    """Engine construction kwargs for the vLLM backend, beyond what ``load_model`` derives."""
+    extra: dict[str, Any] = {
+        # Tell vLLM this model is text-only, because on this server it is: no endpoint accepts
+        # an image. The flag it reads, `is_mm_prefix_lm`, means "image tokens attend
+        # bidirectionally", and vLLM keys it off `model_type` against a list that holds
+        # "gemma3" -- so gemma-3-12b (model_type "gemma3") gets it while gemma-3-1b
+        # (model_type "gemma3_text") does not. Every attention layer then demands a backend
+        # that can express that mask, which rules FlashAttention out and leaves Triton unified
+        # attention running even on a pure-text request. It is a no-op on a text-only
+        # architecture, where vLLM derives the same False.
+        #
+        # This is only sound while the "no images" premise holds. Delete it, do not work
+        # around it, the day an endpoint takes one.
+        "hf_overrides": {"is_mm_prefix_lm": False},
+    }
+    kwargs: dict[str, Any] = {
+        "gpu_memory_utilization": _vllm_gpu_memory_utilization(),
+        "max_model_len": max_model_len,
+        "extra_vllm_kwargs": extra,
+    }
+    batched_tokens = _vllm_max_num_batched_tokens()
+    if batched_tokens is not None:
+        extra["max_num_batched_tokens"] = batched_tokens
+    if backend != "vllm":
+        # Both graph-replaying backends want inductor. The engine owns enforce_eager for them --
+        # it sets False and refuses True -- so this must not pass it, and vllm-generate needs no
+        # tap argument because backend= is already the whole declaration.
+        extra["compilation_config"] = _graph_compilation_config()
+    if backend == "vllm-static":
+        kwargs["static_points"] = static_points
+    return kwargs
+
+
+def _resolve_generation_only(args: Any) -> bool:
+    """Validate ``GENERATION_ONLY`` against the rest of the startup config, and refuse early.
+
+    The flag selects the engine's ``backend="vllm-generate"``: CUDA graphs kept, no taps declared.
+    Graph replay does not run the Python forward that capture and steering hooks live on, so the
+    flag does not disable one feature, it disables every hook-dependent one -- which is most of this
+    server. Two combinations are configuration errors rather than degraded modes, and both are
+    cheaper to reject here than to debug from a pod that boots happily and 400s on every request a
+    router sends it:
+
+    - **SAE sets.** An SAE read *is* a capture. A pod with SAEs loaded and no way to capture has
+      nothing to do with them but occupy VRAM.
+    - **The eager backend.** There is no generate-only variant of it; the flag would silently buy
+      nothing while still turning the endpoints off.
+    """
+    if not getattr(args, "generation_only", False):
+        return False
+    if args.backend != "vllm":
+        raise ValueError(
+            f"GENERATION_ONLY=true is only meaningful on the vLLM backend, but this pod resolved to "
+            f"{args.backend!r}. It selects backend='vllm-generate', which trades vLLM's capture "
+            "hooks for the CUDA graphs they rule out; there is no such tradeoff to make on eager, "
+            "which hooks the module tree in-process. Unset GENERATION_ONLY, or force vLLM with "
+            "--force-vllm."
+        )
+    if args.sae_sets:
+        raise ValueError(
+            f"GENERATION_ONLY=true cannot be combined with SAE_SETS={args.sae_sets!r}: reading an SAE "
+            "means capturing an activation, and this mode exists to give up capture (CUDA graph "
+            "replay skips the Python forward the hooks are attached to). Start with SAE_SETS='[]' to "
+            "serve completions only, or unset GENERATION_ONLY and pass STATIC_POINTS=sae to declare "
+            "those SAE sites and read them at graph speed."
+        )
+    static = getattr(args, "static_points", None)
+    if static not in (None, ""):
+        raise ValueError(
+            "GENERATION_ONLY=true already means backend='vllm-generate' (graphs, no taps). "
+            "Do not also pass STATIC_POINTS; omit GENERATION_ONLY for a declared tap set."
+        )
+    return True
 
 
 def _is_hf_429_error(exc: BaseException) -> bool:
@@ -132,78 +339,45 @@ def _is_hf_429_error(exc: BaseException) -> bool:
     return False
 
 
-class TextOnlyAutoModelForCausalLM(AutoModelForCausalLM):
-    """Loads the text-only causal-LM stack of multimodal (image-text-to-text)
-    models such as Qwen3-Next / Qwen3.6.
-
-    nnsight's ``LanguageModel`` refuses to load any model whose config is
-    registered with ``AutoModelForImageTextToText`` and points the user at
-    ``VisionLanguageModel`` instead. That guard is bypassed whenever the
-    ``automodel`` passed to nnsight is not literally ``AutoModelForCausalLM``.
-    These models are *also* registered with ``AutoModelForCausalLM`` (mapping to
-    their text-only ``*ForCausalLM`` class, which ignores the vision weights on
-    load), so this trivial subclass keeps the full causal-LM behaviour while
-    skipping the guard. It behaves identically to ``AutoModelForCausalLM`` for
-    plain text models.
-    """
+def _serving_url() -> str:
+    """The address uvicorn was told to bind to, exported by start.py."""
+    host = os.getenv("SERVER_HOST", "0.0.0.0")
+    port = os.getenv("SERVER_PORT", "5002")
+    # 0.0.0.0 / :: are bind wildcards, not addresses anyone can open.
+    display_host = "localhost" if host in ("0.0.0.0", "::", "") else host
+    return f"http://{display_host}:{port}"
 
 
-class HybridAttnProbFunction(AttnProbFunction):
-    """Attention-probability source for hybrid linear/full-attention models
-    (e.g. Qwen3-Next / Qwen3.6) under transformers >= 4.57 (including v5).
-
-    Full-attention layers run ``attn_output, attn_weights = attention_interface(self, ...)``
-    (that call site is unchanged across the transformers v5 attention-dispatch
-    refactor, which only rewrote the *assignment* of ``attention_interface``),
-    and ``eager_attention_forward`` applies ``nn.functional.softmax`` then
-    ``nn.functional.dropout`` — the dropout output is the attention-probability
-    tensor (dropout is a no-op in eval). The interleaved linear-attention
-    (GatedDeltaNet) layers have no such call site, so we raise a clear
-    RenamingError instead of surfacing nnsight's opaque ``AttributeError``.
-    """
-
-    def get_attention_prob_source(
-        self, attention_module, return_module_source: bool = False
-    ):
-        source = attention_module.source
-        if not hasattr(source, "attention_interface_0"):
-            raise RenamingError(
-                "This layer has no softmax attention probabilities "
-                "(hybrid linear-attention layer). Attention patterns are only "
-                "available on full-attention layers of this model."
-            )
-        inner = source.attention_interface_0.source
-        if return_module_source:
-            return inner
-        # eager_attention_forward runs softmax then dropout; prefer the dropout
-        # output (matches nnterp's default), falling back to softmax if a given
-        # implementation omits the dropout call.
-        if hasattr(inner, "nn_functional_dropout_0"):
-            return inner.nn_functional_dropout_0
-        return inner.nn_functional_softmax_0
+def _format_duration(seconds: float) -> str:
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}m {secs}s" if minutes else f"{secs}s"
 
 
-def _model_uses_hybrid_attention(hf_model_id: str) -> bool:
-    """Return True if the model interleaves linear- and full-attention layers.
+def _log_banner(title: str, lines: list[str]) -> None:
+    """One visually obvious block, so the end of a long noisy startup is findable."""
+    bar = "=" * 100
+    body = "\n".join(f"  {line}" for line in lines)
+    logger.info("\n%s\n  %s\n%s\n%s\n%s\n", bar, title, "-" * 100, body, bar)
 
-    Detected via ``config.layer_types`` (e.g. Qwen3-Next / Qwen3.6), which lists
-    ``"linear_attention"`` / ``"full_attention"`` per layer. Such models only
-    expose softmax attention probabilities on their full-attention layers, and
-    nnterp's load-time attention-probability check probes layer 0 (a
-    linear-attention layer here), so that check must be skipped. Best-effort:
-    any failure to read the config returns False (treat as a standard model).
-    """
-    try:
-        cfg = AutoConfig.from_pretrained(hf_model_id, trust_remote_code=True)
-    except Exception:  # noqa: BLE001 - config probe is best-effort
-        return False
-    layer_types = getattr(cfg, "layer_types", None)
-    if not layer_types:
-        text_cfg = getattr(cfg, "text_config", None)
-        layer_types = getattr(text_cfg, "layer_types", None)
-    if not layer_types:
-        return False
-    return "linear_attention" in layer_types and "full_attention" in layer_types
+
+def _log_ready_banner(elapsed_seconds: float) -> None:
+    config = Config.get_instance()
+    sae_manager = SAEManager.get_instance()
+    configured_saes = sum(len(saes) for saes in sae_manager.sae_set_to_saes.values())
+    model_desc = config.custom_hf_model_id or config.override_model_id or config.model_id
+    _log_banner(
+        f"==== LOADING COMPLETE - SERVING ON {_serving_url()} ====",
+        [
+            f"model: {model_desc}",
+            f"backend: {config.backend} | device: {config.device} | gpus: {config.num_gpus} | "
+            f"model dtype: {config.model_dtype} | sae dtype: {config.sae_dtype}",
+            f"saes: {len(sae_manager.loaded_saes)} resident of {configured_saes} configured "
+            f"({', '.join(sae_manager.valid_sae_sets) or 'none'})",
+            f"token limits: prompt={config.token_limit} activation={config.activation_token_limit} "
+            f"lens={config.lens_token_limit}",
+            f"startup took {_format_duration(elapsed_seconds)}",
+        ],
+    )
 
 
 # Initialize logging at module level
@@ -219,7 +393,16 @@ initialized = False
 global initialization_error
 initialization_error: str | None = None
 
-app = FastAPI()
+# Metadata carried over from the hand-written spec this server used to be generated from, so
+# the published clients keep the same title, version and license. Bump `version` when the wire
+# format changes; the publish job reads it.
+app = FastAPI(
+    title="Neuronpedia - Inference Server",
+    version="1.9.0",
+    contact={"email": "johnny@neuronpedia.org"},
+    license_info={"name": "Apache-2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0"},
+    generate_unique_id_function=sdk_operation_id,
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -235,11 +418,106 @@ app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 args = parse_env_and_args()
 
+if TYPE_CHECKING:
+    from sentry_sdk._types import Event, Hint
+
+# Callers authenticate with a shared secret in `x-secret-key`, and it reaches Sentry by two
+# routes. The obvious one is `request.headers`: the SDK redacts Authorization, Cookie and
+# X-Api-Key, but its list does not include this header. The other is stack-trace locals -- an
+# error inside a route serializes every frame's variables, and the raw ASGI `scope` (headers
+# included) is a local in roughly twenty of them, so scrubbing by header name alone still ships
+# the secret about twenty times over. The value sweep is what covers that; the key passes above
+# are still worth keeping, since they redact the header on transactions, which carry no locals.
+SENTRY_SCRUBBED_HEADERS = frozenset({"x-secret-key"})
+_SENTRY_HEADER_ATTR_PREFIX = "http.request.header."
+_SENTRY_FILTERED = "[Filtered]"
+
+
+def _redact_sentry_value(node: "Any", secret: str) -> None:
+    """Replace every occurrence of `secret` in a nested event payload, in place."""
+    if isinstance(node, dict):
+        pairs = list(node.items())
+    elif isinstance(node, list):
+        pairs = list(enumerate(node))
+    else:
+        return
+    for key, value in pairs:
+        if isinstance(value, str) and secret in value:
+            node[key] = value.replace(secret, _SENTRY_FILTERED)
+        else:
+            _redact_sentry_value(value, secret)
+
+
+def scrub_sentry_event(event: "Event", _hint: "Hint") -> "Event":
+    """Redact the auth header wherever it reaches an event: headers, span attributes, locals."""
+    request: Any = event.get("request")
+    headers = request.get("headers") if isinstance(request, dict) else None
+    if isinstance(headers, dict):
+        for key in headers:
+            if key.lower() in SENTRY_SCRUBBED_HEADERS:
+                headers[key] = _SENTRY_FILTERED
+
+    # Transactions carry the same headers again as span attributes, so scrubbing only `request`
+    # would still ship the secret on the sampled quarter of traffic.
+    contexts: Any = event.get("contexts") or {}
+    trace: Any = contexts.get("trace") or {}
+    spans: Any = event.get("spans") or []
+    for data in [trace.get("data"), *(span.get("data") for span in spans)]:
+        if not isinstance(data, dict):
+            continue
+        for key in data:
+            if key.lower().removeprefix(_SENTRY_HEADER_ATTR_PREFIX) in SENTRY_SCRUBBED_HEADERS:
+                data[key] = _SENTRY_FILTERED
+
+    # Guarded on non-empty: `"".replace` would rewrite every string in the event.
+    secret = os.environ.get("SECRET")
+    if secret:
+        _redact_sentry_value(event, secret)
+    return event
+
+
+# Module scope on purpose. Production starts this server as `uvicorn ...server:app` (see
+# start.py), so any init placed in a `main()` never runs and the server reports nothing. It also
+# has to land above the `include_router` calls below, since the FastAPI integration only wraps
+# handlers registered after it.
+if args.sentry_dsn:
+    logger.info("Initializing Sentry")
+    sentry_sdk.init(
+        dsn=args.sentry_dsn,
+        environment=os.getenv("SENTRY_ENVIRONMENT", "development"),
+        release=os.getenv("SENTRY_RELEASE"),
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.25")),
+        profile_session_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.25")),
+        profile_lifecycle="trace",
+        before_send=scrub_sentry_event,
+        before_send_transaction=scrub_sentry_event,
+    )
+    # Which model and SAEs a pod serves is a property of that pod, not a deploy target, so it
+    # belongs on a tag. Putting it in `environment` (as this used to) makes every new source set
+    # look like a new deploy environment in the issue filters.
+    sentry_sdk.set_tag("model_id", args.model_id)
+    sentry_sdk.set_tag("sae_sets", ",".join(args.sae_sets) or "no-saes")
+    sentry_sdk.set_tag("model_dtype", args.model_dtype)
+    # Everything else this pod was started with, as a context rather than more tags: tags are a
+    # searchable index, and a namespace this size would swamp the ones worth filtering on above.
+    # `args` is built entirely from the environment (see args.py), so this is literally the pod's
+    # start arguments -- enough to tell two pods of the same model apart by token limit, GPU count
+    # or SAE budget. The DSN is dropped rather than echoed back into its own payload.
+    sentry_sdk.set_context("start_args", {k: v for k, v in vars(args).items() if k != "sentry_dsn"})
+else:
+    logger.info("SENTRY_DSN not set, skipping Sentry initialization")
+
 
 # we have to initialize SAE's AFTER server startup, because some infrastructure providers require
 # our server to respond to health checks within a few minutes of starting up
 @app.on_event("startup")  # pyright: ignore[reportDeprecated]
 async def startup_event():
+    # Tests (and any caller that already ran ``initialize()``) must be able to enter
+    # ``TestClient`` as a context manager without kicking off a second load -- that
+    # would race the already-loaded model / vLLM engine.
+    if initialized:
+        logger.info("Startup skipped: already initialized")
+        return
     logger.info("Starting initialization...")
     # Wait briefly to ensure server is ready
     await asyncio.sleep(3)
@@ -258,6 +536,7 @@ async def startup_event():
 
 v1_router = APIRouter(prefix="/v1")
 
+v1_router.include_router(capabilities_router)
 v1_router.include_router(activation_all_router)
 v1_router.include_router(activation_all_batch_router)
 v1_router.include_router(steer_completion_chat_router)
@@ -270,33 +549,46 @@ v1_router.include_router(activation_topk_by_token_batch_router)
 v1_router.include_router(sae_topk_by_decoder_cossim_router)
 v1_router.include_router(sae_vector_router)
 v1_router.include_router(tokenize_router)
+v1_router.include_router(chat_template_router)
 v1_router.include_router(similarity_matrix_pred_router)
 v1_router.include_router(activation_source_router)
-v1_router.include_router(persona_monitor_router)
+v1_router.include_router(activation_raw_router)
 v1_router.include_router(lens_prompt_router)
 app.include_router(v1_router)
 
 
-@app.get("/health")
+def _openapi_with_secret_key_auth() -> dict[str, Any]:
+    """Document the ``X-SECRET-KEY`` header that ``check_secret_key`` below enforces.
+
+    That check is middleware rather than a route dependency, so FastAPI cannot see it and
+    would otherwise emit a spec claiming every endpoint is open -- which the clients
+    generated from that spec would then believe. ``/health`` is the one exemption, matching
+    the middleware.
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        contact=app.contact,
+        license_info=app.license_info,
+        routes=app.routes,
+    )
+    schema.setdefault("components", {})["securitySchemes"] = {
+        "SimpleSecretAuth": {"type": "apiKey", "in": "header", "name": "X-SECRET-KEY"}
+    }
+    schema["security"] = [{"SimpleSecretAuth": []}]
+    schema["paths"]["/health"]["get"]["security"] = []
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _openapi_with_secret_key_auth
+
+
+@app.get("/health", responses={200: {"model": HealthResponse}})
 async def health_check():
     return {"status": "healthy"}
-
-
-@app.get("/health/nnsight")
-async def nnsight_health_check():
-    """Fast probe of the nnsight runtime.
-
-    Returns 200 if nnsight has not been observed in the corrupted-mount
-    state described in `nnsight_health.py`, otherwise 503. Intended to
-    be polled by an external health checker so the host can be drained
-    or restarted without having to issue a full (slow) steering request.
-    """
-    healthy, details = get_nnsight_health()
-    payload = {"status": "healthy" if healthy else "unhealthy", **details}
-    return JSONResponse(content=payload, status_code=200 if healthy else 503)
-
-
-USE_TLENS_BRIDGE = False
 
 
 @app.post("/initialize")
@@ -306,30 +598,23 @@ async def initialize(
     logger.info("Initializing...")
     global initialization_error
     initialization_error = None
+    startup_started_at = time.monotonic()
 
     # Move the heavy operations to a separate thread pool to prevent blocking
     def load_model_and_sae():
-        # Validate inputs
-        df = get_saelens_neuronpedia_directory_df()
-        models = df["model"].unique()
-        sae_sets = df["neuronpedia_set"].unique()
-        # if args.model_id not in models:
-        #     logger.error(
-        #         f"Error: Invalid model_id '{args.model_id}'. Use --list_models to see available options."
-        #     )
-        #     exit(1)
+        # Before anything reaches the GPU: args.device is still the *requested* device
+        # here (select_backend resolves it below), which is what decides whether a
+        # too-old driver is fatal or merely worth a warning.
+        check_cuda_driver(args.device, cpu_hint="To serve on CPU instead, pass --device cpu.")
+
+        # The model_id / SAE-set values are not validated against the SAELens directory
+        # (get_saelens_neuronpedia_directory_df): sets served here can be local or not yet
+        # published, so an unknown name is not an error.
         # iterate through sae_sets and split them by spaces
         args_sae_sets = []
         for sae_set in args.sae_sets:
             args_sae_sets.extend(sae_set.split())
         logger.info("SAE sets: %s", args_sae_sets)
-        # logger.info("Checking for invalid SAE sets...")
-        # invalid_sae_sets = set(args_sae_sets) - set(sae_sets)
-        # if invalid_sae_sets:
-        #     logger.error(
-        #         f"Error: Invalid SAE set(s): {', '.join(invalid_sae_sets)}. Use --list_models to see available options."
-        #     )
-        #     exit(1)
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
@@ -337,13 +622,39 @@ async def initialize(
         gc.collect()
         torch.set_grad_enabled(False)
         checkCudaError("cpu")
-        # todo: use multiple devices if available
-        device_count = 1
 
         SECRET = os.getenv("SECRET")
 
-        logger.info(f"device in args: {args.device}")
-        logger.info(f"device set in args: {args.device}")
+        # Auto-select backend (vLLM vs EagerModel) + device + dtype from what
+        # the box can do and what the model needs. Explicit DEVICE / MODEL_DTYPE and
+        # the backend force (--force-vllm / --force-eager -> FORCE_BACKEND) override.
+        # ``--model_id`` is the Hugging Face repo id (override/custom_hf still win when set).
+        probe_hf_model_id = custom_hf_model_id or args.override_model_id or args.model_id
+        selection = select_backend(
+            probe_hf_model_id,
+            requested_device=args.device,
+            requested_dtype=args.model_dtype,
+            force_backend=args.force_backend,
+            vllm_available=VLLM_AVAILABLE,
+        )
+        logger.info("Backend selection for %s: %s", probe_hf_model_id, selection.reason)
+        args.device = selection.device
+        args.model_dtype = selection.dtype
+        args.backend = "vllm" if selection.use_vllm else "eager"
+        static_mode = _parse_static_points(getattr(args, "static_points", None))
+        if static_mode is not None and args.backend != "vllm":
+            raise ValueError(
+                f"STATIC_POINTS selects backend='vllm-static', but this pod resolved to "
+                f"{args.backend!r}. The eager backend hooks the module tree in-process, so every "
+                "site is already reachable and there is nothing to declare. Omit STATIC_POINTS, or "
+                "force vLLM with --force-vllm."
+            )
+        if static_mode == "sae" and not args_sae_sets:
+            raise ValueError("STATIC_POINTS=sae needs SAE_SETS so there are hook sites to declare.")
+        num_gpus = max(1, int(getattr(args, "num_gpus", 1) or 1))
+        if num_gpus > 1:
+            logger.info("Multi-GPU: sharding across %d GPUs (%s)", num_gpus, args.backend)
+
         config = Config(
             secret=SECRET,
             model_id=args.model_id,
@@ -359,224 +670,103 @@ async def initialize(
             exclude_sae=args.exclude_sae,
             model_from_pretrained_kwargs=args.model_from_pretrained_kwargs,
             max_loaded_saes=args.max_loaded_saes,
-            nnsight=args.nnsight,
-            chatspace=args.chatspace,
+            backend=args.backend,
+            num_gpus=num_gpus,
+            sae_gpu_budget_gib=args.sae_gpu_budget_gib,
+            sae_pinned_host_gib=args.sae_pinned_host_gib,
+            generation_only=_resolve_generation_only(args),
         )
         Config._instance = config
 
-        if args.nnsight:
-            logger.info("Loading model with nnterp...")
-
-            if args.device == "mps":
-                raise RuntimeError(
-                    "nnsight+nnterp is not supported on MPS for this server setup. "
-                    "Use --device cpu, or disable --nnsight."
+        # The engine is keyed by the raw HF repo id.
+        model_to_load = config.override_model_id if config.override_model_id else config.model_id
+        hf_model_id = config.custom_hf_model_id or model_to_load
+        logger.info("Model to load (HF id): %s", hf_model_id)
+        # The backend was already resolved above, so pass it explicitly rather than letting
+        # load_model re-run the ladder -- Config needs the resolved device/dtype before the
+        # model exists, so the app owns the selection call and load_model only constructs.
+        # Backend-specific kwargs stay explicit here.
+        if args.backend == "vllm":
+            # The engine splits vLLM into three backends by what the pod declares up front, so
+            # resolve which one these flags mean. config.backend stays the family name, because
+            # what the rest of the server asks is "vLLM or eager".
+            load_points = None if static_mode == "sae" else static_mode
+            engine_backend = _vllm_engine_backend(generation_only=config.generation_only, static_points=load_points)
+            logger.info("Loading model with engine-owned vLLM backend (%s)...", engine_backend)
+            # Lightweight construct (tokenizer + config); the vLLM engine (with native
+            # extract_hidden_states on) is created lazily on first async use.
+            # num_gpus>1 -> tensor-parallel across that many GPUs on this node.
+            backend_kwargs: dict[str, Any] = _vllm_backend_kwargs(
+                _engine_context_len(config.token_limit, config.lens_token_limit),
+                backend=engine_backend,
+                static_points=load_points,
+            )
+            if config.generation_only:
+                logger.warning(
+                    "GENERATION_ONLY: loading backend='vllm-generate', which keeps vLLM's CUDA "
+                    "graphs. This pod serves completions and tokenization; capture, steering, DFA, "
+                    "attention and the lens endpoints are unavailable and report so at "
+                    "/capabilities."
                 )
-
-            model_to_load = (
-                config.override_model_id
-                if config.override_model_id
-                else config.model_id
-            )
-            logger.info("Model to load: %s", model_to_load)
-            nnsight_kwargs = {}
-            if args.nnsight_max_memory is not None:
-                mem_values = [v.strip() for v in args.nnsight_max_memory.split(",")]
-                num_gpus = torch.cuda.device_count()
-                if len(mem_values) == 1:
-                    nnsight_kwargs["max_memory"] = {
-                        i: f"{mem_values[0]}GiB" for i in range(num_gpus)
-                    }
-                else:
-                    if len(mem_values) != num_gpus:
-                        raise ValueError(
-                            f"nnsight_max_memory has {len(mem_values)} values but found {num_gpus} GPUs"
-                        )
-                    nnsight_kwargs["max_memory"] = {
-                        i: f"{mem_values[i]}GiB" for i in range(num_gpus)
-                    }
-                logger.info("nnsight max_memory: %s", nnsight_kwargs["max_memory"])
-            hf_model_id = replace_tlens_model_id_with_hf_model_id(model_to_load)
-
-            # Hybrid-attention models (e.g. Qwen3-Next / Qwen3.6) interleave
-            # gated linear-attention layers (module named ``linear_attn``) with
-            # full-attention layers (module named ``self_attn``). nnterp only
-            # looks for ``self_attn`` when standardizing, so the linear-attention
-            # layers fail its renaming check. Tell nnterp to also treat
-            # ``linear_attn`` as the attention module so every layer exposes a
-            # standardized ``self_attn``. This is a no-op for architectures that
-            # don't have a ``linear_attn`` module.
-            uses_hybrid_attention = _model_uses_hybrid_attention(hf_model_id)
-            # For hybrid models, only the full-attention layers expose softmax
-            # probabilities; this source reads them (and raises a clear error on
-            # the interleaved linear-attention layers) rather than surfacing
-            # nnsight's opaque AttributeError from the default source path.
-            rename_config = RenameConfig(
-                attn_name=["self_attn", "linear_attn"],
-                attn_prob_source=(
-                    HybridAttnProbFunction() if uses_hybrid_attention else None
-                ),
-            )
-
-            # Attention-sink models (e.g. gpt-oss) add a learned per-head sink to
-            # the attention softmax denominator, so their attention probabilities
-            # over the real tokens deliberately do NOT sum to 1, which fails
-            # nnterp's sum-to-1 validation and aborts loading.
-            uses_attention_sinks = "gpt-oss" in hf_model_id.lower()
-            common_kwargs = dict(
-                dtype=STR_TO_DTYPE[config.model_dtype],
-                trust_remote_code=True,
-                rename_config=rename_config,
-                # Load only the text stack of multimodal models (e.g. Qwen3.6)
-                # instead of erroring out / pulling in the vision tower. No-op
-                # for plain text models.
-                automodel=TextOnlyAutoModelForCausalLM,
-                **nnsight_kwargs,
-            )
-            try:
-                if uses_attention_sinks or uses_hybrid_attention:
-                    # Neither can pass nnterp's load-time attention-probs check:
-                    # attention-sink models fail the sum-to-1 assertion, and
-                    # hybrid models fail because the check probes layer 0 — a
-                    # linear-attention layer with no softmax probabilities. Load
-                    # with the built-in check disabled but force eager attention
-                    # (so per-head probabilities are still computed and
-                    # readable), then re-enable the accessor manually so the
-                    # /activation/attention endpoint works on the layers that do
-                    # have probabilities.
-                    logger.info(
-                        "Model %s uses %s; loading with eager attention and "
-                        "enabling attention probabilities without nnterp's "
-                        "load-time check.",
-                        hf_model_id,
-                        "attention sinks"
-                        if uses_attention_sinks
-                        else "hybrid linear/full attention",
-                    )
-                    model = StandardizedTransformer(
-                        hf_model_id,
-                        enable_attention_probs=False,
-                        attn_implementation="eager",
-                        **common_kwargs,
-                    )
-                    # The accessor's source is already wired up during init; only
-                    # the enabled flag was turned off. Re-enable it directly.
-                    model.attention_probabilities.enabled = True
-                    model.attention_probabilities.initialized_with_enable = True
-                else:
-                    model = StandardizedTransformer(
-                        hf_model_id,
-                        # Expose attention probabilities (forces
-                        # attn_implementation "eager") so the
-                        # /activation/attention endpoint can read per-head
-                        # attention patterns for custom text. Skip the load-time
-                        # trace validation to avoid dispatching the model.
-                        enable_attention_probs=True,
-                        check_attn_probs_with_trace=False,
-                        **common_kwargs,
-                    )
-            except RecursionError as exc:
-                raise RuntimeError(
-                    "Failed to initialize nnterp StandardizedTransformer due to a recursion error. "
-                    "This is typically caused by an nnterp/nnsight/backend incompatibility for the "
-                    "current model/runtime. Try --device cpu, or disable --nnsight."
-                ) from exc
-        elif args.chatspace:
-            if not VLLM_AVAILABLE:
-                raise RuntimeError(
-                    "chatspace mode requires vLLM, which is only available on Linux. "
-                    "Use a different model loading mode on macOS."
-                )
-            logger.info("Loading model with chatspace VLLM...")
-            model_to_load = (
-                config.override_model_id
-                if config.override_model_id
-                else config.model_id
-            )
-            logger.info("Model to load: %s", model_to_load)
-            cfg = VLLMSteeringConfig(
-                model_name=replace_tlens_model_id_with_hf_model_id(model_to_load),
-                tensor_parallel_size=CHATSPACE_NUM_GPUS,
-                gpu_memory_utilization=CHATSPACE_GPU_MEMORY_UTILIZATION,
-                max_model_len=config.token_limit,
-                dtype=config.model_dtype,
-            )
-            model = VLLMSteerModel(
-                cfg,
-                bootstrap_layers=(),
-                enable_prefix_caching=False,  # this ensures old caches don't "bleed" over to new requests
-                enable_chunked_prefill=False,
-                max_num_batched_tokens=config.token_limit,
-            )
-
-        elif USE_TLENS_BRIDGE == False:
-            logger.info("Loading model...")
-
-            hf_model = None
-            hf_tokenizer = None
-            if custom_hf_model_id is not None:
-                logger.info("Loading custom HF model: %s", custom_hf_model_id)
-                hf_model = AutoModelForCausalLM.from_pretrained(
-                    custom_hf_model_id,
-                    torch_dtype=STR_TO_DTYPE[config.model_dtype],
-                )
-                hf_tokenizer = AutoTokenizer.from_pretrained(custom_hf_model_id)
-
-            model = HookedTransformer.from_pretrained_no_processing(
-                (
-                    config.override_model_id
-                    if config.override_model_id
-                    else config.model_id
-                ),
-                device=args.device,
-                dtype=STR_TO_DTYPE[config.model_dtype],
-                n_devices=device_count,
-                hf_model=hf_model,
-                **({"hf_config": hf_model.config} if hf_model else {}),
-                tokenizer=hf_tokenizer,
-                **config.model_kwargs,
-            )
-
-            # add hook_in to mlp for transcoders
-            def add_hook_in_to_mlp(mlp):  # type: ignore
-                mlp.hook_in = HookPoint()
-                original_forward = mlp.forward
-                mlp.forward = lambda x: original_forward(mlp.hook_in(x))
-
-            for block in model.blocks:
-                add_hook_in_to_mlp(block.mlp)
-            model.setup()
+            elif static_mode == "sae":
+                logger.info("STATIC_POINTS=sae: will bind static wraps after SAE load, before engine warmup.")
+        else:
+            engine_backend = "eager"
+            logger.info("Loading model with interp-engine (raw HF, eager PyTorch)...")
+            backend_kwargs = {
+                # Force eager attention so the /activation/attention endpoint can read
+                # per-head attention probabilities (no-op cost for other endpoints).
+                "attn_implementation": "eager",
+                "default_prepend_bos": True,
+                "model_kwargs": config.model_kwargs,
+            }
+        model = load_model(
+            hf_model_id,
+            backend=engine_backend,
+            device=args.device,
+            dtype=config.model_dtype,
+            num_gpus=num_gpus,
+            **backend_kwargs,
+        )
 
         Model._instance = model
-        if isinstance(model, StandardizedTransformer):
-            config.set_num_layers(model.num_layers)
-        elif VLLM_AVAILABLE and isinstance(model, VLLMSteerModel):
-            config.set_num_layers(model.layer_count)
-        else:
-            config.set_num_layers(model.cfg.n_layers)
+        num_layers = model.n_layers
+        config.set_num_layers(num_layers)
 
-        if model.tokenizer:
-            # Some tokenizers (e.g. Qwen2Tokenizer) don't expose
-            # `additional_special_tokens_ids` and their base-class `__getattr__`
-            # raises AttributeError instead of returning a default, so access it
-            # defensively.
-            additional_special_token_ids = (
-                getattr(model.tokenizer, "additional_special_tokens_ids", None) or []
+        # Memory-derived serving limits: how many concurrent requests to admit and
+        # the per-request token budget. On vLLM we admit up to max_concurrent (vLLM
+        # batches); off vLLM (eager) we serve one at a time. See startup_memory.py.
+        is_vllm = isinstance(model, VLLMModel)
+        if is_vllm:
+            attn = model._attn_dims  # type: ignore[attr-defined]
+            model_info = ModelMemoryInfo(
+                n_layers=num_layers,
+                n_kv_heads=attn["n_kv_heads"],
+                head_dim=attn["head_dim"],
+                dtype=config.model_dtype,
             )
-            special_token_ids = set(
-                [
-                    model.tokenizer.bos_token_id,  # type: ignore
-                    model.tokenizer.eos_token_id,
-                ]
-                + list(additional_special_token_ids)
+        else:
+            model_info = ModelMemoryInfo(
+                n_layers=num_layers,
+                n_kv_heads=model.n_kv_heads,  # type: ignore[attr-defined]
+                head_dim=model.head_dim,  # type: ignore[attr-defined]
+                dtype=config.model_dtype,
             )
-            special_token_ids = {
-                tid
-                for tid in special_token_ids
-                if tid is not None  # type: ignore
-            }
-            # cache this one time for steering later use
-            config.set_steer_special_token_ids(special_token_ids)  # type: ignore
+        serving_limits = compute_serving_limits(device=args.device, is_vllm=is_vllm, model_info=model_info)
+        config.set_max_tokens(serving_limits.max_tokens)
+        # Bound the prompt caps by the memory-safe sequence budget (never raise them).
+        config.token_limit = min(config.token_limit, serving_limits.max_tokens)
+        config.lens_token_limit = min(config.lens_token_limit, serving_limits.max_tokens)
+        configure_limiter(
+            concurrent=is_vllm,
+            max_concurrent=serving_limits.max_concurrent_requests,
+        )
+        logger.info(
+            "Serving limits: %s (token_limit=%d, lens_token_limit=%d)",
+            serving_limits,
+            config.token_limit,
+            config.lens_token_limit,
+        )
 
         logger.info(
             f"Loaded {config.custom_hf_model_id if config.custom_hf_model_id else config.override_model_id} on {args.device}"
@@ -584,8 +774,38 @@ async def initialize(
         checkCudaError()
 
         logger.info("Loading SAEs...")
-        SAEManager._instance = SAEManager(config.num_layers, args.device)
+        # SAE paging: when a residency budget is configured the SAEs are kept in host RAM
+        # and only a bounded slice of them sits on the GPU. Resolved here (rather than in
+        # Config) because "auto" depends on the backend that was just selected -- under
+        # vLLM the engine's reservation is not on the card yet, so the budget has to be
+        # derived from the utilization figure instead of measured.
+        sae_gpu_budget_bytes = resolve_sae_gpu_budget_bytes(
+            config.sae_gpu_budget_gib,
+            device=args.device,
+            is_vllm=is_vllm,
+            vllm_gpu_utilization=_vllm_gpu_memory_utilization(),
+        )
+        sae_pinned_host_bytes = (
+            measure_pinnable_host_bytes(config.sae_pinned_host_gib) if sae_gpu_budget_bytes > 0 else 0
+        )
+        SAEManager._instance = SAEManager(
+            num_layers,
+            args.device,
+            sae_gpu_budget_bytes=sae_gpu_budget_bytes,
+            sae_pinned_host_bytes=sae_pinned_host_bytes,
+        )
         SAEManager._instance.load_saes()
+
+        if is_vllm and static_mode == "sae":
+            from neuronpedia_inference.engine_adapter import sae_static_addresses
+
+            reads, writes = sae_static_addresses(SAEManager._instance)
+            logger.info(
+                "STATIC_POINTS=sae: freezing %d read site(s) and %d write site(s)",
+                len(reads),
+                len(writes),
+            )
+            model.configure_static(reads, static_writes=writes)
 
         # Load the fitted Jacobian lens (best-effort; never fatal). LOGIT_LENS
         # requests work regardless; JACOBIAN_LENS requests error if this fails.
@@ -593,8 +813,7 @@ async def initialize(
         load_jacobian_lens_at_startup(config, args)
 
         # If a Jacobian lens loaded, run a 1-token pass through the real lens
-        # code now so nnsight's first-trace initialization happens at startup
-        # (otherwise the first JACOBIAN_LENS request returns uniform logits).
+        # code now so any one-time initialization happens at startup.
         logger.info("Warming up lens code path (if Jacobian lens available)...")
         warmup_lens()
 
@@ -623,56 +842,88 @@ async def initialize(
                 continue
             initialization_error = str(exc)
             logger.exception("Initialization failed")
+            _log_banner(
+                "==== LOADING FAILED - NOT SERVING ====",
+                [
+                    f"error: {exc}",
+                    "see the traceback above for details",
+                ],
+            )
             raise
 
-    # After model is loaded, preload chatspace model if needed
-    if args.chatspace and VLLM_AVAILABLE:
-        model = Model.get_instance()
-        if isinstance(model, VLLMSteerModel):
-            logger.info("Preloading chatspace model with a test generation...")
+    # After the model is loaded: preload the vLLM engine (vLLM backend only), then
+    # initialize persona data for the assistant-axis feature. Persona data loads
+    # for whichever backend is active (vLLM or EagerModel); it's a no-op/warn
+    # when the model has no persona data files on disk.
+    model = Model.get_instance()
+    if isinstance(model, VLLMModel):
+        # warmup() builds the engine, compiles decode kernels, and — when static taps
+        # exist — runs a sentinel capture/write. A dead copy_/add_ raises here so we
+        # refuse to serve rather than return fluent unsteered text.
+        logger.info("Warming up vLLM engine...")
+        await model.warmup()
+        logger.info("vLLM engine ready")
 
-            async def preload_model():
-                prompts = ["Hi"]
-                sampling_params = SamplingParams(temperature=0.1, max_tokens=1)
-                result = await model.generate(prompts, sampling_params)
-                print("result:", result)
-                print("  ✓ Model preloaded successfully")
+    config = Config.get_instance()
 
-            await preload_model()
+    # Upload the Jacobian lens now: after the vLLM engine has taken its pool (so the budget
+    # is measured against what is really left) and before the transient budget below counts
+    # the rest as free. On vLLM it goes into the worker, beside the weights and the residuals
+    # it will be applied to; anywhere else, onto this process's device. Both land on the same
+    # card, so either way the measurement below sees what the lens took.
+    if not await place_jacobian_lens_on_worker(config, args, model):
+        place_jacobian_lens_on_device(config, args)
 
-            # Initialize persona data for persona monitoring endpoint
-            config = Config.get_instance()
-            model_id_for_persona = config.override_model_id or config.model_id
-            logger.info(f"Initializing persona data for model: {model_id_for_persona}")
-            initialize_persona_data(model_id_for_persona)
+    model_id_for_persona = config.override_model_id or config.model_id
+    logger.info(f"Initializing persona data for model: {model_id_for_persona}")
+    initialize_persona_data(model_id_for_persona)
 
-    # After model is loaded, preload chatspace model if needed
-    if args.chatspace and VLLM_AVAILABLE:
-        model = Model.get_instance()
-        if isinstance(model, VLLMSteerModel):
-            logger.info("Preloading chatspace model with a test generation...")
+    # ---- size the request working-set budget, LAST ----
+    # Deliberately the final step of startup. compute_serving_limits() above runs before the
+    # SAE cache and the vLLM reservation exist, so it can only estimate; this measures what is
+    # actually left on the card once every persistent allocation is in place. Requests are
+    # then admitted against real free memory instead of a flat count (see VramBudget), which
+    # is also what makes adding an SAE self-correcting: a bigger cache measures as a smaller
+    # budget here, with nothing to reconfigure.
+    if config.device is None:
+        raise RuntimeError("Config.device must be set before measuring the transient budget")
+    budget_bytes = measure_transient_budget(config.device)
+    # With paging the cache was warmed before this measurement, so the SAEs it already holds
+    # are counted as used. What it may still stage in is not, and it must not be handed to
+    # requests as well: hold back the unwarmed remainder of the residency budget.
+    unclaimed_sae_bytes = max(0, sae_cache.budget_bytes - sae_cache.resident_bytes)
+    if unclaimed_sae_bytes:
+        logger.info(
+            "[startup_memory] holding back %.2f GiB of unwarmed SAE residency budget",
+            unclaimed_sae_bytes / 1024**3,
+        )
+        budget_bytes = max(0, budget_bytes - unclaimed_sae_bytes)
+    configure_budget(budget_bytes)
 
-            async def preload_model():
-                prompts = ["Hi"]
-                sampling_params = SamplingParams(temperature=0.1, max_tokens=1)
-                result = await model.generate(prompts, sampling_params)
-                print("result:", result)
-                print("  ✓ Model preloaded successfully")
+    # Activation prompts are O(d_sae * tokens) after the streaming top-K rewrite; completion
+    # / steer keep the pods.yaml token_limit (the vLLM context is sized from that or the lens
+    # cap, whichever is larger -- see _engine_context_len). Shrink the activation
+    # cap from the measured budget + widest configured SAE so a newly added wider SAE lowers
+    # it automatically rather than OOMing the first all-layers search.
+    d_sae, d_in, n_hooks = SAEManager.get_instance().widest_activation_dims()
+    config.set_activation_token_limit(
+        compute_activation_token_limit(
+            budget_bytes=budget_bytes,
+            token_limit=config.token_limit,
+            d_sae=d_sae,
+            d_in=d_in,
+            n_hooks=n_hooks,
+            sae_dtype=config.sae_dtype,
+            model_dtype=config.model_dtype,
+        )
+    )
 
-            await preload_model()
-
-            # Initialize persona data for persona monitoring endpoint
-            config = Config.get_instance()
-            model_id_for_persona = config.override_model_id or config.model_id
-            logger.info(f"Initializing persona data for model: {model_id_for_persona}")
-            initialize_persona_data(model_id_for_persona)
+    _log_ready_banner(time.monotonic() - startup_started_at)
 
 
 @app.middleware("http")
-async def check_secret_key(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
-    if request.url.path in ("/health", "/health/nnsight"):
+async def check_secret_key(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    if request.url.path in ("/health",):
         return await call_next(request)
 
     config = Config.get_instance()
@@ -688,39 +939,29 @@ async def check_secret_key(
 
 
 @app.middleware("http")
-async def check_model(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
-    config = Config.get_instance()
+async def check_model(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """Note, without rejecting, a request that names a model this pod did not load.
 
+    A pod holds exactly one model, so the ``model`` field selects nothing and can only ever
+    be a client-side assertion. It used to be enforced here, which meant a caller had to
+    spell the id the way the alias expansion happened to produce it -- and pods are started
+    for reasons that have nothing to do with the SAE directory those aliases come from.
+    """
     if request.method == "POST":
         try:
             body = await request.json()
-            if "model" in body and (
-                body["model"] != config.model_id
-                and body["model"] != config.override_model_id
-                and body["model"] != config.custom_hf_model_id
-            ):
-                logger.error("Unsupported model: %s", body["model"])
-                return JSONResponse(
-                    content={"error": "Unsupported model"}, status_code=400
-                )
         except (json.JSONDecodeError, ValueError):
-            pass
+            return await call_next(request)
+        if isinstance(body, dict) and body.get("model"):
+            Config.get_instance().check_requested_model(body["model"])
 
     return await call_next(request)
 
 
 @app.middleware("http")
-async def log_and_check_cuda_error(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
+async def log_and_check_cuda_error(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
     if not initialized:
-        error_details = (
-            f" Initialization error: {initialization_error}"
-            if initialization_error
-            else ""
-        )
+        error_details = f" Initialization error: {initialization_error}" if initialization_error else ""
         return JSONResponse(
             status_code=500,
             content={"error": f"Server not initialized.{error_details}"},
@@ -728,19 +969,48 @@ async def log_and_check_cuda_error(
     logger.info("=== Request Info ===")
     logger.info(f"URL: {request.url}")
 
-    # try:
-    #     body = await request.body()
-    #     if body:
-    #         logger.info(f"Body: {body.decode()}")
-    # except Exception as e:
-    #     logger.error(f"Error reading body: {str(e)}")
+    response = await call_next(request)
 
-    return await call_next(request)
+    # Post-request CUDA health probe: if this request poisoned the CUDA context
+    # (device-side assert / illegal access / wedged post-OOM), terminate so the
+    # supervisor restarts us -- even if the endpoint swallowed the error into a 500.
+    probe_cuda_or_die(Config.get_instance().device)
+    return response
+
+
+@app.exception_handler(RequestTooLarge)
+async def request_too_large_handler(request: Request, exc: RequestTooLarge):  # noqa: ARG001
+    """One request that cannot fit the whole budget: a client problem, not a server one.
+
+    Waiting would never help, so fail immediately with both numbers in the message rather than
+    holding the connection for the full lock timeout.
+    """
+    logger.error("[BUDGET] rejected an over-large request: %s", exc)
+    return JSONResponse(status_code=400, content={"error": str(exc)})
+
+
+@app.exception_handler(RecoverableOutOfMemory)
+async def recoverable_oom_handler(request: Request, exc: RecoverableOutOfMemory):  # noqa: ARG001
+    """503, because the allocator OOM'd but the CUDA context survived -- retrying may work.
+
+    The post-request probe in the middleware above still runs, so if the context turns out to
+    be poisoned after all we restart anyway.
+    """
+    return JSONResponse(status_code=503, content={"error": str(exc)})
+
+
+@app.exception_handler(TimeoutError)
+async def timeout_handler(request: Request, exc: TimeoutError):  # noqa: ARG001
+    """Waited too long for a slot or for memory: overloaded, so 503 (retryable) not 500."""
+    logger.error("[LIMITER] %s", exc)
+    return JSONResponse(status_code=503, content={"error": str(exc)})
 
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):  # noqa: ARG001
-    detect_and_mark(exc)
+    # An unhandled irrecoverable CUDA error means the process is wedged: restart.
+    if is_fatal_cuda_error(exc):
+        terminate_for_restart(f"unhandled exception: {exc}")
     return JSONResponse(
         status_code=500,
         content={
@@ -750,24 +1020,3 @@ async def generic_exception_handler(request: Request, exc: Exception):  # noqa: 
             "traceback": traceback.format_exc() if app.debug else None,
         },
     )
-
-
-def main():
-    if os.getenv("SENTRY_DSN"):
-        logger.info("Initializing Sentry")
-        sentry_sdk.init(
-            dsn=os.getenv("SENTRY_DSN"),
-            traces_sample_rate=1.0,
-            _experiments={
-                "continuous_profiling_auto_start": True,
-            },
-            environment=",".join(args.sae_sets),
-        )
-    else:
-        logger.info("SENTRY_DSN not set, skipping Sentry initialization")
-
-    if args.list_models:
-        list_available_options()
-        sys.exit(0)
-
-    return app

@@ -1,0 +1,3346 @@
+{
+  "components": {
+    "schemas": {
+      "ActivationAllBatchRequest": {
+        "description": "For a given batch of prompts, get the top activating features for a set of SAEs (eg gemmascope-res-65k), or specific SAEs in the set of SAEs (eg 0-gemmascope-res-65k, 5-gemmascope-res-65k). Also has other customization options.",
+        "properties": {
+          "ignoreBos": {
+            "description": "Whether or not to include features whose highest activation value is the BOS token.",
+            "title": "Ignorebos",
+            "type": "boolean"
+          },
+          "model": {
+            "description": "Name of the model to test activations on",
+            "title": "Model",
+            "type": "string"
+          },
+          "numResults": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 25,
+            "description": "Optional. The number of top features to return.",
+            "title": "Numresults"
+          },
+          "prompts": {
+            "description": "Input text prompts to get activations for",
+            "items": {
+              "type": "string"
+            },
+            "title": "Prompts",
+            "type": "array"
+          },
+          "selectedSources": {
+            "description": "List of specific SAEs to get activations for (eg [\"0-gemmascope-res-65k\", \"5-gemmascope-res-65k\"]). If not specified, will get activations for all SAEs in the source set.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Selectedsources",
+            "type": "array"
+          },
+          "sortByTokenIndexes": {
+            "description": "Sort the results by the sum of the activations at the specified token indexes.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Sortbytokenindexes",
+            "type": "array"
+          },
+          "sourceSet": {
+            "description": "The source set name of the SAEs (eg gemmascope-res-16k)",
+            "title": "Sourceset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompts",
+          "model",
+          "sourceSet",
+          "selectedSources",
+          "sortByTokenIndexes",
+          "ignoreBos"
+        ],
+        "title": "ActivationAllBatchRequest",
+        "type": "object"
+      },
+      "ActivationAllBatchResponse": {
+        "description": "Response for NPActivationAllBatchRequest. Contains the batch results of activations for each top feature and the tokenized prompts.",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationAllBatchResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "ActivationAllBatchResponse",
+        "type": "object"
+      },
+      "ActivationAllBatchResult": {
+        "description": "One prompt's result within a batched top-features request.",
+        "properties": {
+          "activations": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationAllFeature"
+            },
+            "title": "Activations",
+            "type": "array"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Not currently supported and may be incorrect. This is the number of features that activated by layer, starting from layer 0 of this SAE. Need to be redesigned.",
+            "title": "Counts"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "activations",
+          "tokens"
+        ],
+        "title": "ActivationAllBatchResult",
+        "type": "object"
+      },
+      "ActivationAllFeature": {
+        "description": "One feature and its activation in an NPActivationAllResponse",
+        "properties": {
+          "dfaMaxValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dfamaxvalue"
+          },
+          "dfaTargetIndex": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dfatargetindex"
+          },
+          "dfaValues": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dfavalues"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "maxValue": {
+            "title": "Maxvalue",
+            "type": "number"
+          },
+          "maxValueIndex": {
+            "title": "Maxvalueindex",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "sumValues": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sumvalues"
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source",
+          "index",
+          "values",
+          "maxValue",
+          "maxValueIndex"
+        ],
+        "title": "ActivationAllFeature",
+        "type": "object"
+      },
+      "ActivationAllRequest": {
+        "description": "For a given prompt, get the top activating features for a set of SAEs (eg gemmascope-res-65k), or specific SAEs in the set of SAEs (eg 0-gemmascope-res-65k, 5-gemmascope-res-65k). Also has other customization options.",
+        "properties": {
+          "ignoreBos": {
+            "description": "Whether or not to include features whose highest activation value is the BOS token.",
+            "title": "Ignorebos",
+            "type": "boolean"
+          },
+          "model": {
+            "description": "Name of the model to test activations on",
+            "title": "Model",
+            "type": "string"
+          },
+          "numResults": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 25,
+            "description": "Optional. The number of top features to return.",
+            "title": "Numresults"
+          },
+          "prompt": {
+            "description": "Input text prompt to get activations for",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "selectedSources": {
+            "description": "List of specific SAEs to get activations for (eg [\"0-gemmascope-res-65k\", \"5-gemmascope-res-65k\"]). If not specified, will get activations for all SAEs in the source set.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Selectedsources",
+            "type": "array"
+          },
+          "sortByTokenIndexes": {
+            "description": "Sort the results by the sum of the activations at the specified token indexes.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Sortbytokenindexes",
+            "type": "array"
+          },
+          "sourceSet": {
+            "description": "The source set name of the SAEs (eg gemmascope-res-16k)",
+            "title": "Sourceset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt",
+          "model",
+          "sourceSet",
+          "selectedSources",
+          "sortByTokenIndexes",
+          "ignoreBos"
+        ],
+        "title": "ActivationAllRequest",
+        "type": "object"
+      },
+      "ActivationAllResponse": {
+        "description": "Response for NPActivationAllRequest. Contains activations for each top feature and the tokenized prompt.",
+        "properties": {
+          "activations": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationAllFeature"
+            },
+            "title": "Activations",
+            "type": "array"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Not currently supported and may be incorrect. This is the number of features that activated by layer, starting from layer 0 of this SAE. Need to be redesigned.",
+            "title": "Counts"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "activations",
+          "tokens"
+        ],
+        "title": "ActivationAllResponse",
+        "type": "object"
+      },
+      "ActivationAttentionRequest": {
+        "description": "Attention pattern for one (layer, head) of the model.",
+        "properties": {
+          "head": {
+            "title": "Head",
+            "type": "integer"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt",
+          "model",
+          "layer",
+          "head"
+        ],
+        "title": "ActivationAttentionRequest",
+        "type": "object"
+      },
+      "ActivationAttentionResponse": {
+        "description": "A sparse COO attention matrix for one head.\n\nOnly the top keys per query row survive, each encoded as a flat ``q * seq_len + k``\nindex, so the two arrays are index-aligned with each other rather than with the tokens.",
+        "properties": {
+          "attentionIndices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Attentionindices",
+            "type": "array"
+          },
+          "attentionValues": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Attentionvalues",
+            "type": "array"
+          },
+          "maxActivation": {
+            "title": "Maxactivation",
+            "type": "number"
+          },
+          "seqLen": {
+            "title": "Seqlen",
+            "type": "integer"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "seqLen",
+          "attentionIndices",
+          "attentionValues",
+          "maxActivation",
+          "tokens"
+        ],
+        "title": "ActivationAttentionResponse",
+        "type": "object"
+      },
+      "ActivationRawLayer": {
+        "description": "The captured vectors for one layer of one prompt.",
+        "properties": {
+          "layer": {
+            "title": "Layer",
+            "type": "integer"
+          },
+          "tokenIndices": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Tokenindices",
+            "type": "array"
+          },
+          "values": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "layer",
+          "tokenIndices",
+          "values"
+        ],
+        "title": "ActivationRawLayer",
+        "type": "object"
+      },
+      "ActivationRawPromptResult": {
+        "description": "One prompt's tokens and its per-layer captured vectors.",
+        "properties": {
+          "activations": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationRawLayer"
+            },
+            "title": "Activations",
+            "type": "array"
+          },
+          "tokenIds": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Tokenids",
+            "type": "array"
+          },
+          "tokenStrings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokenstrings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tokenStrings",
+          "tokenIds",
+          "activations"
+        ],
+        "title": "ActivationRawPromptResult",
+        "type": "object"
+      },
+      "ActivationRawRequest": {
+        "description": "Residual-stream vectors at each prompt's final token, with no SAE involved.",
+        "properties": {
+          "hookPoint": {
+            "default": "residual_stream",
+            "title": "Hookpoint",
+            "type": "string"
+          },
+          "layers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layers"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "prompts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Prompts",
+            "type": "array"
+          },
+          "type": {
+            "default": "final_output_token",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompts"
+        ],
+        "title": "ActivationRawRequest",
+        "type": "object"
+      },
+      "ActivationRawResponse": {
+        "description": "Raw capture results, echoing the capture settings they were produced under.",
+        "properties": {
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "dtype": {
+            "title": "Dtype",
+            "type": "string"
+          },
+          "hookPoint": {
+            "title": "Hookpoint",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationRawPromptResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hookPoint",
+          "type",
+          "dtype",
+          "device",
+          "results"
+        ],
+        "title": "ActivationRawResponse",
+        "type": "object"
+      },
+      "ActivationSingleBatchRequest": {
+        "description": "Get activations for either a specific feature in an SAE (specified by \"source\" + \"index\") or a custom vector (specified by \"vector\" + \"hook\")",
+        "properties": {
+          "hook": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hook that the custom vector applies to. Must be specified with \"vector\".",
+            "title": "Hook"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Index of the SAE. Must be specified with \"source\", or not at all.",
+            "title": "Index"
+          },
+          "model": {
+            "description": "Name of the model to test activations on",
+            "title": "Model",
+            "type": "string"
+          },
+          "prompts": {
+            "description": "Input text prompts to get activations for",
+            "items": {
+              "type": "string"
+            },
+            "title": "Prompts",
+            "type": "array"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with \"index\", or not at all.",
+            "title": "Source"
+          },
+          "vector": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom vector to test activations. Must be specified with \"hook\".",
+            "title": "Vector"
+          }
+        },
+        "required": [
+          "prompts",
+          "model"
+        ],
+        "title": "ActivationSingleBatchRequest",
+        "type": "object"
+      },
+      "ActivationSingleBatchResponse": {
+        "description": "Response for NPActivationBatchRequest. Contains the batch results of activation values and tokenized prompt.",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationSingleBatchResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "ActivationSingleBatchResponse",
+        "type": "object"
+      },
+      "ActivationSingleBatchResult": {
+        "description": "One prompt's result within a batched single-feature request.",
+        "properties": {
+          "activation": {
+            "$ref": "#/components/schemas/ActivationValues"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          },
+          "tokensIsSpecial": {
+            "description": "Index-aligned with \"tokens\". True where the token is one of the tokenizer's special tokens (BOS, EOS, padding, chat turn markers, and so on) rather than content. Lets a client filter scaffolding without knowing any model family's token literals.",
+            "items": {
+              "type": "boolean"
+            },
+            "title": "Tokensisspecial",
+            "type": "array"
+          }
+        },
+        "required": [
+          "activation",
+          "tokens",
+          "tokensIsSpecial"
+        ],
+        "title": "ActivationSingleBatchResult",
+        "type": "object"
+      },
+      "ActivationSingleRequest": {
+        "description": "Get activations for either a specific feature in an SAE (specified by \"source\" + \"index\") or a custom vector (specified by \"vector\" + \"hook\")",
+        "properties": {
+          "hook": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Hook that the custom vector applies to. Must be specified with \"vector\".",
+            "title": "Hook"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Index of the SAE. Must be specified with \"source\", or not at all.",
+            "title": "Index"
+          },
+          "model": {
+            "description": "Name of the model to test activations on",
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "description": "Input text prompt to get activations for",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with \"index\", or not at all.",
+            "title": "Source"
+          },
+          "vector": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom vector to test activations. Must be specified with \"hook\".",
+            "title": "Vector"
+          }
+        },
+        "required": [
+          "prompt",
+          "model"
+        ],
+        "title": "ActivationSingleRequest",
+        "type": "object"
+      },
+      "ActivationSingleResponse": {
+        "description": "Response for NPActivationSingleRequest. Contains the activation values and tokenized prompt.",
+        "properties": {
+          "activation": {
+            "$ref": "#/components/schemas/ActivationValues"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          },
+          "tokensIsSpecial": {
+            "description": "Index-aligned with \"tokens\". True where the token is one of the tokenizer's special tokens (BOS, EOS, padding, chat turn markers, and so on) rather than content. Lets a client filter scaffolding without knowing any model family's token literals.",
+            "items": {
+              "type": "boolean"
+            },
+            "title": "Tokensisspecial",
+            "type": "array"
+          }
+        },
+        "required": [
+          "activation",
+          "tokens",
+          "tokensIsSpecial"
+        ],
+        "title": "ActivationSingleResponse",
+        "type": "object"
+      },
+      "ActivationSourceRequest": {
+        "description": "For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.",
+        "properties": {
+          "model": {
+            "description": "Name of the model to test activations on",
+            "title": "Model",
+            "type": "string"
+          },
+          "prompts": {
+            "description": "Input text prompt to get activations for",
+            "items": {
+              "type": "string"
+            },
+            "title": "Prompts",
+            "type": "array"
+          },
+          "source": {
+            "description": "The source (eg 5-gemmascope-res-16k)",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompts",
+          "model",
+          "source"
+        ],
+        "title": "ActivationSourceRequest",
+        "type": "object"
+      },
+      "ActivationSourceResponse": {
+        "description": "All prompts results, only including non-zero features and non-zero activations",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationSourceResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "ActivationSourceResponse",
+        "type": "object"
+      },
+      "ActivationSourceResult": {
+        "description": "One prompt's results, only including non-zero values and non-zero activations",
+        "properties": {
+          "activeFeatures": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "maxItems": 2,
+                    "minItems": 2,
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dictionary mapping feature indices to arrays of [token_index, activation_value]",
+            "title": "Activefeatures"
+          },
+          "tokens": {
+            "description": "The prompt, tokenized.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tokens"
+        ],
+        "title": "ActivationSourceResult",
+        "type": "object"
+      },
+      "ActivationTopkByTokenBatchRequest": {
+        "description": "Get activations for either a specific feature in an SAE (specified by \"source\" + \"index\") or a custom vector (specified by \"vector\" + \"hook\")",
+        "properties": {
+          "ignoreBos": {
+            "description": "Whether or not to include features whose highest activation value is the BOS token.",
+            "title": "Ignorebos",
+            "type": "boolean"
+          },
+          "model": {
+            "description": "Name of the model to test activations on",
+            "title": "Model",
+            "type": "string"
+          },
+          "prompts": {
+            "description": "Input text prompts to get activations for",
+            "items": {
+              "type": "string"
+            },
+            "title": "Prompts",
+            "type": "array"
+          },
+          "source": {
+            "description": "Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with \"index\", or not at NPActivationAllRequest.",
+            "title": "Source",
+            "type": "string"
+          },
+          "topK": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of features to include for each token position.",
+            "title": "Topk"
+          }
+        },
+        "required": [
+          "prompts",
+          "model",
+          "source",
+          "ignoreBos"
+        ],
+        "title": "ActivationTopkByTokenBatchRequest",
+        "type": "object"
+      },
+      "ActivationTopkByTokenBatchResponse": {
+        "description": "Response for NPActivationTopkByTokenBatchRequest. Contains the batch results of top features at each token position and the tokenized prompts.",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationTopkByTokenBatchResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "ActivationTopkByTokenBatchResponse",
+        "type": "object"
+      },
+      "ActivationTopkByTokenBatchResult": {
+        "description": "One prompt's result within a batched topk-by-token request.",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationTopkByTokenResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results",
+          "tokens"
+        ],
+        "title": "ActivationTopkByTokenBatchResult",
+        "type": "object"
+      },
+      "ActivationTopkByTokenFeature": {
+        "description": "One feature active at a single token position.",
+        "properties": {
+          "activationValue": {
+            "description": "The activation value of this feature at this token position.",
+            "title": "Activationvalue",
+            "type": "number"
+          },
+          "featureIndex": {
+            "description": "The index of the feature in the SAE.",
+            "title": "Featureindex",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "featureIndex",
+          "activationValue"
+        ],
+        "title": "ActivationTopkByTokenFeature",
+        "type": "object"
+      },
+      "ActivationTopkByTokenRequest": {
+        "description": "Get activations for either a specific feature in an SAE (specified by \"source\" + \"index\") or a custom vector (specified by \"vector\" + \"hook\")",
+        "properties": {
+          "ignoreBos": {
+            "description": "Whether or not to include features whose highest activation value is the BOS token.",
+            "title": "Ignorebos",
+            "type": "boolean"
+          },
+          "model": {
+            "description": "Name of the model to test activations on",
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt": {
+            "description": "Input text prompt to get activations for",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "source": {
+            "description": "Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with \"index\", or not at NPActivationAllRequest.",
+            "title": "Source",
+            "type": "string"
+          },
+          "topK": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number of features to include for each token position.",
+            "title": "Topk"
+          }
+        },
+        "required": [
+          "prompt",
+          "model",
+          "source",
+          "ignoreBos"
+        ],
+        "title": "ActivationTopkByTokenRequest",
+        "type": "object"
+      },
+      "ActivationTopkByTokenResponse": {
+        "description": "Response for NPActivationTopkByTokenRequest.",
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationTopkByTokenResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results",
+          "tokens"
+        ],
+        "title": "ActivationTopkByTokenResponse",
+        "type": "object"
+      },
+      "ActivationTopkByTokenResult": {
+        "description": "One token's TopK result, including its top features.",
+        "properties": {
+          "isSpecial": {
+            "description": "Whether this token is one of the tokenizer's special tokens (BOS, EOS, padding, chat turn markers, and so on) rather than content. Lets a client filter scaffolding without knowing any model family's token literals.",
+            "title": "Isspecial",
+            "type": "boolean"
+          },
+          "token": {
+            "description": "The token string",
+            "title": "Token",
+            "type": "string"
+          },
+          "tokenPosition": {
+            "description": "The index of the token in the prompt.",
+            "title": "Tokenposition",
+            "type": "integer"
+          },
+          "topFeatures": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationTopkByTokenFeature"
+            },
+            "title": "Topfeatures",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tokenPosition",
+          "token",
+          "isSpecial",
+          "topFeatures"
+        ],
+        "title": "ActivationTopkByTokenResult",
+        "type": "object"
+      },
+      "ActivationValues": {
+        "description": "One feature's activation over a prompt, plus its DFA attribution if computed.",
+        "properties": {
+          "dfaMaxValue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dfamaxvalue"
+          },
+          "dfaTargetIndex": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dfatargetindex"
+          },
+          "dfaValues": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dfavalues"
+          },
+          "maxValue": {
+            "title": "Maxvalue",
+            "type": "number"
+          },
+          "maxValueIndex": {
+            "title": "Maxvalueindex",
+            "type": "integer"
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "values",
+          "maxValue",
+          "maxValueIndex"
+        ],
+        "title": "ActivationValues",
+        "type": "object"
+      },
+      "ApplyChatTemplateRequest": {
+        "description": "Messages to render, plus the template switches to render them under.",
+        "properties": {
+          "addGenerationPrompt": {
+            "default": true,
+            "title": "Addgenerationprompt",
+            "type": "boolean"
+          },
+          "chatTemplateKwargs": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Chattemplatekwargs",
+            "type": "object"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "messages"
+        ],
+        "title": "ApplyChatTemplateRequest",
+        "type": "object"
+      },
+      "ApplyChatTemplateResponse": {
+        "description": "The rendered prompt, its token ids, and the per-token span metadata.",
+        "properties": {
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/TokenSpan"
+            },
+            "title": "Spans",
+            "type": "array"
+          },
+          "tokens": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "prompt",
+          "tokens",
+          "spans"
+        ],
+        "title": "ApplyChatTemplateResponse",
+        "type": "object"
+      },
+      "ChatMessage": {
+        "description": "One message to render through the model's chat template.",
+        "properties": {
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessage",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Liveness only -- says the process is up, not that a model finished loading.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "LensChatMessage": {
+        "description": "One message of a chat-formatted lens prompt.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "LensChatMessage",
+        "type": "object"
+      },
+      "LensPromptRequest": {
+        "description": "Everything one lens run needs: what to read out, where, and how to intervene.",
+        "properties": {
+          "cachedTokenIds": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cachedtokenids",
+            "type": "array"
+          },
+          "chat": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LensChatMessage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat"
+          },
+          "enableThinking": {
+            "default": false,
+            "title": "Enablethinking",
+            "type": "boolean"
+          },
+          "failIfBusy": {
+            "default": false,
+            "title": "Failifbusy",
+            "type": "boolean"
+          },
+          "filterNonWordTokens": {
+            "default": true,
+            "title": "Filternonwordtokens",
+            "type": "boolean"
+          },
+          "inputTokenIds": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Inputtokenids",
+            "type": "array"
+          },
+          "layers": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "maxSeqLen": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxseqlen"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "numCompletionTokens": {
+            "default": 0,
+            "title": "Numcompletiontokens",
+            "type": "integer"
+          },
+          "prependBos": {
+            "default": true,
+            "title": "Prependbos",
+            "type": "boolean"
+          },
+          "preserveThinking": {
+            "default": true,
+            "title": "Preservethinking",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "steerAblate": {
+            "default": false,
+            "title": "Steerablate",
+            "type": "boolean"
+          },
+          "steerGeneratedTokens": {
+            "default": false,
+            "title": "Steergeneratedtokens",
+            "type": "boolean"
+          },
+          "steerLayers": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Steerlayers",
+            "type": "array"
+          },
+          "steerStrength": {
+            "default": 0.0,
+            "title": "Steerstrength",
+            "type": "number"
+          },
+          "steerTokens": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LensSteerToken"
+            },
+            "title": "Steertokens",
+            "type": "array"
+          },
+          "stream": {
+            "default": true,
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "swapToken": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LensSteerToken"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "temperature": {
+            "default": 1.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "topN": {
+            "default": 10,
+            "title": "Topn",
+            "type": "integer"
+          },
+          "type": {
+            "items": {
+              "$ref": "#/components/schemas/LensType"
+            },
+            "title": "Type",
+            "type": "array"
+          }
+        },
+        "required": [
+          "model",
+          "type"
+        ],
+        "title": "LensPromptRequest",
+        "type": "object"
+      },
+      "LensSteerToken": {
+        "description": "A single readout to steer on.\n\n``token`` is the EXACT decoded token string (whitespace preserved, e.g.\n``\" cat\"``) as it appeared in a read-out slice; the server resolves it back\nto a vocab id via a cached reverse-decode map. ``type`` selects which lens's\nreadout direction to use: ``JACOBIAN_LENS`` uses the J-lens direction\n``J_bar_l^T @ w_t`` at each fitted layer (the residual-space direction whose\nJ-lens readout is this token), ``LOGIT_LENS`` uses the plain unembedding\ndirection ``w_t``.",
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/LensType"
+          }
+        },
+        "required": [
+          "token",
+          "type"
+        ],
+        "title": "LensSteerToken",
+        "type": "object"
+      },
+      "LensType": {
+        "description": "Which lens's readout direction to use.",
+        "enum": [
+          "LOGIT_LENS",
+          "JACOBIAN_LENS"
+        ],
+        "title": "LensType",
+        "type": "string"
+      },
+      "NPFeature": {
+        "description": "A feature in Neuronpedia, identified by model, source, and index.",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "source",
+          "index"
+        ],
+        "title": "NPFeature",
+        "type": "object"
+      },
+      "NPLogprob": {
+        "description": "What the model was weighing at one position of the output",
+        "properties": {
+          "logprob": {
+            "description": "Natural log of the probability of the emitted token",
+            "title": "Logprob",
+            "type": "number"
+          },
+          "token": {
+            "description": "The token that was actually emitted, as text",
+            "title": "Token",
+            "type": "string"
+          },
+          "topLogprobs": {
+            "description": "The highest-scoring candidates at this position, most likely first",
+            "items": {
+              "$ref": "#/components/schemas/NPLogprobTop"
+            },
+            "title": "Toplogprobs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "token",
+          "logprob",
+          "topLogprobs"
+        ],
+        "title": "NPLogprob",
+        "type": "object"
+      },
+      "NPLogprobTop": {
+        "description": "One token the model considered at a single position",
+        "properties": {
+          "logprob": {
+            "description": "Natural log of the probability the model gave this candidate",
+            "title": "Logprob",
+            "type": "number"
+          },
+          "token": {
+            "description": "The candidate token, as text",
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "logprob"
+        ],
+        "title": "NPLogprobTop",
+        "type": "object"
+      },
+      "NPSteerChatMessage": {
+        "description": "One message in a steered chat exchange.",
+        "properties": {
+          "content": {
+            "description": "The chat message",
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "description": "The role of the message (eg \"model\", \"user\", etc)",
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "role"
+        ],
+        "title": "NPSteerChatMessage",
+        "type": "object"
+      },
+      "NPSteerChatResult": {
+        "description": "The formatted and unformatted (\"raw\") chat messages",
+        "properties": {
+          "chatTemplate": {
+            "items": {
+              "$ref": "#/components/schemas/NPSteerChatMessage"
+            },
+            "title": "Chattemplate",
+            "type": "array"
+          },
+          "logprobs": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NPLogprob"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per-token scores for the generated text, in output order. Absent unless logprobs were both requested and reported by the serving backend, so read its absence as \"not available\" rather than \"no candidates\".",
+            "title": "Logprobs"
+          },
+          "raw": {
+            "title": "Raw",
+            "type": "string"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NPSteerType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "chatTemplate",
+          "raw"
+        ],
+        "title": "NPSteerChatResult",
+        "type": "object"
+      },
+      "NPSteerCompletionOutput": {
+        "description": "A streamed steering/default response. Output is either the whole response or a chunk, depending on response type.",
+        "properties": {
+          "logprobs": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NPLogprob"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per-token scores for the generated text, in output order. Absent unless logprobs were both requested and reported by the serving backend, so read its absence as \"not available\" rather than \"no candidates\".",
+            "title": "Logprobs"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/NPSteerType"
+          }
+        },
+        "required": [
+          "type",
+          "output"
+        ],
+        "title": "NPSteerCompletionOutput",
+        "type": "object"
+      },
+      "NPSteerFeature": {
+        "description": "An SAE feature to steer with, and how hard.",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "steeringVector": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steeringvector"
+          },
+          "strength": {
+            "title": "Strength",
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "source",
+          "index",
+          "strength"
+        ],
+        "title": "NPSteerFeature",
+        "type": "object"
+      },
+      "NPSteerMethod": {
+        "description": "How a steering vector is combined with the residual stream.",
+        "enum": [
+          "SIMPLE_ADDITIVE",
+          "ORTHOGONAL_DECOMP",
+          "PROJECTION_CAP"
+        ],
+        "title": "NPSteerMethod",
+        "type": "string"
+      },
+      "NPSteerType": {
+        "description": "Whether a given output was produced with steering applied or without it.",
+        "enum": [
+          "STEERED",
+          "DEFAULT"
+        ],
+        "title": "NPSteerType",
+        "type": "string"
+      },
+      "NPSteerVector": {
+        "description": "A raw vector for steering, including its hook and strength",
+        "properties": {
+          "hook": {
+            "title": "Hook",
+            "type": "string"
+          },
+          "steeringVector": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Steeringvector",
+            "type": "array"
+          },
+          "strength": {
+            "title": "Strength",
+            "type": "number"
+          }
+        },
+        "required": [
+          "steeringVector",
+          "strength",
+          "hook"
+        ],
+        "title": "NPSteerVector",
+        "type": "object"
+      },
+      "SimilarityMatrixRequest": {
+        "description": "Predicted similarity matrix for one feature over a piece of text.",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "modelId": {
+            "title": "Modelid",
+            "type": "string"
+          },
+          "sourceId": {
+            "title": "Sourceid",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "modelId",
+          "sourceId",
+          "index",
+          "text"
+        ],
+        "title": "SimilarityMatrixRequest",
+        "type": "object"
+      },
+      "SimilarityMatrixResponse": {
+        "description": "Token-by-token cosine similarities, with the BOS token dropped from both axes.",
+        "properties": {
+          "similarityMatrix": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Similaritymatrix",
+            "type": "array"
+          },
+          "tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "similarityMatrix",
+          "tokens"
+        ],
+        "title": "SimilarityMatrixResponse",
+        "type": "object"
+      },
+      "SteerAssistantAxis": {
+        "description": "Persona monitoring for one steer type, across the assistant's turns.",
+        "properties": {
+          "pcTitles": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "List of principal component titles/descriptions",
+            "title": "Pctitles"
+          },
+          "turns": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SteerAssistantAxisTurn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turns"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NPSteerType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "SteerAssistantAxis",
+        "type": "object"
+      },
+      "SteerAssistantAxisTurn": {
+        "description": "One assistant turn's projection onto the persona axes.",
+        "properties": {
+          "pcValues": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dict mapping PC title to projection value (pre-cap)",
+            "title": "Pcvalues"
+          },
+          "pcValuesPostCap": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dict mapping PC title to projection value (post-cap)",
+            "title": "Pcvaluespostcap"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Truncated conversation content for this turn",
+            "title": "Snippet"
+          }
+        },
+        "title": "SteerAssistantAxisTurn",
+        "type": "object"
+      },
+      "SteerCompletionChatRequest": {
+        "description": "Steer a chat exchange rather than a bare completion.",
+        "properties": {
+          "features": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NPSteerFeature"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Features to steer towards or away from",
+            "title": "Features"
+          },
+          "freqPenalty": {
+            "title": "Freqpenalty",
+            "type": "number"
+          },
+          "isAssistantAxis": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "title": "Isassistantaxis"
+          },
+          "model": {
+            "description": "Name of the model",
+            "title": "Model",
+            "type": "string"
+          },
+          "nCompletionTokens": {
+            "description": "Number of completion tokens to generate",
+            "minimum": 1.0,
+            "title": "Ncompletiontokens",
+            "type": "integer"
+          },
+          "nLogprobs": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0,
+            "description": "How many candidate tokens to report for each generated position. 0 asks for none. Backends that cannot report scores omit `logprobs` whatever this is set to.",
+            "title": "Nlogprobs"
+          },
+          "normalizeSteering": {
+            "title": "Normalizesteering",
+            "type": "boolean"
+          },
+          "prompt": {
+            "description": "Array of chat messages to pass to the model",
+            "items": {
+              "$ref": "#/components/schemas/NPSteerChatMessage"
+            },
+            "title": "Prompt",
+            "type": "array"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "number"
+          },
+          "steerMethod": {
+            "$ref": "#/components/schemas/NPSteerMethod"
+          },
+          "steerSpecialTokens": {
+            "title": "Steerspecialtokens",
+            "type": "boolean"
+          },
+          "stream": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Whether or not to stream responses using Server Side Events (SSE). Note that the OpenAPI spec does not support SSE - you will receive multiple responses with the same format as non-streaming, except with the \"output\" field chunked.",
+            "title": "Stream"
+          },
+          "strengthMultiplier": {
+            "description": "The steering strength will be multiplied by this number",
+            "title": "Strengthmultiplier",
+            "type": "number"
+          },
+          "temperature": {
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "types": {
+            "description": "Array that specifies whether or not to generate STEERED output, DEFAULT (non-steered) output, or both.",
+            "items": {
+              "$ref": "#/components/schemas/NPSteerType"
+            },
+            "minItems": 1,
+            "title": "Types",
+            "type": "array"
+          },
+          "vectors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NPSteerVector"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vectors"
+          }
+        },
+        "required": [
+          "prompt",
+          "model",
+          "steerMethod",
+          "normalizeSteering",
+          "types",
+          "nCompletionTokens",
+          "temperature",
+          "strengthMultiplier",
+          "freqPenalty",
+          "seed",
+          "steerSpecialTokens"
+        ],
+        "title": "SteerCompletionChatRequest",
+        "type": "object"
+      },
+      "SteerCompletionChatResponse": {
+        "description": "The steering/default chat responses.",
+        "properties": {
+          "assistantAxis": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SteerAssistantAxis"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Persona monitoring data for assistant turns, one entry per steer type",
+            "title": "Assistantaxis"
+          },
+          "input": {
+            "$ref": "#/components/schemas/NPSteerChatResult"
+          },
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/NPSteerChatResult"
+            },
+            "title": "Outputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outputs",
+          "input"
+        ],
+        "title": "SteerCompletionChatResponse",
+        "type": "object"
+      },
+      "SteerCompletionRequest": {
+        "description": "Base request for steering",
+        "properties": {
+          "features": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NPSteerFeature"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Features to steer towards or away from",
+            "title": "Features"
+          },
+          "freqPenalty": {
+            "title": "Freqpenalty",
+            "type": "number"
+          },
+          "model": {
+            "description": "Name of the model",
+            "title": "Model",
+            "type": "string"
+          },
+          "nCompletionTokens": {
+            "description": "Number of completion tokens to generate",
+            "minimum": 1.0,
+            "title": "Ncompletiontokens",
+            "type": "integer"
+          },
+          "nLogprobs": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0,
+            "description": "How many candidate tokens to report for each generated position. 0 asks for none. Backends that cannot report scores omit `logprobs` whatever this is set to.",
+            "title": "Nlogprobs"
+          },
+          "normalizeSteering": {
+            "title": "Normalizesteering",
+            "type": "boolean"
+          },
+          "prompt": {
+            "description": "Text to pass the model for completion",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "number"
+          },
+          "steerMethod": {
+            "$ref": "#/components/schemas/NPSteerMethod"
+          },
+          "stream": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Whether or not to stream responses using Server Side Events (SSE). Note that the OpenAPI spec does not support SSE - you will receive multiple responses with the same format as non-streaming, except with the \"output\" field chunked.",
+            "title": "Stream"
+          },
+          "strengthMultiplier": {
+            "description": "The steering strength will be multiplied by this number",
+            "title": "Strengthmultiplier",
+            "type": "number"
+          },
+          "temperature": {
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "types": {
+            "description": "Array that specifies whether or not to generate STEERED output, DEFAULT (non-steered) output, or both.",
+            "items": {
+              "$ref": "#/components/schemas/NPSteerType"
+            },
+            "minItems": 1,
+            "title": "Types",
+            "type": "array"
+          },
+          "vectors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NPSteerVector"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vectors"
+          }
+        },
+        "required": [
+          "prompt",
+          "model",
+          "steerMethod",
+          "normalizeSteering",
+          "types",
+          "nCompletionTokens",
+          "temperature",
+          "strengthMultiplier",
+          "freqPenalty",
+          "seed"
+        ],
+        "title": "SteerCompletionRequest",
+        "type": "object"
+      },
+      "SteerCompletionResponse": {
+        "description": "The steering/default responses.",
+        "properties": {
+          "outputs": {
+            "items": {
+              "$ref": "#/components/schemas/NPSteerCompletionOutput"
+            },
+            "title": "Outputs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "outputs"
+        ],
+        "title": "SteerCompletionResponse",
+        "type": "object"
+      },
+      "TokenSpan": {
+        "description": "One rendered token and the message it belongs to.",
+        "properties": {
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "messageIndex": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messageindex"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "section": {
+            "title": "Section",
+            "type": "string"
+          },
+          "tokenId": {
+            "title": "Tokenid",
+            "type": "integer"
+          },
+          "tokenStr": {
+            "title": "Tokenstr",
+            "type": "string"
+          }
+        },
+        "required": [
+          "position",
+          "tokenId",
+          "tokenStr",
+          "messageIndex",
+          "role",
+          "channel",
+          "section"
+        ],
+        "title": "TokenSpan",
+        "type": "object"
+      },
+      "TokenizeRequest": {
+        "description": "Text to split into tokens, plus how to treat the BOS token",
+        "properties": {
+          "model": {
+            "description": "Model whose tokenizer should be used",
+            "title": "Model",
+            "type": "string"
+          },
+          "prependBos": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Force a beginning-of-sequence token on or off. Omit to follow whatever the model normally does, which is what the other endpoints assume.",
+            "title": "Prependbos"
+          },
+          "text": {
+            "description": "Text to split into tokens",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "text"
+        ],
+        "title": "TokenizeRequest",
+        "type": "object"
+      },
+      "TokenizeResponse": {
+        "description": "The token ids, their rendered text, and whether BOS was prepended.",
+        "properties": {
+          "prependBos": {
+            "description": "Whether a beginning-of-sequence token was actually prepended",
+            "title": "Prependbos",
+            "type": "boolean"
+          },
+          "tokenStrings": {
+            "description": "The same tokens rendered back to text, index-aligned with `tokens`",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokenstrings",
+            "type": "array"
+          },
+          "tokens": {
+            "description": "One token id per token, in order",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Tokens",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tokens",
+          "tokenStrings",
+          "prependBos"
+        ],
+        "title": "TokenizeResponse",
+        "type": "object"
+      },
+      "UtilSaeTopkByDecoderCossimFeature": {
+        "description": "One nearby feature and how close it is.",
+        "properties": {
+          "cosineSimilarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cosinesimilarity"
+          },
+          "feature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NPFeature"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "UtilSaeTopkByDecoderCossimFeature",
+        "type": "object"
+      },
+      "UtilSaeTopkByDecoderCossimRequest": {
+        "description": "Find the features whose decoder directions are closest to a feature or vector.",
+        "properties": {
+          "feature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NPFeature"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "description": "Model to compare the vector or feature against.",
+            "title": "Model",
+            "type": "string"
+          },
+          "numResults": {
+            "description": "Number of top features to return. Clamped to 128, and to the number of features in the source.",
+            "title": "Numresults",
+            "type": "integer"
+          },
+          "source": {
+            "description": "Source/SAE ID to compare the vector or feature against.",
+            "title": "Source",
+            "type": "string"
+          },
+          "vector": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Custom vector to find the top features by cossim for.",
+            "title": "Vector"
+          }
+        },
+        "required": [
+          "model",
+          "source",
+          "numResults"
+        ],
+        "title": "UtilSaeTopkByDecoderCossimRequest",
+        "type": "object"
+      },
+      "UtilSaeTopkByDecoderCossimResponse": {
+        "description": "The query feature echoed back, alongside its nearest neighbours.",
+        "properties": {
+          "feature": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NPFeature"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "topkDecoderCossimFeatures": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UtilSaeTopkByDecoderCossimFeature"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topkdecodercossimfeatures"
+          }
+        },
+        "title": "UtilSaeTopkByDecoderCossimResponse",
+        "type": "object"
+      },
+      "UtilSaeVectorRequest": {
+        "description": "Get the raw vector for an SAE feature",
+        "properties": {
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model",
+          "source",
+          "index"
+        ],
+        "title": "UtilSaeVectorRequest",
+        "type": "object"
+      },
+      "UtilSaeVectorResponse": {
+        "description": "The decoder vector for one feature, and the hook it belongs to.",
+        "properties": {
+          "hookName": {
+            "title": "Hookname",
+            "type": "string"
+          },
+          "vector": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Vector",
+            "type": "array"
+          }
+        },
+        "required": [
+          "vector",
+          "hookName"
+        ],
+        "title": "UtilSaeVectorResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "SimpleSecretAuth": {
+        "in": "header",
+        "name": "X-SECRET-KEY",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "contact": {
+      "email": "johnny@neuronpedia.org"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    "title": "Neuronpedia - Inference Server",
+    "version": "1.9.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "healthGet",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [],
+        "summary": "Health Check"
+      }
+    },
+    "/initialize": {
+      "post": {
+        "operationId": "initializePost",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "custom_hf_model_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Custom Hf Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Initialize"
+      }
+    },
+    "/v1/activation/all": {
+      "post": {
+        "operationId": "activationAllPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationAllRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationAllResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation All"
+      }
+    },
+    "/v1/activation/all-batch": {
+      "post": {
+        "operationId": "activationAllBatchPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationAllBatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationAllBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation All Batch"
+      }
+    },
+    "/v1/activation/attention": {
+      "post": {
+        "operationId": "activationAttentionPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationAttentionRequest",
+                "examples": [
+                  {
+                    "head": 1,
+                    "layer": 5,
+                    "model": "gpt2-small",
+                    "prompt": "When Mary and John went to the store, John gave a drink to Mary."
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationAttentionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation Attention"
+      }
+    },
+    "/v1/activation/raw": {
+      "post": {
+        "operationId": "activationRawPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRawRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationRawResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation Raw"
+      }
+    },
+    "/v1/activation/single": {
+      "post": {
+        "operationId": "activationSinglePost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationSingleRequest",
+                "examples": [
+                  {
+                    "index": "14057",
+                    "model": "gpt2-small",
+                    "prompt": "The Jedi in Star Wars wield lightsabers.",
+                    "source": "0-res-jb"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationSingleResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation Single"
+      }
+    },
+    "/v1/activation/single-batch": {
+      "post": {
+        "operationId": "activationSingleBatchPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationSingleBatchRequest",
+                "examples": [
+                  {
+                    "index": "14057",
+                    "model": "gpt2-small",
+                    "prompts": [
+                      "The Jedi in Star Wars wield lightsabers.",
+                      "The Force is strong with this one."
+                    ],
+                    "source": "0-res-jb"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationSingleBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation Single Batch"
+      }
+    },
+    "/v1/activation/source": {
+      "post": {
+        "operationId": "activationSourcePost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationSourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation Source"
+      }
+    },
+    "/v1/activation/topk-by-token": {
+      "post": {
+        "operationId": "activationTopkByTokenPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationTopkByTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationTopkByTokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation Topk By Token"
+      }
+    },
+    "/v1/activation/topk-by-token-batch": {
+      "post": {
+        "operationId": "activationTopkByTokenBatchPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationTopkByTokenBatchRequest",
+                "examples": [
+                  {
+                    "ignore_bos": true,
+                    "model": "gpt2-small",
+                    "prompts": [
+                      "The Jedi in Star Wars wield lightsabers.",
+                      "The Force is strong with this one."
+                    ],
+                    "source": "0-res-jb"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivationTopkByTokenBatchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activation Topk By Token Batch"
+      }
+    },
+    "/v1/apply-chat-template": {
+      "post": {
+        "operationId": "applyChatTemplatePost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyChatTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplyChatTemplateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Chat Template"
+      }
+    },
+    "/v1/capabilities": {
+      "get": {
+        "description": "Report the loaded model, backend, concurrency/token limits, and feature support.",
+        "operationId": "capabilitiesGet",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Capabilities"
+      }
+    },
+    "/v1/lens/prompt": {
+      "post": {
+        "operationId": "lensPromptPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LensPromptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lens Prompt"
+      }
+    },
+    "/v1/steer/completion": {
+      "post": {
+        "operationId": "steerCompletionPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SteerCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SteerCompletionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Completion"
+      }
+    },
+    "/v1/steer/completion-chat": {
+      "post": {
+        "operationId": "steerCompletionChatPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SteerCompletionChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SteerCompletionChatResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Completion Chat"
+      }
+    },
+    "/v1/steer/health": {
+      "get": {
+        "description": "Get health stats for the vLLM engine.\n\nReturns GPU memory usage, system RAM, active requests, threads, etc.\nUseful for debugging hanging requests.",
+        "operationId": "steerHealthGet",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Check"
+      }
+    },
+    "/v1/tokenize": {
+      "post": {
+        "operationId": "tokenizePost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenizeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tokenize"
+      }
+    },
+    "/v1/util/sae-topk-by-decoder-cossim": {
+      "post": {
+        "operationId": "utilSaeTopkByDecoderCossimPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UtilSaeTopkByDecoderCossimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilSaeTopkByDecoderCossimResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sae Topk By Decoder Cossim"
+      }
+    },
+    "/v1/util/sae-vector": {
+      "post": {
+        "operationId": "utilSaeVectorPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UtilSaeVectorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UtilSaeVectorResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sae Vector"
+      }
+    },
+    "/v1/util/similarity-matrix-pred": {
+      "post": {
+        "operationId": "utilSimilarityMatrixPredPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimilarityMatrixRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimilarityMatrixResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Similarity Matrix"
+      }
+    }
+  },
+  "security": [
+    {
+      "SimpleSecretAuth": []
+    }
+  ]
+}

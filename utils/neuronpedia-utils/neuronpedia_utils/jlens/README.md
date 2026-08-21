@@ -1,13 +1,13 @@
 # jlens — Jacobian lens fitting for Neuronpedia
 
-Fits a [Jacobian lens](https://github.com/anthropics/jlens) for the models
+Fits a [Jacobian lens](https://github.com/anthropics/jacobian-lens) for the models
 Neuronpedia serves and writes the results into the shared `exports/` tree.
 
 > Based on the **jlens** reference implementation by **Anthropic PBC** —
 > companion code for the *Verbalizable Workspace* paper
-> (<https://github.com/anthropics/jlens>), Apache-2.0. The `jlens/` package here
-> is a copy of that library; `fit_lens.py` is a Neuronpedia-adapted copy of its
-> `demo/fit_lens.py` (visualisation removed, multi-GPU loading added).
+> (<https://github.com/anthropics/jacobian-lens>), Apache-2.0. The `jlens/`
+> package here is a copy of that library; `fit_lens.py` is a Neuronpedia-adapted
+> copy of its `demo/fit_lens.py` (visualisation removed, multi-GPU loading added).
 
 ## Layout
 

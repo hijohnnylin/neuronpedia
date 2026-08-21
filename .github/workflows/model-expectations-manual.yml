@@ -1,0 +1,71 @@
+name: Model Expectations - Manual (xl)
+
+# The `manual` tier of apps/inference/tests/model_expectations.yaml: the rows whose weights are
+# tens of GB (gemma-2-2b, llama3.1-8b-it, gpt-oss-20b). They carry the architectural edges no small
+# checkpoint has -- gemma-2's final-logit softcapping, gpt-oss's MXFP4 + attention sinks --
+# which is exactly why they are worth running, and why they cannot run per-PR.
+#
+# The engine has an expectations table of its own, dispatched from its own copy of this workflow in
+# decoderesearch/interp-engine. The two are split along the line of what each layer owns, so neither
+# covers the other; this file stopped covering both when the engine moved out.
+#
+# MANUAL DISPATCH ONLY. Both per-PR workflows deselect `-m xl`, including the GPU one: the
+# marker is orthogonal to cuda/gated/thinking, so an xl row that is also gated would otherwise
+# be pulled onto the managed L4 by its `or gated` selector and spend the job's budget
+# downloading weights that runner is not sized for.
+#
+# Targets `[self-hosted, gpu]`, which NOTHING is registered against by default: CI's managed GPU
+# runner (machine.dev, see inference-gpu-tests.yml) is neither sized for these weights nor worth
+# the minutes. To use this workflow, register your own big-VRAM box under those labels first --
+# otherwise a dispatch queues forever. Weights are deliberately NOT cached via actions/cache
+# (tens of GB would blow the budget); a box you own keeps them warm in ~/.cache/huggingface
+# between runs, which is the other reason this can't be a managed runner.
+#
+# Running the same thing locally needs no runner at all: `pytest -m xl` in apps/inference/ is what
+# this job does.
+#
+# Expect failures the first time a row runs. A failure here is a prompt to measure and
+# rewrite the row (and its comment), not necessarily a regression.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pytest_args:
+        description: "Extra pytest args (e.g. -k gpt-oss to run one row)"
+        type: string
+        default: ""
+
+concurrency:
+  # Not cancel-in-progress: a run that has spent twenty minutes pulling a 20B checkpoint
+  # should finish rather than be thrown away by the next dispatch.
+  group: model-expectations-manual-${{ github.ref }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  inference:
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: ./apps/inference
+    steps:
+      - uses: actions/checkout@v4
+      - name: GPU sanity (driver present)
+        run: nvidia-smi || { echo "::error::No GPU visible on this runner"; exit 1; }
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Install dependencies
+        run: uv sync --python 3.12
+      - name: Run the xl rows
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_HUB_OFFLINE: "0"
+          TRANSFORMERS_OFFLINE: "0"
+          # Same headroom the other GPU workflows leave; an 8B/20B row plus an SAE is the
+          # tightest fit in this suite.
+          VLLM_GPU_MEMORY_UTILIZATION: "0.5"
+          VLLM_USE_FLASHINFER_SAMPLER: "0"
+        run: uv run pytest tests/integration/test_model_expectations.py -m xl -v --durations=25 ${{ inputs.pytest_args }}

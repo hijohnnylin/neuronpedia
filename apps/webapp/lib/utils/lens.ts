@@ -41,6 +41,11 @@ export const JLENS_METADATA_PATH = '/jlens/jlens.jpg';
 export const DEFAULT_LENS_TOP_N = 8;
 export const DEFAULT_LENS_TEMPERATURE = 0;
 export const DEFAULT_LENS_COMPLETION_TOKENS = 128;
+// Ceiling on generated tokens: the chat interface's slider maximum, and the
+// bound both `/api/lens/prompt` and `/api/lens/share` validate against. All
+// three have to agree — a run the UI lets you generate must be one the prompt
+// endpoint accepts and the share endpoint can then store.
+export const MAX_LENS_COMPLETION_TOKENS = 2048;
 // The single-shot completion interface caps generation lower than chat.
 export const MAX_LENS_COMPLETION_TOKENS_COMPLETION = 128;
 // Default number of generated tokens for the completion interface (lower than

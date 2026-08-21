@@ -141,8 +141,27 @@ dist
 
 .secrets*
 
+# Throwaway dev-group-only venvs built by `make python-lint`, one per app. Kept out of each app's
+# own .venv so running the lint gate never disturbs a working development environment.
+.lint-venvs/
+
+# Personal, uncommitted agent instructions and per-user harness settings. The committed rules
+# all live in AGENTS.md; see its "Agent instruction files" section.
+AGENTS.local.md
 CLAUDE.local.md
+.claude/settings.local.json
+.cursor/rules/local-*.mdc
 
+*.plan.md
+.plan.md
 plans/*
+plans/
 
-.playwright-mcp/*
+# Screenshots and traces written by the Playwright MCP server (.cursor/mcp.json).
+.playwright-mcp/
+
+# Written by `make engine-link`, holding the path to a local interp-engine checkout that app's venv
+# is running instead of its pinned release. Ignored deliberately: this is the file that lets the
+# swap happen without touching pyproject.toml or uv.lock, which are committed and would break every
+# other checkout if a local path reached them.
+apps/*/.engine-linked

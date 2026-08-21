@@ -48,6 +48,19 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
     ],
   },
   {
+    modelId: 'deepseek-v4-flash',
+    displayName: 'DeepSeek V4 Flash',
+    featured: true,
+    demos: [
+      { shareId: 'cmt28t2od0000332x3qvbbwiw', displayName: '💬 Verbal Report' },
+      { shareId: 'cmt293qnp0001332x512g3nkm', displayName: '🤔 Directed Modulation' },
+      { shareId: 'cmt29hbqf0003332xa7oe5ezl', displayName: '🕷️ Multi-Hop Reasoning' },
+      { shareId: 'cmt2aym590000332xc7o88l99', displayName: '🛜 General Broadcast' },
+      { shareId: 'cmt2b6yd70000012x6voje2h7', displayName: '🔀 Selective Mediation' },
+      { shareId: 'cmt2bcgw40001012xgbleezs7', displayName: '🤼 Versus Logit-Lens' },
+    ],
+  },
+  {
     modelId: 'gemma-3-1b',
     displayName: 'Gemma 1B',
     demos: [{ shareId: 'cmre470y20000vf2xaw0xccb9', displayName: '🏛️ Multi-Hop Reasoning' }],
@@ -88,7 +101,7 @@ const FEATURED_MODEL_IDS = JLENS_MODEL_TOGGLE_OPTIONS.filter((o) => 'featured' i
 // these is active, its name shows on the tab, so the dropdown trigger just reads
 // "Models". Any other model (even if it has curated demos) shows its name in the
 // dropdown trigger instead.
-const TAB_MODEL_IDS: readonly string[] = ['qwen3.6-27b', 'gemma-3-12b'];
+const TAB_MODEL_IDS: readonly string[] = ['qwen3.6-27b', 'gemma-3-12b', 'deepseek-v4-flash'];
 
 // Given the model + currently-viewed shareId, return where a "Next demo" button
 // should go: the next demo in that model's curated list, or free chat when on
@@ -191,6 +204,14 @@ export default function JlensModelSelector({
           >
             Gemma <span className="hidden sm:inline sm:px-1">3</span> 12B
           </button>
+          <button
+            type="button"
+            onClick={() => onModelChange('deepseek-v4-flash')}
+            className={`-ml-px ${tabClass(modelId === 'deepseek-v4-flash', 'px-2.5')}`}
+          >
+            <span className="sm:hidden">DSv4</span>
+            <span className="hidden sm:inline">DeepSeek V4 Flash</span>
+          </button>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
@@ -213,7 +234,7 @@ export default function JlensModelSelector({
               <DropdownMenu.Content
                 align="center"
                 sideOffset={4}
-                className="z-30 max-h-[400px] w-[200px] overflow-y-auto rounded-md border border-slate-300 bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+                className="z-30 max-h-[400px] w-[230px] overflow-y-auto rounded-md border border-slate-300 bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
               >
                 {dropdownModelIds.length === 0 ? (
                   <div className="px-3 py-2.5 text-[11px] font-normal text-slate-400">No models available</div>

@@ -16,7 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        # requires-python is >=3.11,<3.14 (3.10 fails `uv sync`); vLLM/CUDA-only tests are
+        # deselected below, so this job is the EagerModel (CPU) coverage.
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
@@ -27,11 +29,20 @@ jobs:
       run: uv python install ${{ matrix.python-version }}
     - name: Install dependencies
       run: uv sync --python ${{ matrix.python-version }}
-    - name: Check linting
-      run: uv run ruff check .
-    - name: Check formatting
-      run: uv run ruff format --check .
+    # Ruff is NOT run here: python-lint.yml owns the lint/format gate for every apps/* project and
+    # reaches the same verdict in seconds, without installing torch three times over. Type checking
+    # stays put, because pyright needs the dependencies this job already has.
     - name: Type checking
       run: uv run pyright .
-    - name: Run tests
-      run: uv run pytest
+    # The engine suite is NOT run here. It lives in decoderesearch/interp-engine and runs in that
+    # repo's own CI, against the engine's venv rather than this one. This job installs the engine
+    # as a pinned wheel; what it tests is this service's use of it.
+    - name: Run tests (EagerModel/CPU; cuda/vllm/thinking/gated run on the GPU workflow)
+      env:
+        # The same repo secret every other workflow passes; this job was the one that didn't,
+        # so it ran anonymously against HF. Nothing selected here is gated (the marker is
+        # deselected below), but authenticated downloads get the higher rate limit, and three
+        # Python versions pulling gpt2 + the res-jb SAEs from a shared runner IP is what gets
+        # 429'd without it.
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: uv run pytest -m "not cuda and not vllm and not thinking and not gated and not xl"

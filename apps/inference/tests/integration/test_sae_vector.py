@@ -3,18 +3,17 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
-from neuronpedia_inference_client.models.util_sae_vector_post200_response import (
-    UtilSaeVectorPost200Response,
-)
-from neuronpedia_inference_client.models.util_sae_vector_post_request import (
-    UtilSaeVectorPostRequest,
-)
 
+from neuronpedia_inference.schemas import (
+    UtilSaeVectorRequest,
+    UtilSaeVectorResponse,
+)
 from tests.conftest import (
     ABS_TOLERANCE,
     INVALID_SAE_SOURCE,
     MODEL_ID,
     SAE_SELECTED_SOURCES,
+    SAELENS_MODEL_ID,
     X_SECRET_KEY,
 )
 
@@ -29,13 +28,13 @@ def test_sae_vector_valid_request(client: TestClient):
     Utilize multiple indexes to be sure that we have different vectors for different indices.
     """
 
-    request_idx_5 = UtilSaeVectorPostRequest(
+    request_idx_5 = UtilSaeVectorRequest(
         model=MODEL_ID,
         source=SAE_SELECTED_SOURCES[0],
         index=FEATURE_INDEX_5,
     )
 
-    request_idx_6 = UtilSaeVectorPostRequest(
+    request_idx_6 = UtilSaeVectorRequest(
         model=MODEL_ID,
         source=SAE_SELECTED_SOURCES[0],
         index=FEATURE_INDEX_6,
@@ -59,8 +58,8 @@ def test_sae_vector_valid_request(client: TestClient):
     data_idx_5 = response_idx_5.json()
     data_idx_6 = response_idx_6.json()
 
-    response_model_idx_5 = UtilSaeVectorPost200Response(**data_idx_5)
-    response_model_idx_6 = UtilSaeVectorPost200Response(**data_idx_6)
+    response_model_idx_5 = UtilSaeVectorResponse(**data_idx_5)
+    response_model_idx_6 = UtilSaeVectorResponse(**data_idx_6)
 
     test_data_path = os.path.join(
         os.path.dirname(__file__),
@@ -77,26 +76,22 @@ def test_sae_vector_valid_request(client: TestClient):
     assert len(response_model_idx_5.vector) == len(expected_feature_vector_index_5)
     assert len(response_model_idx_6.vector) == len(expected_feature_vector_index_6)
 
-    for actual, expected in zip(
-        response_model_idx_5.vector, expected_feature_vector_index_5
-    ):
-        assert (
-            abs(actual - expected) <= ABS_TOLERANCE
-        ), f"Vector element difference {abs(actual - expected)} exceeds tolerance {ABS_TOLERANCE}"
+    for actual, expected in zip(response_model_idx_5.vector, expected_feature_vector_index_5):
+        assert abs(actual - expected) <= ABS_TOLERANCE, (
+            f"Vector element difference {abs(actual - expected)} exceeds tolerance {ABS_TOLERANCE}"
+        )
 
-    for actual, expected in zip(
-        response_model_idx_6.vector, expected_feature_vector_index_6
-    ):
-        assert (
-            abs(actual - expected) <= ABS_TOLERANCE
-        ), f"Vector element difference {abs(actual - expected)} exceeds tolerance {ABS_TOLERANCE}"
+    for actual, expected in zip(response_model_idx_6.vector, expected_feature_vector_index_6):
+        assert abs(actual - expected) <= ABS_TOLERANCE, (
+            f"Vector element difference {abs(actual - expected)} exceeds tolerance {ABS_TOLERANCE}"
+        )
 
 
 def test_sae_vector_invalid_source(client: TestClient):
     """
     Test the /util/sae-vector endpoint with an invalid source.
     """
-    request = UtilSaeVectorPostRequest(
+    request = UtilSaeVectorRequest(
         model=MODEL_ID,
         source=INVALID_SAE_SOURCE,
         index=FEATURE_INDEX_5,
@@ -109,6 +104,7 @@ def test_sae_vector_invalid_source(client: TestClient):
             headers={"X-SECRET-KEY": X_SECRET_KEY},
         )
 
-    assert f"Found 0 entries when searching for {MODEL_ID}/{INVALID_SAE_SOURCE}" in str(
-        excinfo.value
-    )
+    # The request names the model by its HF id, but the lookup that raises runs after
+    # resolve_saelens_model_id, so the message quotes the SAELens id -- as the same assertion in
+    # test_activation_topk_by_token.py already does.
+    assert f"Found 0 entries when searching for {SAELENS_MODEL_ID}/{INVALID_SAE_SOURCE}" in str(excinfo.value)

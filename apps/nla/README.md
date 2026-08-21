@@ -29,7 +29,39 @@ SECRET=my-secret uv run server.py
 NLA_RECONSTRUCTOR_MODEL="" NLA_SOURCE_MODEL="" uv run server.py
 ```
 
-Server starts on **port 5009**. The verbalizer model loads via `sgl.Engine` in-process — no separate SGLang server needed.
+Server starts on **port 5009**.
+
+### Verbalizer backend (engine-owned vLLM by default)
+
+The CUDA verbalizer runs on **[`interp-engine`](https://github.com/decoderesearch/interp-engine)**'s vLLM backend,
+serving concept injection through vLLM **`prompt_embeds`** (`VLLMModel` +
+`vllm_verbalizer.VLLMVerbalizer`). NLA imports the engine as a path dependency
+(`interp-engine[vllm]` in `pyproject.toml`) — the same way `apps/inference`
+does — so the separate SGLang stack is no longer installed by default.
+
+- **CUDA** → `VLLMVerbalizer` (engine vLLM `prompt_embeds`). **Default.**
+- **no CUDA (MPS / CPU)** → `EagerVerbalizer` (plain `transformers`
+  `generate(inputs_embeds=...)`; dev/test parity, not production throughput).
+- **legacy sglang** → set `NLA_VERBALIZER_BACKEND=sglang` to restore the in-process
+  `sgl.Engine` path (`NLAClient`). You must install `sglang` yourself in a
+  compatible env — it pins `transformers<5` and conflicts with vLLM 0.25 / the
+  engine, so it is intentionally **not** in `pyproject.toml`.
+
+The **reconstructor** and **source** models stay on plain `transformers`: they are
+single-forward encoders/extractors (not autoregressive generators), so vLLM adds no
+benefit.
+
+> ⚠️ Many of the tuning / quantization / multi-GPU sections below describe the
+> **legacy sglang** verbalizer. On the default vLLM path the verbalizer runs
+> **non-eager, so CUDA graphs + inductor `torch.compile` are ON by default** (vLLM
+> bundles both). Env mapping:
+> - `NLA_MEM_FRACTION` → vLLM `gpu_memory_utilization`
+> - `NLA_KV_CACHE_DTYPE` → vLLM `kv_cache_dtype` (fp8 KV memory win); pre-quantized
+>   FP8 verbalizer checkpoints are auto-detected by vLLM
+> - `NLA_CUDA_GRAPH_MAX_BS` → caps/extends vLLM's CUDA-graph capture batch sizes to
+>   the fan-out (vLLM captures up to 256 by default)
+> - `NLA_VERBALIZER_ENFORCE_EAGER=1` → disable graphs + compile (debug/compat). There
+>   is no separate `--torch-compile` toggle — compile is bundled into the non-eager path.
 
 CLI args override env vars:
 
@@ -769,8 +801,8 @@ source = SourceModel(
     "Qwen/Qwen2.5-7B-Instruct",
     layer_index=20,
     device="cuda",
-    truncate=True,    # drop layers past 20 + lm_head + final norm
-    fp8=True,         # torchao Float8WeightOnly
+    truncate=True,  # drop layers past 20 + lm_head + final norm
+    fp8=True,  # torchao Float8WeightOnly
 )
 tokens = source.extract("The capital of France is Paris")
 v = np.array(tokens[0]["activation"], dtype=np.float32)
@@ -780,7 +812,7 @@ client = NLAClient(
     "kitft/nla-qwen2.5-7b-actor-step4200",
     embed_device="cuda",
     mem_fraction_static=0.45,
-    quantization="fp8",   # Hopper+ only; omit/None on Ampere
+    quantization="fp8",  # Hopper+ only; omit/None on Ampere
 )
 description = client.generate(v)
 
@@ -788,7 +820,7 @@ description = client.generate(v)
 reconstructor = NLAReconstructor(
     "kitft/nla-qwen2.5-7b-critic-step4200",
     device="cuda",
-    fp8=True,             # FP8 backbone via torchao; value_head stays bf16
+    fp8=True,  # FP8 backbone via torchao; value_head stays bf16
 )
 mse, cos = reconstructor.score(description, v)
 
@@ -799,6 +831,33 @@ client.shutdown()
 `SourceModel(..., truncate=True)` fails-loud on `/completion` semantics — `model.generate()` will produce garbage from the `Identity` lm_head — so don't use a truncated `SourceModel` for completion in custom code. Use `truncate=False` if you need both extraction and generation.
 
 ## Troubleshooting
+
+### `CUDA driver is too old for this PyTorch build`
+
+The server refuses to start with something like:
+
+```
+CUDA driver is too old for this PyTorch build: the driver supports CUDA 12.8,
+but torch 2.11.0+cu130 needs CUDA 13.0.
+```
+
+The wheels here are CUDA 13 (torch cu130, and the engine's vLLM links `libcudart.so.13`),
+so a host still on a 12.x driver can't run them. The error prints the fix, which is the
+NVIDIA forward-compat driver — a newer user-mode driver over the host's older kernel
+driver, supported on datacenter GPUs:
+
+```bash
+apt-get install -y cuda-compat-13-0
+export LD_LIBRARY_PATH=/usr/local/cuda-13.0/compat:$LD_LIBRARY_PATH
+```
+
+`LD_LIBRARY_PATH` has to be set before launching — the dynamic loader reads it at exec, so
+the server can't set it for itself. This check (`check_cuda_driver` in the engine) runs
+before the first CUDA call precisely because `torch.cuda.is_available()` does *not* raise on
+a too-old driver: it answers False, which would otherwise demote the whole server to CPU
+with no explanation. To run on CPU deliberately on such a box, set `NLA_VERBALIZER_DEVICE`,
+`NLA_RECONSTRUCTOR_DEVICE`, and `NLA_SOURCE_DEVICE` to `cpu` (the CLI `--*-device` flags are
+parsed too late to be seen by the check).
 
 ### `sgl_kernel` import error / `libnuma.so.1` not found
 

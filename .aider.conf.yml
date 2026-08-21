@@ -1,0 +1,4 @@
+# Aider is the one common harness that reads no instruction file by default, so point it at the
+# same AGENTS.md every other agent uses. See the "Agent instruction files" section there.
+read:
+  - AGENTS.md

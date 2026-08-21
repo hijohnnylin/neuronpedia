@@ -5,27 +5,181 @@ import os
 import threading
 import time
 import tomllib
+from contextlib import asynccontextmanager
+from functools import cache
 from importlib.metadata import version as pkg_version
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
 import psutil
 import requests
+import sentry_sdk
 import torch
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ValidationError
 from starlette.concurrency import run_in_threadpool
 from transformers import AutoTokenizer
 
+from neuronpedia_graph.chat_prompt import (
+    learn_turn_delimiters,
+    parse_chat_prompt,
+    render_prompt_from_messages,
+    strip_leading_bos,
+    unsteerable_token_positions,
+)
+from neuronpedia_graph.runtime_env import get_device, get_model_dtype, get_model_engine
+from neuronpedia_graph.schemas import (
+    CheckBusyResponse,
+    ForwardPassRequest,
+    ForwardPassResponse,
+    GraphChatMessage,
+    GraphGenerationRequest,
+    GraphGenerationResponse,
+    LogitsByToken,
+    ParseChatPromptRequest,
+    ParseChatPromptResponse,
+    SalientLogit,
+    SteerRequest,
+    SteerResponse,
+    TopLogit,
+)
+
 load_dotenv()
 
-BACKEND = os.getenv("BACKEND", "circuit-tracer")
+if TYPE_CHECKING:
+    # Aliased so the names stay distinct from the backend symbols the block further down declares.
+    from sentry_sdk._types import Event as SentryEvent
+    from sentry_sdk._types import Hint as SentryHint
 
-if BACKEND == "circuit-tracer":
+# Callers authenticate with a shared secret in `x-secret-key`, and it reaches Sentry by two
+# routes. The obvious one is `request.headers`: the SDK redacts Authorization, Cookie and
+# X-Api-Key, but its list does not include this header. The other is stack-trace locals -- an
+# error inside a route serializes every frame's variables, and the raw ASGI `scope` (headers
+# included) is a local in roughly twenty of them, so scrubbing by header name alone still ships
+# the secret about twenty times over. The value sweep is what covers that; the key passes above
+# are still worth keeping, since they redact the header on transactions, which carry no locals.
+SENTRY_SCRUBBED_HEADERS = frozenset({"x-secret-key"})
+_SENTRY_HEADER_ATTR_PREFIX = "http.request.header."
+_SENTRY_FILTERED = "[Filtered]"
+
+
+def _redact_sentry_value(node: "Any", secret: str) -> None:
+    """Replace every occurrence of `secret` in a nested event payload, in place."""
+    if isinstance(node, dict):
+        pairs = list(node.items())
+    elif isinstance(node, list):
+        pairs = list(enumerate(node))
+    else:
+        return
+    for key, value in pairs:
+        if isinstance(value, str) and secret in value:
+            node[key] = value.replace(secret, _SENTRY_FILTERED)
+        else:
+            _redact_sentry_value(value, secret)
+
+
+def scrub_sentry_event(event: "SentryEvent", _hint: "SentryHint") -> "SentryEvent":
+    """Redact the auth header wherever it reaches an event: headers, span attributes, locals."""
+    request: Any = event.get("request")
+    headers = request.get("headers") if isinstance(request, dict) else None
+    if isinstance(headers, dict):
+        for key in headers:
+            if key.lower() in SENTRY_SCRUBBED_HEADERS:
+                headers[key] = _SENTRY_FILTERED
+
+    # Transactions carry the same headers again as span attributes, so scrubbing only `request`
+    # would still ship the secret on the sampled quarter of traffic.
+    contexts: Any = event.get("contexts") or {}
+    trace: Any = contexts.get("trace") or {}
+    spans: Any = event.get("spans") or []
+    for data in [trace.get("data"), *(span.get("data") for span in spans)]:
+        if not isinstance(data, dict):
+            continue
+        for key in data:
+            if key.lower().removeprefix(_SENTRY_HEADER_ATTR_PREFIX) in SENTRY_SCRUBBED_HEADERS:
+                data[key] = _SENTRY_FILTERED
+
+    # Guarded on non-empty: `"".replace` would rewrite every string in the event.
+    secret = os.environ.get("SECRET")
+    if secret:
+        _redact_sentry_value(event, secret)
+    return event
+
+
+# Error reporting. Off entirely without a DSN, so a local run needs no Sentry account. This has
+# to precede the `FastAPI(...)` below: the integration wraps route handlers as they are
+# registered, so an app built before init reports nothing.
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment=os.getenv("SENTRY_ENVIRONMENT", "development"),
+        release=os.getenv("SENTRY_RELEASE"),
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.25")),
+        profile_session_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.25")),
+        profile_lifecycle="trace",
+        before_send=scrub_sentry_event,
+        before_send_transaction=scrub_sentry_event,
+    )
+
+# Which attribution algorithm builds the graph, and so what the graph contains. The two share no
+# code, which is why their dependencies are separate extras (see pyproject.toml) and why every
+# import below is gated.
+ATTRIBUTION_ENGINE = os.getenv("ATTRIBUTION_ENGINE", "circuit-tracer")
+
+# Which implementation executes the model. Orthogonal to the above: it changes nothing about the
+# graph's contents, only which architectures are reachable. `nnsight` is circuit-tracer only.
+# Resolved here rather than at first use so an invalid value fails at startup.
+MODEL_ENGINE = get_model_engine()
+
+# Load transcoder encoder weights lazily (VRAM for speed). A property of the transcoder loader, not
+# of the model engine, despite having once been decided by the same flag.
+LAZY_ENCODER = os.getenv("LAZY_ENCODER", "").lower() in ("1", "true", "yes")
+
+# The env vars start.py writes from its CLI arguments, i.e. this pod's start args. Listed
+# explicitly rather than dumped from os.environ, which also holds HF_TOKEN and SECRET; a new flag
+# in start.py needs a line here to show up in Sentry.
+SENTRY_START_ARG_ENV_VARS = (
+    "ATTRIBUTION_ENGINE",
+    "MODEL_ENGINE",
+    "MODEL_ID",
+    "MODEL_DTYPE",
+    "TRANSCODER_SET",
+    "LAZY_ENCODER",
+    "DEVICE",
+    "TOKEN_LIMIT",
+    "MAX_FEATURE_NODES",
+    "UPDATE_INTERVAL",
+    "NP_MODEL_ID",
+    "SAE_REPO",
+    "SAE_EXPANSION",
+    "SAE_TOPK",
+    "NP_TRANSCODER_SOURCE_SET",
+    "NP_LORSA_SOURCE_SET",
+)
+
+# Deliberately below the config above rather than inside the init block: what a graph pod is
+# serving is only known once these resolve, but init has to happen first so that a bad
+# MODEL_ENGINE or ATTRIBUTION_ENGINE still crashes into a Sentry that is listening. Only the axes
+# worth filtering a pod by are tags ("which graph pods are on gemma-2?"); the rest is a context,
+# read once an issue is already open.
+if sentry_sdk.is_initialized():
+    sentry_sdk.set_tag("model_id", os.getenv("MODEL_ID") or "unset")
+    sentry_sdk.set_tag("transcoder_set", os.getenv("TRANSCODER_SET") or "none")
+    sentry_sdk.set_tag("attribution_engine", ATTRIBUTION_ENGINE)
+    sentry_sdk.set_tag("model_engine", MODEL_ENGINE)
+    sentry_sdk.set_context(
+        "start_args",
+        {name: os.environ[name] for name in SENTRY_START_ARG_ENV_VARS if name in os.environ},
+    )
+
+if TYPE_CHECKING:
+    # Both backends' symbols, declared unconditionally so a type checker sees them as always bound.
+    # It cannot follow an environment variable into an import, so without this every use below --
+    # each one already inside a matching `ATTRIBUTION_ENGINE` guard -- reads as possibly unbound.
+    # At runtime only one of the two blocks below actually executes.
     from circuit_tracer import attribute
     from circuit_tracer.graph import prune_graph
     from circuit_tracer.replacement_model import ReplacementModel
@@ -35,24 +189,40 @@ if BACKEND == "circuit-tracer":
         create_used_nodes_and_edges,
     )
     from circuit_tracer.utils.salient_logits import compute_salient_logits
-elif BACKEND == "lm-saes-crm":
+
     from neuronpedia_graph.crm_backend import (
         forward_pass_crm,
         generate_graph_crm,
         load_crm_model,
     )
 
+if ATTRIBUTION_ENGINE == "circuit-tracer":
+    from circuit_tracer import attribute
+    from circuit_tracer.graph import prune_graph
+    from circuit_tracer.replacement_model import ReplacementModel
+    from circuit_tracer.utils.create_graph_files import (
+        build_model,
+        create_nodes,
+        create_used_nodes_and_edges,
+    )
+    from circuit_tracer.utils.salient_logits import compute_salient_logits
+elif ATTRIBUTION_ENGINE == "lm-saes-crm":
+    from neuronpedia_graph.crm_backend import (
+        forward_pass_crm,
+        generate_graph_crm,
+        load_crm_model,
+    )
+else:
+    raise ValueError(f"ATTRIBUTION_ENGINE must be 'circuit-tracer' or 'lm-saes-crm', got {ATTRIBUTION_ENGINE!r}")
 
-LIMIT_TOKENS = int(os.getenv("TOKEN_LIMIT", 64))
-DEFAULT_MAX_FEATURE_NODES = int(os.getenv("MAX_FEATURE_NODES", 10000))
+
+LIMIT_TOKENS = int(os.getenv("TOKEN_LIMIT", "64"))
 OFFLOAD = None
-UPDATE_INTERVAL = int(os.getenv("UPDATE_INTERVAL", 1000))
+UPDATE_INTERVAL = int(os.getenv("UPDATE_INTERVAL", "1000"))
 
 SECRET_KEY = os.getenv("SECRET")
 if not SECRET_KEY:
-    raise ValueError(
-        "SECRET environment variable not set. Please create a .env file with SECRET=<your_secret_key>"
-    )
+    raise ValueError("SECRET environment variable not set. Please create a .env file with SECRET=<your_secret_key>")
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 if not HF_TOKEN:
@@ -60,39 +230,6 @@ if not HF_TOKEN:
         "HF_TOKEN environment variable not set. Please create a .env file with HF_TOKEN=<your_huggingface_token>"
     )
 
-
-def get_device() -> torch.device:
-    """Determine the appropriate device for model loading."""
-    device_env = os.environ.get("DEVICE")
-    if device_env:
-        return torch.device(device_env)
-
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        return torch.device("mps")
-    else:
-        return torch.device("cpu")
-
-
-def get_model_dtype() -> torch.dtype | None:
-    """
-    Parse MODEL_DTYPE environment variable into torch dtype.
-    Default is float32.
-    """
-    model_dtype_env = os.environ.get("MODEL_DTYPE", "bfloat16")
-
-    dtype_mapping = {
-        "bfloat16": torch.bfloat16,
-        "float16": torch.float16,
-        "float32": torch.float32,
-    }
-
-    return dtype_mapping.get(model_dtype_env)
-
-
-app = FastAPI()
-app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 transcoders: Any = None
 model: Any = None
@@ -125,14 +262,20 @@ TLENS_MODEL_ID_TO_NP_MODEL_ID = {
     "Qwen/Qwen3-4B": "qwen3-4b",
 }
 
-def _circuit_tracer_version() -> str:
-    """Report the pinned circuit-tracer git tag (e.g. "v0.4.1") from uv.lock.
 
-    circuit-tracer is pinned to a git tag in pyproject.toml, but the tag name is
-    the meaningful version to surface. We read it from uv.lock's recorded git
-    source (`...?tag=v0.4.1#<commit>`) rather than importlib metadata, since a
-    package's self-reported version can lag its release tags. Falls back to the
-    installed package's metadata version if the lock can't be read.
+def _circuit_tracer_version() -> str:
+    """Report the pinned circuit-tracer version from uv.lock.
+
+    circuit-tracer is pinned to a git reference in pyproject.toml, and that reference is the
+    meaningful version to surface -- more so than importlib metadata, since a package's
+    self-reported version can lag its release tags (a branch build reports something like
+    `0.0.1.dev48+g6ca66b3f1`, which says nothing about what it contains).
+
+    uv.lock records the resolved source as `...?tag=v0.5.1#<commit>` for a tag pin and
+    `...?branch=<name>#<commit>` for a branch pin. A tag reports as-is; a branch reports as
+    `<branch>@<short commit>`, which stays honest that it is not a release while still naming
+    exactly what is installed; a rev pin reports the short commit alone. Falls back to metadata
+    if the lock cannot be read.
     """
     lock_path = Path(__file__).resolve().parent.parent / "uv.lock"
     try:
@@ -141,61 +284,181 @@ def _circuit_tracer_version() -> str:
         for pkg in lock.get("package", []):
             if pkg.get("name") == "circuit-tracer":
                 git_url = (pkg.get("source") or {}).get("git", "")
-                tag = parse_qs(urlparse(git_url).query).get("tag", [None])[0]
+                parsed = urlparse(git_url)
+                query = parse_qs(parsed.query)
+                tag = query.get("tag", [None])[0]
                 if tag:
                     return tag
+                commit = parsed.fragment[:8]
+                branch = query.get("branch", [None])[0]
+                if branch:
+                    return f"{branch}@{commit}" if commit else branch
+                rev = query.get("rev", [None])[0]
+                if rev:
+                    # Already a commit, so a short form of it says everything.
+                    return commit or rev[:8]
     except (OSError, tomllib.TOMLDecodeError):
         pass
     return pkg_version("circuit-tracer")
 
 
-GENERATOR_INFO = {
-    "name": "circuit-tracer by Hanna & Piotrowski",
-    "version": _circuit_tracer_version(),
-    "url": "https://github.com/decoderesearch/circuit-tracer",
-}
+@cache
+def generator_info() -> dict[str, str]:
+    """Attribution-library provenance for the circuit-tracer backend's graph metadata.
 
-loaded_model_arg = os.getenv("MODEL_ID")
-print(f"Model: {loaded_model_arg}")
-if not loaded_model_arg:
-    raise ValueError(
-        "TransformerLens model name is required. Please specify a model as a command line argument. Valid models: "
-        + ", ".join(TLENS_MODEL_ID_TO_NP_MODEL_ID.keys())
+    Deliberately a function, not a module-level constant: it reads circuit-tracer's installed
+    version, and the CRM backend imports none of circuit-tracer. Evaluating this at import time
+    would make an optional dependency mandatory for a server that never touches it. The CRM
+    backend reports its own generator, in `format_converter`.
+    """
+    return {
+        "name": "circuit-tracer by Hanna & Piotrowski",
+        "version": _circuit_tracer_version(),
+        "url": "https://github.com/decoderesearch/circuit-tracer",
+    }
+
+
+def _serving_url() -> str:
+    """The address uvicorn was told to bind to (set in start.py / env)."""
+    host = os.getenv("SERVER_HOST", "0.0.0.0")
+    port = os.getenv("SERVER_PORT", "5004")
+    display_host = "localhost" if host in ("0.0.0.0", "::", "") else host
+    return f"http://{display_host}:{port}"
+
+
+def _format_duration(seconds: float) -> str:
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}m {secs}s" if minutes else f"{secs}s"
+
+
+def _print_banner(title: str, lines: list[str]) -> None:
+    """One visually obvious block, so the end of a long noisy startup is findable."""
+    bar = "=" * 100
+    body = "\n".join(f"  {line}" for line in lines)
+    print(f"\n{bar}\n  {title}\n{'-' * 100}\n{body}\n{bar}\n", flush=True)
+
+
+def _print_ready_banner(
+    elapsed_seconds: float,
+    *,
+    model_id: str,
+    attribution_engine: str,
+    model_engine: str,
+    device: torch.device,
+    model_dtype: torch.dtype,
+    transcoder_set: str | None,
+) -> None:
+    dtype_label = str(model_dtype).removeprefix("torch.")
+    lines = [
+        f"model: {model_id}",
+        f"attribution engine: {attribution_engine} | model engine: {model_engine}",
+        f"device: {device} | dtype: {dtype_label}",
+    ]
+    if transcoder_set:
+        lines.append(f"transcoder set: {transcoder_set}")
+    lines.append(f"token limit: {LIMIT_TOKENS}")
+    lines.append(f"startup took {_format_duration(elapsed_seconds)}")
+    _print_banner(
+        f"==== LOADING COMPLETE - SERVING ON {_serving_url()} ====",
+        lines,
     )
 
-device = get_device()
-model_dtype = get_model_dtype()
+
+# Assigned by the lifespan below rather than at import. Annotated without a value so the
+# handlers still see `str` rather than `str | None`; reading it before startup would be a
+# NameError, which is the right outcome if it ever happens.
+loaded_model_arg: str
 
 # CRM backend: lm-saes with Lorsa + Transcoders
 crm_model: Any = None
 crm_replacement_modules: Any = None
 crm_sae_metadata: Any = None
+transcoder_set: str | None = None
 
-if BACKEND == "lm-saes-crm":
-    print(f"[CRM] Loading CRM backend for model: {loaded_model_arg}")
-    crm_model, crm_replacement_modules, crm_sae_metadata = load_crm_model()
-    model = crm_model
-else:
-    # Circuit-tracer backend (default)
-    transcoder_set = os.getenv("TRANSCODER_SET")
-    print(f"Transcoder set: {transcoder_set}")
-    if not transcoder_set:
-        raise ValueError("Transcoder set is required. Please specify a transcoders set.")
 
-    def check_is_nnsight_model(model_id: str) -> bool:
-        return model_id.startswith("google/gemma-3-")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Load the model before the server accepts traffic.
 
-    is_nnsight_model = check_is_nnsight_model(loaded_model_arg)
+    This ran at module scope until the wire models were introduced, which made importing the
+    module equivalent to booting the server -- so ``dump_openapi.py`` could not read the route
+    table without a GPU and a set of weights, defeating the point of committing the spec. A
+    lifespan still completes before uvicorn serves its first request, so readiness is
+    unchanged; only importing is cheap now.
+    """
+    global loaded_model_arg, model, crm_model, crm_replacement_modules, crm_sae_metadata, transcoder_set
 
-    model = ReplacementModel.from_pretrained(
-        loaded_model_arg,
-        transcoder_set,
+    model_id_env = os.getenv("MODEL_ID")
+    print(f"Model: {model_id_env}")
+    if not model_id_env:
+        raise ValueError(
+            "TransformerLens model name is required. Please specify a model as a command line argument. Valid models: "
+            + ", ".join(TLENS_MODEL_ID_TO_NP_MODEL_ID.keys())
+        )
+    loaded_model_arg = model_id_env
+
+    device = get_device()
+    model_dtype = get_model_dtype()
+    startup_started_at = time.monotonic()
+
+    if ATTRIBUTION_ENGINE == "lm-saes-crm":
+        print(f"[CRM] Loading CRM backend for model: {loaded_model_arg}")
+        crm_model, crm_replacement_modules, crm_sae_metadata = load_crm_model()
+        model = crm_model
+    else:
+        # Circuit-tracer backend (default)
+        transcoder_set = os.getenv("TRANSCODER_SET")
+        print(f"Transcoder set: {transcoder_set}")
+        if not transcoder_set:
+            raise ValueError("Transcoder set is required. Please specify a transcoders set.")
+
+        model = ReplacementModel.from_pretrained(
+            loaded_model_arg,
+            transcoder_set,
+            device=device,
+            dtype=model_dtype,
+            lazy_encoder=LAZY_ENCODER,
+            lazy_decoder=True,
+            backend=MODEL_ENGINE,
+        )
+
+    _print_ready_banner(
+        time.monotonic() - startup_started_at,
+        model_id=loaded_model_arg,
+        attribution_engine=ATTRIBUTION_ENGINE,
+        model_engine=MODEL_ENGINE,
         device=device,
-        dtype=model_dtype,
-        lazy_encoder=is_nnsight_model,
-        lazy_decoder=True,
-        backend="nnsight" if is_nnsight_model else "transformerlens",
+        model_dtype=model_dtype,
+        transcoder_set=transcoder_set,
     )
+
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+def resolve_prompt(prompt: str, messages: list[GraphChatMessage] | None) -> str:
+    """Prefer structured ``messages`` (rendered server-side); else the raw string.
+
+    Dumped back to plain dicts here because the renderer hands them to the tokenizer's chat
+    template, which is dict-based; ``chat_prompt`` stays free of our wire models.
+    """
+    if messages:
+        return render_prompt_from_messages(model.tokenizer, [message.model_dump() for message in messages])
+    return prompt
+
+
+# The process serves exactly one model, so the probed delimiters never change.
+_turn_delimiters_cache: dict[str, tuple[str, str]] | None = None
+
+
+def get_turn_delimiters() -> dict[str, tuple[str, str]]:
+    global _turn_delimiters_cache
+    if _turn_delimiters_cache is None:
+        _turn_delimiters_cache = learn_turn_delimiters(model.tokenizer)
+    return _turn_delimiters_cache
 
 
 def ensure_bos_for_circuit_tracer(prompt: str) -> str:
@@ -234,86 +497,67 @@ async def verify_secret_key(x_secret_key: str = Header(None)):
     return x_secret_key
 
 
-class GraphGenerationRequest(BaseModel):
-    prompt: str
-    model_id: str
-    batch_size: int = 48
-    max_n_logits: int = 10
-    desired_logit_prob: float = 0.95
-    node_threshold: float = 0.8
-    edge_threshold: float = 0.98
-    slug_identifier: str
-    max_feature_nodes: int = DEFAULT_MAX_FEATURE_NODES
-    signed_url: str | None = None
-    user_id: str | None = None
-    compress: bool = False
-    enable_qk_tracing: bool = False
-    qk_top_fraction: float = 0.6
-    qk_topk: int = 10
-
-
-class ForwardPassRequest(BaseModel):
-    prompt: str
-    max_n_logits: int = 10
-    desired_logit_prob: float = 0.95
-
-
-class SteerFeature(BaseModel):
-    layer: int
-    index: int
-    token_active_position: int
-    steer_position: int | None = None
-    steer_generated_tokens: bool = False
-    delta: float | None = None
-    ablate: bool = False
-
-
-class SteerRequest(BaseModel):
-    model_id: str
-    prompt: str
-    features: list[SteerFeature]
-    n_tokens: int = 10
-    top_k: int = 5
-    temperature: float = 0.0
-    freq_penalty: float = 0
-    seed: int | None = None
-    freeze_attention: bool = False
-
-
-@app.get("/check-busy")
+@app.get("/check-busy", responses={200: {"model": CheckBusyResponse}})
 async def check_busy():
     """Check if the server is currently busy processing a request."""
-    is_busy = request_lock.locked()
-    return {"busy": is_busy}
+    return CheckBusyResponse(busy=request_lock.locked())
+
+
+@app.post(
+    "/parse-chat-prompt",
+    dependencies=[Depends(verify_secret_key)],
+    responses={200: {"model": ParseChatPromptResponse}},
+)
+async def parse_chat_prompt_handler(req: ParseChatPromptRequest):
+    """Recover structured chat turns from a rendered prompt string.
+
+    Deliberately does NOT take ``request_lock``: this is tokenizer-only string
+    work with no GPU involvement, and the webapp calls it while opening a modal,
+    so a graph generation in flight must not turn it into a 503.
+
+    ``prompt`` echoes back the BOS-stripped input. A non-chat prompt has no
+    ``messages`` to carry the strip, and the caller wants to put the string back
+    in an editor, so returning it here is what keeps the BOS literal out of the
+    frontend.
+
+    ``unsteerable_positions`` is the set ``/steer`` will silently drop features
+    at, computed here the same way and from the same normalized prompt. A steer
+    UI needs it to know which sliders would do nothing; without it the client has
+    to guess from token strings, which is the token knowledge this endpoint
+    exists to keep server-side.
+    """
+    prompt = strip_leading_bos(model.tokenizer, req.prompt)
+    messages = parse_chat_prompt(prompt, get_turn_delimiters())
+    return ParseChatPromptResponse(
+        messages=[GraphChatMessage(**message) for message in messages] if messages is not None else None,
+        is_chat=messages is not None,
+        prompt=prompt,
+        unsteerable_positions=sorted(unsteerable_token_positions(model.tokenizer, prompt)),
+    )
 
 
 def get_topk(logits: torch.Tensor, tokenizer, k: int = 5):
     probs = torch.softmax(logits[0, -1, :], dim=-1)
     topk = torch.topk(probs, k)
-    return [
-        (tokenizer.decode([topk.indices[i]]), topk.values[i].item()) for i in range(k)
-    ]
+    return [(tokenizer.decode([topk.indices[i]]), topk.values[i].item()) for i in range(k)]
 
 
-@app.post("/steer", dependencies=[Depends(verify_secret_key)])
-async def steer_handler(req: Request):
+@app.post("/steer", dependencies=[Depends(verify_secret_key)], responses={200: {"model": SteerResponse}})
+async def steer_handler(req_data: SteerRequest):
     """Handle steer requests"""
     print("========== Steer Start ==========")
-    print(
-        f"Thread {threading.get_ident()}: Received request. Attempting to acquire lock."
-    )
+    print(f"Thread {threading.get_ident()}: Received request. Attempting to acquire lock.")
     if not request_lock.acquire(blocking=False):
-        print(
-            f"Thread {threading.get_ident()}: Lock acquisition failed (busy). Rejecting request."
-        )
-        return JSONResponse(
-            content={"error": "Server busy, please try again later."}, status_code=503
-        )
+        print(f"Thread {threading.get_ident()}: Lock acquisition failed (busy). Rejecting request.")
+        return JSONResponse(content={"error": "Server busy, please try again later."}, status_code=503)
 
     print(f"Thread {threading.get_ident()}: Lock acquired.")
     try:
-        request_body = await req.json()
-        req_data = SteerRequest.model_validate(request_body)
+        # A graph's stored prompt has BOS baked in for families whose template
+        # emits one, and the tokenizer below adds its own. Left in, every token
+        # position would shift by one and each feature would be steered at the
+        # wrong token, so strip it here rather than making callers do it.
+        req_data.prompt = strip_leading_bos(model.tokenizer, resolve_prompt(req_data.prompt, req_data.messages))
 
         if req_data.model_id != loaded_model_arg:
             raise HTTPException(
@@ -337,17 +581,13 @@ async def steer_handler(req: Request):
                 )
             if feature.steer_generated_tokens and feature.steer_position is not None:
                 return JSONResponse(
-                    content={
-                        "error": "When steer_generated_tokens is True, position must be None"
-                    },
+                    content={"error": "When steer_generated_tokens is True, position must be None"},
                     status_code=400,
                 )
             # Validate that if steer_generated_tokens is False, position must be provided
             if not feature.steer_generated_tokens and feature.steer_position is None:
                 return JSONResponse(
-                    content={
-                        "error": "When steer_generated_tokens is False, position must be provided"
-                    },
+                    content={"error": "When steer_generated_tokens is False, position must be provided"},
                     status_code=400,
                 )
             # Validate that if position is provided, it's not out of bounds
@@ -358,6 +598,20 @@ async def steer_handler(req: Request):
                     content={"error": "Position is out of bounds"},
                     status_code=400,
                 )
+
+        # Enforcing this here makes it a property of the server rather than
+        # something every client reimplements. `/parse-chat-prompt` reports the
+        # same set from the same function, which is how the UI knows to hide
+        # those sliders instead of rendering ones that silently do nothing.
+        unsteerable = unsteerable_token_positions(model.tokenizer, req_data.prompt)
+        if unsteerable:
+            kept = [f for f in req_data.features if f.steer_position not in unsteerable]
+            if len(kept) != len(req_data.features):
+                print(
+                    f"Ignoring {len(req_data.features) - len(kept)} steer feature(s) "
+                    f"targeting unsteerable position(s) {sorted(unsteerable)}"
+                )
+            req_data.features = kept
 
         print(f"Received steer request: {req_data}")
 
@@ -372,10 +626,7 @@ async def steer_handler(req: Request):
                         # TODO: double check this
                         slice(sequence_length, None, None),
                         f.index,
-                        0
-                        if f.ablate
-                        else activations[(f.layer, f.token_active_position, f.index)]
-                        + f.delta,
+                        0 if f.ablate else activations[(f.layer, f.token_active_position, f.index)] + f.delta,
                     )
                 )
             else:
@@ -384,10 +635,7 @@ async def steer_handler(req: Request):
                         f.layer,
                         f.steer_position,
                         f.index,
-                        0
-                        if f.ablate
-                        else activations[(f.layer, f.token_active_position, f.index)]
-                        + f.delta,
+                        0 if f.ablate else activations[(f.layer, f.token_active_position, f.index)] + f.delta,
                     )
                 )
 
@@ -406,9 +654,7 @@ async def steer_handler(req: Request):
             return_type="tokens",
         )[0]
 
-        default_tokenized_str_tokens = [
-            model.tokenizer.decode([token]) for token in default_tokenized
-        ]
+        default_tokenized_str_tokens = [model.tokenizer.decode([token]) for token in default_tokenized]
 
         default_generation = "".join(default_tokenized_str_tokens)
 
@@ -429,9 +675,7 @@ async def steer_handler(req: Request):
         )
 
         steered_tokenized = steered_tokenized[0]
-        steered_tokenized_str_tokens = [
-            model.tokenizer.decode([token]) for token in steered_tokenized
-        ]
+        steered_tokenized_str_tokens = [model.tokenizer.decode([token]) for token in steered_tokenized]
         steered_generation = "".join(steered_tokenized_str_tokens)
 
         # Cross-layer transcoders return 2D logits (seq, vocab) — normalize to 3D
@@ -439,8 +683,8 @@ async def steer_handler(req: Request):
             steered_logits = steered_logits.unsqueeze(0)
 
         # get the logits at each step
-        topk_default_by_token = []
-        topk_steered_by_token = []
+        topk_default_by_token: list[LogitsByToken] = []
+        topk_steered_by_token: list[LogitsByToken] = []
 
         with torch.inference_mode():
             # Pass token IDs directly to avoid retokenization (which can
@@ -454,58 +698,42 @@ async def steer_handler(req: Request):
                 # If we're still processing the original prompt tokens (before generation),
                 # append a blank item since we're only interested in generated tokens
                 if i < sequence_length - 1:
-                    topk_default_by_token.append(
-                        {"token": default_tokenized_str_tokens[i], "top_logits": []}
-                    )
+                    topk_default_by_token.append(LogitsByToken(token=default_tokenized_str_tokens[i], top_logits=[]))
                     continue
                 # get the topk tokens
-                topk_default = get_topk(
-                    default_logits[:, : i + 1, :], model.tokenizer, req_data.top_k
-                )
+                topk_default = get_topk(default_logits[:, : i + 1, :], model.tokenizer, req_data.top_k)
                 # each topk default should be an object of token, prob
                 topk_default_by_token.append(
-                    {
-                        "token": default_tokenized_str_tokens[i],
-                        "top_logits": [
-                            {"token": token, "prob": prob}
-                            for token, prob in topk_default
-                        ],
-                    }
+                    LogitsByToken(
+                        token=default_tokenized_str_tokens[i],
+                        top_logits=[TopLogit(token=token, prob=prob) for token, prob in topk_default],
+                    )
                 )
             # steered_logits only contains generation-step logits (no prompt positions),
             # so we offset the index: position 0 in steered_logits = sequence_length - 1
             # in the full token sequence.
             for i in range(len(default_tokenized_str_tokens)):
                 if i < sequence_length - 1:
-                    topk_steered_by_token.append(
-                        {"token": steered_tokenized_str_tokens[i], "top_logits": []}
-                    )
+                    topk_steered_by_token.append(LogitsByToken(token=steered_tokenized_str_tokens[i], top_logits=[]))
                     continue
                 gen_idx = i - (sequence_length - 1)
-                topk_steered = get_topk(
-                    steered_logits[:, : gen_idx + 1, :], model.tokenizer, req_data.top_k
-                )
+                topk_steered = get_topk(steered_logits[:, : gen_idx + 1, :], model.tokenizer, req_data.top_k)
                 topk_steered_by_token.append(
-                    {
-                        "token": steered_tokenized_str_tokens[i],
-                        "top_logits": [
-                            {"token": token, "prob": prob}
-                            for token, prob in topk_steered
-                        ],
-                    }
+                    LogitsByToken(
+                        token=steered_tokenized_str_tokens[i],
+                        top_logits=[TopLogit(token=token, prob=prob) for token, prob in topk_steered],
+                    )
                 )
 
         print(f"Default generation: {default_generation}")
         print(f"Steered generation: {steered_generation}")
 
-        response = {
-            "DEFAULT_LOGITS_BY_TOKEN": topk_default_by_token,
-            "STEERED_LOGITS_BY_TOKEN": topk_steered_by_token,
-            "DEFAULT_GENERATION": default_generation,
-            "STEERED_GENERATION": steered_generation,
-        }
-
-        return response
+        return SteerResponse(
+            DEFAULT_LOGITS_BY_TOKEN=topk_default_by_token,
+            STEERED_LOGITS_BY_TOKEN=topk_steered_by_token,
+            DEFAULT_GENERATION=default_generation,
+            STEERED_GENERATION=steered_generation,
+        )
 
     finally:
         if request_lock.locked():
@@ -517,42 +745,29 @@ async def steer_handler(req: Request):
             )
 
 
-@app.post("/forward-pass", dependencies=[Depends(verify_secret_key)])
-async def forward_pass_handler(req: Request):
+@app.post(
+    "/forward-pass",
+    dependencies=[Depends(verify_secret_key)],
+    responses={200: {"model": ForwardPassResponse}},
+)
+async def forward_pass_handler(req_data: ForwardPassRequest):
     """Handle forward pass requests to get salient logits"""
     print("========== Forward Pass Start ==========")
 
-    print(
-        f"Thread {threading.get_ident()}: Received request. Attempting to acquire lock."
-    )
+    # Resolved before the lock: it is pure string work, and FastAPI has already validated the
+    # body by this point, so there is no longer a failure path between acquiring and the try.
+    req_data.prompt = resolve_prompt(req_data.prompt, req_data.messages)
+
+    print(f"Thread {threading.get_ident()}: Received request. Attempting to acquire lock.")
     if not request_lock.acquire(blocking=False):
-        print(
-            f"Thread {threading.get_ident()}: Lock acquisition failed (busy). Rejecting request."
-        )
-        return JSONResponse(
-            content={"error": "Server busy, please try again later."}, status_code=503
-        )
+        print(f"Thread {threading.get_ident()}: Lock acquisition failed (busy). Rejecting request.")
+        return JSONResponse(content={"error": "Server busy, please try again later."}, status_code=503)
 
     print(f"Thread {threading.get_ident()}: Lock acquired.")
     try:
-        request_body = await req.json()
-        req_data = ForwardPassRequest.model_validate(request_body)
-    except ValidationError as e:
-        raise HTTPException(
-            status_code=400,
-            detail={"error": "Invalid request body", "details": e.errors()},
-        )
-    finally:
-        if request_lock.locked():
-            print(
-                f"Thread {threading.get_ident()}: Releasing lock in validation finally block."
-            )
-            request_lock.release()
-
-    try:
         print(f"Received forward pass request: prompt='{req_data.prompt}'")
 
-        if BACKEND == "lm-saes-crm":
+        if ATTRIBUTION_ENGINE == "lm-saes-crm":
             return forward_pass_crm(
                 req_data.prompt,
                 crm_model,
@@ -575,46 +790,35 @@ async def forward_pass_handler(req: Request):
 
             logits = output[0, -1, :]
 
-            if hasattr(model, "unembed"):
-                unembed_matrix = model.unembed.W_U
-            elif hasattr(model, "lm_head"):
-                unembed_matrix = model.lm_head.weight
-            else:
-                raise AttributeError(
-                    "Model has neither 'unembed' nor 'lm_head' attribute"
-                )
-
             logit_indices, logit_probs, _ = compute_salient_logits(
                 logits,
-                unembed_matrix,
+                model.unembed_weight,
                 max_n_logits=req_data.max_n_logits,
                 desired_logit_prob=req_data.desired_logit_prob,
             )
 
-        results = []
-        for idx, prob in zip(logit_indices.tolist(), logit_probs.tolist()):
-            token = model.tokenizer.decode([idx])
-            results.append(
-                {"token": token, "token_id": idx, "probability": float(prob)}
-            )
+        results = [
+            SalientLogit(token=model.tokenizer.decode([idx]), token_id=idx, probability=float(prob))
+            for idx, prob in zip(logit_indices.tolist(), logit_probs.tolist())
+        ]
 
-        response = {
-            "prompt": req_data.prompt,
-            "input_tokens": [model.tokenizer.decode([token]) for token in tokens],
-            "salient_logits": results,
-            "total_salient_tokens": len(results),
-            "cumulative_probability": float(logit_probs.sum()),
-        }
-
-        print(
-            f"Found {len(results)} salient tokens with cumulative prob: {response['cumulative_probability']:.4f}"
+        response = ForwardPassResponse(
+            prompt=req_data.prompt,
+            input_tokens=[model.tokenizer.decode([token]) for token in tokens],
+            salient_logits=results,
+            total_salient_tokens=len(results),
+            cumulative_probability=float(logit_probs.sum()),
         )
+
+        print(f"Found {len(results)} salient tokens with cumulative prob: {response.cumulative_probability:.4f}")
 
         return response
 
-    except Exception as e:
-        print(f"Error in forward pass: {str(e)}")
-        return {"error": f"Forward pass failed: {str(e)}"}
+    # Endpoint boundary: a forward pass fails in whatever way the model and its backend
+    # choose to, and the caller gets an error field either way.
+    except Exception as e:  # noqa: BLE001
+        print(f"Error in forward pass: {e!s}")
+        return {"error": f"Forward pass failed: {e!s}"}
 
     finally:
         if request_lock.locked():
@@ -626,39 +830,23 @@ async def forward_pass_handler(req: Request):
             )
 
 
-@app.post("/generate-graph", dependencies=[Depends(verify_secret_key)])
-async def generate_graph(req: Request):
-    print(
-        f"Thread {threading.get_ident()}: Received request. Attempting to acquire lock."
-    )
+@app.post(
+    "/generate-graph",
+    dependencies=[Depends(verify_secret_key)],
+    responses={200: {"model": GraphGenerationResponse}},
+)
+async def generate_graph(req_data: GraphGenerationRequest):
+    # Resolved before the lock: pure string work, and FastAPI has already rejected a malformed
+    # body with a 422, so the hand-rolled validate-and-release dance this replaces is gone.
+    req_data.prompt = resolve_prompt(req_data.prompt, req_data.messages)
+
+    print(f"Thread {threading.get_ident()}: Received request. Attempting to acquire lock.")
     if not request_lock.acquire(blocking=False):
-        print(
-            f"Thread {threading.get_ident()}: Lock acquisition failed (busy). Rejecting request."
-        )
-        return JSONResponse(
-            content={"error": "Server busy, please try again later."}, status_code=503
-        )
+        print(f"Thread {threading.get_ident()}: Lock acquisition failed (busy). Rejecting request.")
+        return JSONResponse(content={"error": "Server busy, please try again later."}, status_code=503)
 
     print(f"Thread {threading.get_ident()}: Lock acquired.")
     try:
-        try:
-            request_body = await req.json()
-            req_data = GraphGenerationRequest.model_validate(request_body)
-        except ValidationError as e:
-            print(f"Thread {threading.get_ident()}: Validation error. Releasing lock.")
-            request_lock.release()
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "Invalid request body", "details": e.errors()},
-            )
-        except Exception as e:
-            print(
-                f"Thread {threading.get_ident()}: JSON parsing error. Releasing lock."
-            )
-            request_lock.release()
-            print(f"Error getting/parsing JSON: {e}")
-            raise HTTPException(status_code=400, detail="Invalid JSON body")
-
         prompt = req_data.prompt
         tlens_model_id = req_data.model_id
         if tlens_model_id is None or tlens_model_id != loaded_model_arg:
@@ -675,9 +863,7 @@ async def generate_graph(req: Request):
         edge_threshold = req_data.edge_threshold
         slug_identifier = req_data.slug_identifier or f"generated-{int(time.time())}"
         max_feature_nodes = req_data.max_feature_nodes
-        print(
-            f"Thread {threading.get_ident()}: Processing request for prompt: '{prompt[:50]}...' with parameters:"
-        )
+        print(f"Thread {threading.get_ident()}: Processing request for prompt: '{prompt[:50]}...' with parameters:")
         print(f"  model_id: {tlens_model_id}")
         print(f"  batch_size: {batch_size}")
         print(f"  max_n_logits: {max_n_logits}")
@@ -686,31 +872,30 @@ async def generate_graph(req: Request):
         print(f"  edge_threshold: {edge_threshold}")
         print(f"  slug_identifier: {slug_identifier}")
         print(f"  max_feature_nodes: {max_feature_nodes}")
-        print(f"  backend: {BACKEND}")
+        print(f"  attribution engine: {ATTRIBUTION_ENGINE}")
 
         def _blocking_graph_generation_task():
-            print(
-                f"Thread {threading.get_ident()} (worker): Starting blocking graph generation."
-            )
+            print(f"Thread {threading.get_ident()} (worker): Starting blocking graph generation.")
             _total_start_time = time.time()
 
             try:
                 tokens = model.tokenizer.encode(prompt, add_special_tokens=False)
-                print(
-                    f"Thread {threading.get_ident()} (worker): {len(tokens)} Tokens: {tokens}"
-                )
+                print(f"Thread {threading.get_ident()} (worker): {len(tokens)} Tokens: {tokens}")
                 if len(tokens) > LIMIT_TOKENS:
                     raise HTTPException(
                         status_code=400,
                         detail=f"Prompt exceeds token limit ({len(tokens)} > {LIMIT_TOKENS})",
                     )
-            except Exception as e:
-                print(
-                    f"Thread {threading.get_ident()} (worker): Tokenization error: {e}"
-                )
-                raise HTTPException(status_code=500, detail="Failed to tokenize prompt")
+            # The token-limit refusal above is an HTTPException, so it has to pass through:
+            # catching it here reported an over-long prompt as a 500 "Failed to tokenize".
+            except HTTPException:
+                raise
+            # Tokenizers raise their own error types, so the fallback stays broad.
+            except Exception as e:  # noqa: BLE001
+                print(f"Thread {threading.get_ident()} (worker): Tokenization error: {e}")
+                raise HTTPException(status_code=500, detail="Failed to tokenize prompt") from e
 
-            if BACKEND == "lm-saes-crm":
+            if ATTRIBUTION_ENGINE == "lm-saes-crm":
                 return generate_graph_crm(
                     prompt,
                     crm_model,
@@ -747,9 +932,7 @@ async def generate_graph(req: Request):
                 update_interval=UPDATE_INTERVAL,
             )
             attribution_time_ms = (time.time() - attribution_start) * 1000
-            print(
-                f"Thread {threading.get_ident()} (worker): Attribution Time: {attribution_time_ms:.2f}ms"
-            )
+            print(f"Thread {threading.get_ident()} (worker): Attribution Time: {attribution_time_ms:.2f}ms")
 
             _graph.to("cuda")
 
@@ -767,9 +950,7 @@ async def generate_graph(req: Request):
                 _cumulative_scores,
             )
             print("nodes created")
-            _used_nodes, _used_edges = create_used_nodes_and_edges(
-                _graph, _nodes, _edge_mask
-            )
+            _used_nodes, _used_edges = create_used_nodes_and_edges(_graph, _nodes, _edge_mask)
             print("used nodes and edges created")
             _output_model = build_model(
                 _graph,
@@ -793,15 +974,15 @@ async def generate_graph(req: Request):
             # Convert to dict to add additional fields
             model_dict = _output_model.model_dump()
 
-            # Add additional metadata fields
+            # Only the circuit-tracer path reaches here, and it refuses to start without a
+            # transcoder set, so this is a startup invariant rather than a runtime check.
+            assert transcoder_set is not None
             model_dict["metadata"]["info"] = {
-                "creator_name": req_data.user_id
-                if req_data.user_id
-                else "Anonymous (CT)",
+                "creator_name": req_data.user_id if req_data.user_id else "Anonymous (CT)",
                 "creator_url": "https://neuronpedia.org",
                 "source_urls": TRANSCODER_SET_TO_SOURCE_URL_ARRAYS[transcoder_set],
                 "transcoder_set": transcoder_set,
-                "generator": GENERATOR_INFO,
+                "generator": generator_info(),
                 "create_time_ms": current_time_ms,
             }
 
@@ -825,9 +1006,7 @@ async def generate_graph(req: Request):
             if req_data.compress:
                 print("Compressing data with gzip (level 3)...")
                 compress_start = time.time()
-                data_to_upload = gzip.compress(
-                    model_json.encode("utf-8"), compresslevel=3
-                )
+                data_to_upload = gzip.compress(model_json.encode("utf-8"), compresslevel=3)
                 compress_time_ms = (time.time() - compress_start) * 1000
                 headers = {
                     "Content-Type": "application/json",
@@ -852,7 +1031,7 @@ async def generate_graph(req: Request):
             print(f"Upload response: {response.status_code}")
             # print(f"Upload response: {response.text}")
             if response.status_code != 200:
-                return {"error": "Failed to upload file"}
+                return GraphGenerationResponse(error="Failed to upload file")
 
             print(f"File: uploaded successfully to url: {req_data.signed_url}")
 
@@ -875,13 +1054,9 @@ async def generate_graph(req: Request):
                     ]
                 )
 
-            print(
-                f"Thread {threading.get_ident()} (worker): Total Time for blocking task: {_total_time_ms=:.2f}s"
-            )
+            print(f"Thread {threading.get_ident()} (worker): Total Time for blocking task: {_total_time_ms=:.2f}s")
 
-            return {
-                "success": f"Graph uploaded successfully to url: {req_data.signed_url}"
-            }
+            return GraphGenerationResponse(success=f"Graph uploaded successfully to url: {req_data.signed_url}")
 
         try:
             result = await run_in_threadpool(_blocking_graph_generation_task)
@@ -889,17 +1064,15 @@ async def generate_graph(req: Request):
             return result
         except HTTPException:
             raise
-        except Exception as e:
+        # Worker boundary: attribution runs third-party model code, so anything it raises
+        # becomes a 500 here rather than escaping as an unhandled task exception.
+        except Exception as e:  # noqa: BLE001
             import traceback
 
-            print(
-                f"Thread {threading.get_ident()}: Error during graph generation in worker thread: {e}"
-            )
+            print(f"Thread {threading.get_ident()}: Error during graph generation in worker thread: {e}")
             print("Stack trace:")
             traceback.print_exc()
-            raise HTTPException(
-                status_code=500, detail="Internal server error during graph generation"
-            )
+            raise HTTPException(status_code=500, detail="Internal server error during graph generation") from e
 
     finally:
         printMemory()

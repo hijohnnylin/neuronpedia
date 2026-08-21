@@ -1,44 +1,46 @@
 import logging
-from typing import Any
+from typing import Any, cast
 
-import einops
-import nnsight
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
-from neuronpedia_inference_client.models.activation_single_post200_response import (
-    ActivationSinglePost200Response,
-)
-from neuronpedia_inference_client.models.activation_single_post200_response_activation import (
-    ActivationSinglePost200ResponseActivation,
-)
-from neuronpedia_inference_client.models.activation_single_post_request import (
-    ActivationSinglePostRequest,
-)
-from nnterp import StandardizedTransformer
-from transformer_lens import ActivationCache, HookedTransformer
+from interp_engine import special_token_positions
 
-# from transformer_lens.model_bridge import TransformerBridge
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.engine_adapter import (
+    BackendUnsupported,
+    calculate_dfa_for_values,
+    capture_activation_async,
+    capture_cache_async,
+)
+from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
+from neuronpedia_inference.memory_cost import activation_single_cost
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.schemas import (
+    ActivationSingleRequest,
+    ActivationSingleResponse,
+    ActivationValues,
+)
+from neuronpedia_inference.shared import LoadedModel, Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.post("/activation/single")
-@with_request_lock()
+@router.post("/activation/single", responses={200: {"model": ActivationSingleResponse}})
+@with_request_lock(exclusive=False, cost=activation_single_cost)
 async def activation_single(
-    request: ActivationSinglePostRequest = Body(
+    request: ActivationSingleRequest = Body(
         ...,
-        example={
-            "prompt": "The Jedi in Star Wars wield lightsabers.",
-            "model": "gpt2-small",
-            "source": "0-res-jb",
-            "index": "14057",
-        },
+        examples=[
+            {
+                "prompt": "The Jedi in Star Wars wield lightsabers.",
+                "model": "gpt2-small",
+                "source": "0-res-jb",
+                "index": "14057",
+            }
+        ],
     ),
 ):
     model = Model.get_instance()
@@ -48,13 +50,9 @@ async def activation_single(
     if (request.source is not None and request.index is not None) == (
         request.vector is not None and request.hook is not None
     ):
-        logger.error(
-            "Invalid request data: exactly one of layer/index or vector must be provided"
-        )
+        logger.error("Invalid request data: exactly one of layer/index or vector must be provided")
         return JSONResponse(
-            content={
-                "error": "Invalid request data: exactly one of layer/index or vector must be provided"
-            },
+            content={"error": "Invalid request data: exactly one of layer/index or vector must be provided"},
             status_code=400,
         )
 
@@ -76,85 +74,75 @@ async def activation_single(
         if not prompt.startswith(bos_token):
             prompt = bos_token + prompt
 
-        if isinstance(model, StandardizedTransformer):
-            tokens = model.tokenizer(
-                prompt, add_special_tokens=False, return_tensors="pt"
-            )["input_ids"][0]
-        else:
-            tokens = model.to_tokens(
-                prompt,
-                prepend_bos=prepend_bos,
-                truncate=False,
-            )[0]
-
-        if len(tokens) > config.token_limit:
-            logger.error(
-                "Text too long: %s tokens, max is %s",
-                len(tokens),
-                config.token_limit,
-            )
-            return JSONResponse(
-                content={
-                    "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
-                },
-                status_code=400,
-            )
-
-        if isinstance(model, StandardizedTransformer):
-            tokenizer = model.tokenizer
-            str_tokens: list[str] = tokenizer.tokenize(prompt)
-            str_tokens = [tokenizer.convert_tokens_to_string([t]) for t in str_tokens]
-        else:
-            str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
-        result = process_activations(model, source, index, tokens)
-
-        # Calculate DFA if enabled
-        if sae_manager.is_dfa_enabled(source):
-            dfa_result = calculate_dfa(
-                model,
-                sae,
-                layer_num,
-                index,
-                result.max_value_index,
-                tokens,
-            )
-            result.dfa_values = dfa_result["dfa_values"]  # type: ignore
-            result.dfa_target_index = dfa_result["dfa_target_index"]  # type: ignore
-            result.dfa_max_value = dfa_result["dfa_max_value"]  # type: ignore
-
-    else:
-        vector = request.vector
-        hook = request.hook
-        prepend_bos = model.cfg.tokenizer_prepends_bos
         tokens = model.to_tokens(
             prompt,
             prepend_bos=prepend_bos,
             truncate=False,
         )[0]
-        if len(tokens) > config.token_limit:
-            logger.error(
-                "Text too long: %s tokens, max is %s",
-                len(tokens),
-                config.token_limit,
-            )
-            return JSONResponse(
-                content={
-                    "error": f"Text too long: {len(tokens)} tokens, max is {config.token_limit}"
-                },
-                status_code=400,
-            )
+
+        too_long = reject_if_over_token_limit(len(tokens), config.activation_token_limit)
+        if too_long is not None:
+            return too_long
 
         str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
-        _, cache = model.run_with_cache(tokens)
+        try:
+            result = await process_activations(model, source, index, tokens)
+
+            # Calculate DFA if enabled. `n_values` because `process_activations` may have
+            # dropped the leading BOS from `values`, which shifts `max_value_index` off the
+            # attention pattern's own indexing (see `calculate_dfa_for_values`).
+            if sae_manager.is_dfa_enabled(source):
+                dfa_result = await calculate_dfa_for_values(
+                    model,
+                    sae,
+                    layer_num,
+                    index,
+                    result.max_value_index,
+                    tokens,
+                    n_values=len(result.values),
+                )
+                result.dfa_values = dfa_result["dfa_values"]  # type: ignore
+                result.dfa_target_index = dfa_result["dfa_target_index"]  # type: ignore
+                result.dfa_max_value = dfa_result["dfa_max_value"]  # type: ignore
+        except BackendUnsupported as e:
+            return JSONResponse(content={"error": str(e)}, status_code=400)
+
+    else:
+        # Both are set on this path: the check above rejects any request that does not supply
+        # exactly one of (source, index) / (vector, hook).
+        vector = cast(list[float], request.vector)
+        hook = cast(str, request.hook)
+        prepend_bos = model.tok.tokenizer_prepends_bos
+        tokens = model.to_tokens(
+            prompt,
+            prepend_bos=prepend_bos,
+            truncate=False,
+        )[0]
+        too_long = reject_if_over_token_limit(len(tokens), config.activation_token_limit)
+        if too_long is not None:
+            return too_long
+
+        str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
+        try:
+            cache = {hook: await capture_activation_async(model, tokens, hook)}
+        except BackendUnsupported as e:
+            return JSONResponse(content={"error": str(e)}, status_code=400)
         result = process_vector_activations(vector, cache, hook, sae_manager.device)  # type: ignore
 
     logger.info("Returning result: %s", result)
 
+    # Built from the ids, then sliced wherever `str_tokens` is, so the two stay
+    # index-aligned whichever branch above produced `result`. Callers use this to
+    # drop scaffolding tokens without matching literals like "<bos>".
+    special_positions = set(special_token_positions(tokens, model.tokenizer))
+    tokens_is_special = [i in special_positions for i in range(len(str_tokens))]
+
     # if the model prepends the BOS token, then we need to remove the first token from the str_tokens
     if len(str_tokens) > len(result.values):
         str_tokens = str_tokens[1:]
+        tokens_is_special = tokens_is_special[1:]
 
-    return ActivationSinglePost200Response(activation=result, tokens=str_tokens)
+    return ActivationSingleResponse(activation=result, tokens=str_tokens, tokens_is_special=tokens_is_special)
 
 
 def _get_safe_dtype(dtype: torch.dtype) -> torch.dtype:
@@ -164,27 +152,16 @@ def _get_safe_dtype(dtype: torch.dtype) -> torch.dtype:
     return torch.float32 if dtype == torch.float16 else dtype
 
 
-def _safe_cast(tensor: torch.Tensor, target_dtype: torch.dtype) -> torch.Tensor:
-    """
-    Safely cast a tensor to the target dtype, creating a copy if needed.
-    Convert float16 to float32, leave other dtypes unchanged.
-    """
-    safe_dtype = _get_safe_dtype(tensor.dtype)
-    if safe_dtype != tensor.dtype or safe_dtype != target_dtype:
-        return tensor.to(target_dtype)
-    return tensor
-
-
 def get_layer_num_from_sae_id(sae_id: str) -> int:
     return int(sae_id.split("-")[0]) if not sae_id.isdigit() else int(sae_id)
 
 
-def process_activations(
-    model: HookedTransformer | StandardizedTransformer,  # | TransformerBridge
+async def process_activations(
+    model: LoadedModel,
     layer: str,
     index: int,
     tokens: torch.Tensor,
-) -> ActivationSinglePost200ResponseActivation:
+) -> ActivationValues:
     sae_manager = SAEManager.get_instance()
     hook_name = sae_manager.get_sae_hook(layer)
     sae_type = sae_manager.get_sae_type(layer)
@@ -193,48 +170,22 @@ def process_activations(
     bos_token_id = model.tokenizer.bos_token_id
     bos_indices = (tokens == bos_token_id).nonzero(as_tuple=True)[0]
 
-    if isinstance(model, StandardizedTransformer):
-        layer_num = get_layer_num_from_sae_id(layer)
-        with model.trace(tokens):
-            if "resid_post" in hook_name:
-                outputs = nnsight.save(model.layers_output[layer_num])
-            elif "hook_mlp_in" in hook_name:
-                outputs = nnsight.save(model.mlps_input[layer_num])
-            else:
-                raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
-        cache = {hook_name: outputs}
-        return process_feature_activations(
-            sae_manager.get_sae(layer),
-            sae_type,
-            cache,
-            hook_name,
-            index,
-            bos_indices,
-        )
-
-    # if isinstance(model, TransformerBridge) and tokens.ndim == 1:
-    #     tokens = tokens.unsqueeze(0)
-    _, cache = model.run_with_cache(tokens)
-
+    cache = await capture_cache_async(model, tokens, [hook_name])
     if sae_type == "neurons":
         return process_neuron_activations(cache, hook_name, index, sae_manager.device)
-    if sae_manager.get_sae(layer) is not None:
-        return process_feature_activations(
-            sae_manager.get_sae(layer), sae_type, cache, hook_name, index, bos_indices
-        )
-    raise ValueError(f"Invalid layer: {layer}")
+    return process_feature_activations(sae_manager.get_sae(layer), sae_type, cache, hook_name, index, bos_indices)
 
 
 def process_neuron_activations(
-    cache: ActivationCache | dict[str, torch.Tensor],
+    cache: dict[str, torch.Tensor],
     hook_name: str,
     index: int,
     device: str,
-) -> ActivationSinglePost200ResponseActivation:
+) -> ActivationValues:
     mlp_activation_data = cache[hook_name].to(device)
     values = torch.transpose(mlp_activation_data[0], 0, 1)[index].detach().tolist()
     max_value = max(values)
-    return ActivationSinglePost200ResponseActivation(
+    return ActivationValues(
         values=values,
         max_value=max_value,
         max_value_index=values.index(max_value),
@@ -244,11 +195,11 @@ def process_neuron_activations(
 def process_feature_activations(
     sae: Any,
     sae_type: str,
-    cache: ActivationCache | dict[str, torch.Tensor],
+    cache: dict[str, torch.Tensor],
     hook_name: str,
     index: int,
     bos_indices: list[int],
-) -> ActivationSinglePost200ResponseActivation:
+) -> ActivationValues:
     if sae_type == "saelens-1":
         return process_saelens_activations(sae, cache, hook_name, index, bos_indices)
     raise ValueError(f"Unsupported SAE type: {sae_type}")
@@ -256,11 +207,11 @@ def process_feature_activations(
 
 def process_saelens_activations(
     sae: Any,
-    cache: ActivationCache | dict[str, torch.Tensor],
+    cache: dict[str, torch.Tensor],
     hook_name: str,
     index: int,
     bos_indices: list[int],
-) -> ActivationSinglePost200ResponseActivation:
+) -> ActivationValues:
     # if the cache[hook_name] is not on the same device as the sae, move it to the sae's device
     cached_value = cache[hook_name]
     if cached_value.device != sae.device:
@@ -276,7 +227,7 @@ def process_saelens_activations(
         values = values[1:]
 
     max_value = max(values)
-    return ActivationSinglePost200ResponseActivation(
+    return ActivationValues(
         values=values,
         max_value=max_value,
         max_value_index=values.index(max_value),
@@ -285,10 +236,10 @@ def process_saelens_activations(
 
 def process_vector_activations(
     vector: torch.Tensor | list[float],
-    cache: ActivationCache | dict[str, torch.Tensor],
+    cache: dict[str, torch.Tensor],
     hook_name: str,
     device: torch.device,
-) -> ActivationSinglePost200ResponseActivation:
+) -> ActivationValues:
     if not isinstance(vector, torch.Tensor):
         vector = torch.tensor(vector, device=device)
     # not normalizing it for now
@@ -299,72 +250,8 @@ def process_vector_activations(
     feature_acts = torch.matmul(activations, vector)
     values = feature_acts.squeeze(0).detach().tolist()
     max_value = max(values)
-    return ActivationSinglePost200ResponseActivation(
+    return ActivationValues(
         values=values,
         max_value=max_value,
         max_value_index=values.index(max_value),
     )
-
-
-def calculate_dfa(
-    model: HookedTransformer,
-    sae: Any,
-    layer_num: int,
-    index: int,
-    max_value_index: int,
-    tokens: torch.Tensor,
-) -> dict[str, list[float] | int | float]:
-    _, cache = model.run_with_cache(tokens)
-    v = cache["v", layer_num]  # [batch, src_pos, n_heads, d_head]
-    attn_weights = cache["pattern", layer_num]  # [batch, n_heads, dest_pos, src_pos]
-
-    # Determine the safe dtype for operations
-    v_dtype = _get_safe_dtype(v.dtype)
-    attn_weights_dtype = _get_safe_dtype(attn_weights.dtype)
-    sae_dtype = _get_safe_dtype(sae.W_enc.dtype)
-
-    # Use the highest precision dtype
-    op_dtype = max(v_dtype, attn_weights_dtype, sae_dtype, key=lambda x: x.itemsize)
-
-    # Check if the model uses GQA
-    use_gqa = (
-        hasattr(model.cfg, "n_key_value_heads")
-        and model.cfg.n_key_value_heads is not None
-        and model.cfg.n_key_value_heads < model.cfg.n_heads
-    )
-
-    if use_gqa:
-        n_query_heads = attn_weights.shape[1]
-        n_kv_heads = v.shape[2]
-        expansion_factor = n_query_heads // n_kv_heads
-        v = v.repeat_interleave(expansion_factor, dim=2)
-
-    # Cast tensors to operation dtype
-    v = _safe_cast(v, op_dtype)
-    attn_weights = _safe_cast(attn_weights, op_dtype)
-
-    v_cat = einops.rearrange(
-        v, "batch src_pos n_heads d_head -> batch src_pos (n_heads d_head)"
-    )
-    attn_weights_bcast = einops.repeat(
-        attn_weights,
-        "batch n_heads dest_pos src_pos -> batch dest_pos src_pos (n_heads d_head)",
-        d_head=model.cfg.d_head,
-    )
-    decomposed_z_cat = attn_weights_bcast * v_cat.unsqueeze(1)
-
-    # Cast SAE weights to operation dtype
-    W_enc = _safe_cast(sae.W_enc[:, index], op_dtype)
-
-    per_src_pos_dfa = einops.einsum(
-        decomposed_z_cat,
-        W_enc,
-        "batch dest_pos src_pos d_model, d_model -> batch dest_pos src_pos",
-    )
-    per_src_dfa = per_src_pos_dfa[torch.arange(1), torch.tensor([max_value_index]), :]
-    dfa_values = per_src_dfa[0].tolist()
-    return {
-        "dfa_values": dfa_values,
-        "dfa_target_index": max_value_index,
-        "dfa_max_value": max(dfa_values),
-    }

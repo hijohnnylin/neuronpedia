@@ -1,0 +1,305 @@
+# Per-model endpoint expectations for the inference server, as data.
+#
+# The companion to the engine's own tests/model_expectations.yaml, split along the line of what each
+# layer can actually assert. The engine has no SAE and no HTTP surface, so it owns the
+# read-out and the attention rows; everything here needs SAEManager, a real request/response,
+# or both -- activation magnitudes on a curated feature, and steering at a calibrated
+# strength.
+#
+# ── Every number below was measured ─────────────────────────────────────────
+# Against a real server on this repo's CPU test path, not copied from prod. A row whose value
+# came from the RUNBOOK without being re-measured says so.
+#
+# SAEs load at bf16, because tests/harness.py pins SAE_DTYPE to what local_scripts/pods.yaml
+# serves. That makes an activation magnitude here directly comparable to a production one, and
+# it is why these numbers are quantized (57.75, 1592.0) rather than arbitrary fp32 values.
+#
+# ── Fields ──────────────────────────────────────────────────────────────────
+# Keys under `models:` are looked up in tests/harness.py's MODELS first, so the CI model list
+# and its SAE configuration stay single-sourced there. A row whose key is not in that matrix
+# must carry `hfId` (and may carry `dtype`/`saeSets`/`includeSae`/`gated`) itself; that is how
+# the `manual` tier holds models CI must never download.
+#
+# Capability blocks are optional and independent -- a row with no `saeSource` simply gets no
+# activation or steer coverage, which is the honest state for a model with no published SAEs.
+#
+#   tier             ci | manual. `manual` maps to @pytest.mark.xl (runs nowhere automatically).
+#   saeIndex         The curated feature. It must have a concrete lexical meaning, so that
+#                    `activationText` can be written to make it fire and the magnitude
+#                    assertion is a real check on the encode rather than a tautology.
+#   activationMax*   The peak activation and the token it must land on. Asserting the token
+#                    is what distinguishes "the SAE encode works" from "some number came back".
+#   steerStrength    Measured against a live backend, never guessed: the usable band is narrow
+#                    and does not transfer between SAE families (the same concept needs 5 on
+#                    llamascope and 1000 on gemmascope-2). Each row records the band it sits in.
+#   steerPattern     What the STEERED continuation must contain -- and, just as importantly,
+#                    what the DEFAULT continuation must NOT. A steer case whose unsteered
+#                    output already matches passes with the steering vector removed entirely,
+#                    which is the single easiest way to write a steer test that proves nothing.
+
+version: 1
+
+bindings:
+  # Read-out prompt shared with the engine suite, for the same reason: an induction/copy
+  # continuation is the one thing every model here gets right regardless of size or
+  # instruction tuning, so a failure means the read-out is broken rather than the model being
+  # small. See the long note in the engine's copy.
+  lensPrompt: "cat dog cat dog cat"
+  lensAnswer: "dog"
+  lensTopK: 5
+  # Every read-out assertion below is applied to each type a row lists, so adding
+  # 'JACOBIAN_LENS' to a row is what buys coverage of the fitted-transport path. Only worth it
+  # where a lens is actually published for the checkpoint: the endpoint 400s otherwise.
+  lensTypes: ["LOGIT_LENS"]
+  # How many layers must carry the answer in their top-k. At the final layer the residual is
+  # already what lm_head was trained on, so a subtly wrong read-out can still look right
+  # there; requiring earlier layers to agree is what tests the intermediate decode.
+  minLensLayers: 2
+  # Shared steer prompt. Open-ended enough that a concept feature can visibly redirect it.
+  steerPrompt: "My favorite animal is"
+  steerTokens: 12
+  # Both steer routes cache on the seed in the webapp's database. Nothing here touches that
+  # database -- these are in-process TestClient calls straight to the server -- so a fixed
+  # seed is safe and keeps the generation reproducible.
+  steerSeed: 16
+  tier: ci
+
+models:
+  gpt2:
+    # The whole row runs on the CPU CI job: gpt2 is fp32 and 124M, and one extra res-jb SAE is
+    # small enough that the activation and steer coverage costs no GPU at all. That makes this
+    # the row to reach for when iterating.
+    saeSource: "10-res-jb"
+    saeIndex: 16899
+    # 10-res-jb/16899 is "mentions of cats or similar words related to cats" -- the same
+    # feature the api-compare activation and steer cases bind, so the numbers here and the
+    # numbers prod was compared against are about the same thing.
+    minLensLayers: 5
+    activationText: "My cat is sleeping on the couch."
+    activationMaxToken: " cat"
+    # Measured 57.75 on the ` cat` token (the rest of the prompt is 0.0 apart from ` is` at
+    # 0.922). At bf16 -- the SAE dtype the harness pins, matching what the pods serve -- the
+    # quantization step at this magnitude is ~0.25, which dwarfs the numeric drift the RUNBOOK
+    # found prod-vs-local (at most 0.021 absolute across 3532 values, in fp32). The band is
+    # +/-~6%, far wider than either, and still tight enough to catch every failure that
+    # matters: a broken encode gives 0, and a wrong feature or layer gives a different number
+    # entirely.
+    activationMaxRange: [54.0, 61.5]
+    # Measured on this CPU path, and it reproduces the RUNBOOK's live-backend sweep exactly.
+    # Unsteered: ' the dog. I love the dog. I love the dog'. Steered at 30, 45 and 75 alike:
+    # ' the cat. I love it. I love it. I'. At 150 it collapses into ' thecherfish. I love
+    # thatcherfish, butchers'. 45 sits mid-band, and the fact that the unsteered continuation
+    # says "dog" is what makes the '[Cc]at' assertion mean something.
+    steerStrength: 45
+    steerPattern: "[Cc]at"
+    unsteeredPattern: "[Dd]og"
+
+  gemma-3-270m-it:
+    # Gated, so the CPU job deselects it (`-m "not gated"`) and the GPU job picks it up.
+    minLensLayers: 2
+
+    # SAEs trained on the INSTRUCT checkpoint, not the base one. The RUNBOOK's calibration
+    # (15-gemmascope-2-res-16k/15181 cat @ 1000) was measured against gemma-3-270m, and
+    # gemmascope-2's `-pt` SAEs live in the base model's residual basis, so it does not carry
+    # over. It does not have to: google/gemma-scope-2-270m-it is a separate release whose
+    # SAELens `model` is google/gemma-3-270m-it, and resolve_saelens_model_id returns the
+    # instruct id directly rather than falling back to the base. Same Neuronpedia source name,
+    # different weights -- so the source below is right and only the feature index and
+    # strength needed re-measuring.
+    #
+    # These lists are not in harness.py's GEMMA_IT on purpose: they make every gemma server
+    # boot load an SAE, and SAELens's gemma-3 loader reaches for the HF HTTP API even when the
+    # file is cached, so an offline box would start skipping the chat/template tests that need
+    # no SAE at all. Declared here, they apply to this row alone.
+    saeSets: ["gemmascope-2-res-16k"]
+    includeSae: ["15-gemmascope-2-res-16k"]
+    saeSource: "15-gemmascope-2-res-16k"
+    saeIndex: 14340
+    # Found by ranking features by their activation AT the cat token (sorting by max activation
+    # instead returns dense positional features that fire on every token at ~4000). 14340 reads
+    # as a clean cat feature: 1592.0 on ` cat` here, 1832.0 on ` cat` in "A cat chased the
+    # mouse.", 816.0 on ` kitten` in "The kitten drank its milk." -- and exactly 0.0 on both
+    # "The dog barked at the mailman." and "I parked the car outside."
+    activationText: "My cat is sleeping on the couch."
+    activationMaxToken: " cat"
+    # Wider than gpt2's band because these are bf16 gemmascope-2 magnitudes in the thousands.
+    activationMaxRange: [1200.0, 2000.0]
+    # Measured band on this feature and prompt: 1500, 1800, 2000, 2500 and 3000 all open with
+    # " cat."; 5000 derails into " sleek, sleek, sleek car."; 8000 is word salad
+    # ("vivid and vivid loverheterbird"). 2000 sits mid-band.
+    steerStrength: 2000
+    # NOT the shared animal prompt. On "My favorite animal is" this same feature at this same
+    # strength writes " the bird. I love the way it moves" -- lion at 0, eagle at 500-1000,
+    # bird at 2000+, and never cat. A feature that reads cleanly as one concept does not
+    # necessarily write that concept, and which concept it writes depends on the prompt.
+    steerPrompt: "The best pet to have is a"
+    steerPattern: "[Cc]at"
+    # Unsteered: ' pet that is a good fit for your lifestyle and personality.'
+    unsteeredPattern: "[Pp]et"
+
+  qwen3.5-0.8b:
+    # Thinking model, so the CPU job deselects it (`-m "not thinking"`) and the GPU job runs it.
+    #
+    # No published SAEs for this checkpoint, so no activation or steer coverage. What it can
+    # carry today is the read-out plus the thinking template, below.
+    #
+    # This is the only row in either matrix with a fitted lens, which makes it the only
+    # automatic coverage of the transport path in lens/prompt.py -- lens_loader.py resolves
+    # and applies pre-fitted matrices that nothing else per-PR exercises.
+    #
+    # Nothing had to be configured for it. A published lens already sits at exactly the path
+    # the loader derives from the defaults:
+    #
+    #   qwen3.5-0.8b/jlens/Salesforce-wikitext/Qwen3.5-0.8B_jacobian_lens.pt
+    #
+    # in the neuronpedia/jacobian-lens HF repo -- np_model_to_hf.json maps qwen3.5-0.8b to
+    # Qwen/Qwen3.5-0.8B, whose slug is the filename stem, and JLENS_DATASET already defaults
+    # to Salesforce-wikitext. So the server downloads and loads it at startup unmarked, and
+    # asking for the type here is enough.
+    #
+    # Measured on the GPU job's configuration (bf16 on CUDA), which is where this row runs.
+    # The lens fits layers 0-22 (d_model 1024, 233 prompts); layer 23 has no jacobian and is
+    # decoded raw, so the two types agree exactly at the final layer and the read-out
+    # assertions below are really a claim about the 23 layers before it. On
+    # 'cat dog cat dog cat' the raw read-out first recovers ' dog' at layer 19 (5 layers), the
+    # fitted one at layer 15 (9 layers) -- earlier, which is what a fitted lens is for and
+    # what test_fitted_lens_transports_and_reads_out_no_later asserts.
+    lensTypes: ["LOGIT_LENS", "JACOBIAN_LENS"]
+    # Satisfied by both types (5 raw, 9 fitted); the fitted lens's advantage is asserted as an
+    # ordering rather than pinned to 9, so a re-fit is free to move it.
+    minLensLayers: 5
+
+    # The thinking template, end to end through the read-out. The existing coverage in
+    # test_model_coverage.py asserts that toggling enable_thinking changes the token ids;
+    # this asserts what the toggle is FOR, which is the only version of the check that fails
+    # if the flag is threaded through the template but dropped before generation.
+    #
+    # Measured. enable_thinking=true renders a 17-token prompt ending '<think>', '\n' -- an
+    # OPEN block -- and the model generates reasoning ('Thinking', ' Process', ':') tagged
+    # channel 'analysis'. enable_thinking=false renders 19 tokens ending '<think>', '\n\n',
+    # '</think>', '\n\n' -- pre-CLOSED -- and the model answers directly ('The', ' capital',
+    # ' of', ' France', ' is', ' **') with no analysis channel at all.
+    chatPrompt: "What is the capital of France?"
+    chatTokens: 6
+    thinkingChannel: "analysis"
+    thinkingOffPattern: "capital of France"
+
+  # ── manual tier: multi-GB weights, `pytest -m xl` on a big box ─────────────
+  # Not in tests/harness.py's matrix, so each row carries its own model and SAE configuration.
+  # Latest run: an RTX 5090 (32 GB), all four rows, ~157s total, 15 passed and 9 skipped. Peak
+  # was 23.1 GB on the card (~20.7 GB of it this suite, the rest a desktop), set by the largest
+  # row alone -- the harness keeps only one server alive at a time, so the rows do not stack and
+  # adding one does not move it. The activation bands below are measured; the steer strengths
+  # are still RUNBOOK carry-overs, validated only in the sense that the steered continuation
+  # matched the pattern.
+  gemma-2-2b:
+    tier: manual
+    hfId: google/gemma-2-2b
+    dtype: bfloat16
+    gated: true
+    saeSets: ["gemmascope-res-16k"]
+    includeSae: ["20-gemmascope-res-16k"]
+    saeSource: "20-gemmascope-res-16k"
+    saeIndex: 12082
+    activationText: "My dog is sleeping on the couch."
+    activationMaxToken: " dog"
+    # Measured 87.0 on ` dog`, +/-6%. Not an exclusive feature -- ` is` hits 69.5 and ` the`
+    # 49.0 on the same prompt -- so the peak-token assertion is carrying this row, not the
+    # magnitude. Worth swapping for a cleaner feature if this one ever gets noisy.
+    activationMaxRange: [82.0, 92.0]
+    # RUNBOOK: 250 is where "dog" first appears, 300 is still clean prose, 500 is "obedience
+    # obedience obedience", 800 is "kennel kennel kennel".
+    steerStrength: 300
+    steerPattern: "[Dd]og"
+    # The shared animal prompt is useless here -- unsteered this model already answers " a dog.
+    # I have a dog named Max.", so '[Dd]og' would pass with the steering removed entirely.
+    steerPrompt: "In the morning I like to"
+    unsteeredPattern: '\S'
+
+  gemma-2-2b-transcoder:
+    # The same weights as the row above, for one reason: this is the only row whose SAE reads a
+    # hook the engine has no canonical point for. Gemma Scope's transcoders declare
+    # `blocks.19.ln2.hook_normalized`, which TransformerLens fires between the RMSNorm divide and
+    # its gain -- neither `resid_mid` nor `mlp_in` -- so engine_adapter.py captures `resid_mid`
+    # and recomputes the divide. That recomputation is arithmetic on a captured tensor, which
+    # unit tests cover; what only a real server covers is that SAELens's declared hook name still
+    # resolves at all. It stopped resolving once, and the whole source 500'd.
+    #
+    # A second row rather than a second source on the row above, because a row is one server and
+    # one curated feature; the extra boot is ~5s against cached weights.
+    tier: manual
+    hfId: google/gemma-2-2b
+    dtype: bfloat16
+    gated: true
+    saeSets: ["gemmascope-transcoder-16k"]
+    includeSae: ["19-gemmascope-transcoder-16k"]
+    saeSource: "19-gemmascope-transcoder-16k"
+    saeIndex: 4607
+    activationText: "My dog is sleeping on the couch."
+    activationMaxToken: " dog"
+    # Measured 32.0 on ` dog`, +/-6%. The cleanest feature in the file alongside llamascope's:
+    # every other token on this prompt is exactly 0.0, it reads 66.5 on ` dog` in "The dog barked
+    # at the mailman." and 22.75 on ` puppy` in "The puppy chased its tail.", and it is exactly
+    # 0.0 on both "My cat is sleeping on the couch." and "I parked the car outside." So unlike
+    # the res-16k row above, the magnitude here is load-bearing and not just the peak token --
+    # which is what makes the band a check on the recomputation rather than on the encode. Read
+    # off the two neighbouring tensors, this same feature on this same prompt gives 41.0 from
+    # `mlp_in` (one gain-multiply away) and 256.0 from an unnormalized `resid_mid`; both peak on
+    # ` dog` too, and both are outside the band.
+    #
+    # That last number is the one to know about: the shipping dashboards for every source in this
+    # set were generated from the unnormalized `resid_mid`, so they read roughly an order of
+    # magnitude higher than this band and a bug report saying the server disagrees with a dashboard
+    # is expected rather than a regression. The band stays where the SAE was trained -- see the
+    # long note in engine_adapter.py, and scripts/gemma_transcoder_hook_check.py.
+    activationMaxRange: [30.0, 34.0]
+    # No steer coverage on purpose. A transcoder encodes the MLP's input and decodes toward its
+    # output, so adding its decoder vector at the hook it was read from is not the operation
+    # steerStrength calibrates, and a number here would imply it had been validated.
+
+  llama3.1-8b-it:
+    tier: manual
+    hfId: meta-llama/Llama-3.1-8B-Instruct
+    dtype: bfloat16
+    gated: true
+    saeSets: ["resid-post-aa"]
+    includeSae: ["27-resid-post-aa"]
+    saeSource: "27-resid-post-aa"
+    saeIndex: 76900
+    activationText: "I walked my dog in the park."
+    activationMaxToken: " dog"
+    # Measured 7.4375 on ` dog`, +/-6%. The cleanest curated feature in the file: every other
+    # token on this prompt is exactly 0.0. Note the scale -- llamascope magnitudes are single
+    # digits where gemmascope-2's are in the thousands, so bands do not transfer.
+    activationMaxRange: [7.0, 7.9]
+    # RUNBOOK: 18, 20 and 24 all produce the same steered sentence; 28 collapses into
+    # "gygygygy" mid-word. Its own prompt, because on the shared animal prompt this feature
+    # yields " the octopus" and then " the wolf" rather than the word dog, despite reading as
+    # dog cleanly. A feature's read behavior does not predict what steering with it writes.
+    steerStrength: 20
+    steerPrompt: "I took my new pet"
+    steerPattern: "[Pp]uppy|[Dd]og"
+    unsteeredPattern: '\S'
+
+  gpt-oss-20b:
+    tier: manual
+    hfId: openai/gpt-oss-20b
+    dtype: bfloat16
+    saeSets: ["resid-post-aa"]
+    includeSae: ["23-resid-post-aa"]
+    saeSource: "23-resid-post-aa"
+    saeIndex: 29404
+    activationText: "My dog is sleeping on the couch."
+    activationMaxToken: " dog"
+    # Measured 1864.0 on ` dog`, +/-6%. Like gemma-2-2b this feature is not exclusive (` is`
+    # reaches 1704), so the peak token is the real assertion. This is the row the [0.1, 1000.0]
+    # placeholder caught: the first run reported a number three orders of magnitude off the
+    # llamascope scale, which is exactly what the wide band was left there to surface.
+    activationMaxRange: [1750.0, 1980.0]
+    # The model to re-run after any vLLM bump: it is the one architecture vLLM routes to the
+    # legacy V1 model runner, and the seam that breaks there looks like a model-specific
+    # outage (every steer and activation request 500s) rather than an engine problem.
+    # RUNBOOK: 600 turns " a cat." into " a dog. I love dogs.", 2000 is "dogs dogs".
+    steerStrength: 600
+    steerPattern: "[Dd]og"
+    unsteeredPattern: '\S'

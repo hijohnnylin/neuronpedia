@@ -1,0 +1,140 @@
+name: OpenAPI - Publish SDKs
+
+# The published SDKs are the one generated artifact nothing in this repo consumes: the webapp
+# compiles against lib/api/*.d.ts and the servers own their pydantic models, so
+# neuronpedia-{inference,autointerp}-client exists purely for callers outside the repo. Nothing
+# here can break when a publish fails, which is exactly why it needs to report loudly.
+#
+# Hence no `paths:` filter, deliberately. A filtered job that never fires is silent, and that is
+# the one failure mode nobody would notice. This runs on every push to main and asks the registry
+# whether there is anything to do -- see .github/scripts/publish_sdk.py for how the hash gate
+# works and why it is self-healing. That is also what makes this eligible as a required check.
+#
+# Running unconditionally is not the same as running expensively: the first step answers the
+# question with one `npm view`, and everything costly is skipped behind it. A push touching no
+# spec finishes in seconds, so the filter would buy nothing that this does not already.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Generate and validate the packages without uploading them"
+        type: boolean
+        default: true
+      force:
+        description: "Rebuild even if the published openapiHash already matches the spec"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      # One service failing to publish says nothing about the other, and holding the second back
+      # would only widen the window where the two registries disagree.
+      fail-fast: false
+      matrix:
+        # graph, nla and sparsity deliberately have no SDK. They generate a spec and webapp types
+        # like everyone else, but nothing outside the repo calls them.
+        service: [inference, autointerp]
+    # Two pushes landing together would otherwise resolve the same next version and race to claim
+    # it. Queue rather than cancel: interrupting an upload is worse than waiting for one.
+    concurrency:
+      group: publish-sdk-${{ matrix.service }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every step below is skipped when the published SDK was already built from this exact
+      # spec, which is almost every push. The runner ships node and python3, so this costs one
+      # `npm view` -- the point is to answer the question before paying for a JDK and a venv.
+      #
+      # This is the cheap form of the hash gate, not a substitute for it: publish_sdk.py checks
+      # again, so a stale answer here can only waste time, never publish the wrong thing.
+      - name: Is there anything to publish?
+        id: gate
+        env:
+          SERVICE: ${{ matrix.service }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          args=(--service "$SERVICE" --check-only)
+          if [ "$FORCE" = "true" ]; then
+            args+=(--force)
+          fi
+          python3 .github/scripts/publish_sdk.py "${args[@]}"
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.needed == 'true'
+        with:
+          node-version: 22
+          # Points npm at the public registry and makes `npm publish` read NODE_AUTH_TOKEN.
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Set up Java
+        # openapi-generator-cli is a JVM tool; the npm package is only a launcher for the jar.
+        if: steps.gate.outputs.needed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install uv
+        if: steps.gate.outputs.needed == 'true'
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        if: steps.gate.outputs.needed == 'true'
+        run: uv python install 3.12
+
+      # Publishing is off until the repository variable OPENAPI_PUBLISH_ENABLED is set to "true".
+      # Until then every push does the full generate-and-validate pass and uploads nothing, so
+      # this workflow can be merged and watched before it is trusted with a registry token.
+      #
+      # Written as an if/else rather than `A && B || C`, because that expression collapses to C
+      # whenever B is false -- which for a boolean input is exactly the case being tested.
+      - name: Decide whether this run publishes
+        id: mode
+        if: steps.gate.outputs.needed == 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          PUBLISH_ENABLED: ${{ vars.OPENAPI_PUBLISH_ENABLED }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            dry="$INPUT_DRY_RUN"
+          elif [ "$PUBLISH_ENABLED" = "true" ]; then
+            dry=false
+          else
+            dry=true
+          fi
+          echo "dry_run=$dry" >> "$GITHUB_OUTPUT"
+          if [ "$dry" = "true" ]; then
+            echo "::notice::Dry run - packages will be generated and validated but not uploaded."
+          fi
+
+      - name: Generate, validate and publish
+        if: steps.gate.outputs.needed == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          SERVICE: ${{ matrix.service }}
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+          FORCE: ${{ inputs.force }}
+        # `if` blocks rather than `[ ... ] && ...`: steps run under `bash -e`, where a bare test
+        # that evaluates false is itself a failing command and would abort the step.
+        run: |
+          args=(--service "$SERVICE")
+          if [ "$DRY_RUN" = "false" ]; then
+            args+=(--publish)
+          fi
+          if [ "$FORCE" = "true" ]; then
+            args+=(--force)
+          fi
+          python3 .github/scripts/publish_sdk.py "${args[@]}"

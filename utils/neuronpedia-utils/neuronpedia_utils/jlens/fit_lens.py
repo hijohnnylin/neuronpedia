@@ -1,6 +1,6 @@
 # Based on the Jacobian lens ("jlens") reference implementation by Anthropic PBC.
 # Companion code for the "Verbalizable Workspace" paper.
-# https://github.com/anthropics/jlens
+# https://github.com/anthropics/jacobian-lens
 # SPDX-License-Identifier: Apache-2.0
 #
 # This is a Neuronpedia-adapted copy of the upstream ``demo/fit_lens.py``: the
@@ -37,10 +37,9 @@ import re
 import shutil
 from collections import deque
 
+import jlens
 import torch
 import transformers
-
-import jlens
 
 
 def load_prompts(
@@ -111,9 +110,12 @@ def peak_vram_gb() -> float:
     """Peak allocated CUDA memory summed across all visible devices, in GiB."""
     if not torch.cuda.is_available():
         return 0.0
-    return sum(
-        torch.cuda.max_memory_allocated(i) for i in range(torch.cuda.device_count())
-    ) / 1024**3
+    return (
+        sum(
+            torch.cuda.max_memory_allocated(i) for i in range(torch.cuda.device_count())
+        )
+        / 1024**3
+    )
 
 
 class ConvergenceTracker:
@@ -213,7 +215,9 @@ class ConvergenceTracker:
             last_n, last_v = self.history[-1]
             lines.append(f"  last: Δmean={last_v:.2e} at {last_n} prompts")
             if self.stopped_at is not None:
-                lines.append(f"  stopped early at {self.stopped_at} prompts (--stop_at_delta)")
+                lines.append(
+                    f"  stopped early at {self.stopped_at} prompts (--stop_at_delta)"
+                )
             lines.append(f"  full curve written to {self.csv_path}")
         return "\n".join(lines)
 
@@ -223,9 +227,15 @@ def build_parser() -> argparse.ArgumentParser:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("model", help="HF model id or local path (any decoder LM)")
-    parser.add_argument("--out_dir", default="out", help="output directory for the lens")
-    parser.add_argument("--n_prompts", type=int, default=200, help="prompts to average over")
-    parser.add_argument("--dim_batch", type=int, default=8, help="output dims per backward pass")
+    parser.add_argument(
+        "--out_dir", default="out", help="output directory for the lens"
+    )
+    parser.add_argument(
+        "--n_prompts", type=int, default=200, help="prompts to average over"
+    )
+    parser.add_argument(
+        "--dim_batch", type=int, default=8, help="output dims per backward pass"
+    )
     parser.add_argument("--max_seq_len", type=int, default=128)
     parser.add_argument(
         "--target_layer",
@@ -234,9 +244,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="layer to take gradients w.r.t. (default: final; negative indexes from end)",
     )
     parser.add_argument(
-        "--text_module", default=None, help="dotted path to the text decoder (auto-detected)"
+        "--text_module",
+        default=None,
+        help="dotted path to the text decoder (auto-detected)",
     )
-    parser.add_argument("--no_compile", action="store_true", help="disable per-layer torch.compile")
+    parser.add_argument(
+        "--no_compile", action="store_true", help="disable per-layer torch.compile"
+    )
     parser.add_argument(
         "--device_map",
         default="cuda",
@@ -268,15 +282,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # Dataset selection. Defaults reproduce the WikiText-103 corpus.
-    parser.add_argument("--dataset", default="Salesforce/wikitext", help="HF dataset id")
+    parser.add_argument(
+        "--dataset", default="Salesforce/wikitext", help="HF dataset id"
+    )
     parser.add_argument(
         "--dataset_config",
         default="wikitext-103-raw-v1",
         help="dataset config/subset; pass 'none' for datasets without one",
     )
     parser.add_argument("--dataset_split", default="train", help="dataset split")
-    parser.add_argument("--text_field", default="text", help="text column name on each record")
-    parser.add_argument("--max_chars", type=int, default=2000, help="target prompt length (chars)")
+    parser.add_argument(
+        "--text_field", default="text", help="text column name on each record"
+    )
+    parser.add_argument(
+        "--max_chars", type=int, default=2000, help="target prompt length (chars)"
+    )
     parser.add_argument(
         "--trust_remote_code", action="store_true", help="pass through to HF loaders"
     )
@@ -324,12 +344,22 @@ def main() -> None:
     slug = _slug(args.model)
     lens_path = os.path.join(args.out_dir, f"{slug}_jacobian_lens.pt")
     checkpoint_path = os.path.join(args.out_dir, f"{slug}_checkpoint.pt")
-    metrics_csv = args.metrics_csv or os.path.join(args.out_dir, f"{slug}_convergence.csv")
-    config = None if args.dataset_config.lower() in ("none", "", "null") else args.dataset_config
-    thresholds = tuple(sorted((float(x) for x in args.levels.split(",") if x.strip()), reverse=True))
-    dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}[
-        args.dtype
-    ]
+    metrics_csv = args.metrics_csv or os.path.join(
+        args.out_dir, f"{slug}_convergence.csv"
+    )
+    config = (
+        None
+        if args.dataset_config.lower() in ("none", "", "null")
+        else args.dataset_config
+    )
+    thresholds = tuple(
+        sorted((float(x) for x in args.levels.split(",") if x.strip()), reverse=True)
+    )
+    dtype = {
+        "bfloat16": torch.bfloat16,
+        "float16": torch.float16,
+        "float32": torch.float32,
+    }[args.dtype]
 
     # Confine every HF download (weights + hub metadata) to the cache dir so it
     # can be wiped wholesale afterwards. Without this, downloads also leak into
@@ -344,7 +374,10 @@ def main() -> None:
         os.environ["HF_DATASETS_CACHE"] = os.path.join(cache_root, "datasets")
 
     hub_cache = os.path.join(cache_root, "hub") if cache_root else None
-    load_kwargs: dict = {"torch_dtype": dtype, "trust_remote_code": args.trust_remote_code}
+    load_kwargs: dict = {
+        "torch_dtype": dtype,
+        "trust_remote_code": args.trust_remote_code,
+    }
     if hub_cache:
         load_kwargs["cache_dir"] = hub_cache
     single_gpu = args.device_map.lower() == "cuda"
@@ -353,13 +386,17 @@ def main() -> None:
 
     try:
         print(f"Loading {args.model} ({args.dtype}, device_map={args.device_map}) ...")
-        hf = transformers.AutoModelForCausalLM.from_pretrained(args.model, **load_kwargs)
+        hf = transformers.AutoModelForCausalLM.from_pretrained(
+            args.model, **load_kwargs
+        )
         if single_gpu:
             hf = hf.cuda()
         tok = transformers.AutoTokenizer.from_pretrained(
             args.model, cache_dir=hub_cache, trust_remote_code=args.trust_remote_code
         )
-        model = jlens.from_hf(hf, tok, text_module=args.text_module, compile=not args.no_compile)
+        model = jlens.from_hf(
+            hf, tok, text_module=args.text_module, compile=not args.no_compile
+        )
         print(f"Wrapped: {model!r}")
 
         print(
@@ -377,7 +414,9 @@ def main() -> None:
             trust_remote_code=args.trust_remote_code,
         )
         if not prompts:
-            raise SystemExit("no prompts loaded — check --dataset/--dataset_config/--text_field")
+            raise SystemExit(
+                "no prompts loaded — check --dataset/--dataset_config/--text_field"
+            )
 
         tracker = ConvergenceTracker(
             metrics_csv,
@@ -386,7 +425,9 @@ def main() -> None:
             min_prompts=args.min_prompts,
             window=args.stop_window,
         )
-        print(f"Fitting lens over {len(prompts)} prompts (first call compiles, ~1-2 min) ...")
+        print(
+            f"Fitting lens over {len(prompts)} prompts (first call compiles, ~1-2 min) ..."
+        )
         try:
             lens = jlens.fit(
                 model,

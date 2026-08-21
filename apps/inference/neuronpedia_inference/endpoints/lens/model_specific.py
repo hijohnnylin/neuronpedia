@@ -85,33 +85,45 @@ def _resolve_hf_model_id(model_id: str | None) -> str | None:
     return model_id
 
 
+# Standalone-loaded HF configs, keyed by resolved HF id. `resolve_final_logit_softcap` runs
+# on every lens request, and ``VLLMModel`` exposes no ``.config``, so without this every
+# request re-enters ``AutoConfig.from_pretrained`` -- 2.7s on a cold hub round trip, and it
+# happens on the event loop before the response body starts. A sentinel is stored for
+# failures too, so a model whose config cannot be read fails fast instead of retrying the
+# same round trip forever.
+_HF_CONFIG_CACHE: dict[str, Any] = {}
+
+
 def _try_get_hf_config(model: Any, hf_model_id: str | None) -> Any | None:
     """Best-effort retrieval of the underlying HuggingFace config.
 
-    - nnsight / nnterp (``StandardizedTransformer``) exposes ``model.config``.
-    - TransformerLens (``HookedTransformer``) does not keep the HF config, so we
-      load it standalone (cheap, weights are not downloaded, and the config is
-      already cached because the model is loaded).
+    The engine ``EagerModel`` exposes ``model.config``; otherwise the HF config is
+    loaded standalone (cheap — weights aren't downloaded, and the config is
+    already cached because the model is loaded) and memoized.
     """
     cfg = getattr(model, "config", None)
-    if cfg is not None and (
-        hasattr(cfg, "get_text_config") or hasattr(cfg, "final_logit_softcapping")
-    ):
+    if cfg is not None and (hasattr(cfg, "get_text_config") or hasattr(cfg, "final_logit_softcapping")):
         return cfg
 
     resolved_id = _resolve_hf_model_id(hf_model_id)
-    if resolved_id is not None:
-        try:
-            from transformers import AutoConfig
+    if resolved_id is None:
+        return None
+    if resolved_id in _HF_CONFIG_CACHE:
+        return _HF_CONFIG_CACHE[resolved_id]
 
-            return AutoConfig.from_pretrained(resolved_id, trust_remote_code=True)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "Could not load HF config for %s to resolve softcap: %s",
-                resolved_id,
-                exc,
-            )
-    return None
+    loaded: Any | None = None
+    try:
+        from transformers import AutoConfig
+
+        loaded = AutoConfig.from_pretrained(resolved_id, trust_remote_code=True)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Could not load HF config for %s to resolve softcap: %s",
+            resolved_id,
+            exc,
+        )
+    _HF_CONFIG_CACHE[resolved_id] = loaded
+    return loaded
 
 
 def resolve_final_logit_softcap(
@@ -143,9 +155,7 @@ def resolve_final_logit_softcap(
     return softcap
 
 
-def apply_final_logit_softcap(
-    logits: torch.Tensor, softcap: float | None
-) -> torch.Tensor:
+def apply_final_logit_softcap(logits: torch.Tensor, softcap: float | None) -> torch.Tensor:
     """Apply ``cap * tanh(logits / cap)`` if ``softcap`` is set, else return as-is."""
     if softcap is None:
         return logits

@@ -1,0 +1,51 @@
+name: Agent rules
+
+# Keeps agent instructions readable by every harness rather than just the one whoever wrote them
+# happened to be using. AGENTS.md is the source of truth; the per-tool files are pointers at it.
+# check_agent_rules.py has the full list of what that means in practice.
+#
+# python-lint.yml cannot own this: it is scoped to apps/** and explicitly excludes markdown.
+
+# The two `paths` lists are duplicated because GitHub Actions does not support YAML anchors.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/AGENTS.md"
+      - "**/CLAUDE.md"
+      - "**/*.mdc"
+      - ".aider.conf.yml"
+      - ".claude/**"
+      - ".cursor/**"
+      - ".gemini/**"
+      - ".github/copilot-instructions.md"
+      - ".github/scripts/check_agent_rules.py"
+      - ".github/workflows/agent-rules.yml"
+      - "utils/agent-hooks/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/AGENTS.md"
+      - "**/CLAUDE.md"
+      - "**/*.mdc"
+      - ".aider.conf.yml"
+      - ".claude/**"
+      - ".cursor/**"
+      - ".gemini/**"
+      - ".github/copilot-instructions.md"
+      - ".github/scripts/check_agent_rules.py"
+      - ".github/workflows/agent-rules.yml"
+      - "utils/agent-hooks/**"
+
+concurrency:
+  group: agent-rules-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portability:
+    name: instructions are harness-agnostic
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check agent instruction files
+        run: python3 .github/scripts/check_agent_rules.py

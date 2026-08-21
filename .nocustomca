@@ -1,2 +1,0 @@
-# This is a placeholder file for the webapp's Dockerfile
-# It acts as a fallback COPY source when no custom CA bundle is provided

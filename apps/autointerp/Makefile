@@ -1,13 +1,17 @@
-.PHONY: test format check-format
+.PHONY: test test-verbose format check-format check-type check-ci install install-dev openapi
 
 # Variables
-POETRY = poetry
-PYTEST = $(POETRY) run pytest
-PYTEST_ARGS = -v -s
-RUFF = $(POETRY) run ruff
+UV = uv
+PYTEST = $(UV) run pytest
+COVERAGE = $(UV) run coverage
+RUFF = $(UV) run ruff
 
+# Targets
 test:
-	$(POETRY) run $(PYTEST) -v --cov=neuronpedia_autointerp/ --cov-report=term-missing --cov-branch tests
+	$(PYTEST) -v --cov=neuronpedia_autointerp/ --cov-report=term-missing --cov-branch tests
+
+test-verbose:
+	$(PYTEST) -vv --no-header
 
 format:
 	$(RUFF) format .
@@ -18,6 +22,17 @@ check-format:
 	$(RUFF) format --check .
 
 check-type:
-	$(POETRY) run pyright .
+	$(UV) run pyright .
 
 check-ci: check-format check-type test
+
+# Regenerates the committed openapi.json from the pydantic models. The wire format is
+# defined in neuronpedia_autointerp/schemas/, so this is derived output, never edited.
+openapi:
+	$(UV) run python dump_openapi.py
+
+install:
+	$(UV) sync --no-dev
+
+install-dev:
+	$(UV) sync

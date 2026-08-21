@@ -31,6 +31,41 @@ Please adhere to the following:
   - Describe how you tested your changes
   - Highlight any limitations and TODOs (and create new issues for them)
 
+## Checks Before You Commit
+
+CI runs a few gates that are quick to fail and quick to fix: `ruff check` and `ruff format` for the
+five Python services, `eslint`, `prettier` and `tsc` for the webapp, and some small scripts that
+read committed files (the OpenAPI specs, the shared lint config, the agent instruction files).
+
+You can run the fast ones automatically before each commit. `.githooks/pre-commit` checks only the
+files the commit touches, and only with toolchains you have installed - a webapp-only checkout is
+never asked for `uv`, and vice versa. It changes nothing in your working tree; when something
+fails, it prints the command that fixes it.
+
+Enabling it is per checkout and optional:
+
+```
+make githooks-install     # python contributors
+make githooks-uninstall   # turn it back off
+```
+
+Webapp contributors get it from `npm install`, which runs `.githooks/install.js` through the
+`prepare` script. Both do the same one thing: point `core.hooksPath` at `.githooks/`. That setting
+lives in `.git/config`, which is not tracked, so it affects nobody else. The installer leaves a
+`core.hooksPath` you set yourself alone.
+
+To skip the checks for one commit, use `git commit --no-verify`, or set `SKIP_GITHOOKS=1`.
+
+The slow gates stay out of the hook, so run these yourself before opening a pull request:
+
+| Check                              | Command                                     |
+| ---------------------------------- | ------------------------------------------- |
+| Python lint and format, every app  | `make python-lint` (`make python-lint-fix`) |
+| Python types                       | `cd apps/<app> && uv run pyright .`         |
+| Webapp lint **and** `tsc --noEmit` | `cd apps/webapp && npm run lint`            |
+| Webapp unit tests                  | `cd apps/webapp && npm test`                |
+| Python tests                       | `cd apps/<app> && make test`                |
+
 ## AI Coding / Agents
 
 - Code written or assisted by AI and/or AI agents is welcome, however, we ask that you (the human) manually review all code and verify correct functionality first.
@@ -38,11 +73,16 @@ Please adhere to the following:
 
 ## Contributing Terms
 
-By submitting a contribution to this project, you agree that your contribution is
-licensed to the project under the terms of the [Contributor License Agreement](./CLA.md),
-which grants the project the right to use, distribute, and sublicense your contribution,
-including under license terms that differ from the project's current license. You retain
-copyright to your work.
+Neuronpedia is licensed under the [Apache License, Version 2.0](./LICENSE). There is no
+separate agreement to sign: under section 5 of that license, anything you deliberately
+submit for inclusion in the project is contributed under the same Apache 2.0 terms,
+unless you say otherwise in the pull request.
+
+You keep the copyright to your work. Apache 2.0 also includes an express patent grant
+from each contributor, which is one of the reasons the project uses it.
+
+If a contribution contains code you did not write, say so in the pull request and name
+its source and license, so it can be attributed properly in `NOTICE`.
 
 ## Code of Conduct
 

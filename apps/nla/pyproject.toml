@@ -2,24 +2,147 @@
 name = "nla-server"
 version = "0.1.0"
 description = "FastAPI server for NLA (Natural Language Autoencoder) inference"
-requires-python = ">=3.10"
+# vLLM (via interp-engine) needs Python >=3.11; matches engine/inference.
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "torch",
-    "transformers",
+    # transformers v5 (required by vLLM 0.25 / the engine). Was unpinned; the previous
+    # sglang pin held it <5.
+    "transformers>=5.14",
     "safetensors",
     "orjson",
     "pyyaml",
     "numpy",
     "python-dotenv",
     "huggingface-hub",
-    "sglang[all]==0.5.8.post1",
     "accelerate>=1.13.0",
+    # Engine-owned vLLM backend (via the [vllm] extra, Linux only): the CUDA verbalizer
+    # serves concept injection through vLLM prompt_embeds (VLLMModel), replacing
+    # the vendored sglang stack. The vLLM version pin lives in the engine.
+    # Pinned exactly, not floored: the engine is first-party and moves in lockstep with this
+    # service, so a relock for an unrelated dependency must not swap it. Bump deliberately.
+    "interp-engine[vllm]==1.3.3",
+    # Weight-only quantization for the source model and reconstructor backbone
+    # (--fp8-source / --fp8-reconstructor / --int4-reconstructor). Used to arrive
+    # transitively through `sglang[all]` (which pinned torchao==0.9.0); with sglang
+    # gone it has to be declared, or those flags fail at load time and the pod comes
+    # up with /extract and /score disabled. Floor is 0.14: the INT4 path wants the v2
+    # `Int4WeightOnlyConfig` surface (tile_packed_to_4d packing), which older releases
+    # lack and which is the only layout that loads on Blackwell (pytorch/ao#3842).
+    # Capped below 0.18 to land on the 0.17 the engine already resolves: pods run
+    # `uv lock` at provision time, so an open ceiling means every new pod silently
+    # takes whatever torchao shipped that day.
+    "torchao>=0.14,<0.18",
+    "sentry-sdk[fastapi]>=2.24.1,<3",
 ]
+
+# The legacy in-process sglang verbalizer (NLAClient, NLA_VERBALIZER_BACKEND=sglang) is
+# opt-in only: sglang 0.5.8 pins transformers <5 and conflicts with vLLM 0.25, so it
+# can't be co-installed here. Install it manually in a separate/compatible env if needed.
 
 [dependency-groups]
 dev = [
     "pytest",
     "httpx",
+    # ruff and pyright are pinned to the same ranges in every apps/* project and in
+    # interp-engine, so one `ruff format` verdict and one pyright rule set covers the repo.
+    # Both are capped at a single minor: `ruff format` output and pyright's checks change
+    # between releases, and CI gates on both, so an open ceiling turns an upstream release
+    # into a red build on an unrelated PR. The exact versions live in uv.lock. (An unpinned ruff
+    # is not hypothetical here: this directory once accumulated three ruff caches and six
+    # unformatted files, because `uv run ruff` fell through to whatever was on PATH.)
+    "ruff>=0.16.2,<0.17",
+    "pyright>=1.1.411,<1.2",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The app imports its own modules flat (`from chat_template_spans import ...`) because it runs
+# with this directory on sys.path, so tests need the same for those imports to resolve.
+pythonpath = ["."]
+
+# --------------------------------------------------------------- lint / types --
+# The ruff and pyright config below is shared verbatim by every apps/* project and by
+# interp-engine, so one `ruff format` verdict and one type-check rule set covers the repo.
+# Deviations are per-app paths only, and each is commented as such. Changing a rule here
+# without changing it in the others is how these configs drifted apart in the first place.
+
+[tool.ruff]
+line-length = 120
+# target-version is inferred from project.requires-python above.
+# api_demo.ipynb is a hand-run demo notebook, not shipped code.
+# `*.md`: ruff 0.16 formats Python code blocks in Markdown by default. Every workflow that runs
+# this gate filters Markdown out of its `paths:`, so a docs-only change cannot run the check and
+# the failure lands on the next unrelated Python edit instead. Doc examples are also aligned by
+# hand for reading, which the formatter collapses. Keep the two decisions together: re-enabling
+# this means dropping those `!**/*.md` filters as well.
+extend-exclude = ["*.ipynb", "*.md"]
+
+[tool.ruff.lint]
+# pyflakes + pycodestyle errors (F/E) as the floor, plus the rule families that catch defects
+# rather than taste: isort (I), pyupgrade (UP), bugbear (B), comprehensions (C4), simplify (SIM),
+# return (RET), logging (LOG), and tidy-imports (TID) for the banned typing aliases below.
+# Deliberately NOT selected: ANN/D (annotation and docstring mandates), ARG (unused arguments,
+# which fire on every framework-required signature), and T20 (bans `print`, which several of
+# these servers use as their logging).
+select = ["E", "F", "I", "UP", "B", "C4", "SIM", "RET", "LOG", "TID"]
+ignore = [
+  # Line length is the formatter's job. E501 would only fire on the strings, URLs and comments
+  # the formatter cannot split, i.e. exactly the cases where wrapping is not an improvement.
+  "E501",
+  # zip-without-explicit-strict. The correct fix is usually `strict=True`, but that changes
+  # behaviour at each of the ~30 call sites in this repo, and a blanket `strict=False` only
+  # restates the default while adding noise. Off until someone audits them for real.
+  "B905",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# B008 (function call in a default argument) is the FastAPI dependency-injection idiom, not the
+# mutable-default bug the rule is aimed at: `def route(x: int = Query(...))` is how the framework
+# is meant to be used.
+extend-immutable-calls = [
+  "fastapi.Body",
+  "fastapi.Depends",
+  "fastapi.File",
+  "fastapi.Form",
+  "fastapi.Header",
+  "fastapi.Path",
+  "fastapi.Query",
+  "fastapi.Security",
+]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.Union".msg = "Use `|` instead"
+"typing.Optional".msg = "Use `| None` instead"
+"typing.Dict".msg = "Use `dict` instead"
+"typing.List".msg = "Use `list` instead"
+
+[tool.pyright]
+# "standard" rather than "strict": strict additionally demands annotations on every parameter and
+# type arguments on every generic, which flags hundreds of sites across these apps without catching
+# real defects. Standard still runs the checks that find bugs (None-safety, wrong argument types,
+# unreachable code).
+typeCheckingMode = "standard"
+# torch, transformers and vLLM ship no stubs for large parts of their surface, so this report is
+# noise about our dependencies rather than about this code.
+reportMissingTypeStubs = "none"
+# Per-app deviation, matching graph, autointerp and sparsity. CI installs this app without vLLM
+# (nothing it imports at module scope needs it, and the package is enormous), so `import vllm`
+# inside vllm_verbalizer.py is unresolved there but not on a developer's machine. Leaving this on
+# would make the CI pyright step fail for a reason that is about the install, not the code.
+reportMissingImports = "none"
+# Per-app deviation: the app imports its own modules flat (see [tool.pytest.ini_options] above), so
+# pyright needs this directory on the path too — without it every `from chat_template_spans import
+# ...` is unresolved.
+extraPaths = ["."]
+# `exclude` REPLACES pyright's defaults, so the three default patterns have to be repeated. `**/.*`
+# is the load-bearing one: without it pyright walks `.venv` (torch/vLLM/transformers) and never
+# finishes. Per-app addition: `scripts` holds hand-run quantization/stress helpers that no server
+# path imports.
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", "scripts"]
+
+[tool.uv]
+# Application, not a distributable package (installs deps but not the project itself).
+package = false

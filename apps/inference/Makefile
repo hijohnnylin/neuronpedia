@@ -1,4 +1,4 @@
-.PHONY: test-verbose coverage format test check-format check-ci install install-dev all run-server
+.PHONY: test-verbose coverage format test check-format check-ci install install-dev all run-server openapi
 
 # Variables
 PYTHON = python
@@ -26,6 +26,11 @@ check-type:
 	$(UV) run pyright .
 
 check-ci: check-format check-type test
+
+# Regenerates the committed openapi.json from the pydantic models. The wire format is
+# defined in neuronpedia_inference/schemas/, so this is derived output, never edited.
+openapi:
+	$(UV) run python dump_openapi.py
 
 install:
 	$(UV) sync --no-dev

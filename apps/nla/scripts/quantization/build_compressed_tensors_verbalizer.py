@@ -87,9 +87,7 @@ import shutil
 import sys
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("build_ct_verb")
 
 
@@ -161,11 +159,15 @@ def _copy_upstream_extras(src_dir: Path, out_dir: Path, *, label: str) -> None:
 
         shutil.copy2(src_file, out_dir / dst_name)
         n_copied += 1
-        log.info("[%s] copied %s%s", label, src_file.name, "" if dst_name == src_file.name else f" -> {dst_name}")
+        log.info(
+            "[%s] copied %s%s",
+            label,
+            src_file.name,
+            "" if dst_name == src_file.name else f" -> {dst_name}",
+        )
 
     log.info(
-        "[%s] upstream extras: %d copied, %d already-written skipped, "
-        "%d weight files skipped",
+        "[%s] upstream extras: %d copied, %d already-written skipped, %d weight files skipped",
         label,
         n_copied,
         n_skipped_written,
@@ -173,9 +175,7 @@ def _copy_upstream_extras(src_dir: Path, out_dir: Path, *, label: str) -> None:
     )
 
 
-def _write_verbalizer_readme(
-    out_dir: Path, verbalizer_id: str, scheme: str
-) -> None:
+def _write_verbalizer_readme(out_dir: Path, verbalizer_id: str, scheme: str) -> None:
     text = f"""---
 library_name: transformers
 base_model: {verbalizer_id}
@@ -256,9 +256,7 @@ def _make_recipe(scheme: str, ignore_modules: list[str]):
             "W8A16, or extend the script with a calibration dataset hook."
         )
     if scheme not in ("FP8_DYNAMIC", "W8A16"):
-        raise SystemExit(
-            f"unknown --scheme {scheme!r}; choices: {', '.join(SUPPORTED_SCHEMES)}"
-        )
+        raise SystemExit(f"unknown --scheme {scheme!r}; choices: {', '.join(SUPPORTED_SCHEMES)}")
 
     return QuantizationModifier(
         targets="Linear",
@@ -313,9 +311,7 @@ def build_compressed_tensors_verbalizer(
         trust_remote_code=True,
         low_cpu_mem_usage=True,
     )
-    tokenizer = AutoTokenizer.from_pretrained(
-        str(src_dir), trust_remote_code=True
-    )
+    tokenizer = AutoTokenizer.from_pretrained(str(src_dir), trust_remote_code=True)
 
     recipe = _make_recipe(scheme, ignore_modules)
 
@@ -344,10 +340,7 @@ def build_compressed_tensors_verbalizer(
     log.info("[verbalizer] writing README…")
     _write_verbalizer_readme(out_dir, verbalizer_id, scheme)
 
-    log.info(
-        "[verbalizer] copying upstream extras "
-        "(nla_meta.yaml, prompt templates, model card, …)…"
-    )
+    log.info("[verbalizer] copying upstream extras (nla_meta.yaml, prompt templates, model card, …)…")
     _copy_upstream_extras(src_dir, out_dir, label="verbalizer")
 
     del model
@@ -405,9 +398,7 @@ def _resolve_username(token: str | None, override: str | None) -> str:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument(
         "--verbalizer-model",
         default=DEFAULT_VERBALIZER,
@@ -427,10 +418,7 @@ def main() -> None:
     p.add_argument(
         "--output-dir",
         default=None,
-        help=(
-            "Local output dir. Default: ./quantized_models/<target-name>. "
-            "Created if missing."
-        ),
+        help=("Local output dir. Default: ./quantized_models/<target-name>. Created if missing."),
     )
     p.add_argument(
         "--target-name",
@@ -457,10 +445,7 @@ def main() -> None:
     p.add_argument(
         "--hf-username",
         default=None,
-        help=(
-            "HuggingFace username/org for the upload repo. If omitted, derived "
-            "from the token via whoami()."
-        ),
+        help=("HuggingFace username/org for the upload repo. If omitted, derived from the token via whoami()."),
     )
     p.add_argument(
         "--hf-token",
@@ -496,9 +481,7 @@ def main() -> None:
 
     if args.upload:
         if not args.hf_token:
-            raise SystemExit(
-                "--upload requires --hf-token or $HF_TOKEN to be set."
-            )
+            raise SystemExit("--upload requires --hf-token or $HF_TOKEN to be set.")
         username = _resolve_username(args.hf_token, args.hf_username)
         repo_id = f"{username}/{target_name}"
         upload_to_hf(

@@ -2,27 +2,24 @@ import traceback
 
 import torch
 from fastapi import HTTPException
-from neuronpedia_autointerp_client.models.np_score_fuzz_detection_type import (
-    NPScoreFuzzDetectionType,
-)
-from neuronpedia_autointerp_client.models.score_fuzz_detection_post200_response import (
-    ScoreFuzzDetectionPost200Response,
-)
-from neuronpedia_autointerp_client.models.score_fuzz_detection_post_request import (
-    ScoreFuzzDetectionPostRequest,
-)
 from sae_auto_interp.clients import OpenRouter
 from sae_auto_interp.features import Example, Feature, FeatureRecord
 from sae_auto_interp.scorers import DetectionScorer, FuzzingScorer
 from sae_auto_interp.scorers.scorer import ScorerResult
 
+from neuronpedia_autointerp.schemas import (
+    ScoreFuzzDetectionRequest,
+    ScoreFuzzDetectionResponse,
+    ScoreFuzzDetectionType,
+)
 from neuronpedia_autointerp.utils import (
+    ScoringInputError,
     convert_classifier_output_to_score_classifier_output,
     per_feature_scores_fuzz_detection,
 )
 
 
-async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
+async def generate_score_fuzz_detection(request: ScoreFuzzDetectionRequest) -> ScoreFuzzDetectionResponse:
     """
     Generate a score for a given set of activations and explanation. This endpoint expects:
 
@@ -58,7 +55,7 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
 
         client = OpenRouter(api_key=request.openrouter_key, model=request.model)
 
-        if request.type == NPScoreFuzzDetectionType.FUZZ:
+        if request.type == ScoreFuzzDetectionType.FUZZ:
             scorer = FuzzingScorer(
                 client,
                 tokenizer=None,  # type: ignore
@@ -66,7 +63,7 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
                 verbose=False,
                 log_prob=False,
             )
-        elif request.type == NPScoreFuzzDetectionType.DETECTION:
+        elif request.type == ScoreFuzzDetectionType.DETECTION:
             scorer = DetectionScorer(
                 client,
                 tokenizer=None,  # type: ignore
@@ -80,13 +77,16 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionPostRequest):
         result: ScorerResult = await scorer.__call__(feature_record)  # type: ignore
         score = per_feature_scores_fuzz_detection(result.score)
 
-        breakdown = [
-            convert_classifier_output_to_score_classifier_output(item)
-            for item in result.score
-        ]
+        breakdown = [convert_classifier_output_to_score_classifier_output(item) for item in result.score]
 
-        return ScoreFuzzDetectionPost200Response(score=score, breakdown=breakdown)
+        return ScoreFuzzDetectionResponse(score=score, breakdown=breakdown)
 
+    except ScoringInputError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except HTTPException:
+        # The invalid-type branch above raises its own; re-raising keeps its status rather
+        # than letting the catch-all restate it as a 500.
+        raise
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

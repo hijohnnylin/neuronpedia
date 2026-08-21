@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# The fast half of CI, run against the files you are about to commit.
+#
+# Opt in with `make githooks-install`; any `npm install` in apps/webapp does the same thing (see
+# .githooks/install.js). Both do nothing but point core.hooksPath at this directory, so
+# `make githooks-uninstall` is the whole undo. Skip a single commit with `git commit --no-verify`,
+# or with SKIP_GITHOOKS=1.
+#
+# Only checks that answer in seconds belong here: ruff for the Python apps, eslint and prettier for
+# the webapp, and the .github/scripts that read committed files. The slow gates -- pyright,
+# `tsc --noEmit`, vitest, the pytest suites -- stay in CI and in `make`, because a hook people wait
+# on is a hook people disable.
+#
+# Each check runs only when the commit touches files it covers, and is skipped with a note when its
+# toolchain is absent, so a webapp-only checkout is not asked to install uv. Nothing here rewrites
+# your files: a hook that reformats what you staged makes the commit differ from what you reviewed.
+#
+# One caveat worth knowing: these read the working tree, not the staged content. If you stage half
+# of a file, the other half is what gets linted.
+
+set -o pipefail
+
+[ -n "${SKIP_GITHOOKS:-}" ] && exit 0
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$repo_root" || exit 0
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+# Same list as PYTHON_APPS in the Makefile.
+PYTHON_APPS="autointerp graph inference nla sparsity"
+
+failed=()
+fixes=()
+skipped=()
+
+matches() { printf '%s\n' "$staged" | grep -Eq "$1"; }
+
+# Collect a newline-separated list into FILES, an array, so paths with spaces survive. $2 is the
+# prefix that makes an entry resolvable from here: staged paths are repo-relative, but a linter
+# that runs inside apps/webapp wants them relative to that. Entries no longer on disk are dropped,
+# since these checks read the working tree.
+collect() {
+  FILES=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && [ -e "$2$line" ] && FILES+=("$line")
+  done <<<"$1"
+}
+
+run() {
+  local label=$1 fix=$2 check=$3
+  printf '\033[1;36m==> %s\033[0m\n' "$label"
+  if ! "$check"; then
+    failed+=("$label")
+    fixes+=("$fix")
+  fi
+}
+
+# ------------------------------------------------------------------------------ python apps --
+
+# `make python-lint` covers ruff for the named apps plus the two config scripts, which is exactly
+# what python-lint.yml gates on. LINT_APPS narrows it to the apps this commit touches.
+check_python() { make --no-print-directory python-lint LINT_APPS="$PY_APPS"; }
+
+check_python_config() {
+  python3 .github/scripts/check_lint_config_parity.py &&
+    python3 .github/scripts/check_no_local_path_deps.py
+}
+
+PY_APPS=""
+for app in $PYTHON_APPS; do
+  matches "^apps/$app/.*\.py$" && PY_APPS="$PY_APPS $app"
+done
+PY_APPS=${PY_APPS# }
+
+if [ -n "$PY_APPS" ]; then
+  if ! command -v make >/dev/null 2>&1; then
+    skipped+=("python lint: make is not installed")
+  elif ! command -v uv >/dev/null 2>&1; then
+    skipped+=("python lint: uv is not installed (https://docs.astral.sh/uv/)")
+  else
+    run "ruff: $PY_APPS" "make python-lint-fix" check_python
+  fi
+elif matches "^apps/[^/]+/(pyproject\.toml|uv\.lock)$"; then
+  # No Python edited, but a dependency file was: the shared lint/type block must stay identical
+  # across the five apps, and a local path source must not reach a committed file.
+  if command -v python3 >/dev/null 2>&1; then
+    run "python config" "see the error above; both checks read committed files only" check_python_config
+  else
+    skipped+=("python config checks: python3 is not installed")
+  fi
+fi
+
+# ---------------------------------------------------------------------------------- webapp --
+
+check_prettier() { (cd apps/webapp && ./node_modules/.bin/prettier --check -- "${PRETTIER_FILES[@]}"); }
+
+check_eslint() { (cd apps/webapp && ./node_modules/.bin/eslint --quiet --no-warn-ignored -- "${ESLINT_FILES[@]}"); }
+
+# Paths relative to apps/webapp, so prettier and eslint find that project's config and ignore files.
+webapp_files=$(printf '%s\n' "$staged" | sed -n 's|^apps/webapp/||p')
+
+if [ -n "$webapp_files" ] && [ ! -d apps/webapp/node_modules ]; then
+  skipped+=("webapp lint: dependencies are not installed (make webapp-install)")
+elif [ -n "$webapp_files" ]; then
+  # The same extensions `npm run format:check` covers, which is its own step in webapp-lint.yml.
+  collect "$(printf '%s\n' "$webapp_files" | grep -E '\.(css|js|json|jsx|ts|tsx)$')" "apps/webapp/"
+  PRETTIER_FILES=("${FILES[@]}")
+  [ ${#PRETTIER_FILES[@]} -gt 0 ] &&
+    run "prettier: ${#PRETTIER_FILES[@]} file(s)" "cd apps/webapp && npm run format:write" check_prettier
+
+  # eslint only. `npm run lint` ends in `tsc --noEmit`, which reads the whole project and needs a
+  # generated prisma client, so it is too slow for a hook -- run it before you open the PR.
+  collect "$(printf '%s\n' "$webapp_files" | grep -E '\.(js|jsx|ts|tsx)$')" "apps/webapp/"
+  ESLINT_FILES=("${FILES[@]}")
+  [ ${#ESLINT_FILES[@]} -gt 0 ] &&
+    run "eslint: ${#ESLINT_FILES[@]} file(s)" "cd apps/webapp && npm run lint:fix" check_eslint
+fi
+
+# ------------------------------------------------------------- committed specs and rules --
+
+check_openapi() { python3 .github/scripts/check_openapi_specs.py; }
+
+check_agent_rules() { python3 .github/scripts/check_agent_rules.py; }
+
+if command -v python3 >/dev/null 2>&1; then
+  # Reads the committed specs only: casing per service, no number/integer unions, readable
+  # operationIds. Sub-second, and it is the half of openapi-drift.yml that needs no service.
+  matches "^apps/[^/]+/openapi\.json$" &&
+    run "openapi spec rules" "see the error above, then edit the pydantic model and run 'make openapi'" check_openapi
+
+  matches "(^|/)(AGENTS|CLAUDE)\.md$|^\.(cursor|claude|gemini)/|^\.aider\.conf\.yml$|^\.github/copilot-instructions\.md$" &&
+    run "agent rules" "see the error above; the convention is in AGENTS.md" check_agent_rules
+elif matches "^apps/[^/]+/openapi\.json$|(^|/)(AGENTS|CLAUDE)\.md$"; then
+  skipped+=("spec and agent-rule checks: python3 is not installed")
+fi
+
+# ----------------------------------------------------------------------------------- report --
+
+for note in "${skipped[@]}"; do
+  printf '\033[1;33mSkipped %s\033[0m\n' "$note"
+done
+
+if [ ${#failed[@]} -gt 0 ]; then
+  printf '\n\033[1;31mpre-commit failed:\033[0m\n'
+  for i in "${!failed[@]}"; do
+    printf '  %s\n    try: %s\n' "${failed[$i]}" "${fixes[$i]}"
+  done
+  printf '\nCI runs these same checks. To commit anyway: git commit --no-verify\n'
+  exit 1
+fi
+
+exit 0

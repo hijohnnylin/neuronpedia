@@ -1,0 +1,812 @@
+{
+  "components": {
+    "schemas": {
+      "CheckBusyResponse": {
+        "properties": {
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "busy"
+        ],
+        "title": "CheckBusyResponse",
+        "type": "object"
+      },
+      "ForwardPassRequest": {
+        "properties": {
+          "desired_logit_prob": {
+            "default": 0.95,
+            "title": "Desired Logit Prob",
+            "type": "number"
+          },
+          "max_n_logits": {
+            "default": 10,
+            "title": "Max N Logits",
+            "type": "integer"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GraphChatMessage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "title": "ForwardPassRequest",
+        "type": "object"
+      },
+      "ForwardPassResponse": {
+        "description": "The salient-logit payload.\n\nA failed pass returns ``{\"error\": ...}`` with a 200 instead of this, which the spec does\nnot describe -- callers check for ``error`` before reading any of these fields. Keeping\nthat shape out of the model is what lets the five fields below stay required.",
+        "properties": {
+          "cumulative_probability": {
+            "title": "Cumulative Probability",
+            "type": "number"
+          },
+          "input_tokens": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Input Tokens",
+            "type": "array"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "salient_logits": {
+            "items": {
+              "$ref": "#/components/schemas/SalientLogit"
+            },
+            "title": "Salient Logits",
+            "type": "array"
+          },
+          "total_salient_tokens": {
+            "title": "Total Salient Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "prompt",
+          "input_tokens",
+          "salient_logits",
+          "total_salient_tokens",
+          "cumulative_probability"
+        ],
+        "title": "ForwardPassResponse",
+        "type": "object"
+      },
+      "GraphChatMessage": {
+        "description": "One structured chat turn.\n\nRoles come back canonical rather than as the template's literal label, so a gemma\n``model`` turn is reported as ``assistant``.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "GraphChatMessage",
+        "type": "object"
+      },
+      "GraphGenerationRequest": {
+        "properties": {
+          "batch_size": {
+            "default": 48,
+            "title": "Batch Size",
+            "type": "integer"
+          },
+          "compress": {
+            "default": false,
+            "title": "Compress",
+            "type": "boolean"
+          },
+          "desired_logit_prob": {
+            "default": 0.95,
+            "title": "Desired Logit Prob",
+            "type": "number"
+          },
+          "edge_threshold": {
+            "default": 0.98,
+            "title": "Edge Threshold",
+            "type": "number"
+          },
+          "enable_qk_tracing": {
+            "default": false,
+            "title": "Enable Qk Tracing",
+            "type": "boolean"
+          },
+          "max_feature_nodes": {
+            "default": 10000,
+            "title": "Max Feature Nodes",
+            "type": "integer"
+          },
+          "max_n_logits": {
+            "default": 10,
+            "title": "Max N Logits",
+            "type": "integer"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GraphChatMessage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "node_threshold": {
+            "default": 0.8,
+            "title": "Node Threshold",
+            "type": "number"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "qk_top_fraction": {
+            "default": 0.6,
+            "title": "Qk Top Fraction",
+            "type": "number"
+          },
+          "qk_topk": {
+            "default": 10,
+            "title": "Qk Topk",
+            "type": "integer"
+          },
+          "signed_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed Url"
+          },
+          "slug_identifier": {
+            "title": "Slug Identifier",
+            "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          }
+        },
+        "required": [
+          "model_id",
+          "slug_identifier"
+        ],
+        "title": "GraphGenerationRequest",
+        "type": "object"
+      },
+      "GraphGenerationResponse": {
+        "description": "The receipt from an upload.\n\nOnly describes the ``signed_url`` path, which is the only one the webapp uses. Called\nwithout a ``signed_url`` the endpoint returns the ``circuit_tracer`` graph model itself,\nwhose schema is not ours to publish (see the module docstring).",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success"
+          }
+        },
+        "title": "GraphGenerationResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LogitsByToken": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "top_logits": {
+            "items": {
+              "$ref": "#/components/schemas/TopLogit"
+            },
+            "title": "Top Logits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "token",
+          "top_logits"
+        ],
+        "title": "LogitsByToken",
+        "type": "object"
+      },
+      "ParseChatPromptRequest": {
+        "properties": {
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "ParseChatPromptRequest",
+        "type": "object"
+      },
+      "ParseChatPromptResponse": {
+        "properties": {
+          "is_chat": {
+            "title": "Is Chat",
+            "type": "boolean"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GraphChatMessage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "unsteerable_positions": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Unsteerable Positions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "messages",
+          "is_chat",
+          "prompt",
+          "unsteerable_positions"
+        ],
+        "title": "ParseChatPromptResponse",
+        "type": "object"
+      },
+      "SalientLogit": {
+        "properties": {
+          "probability": {
+            "title": "Probability",
+            "type": "number"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "token_id": {
+            "title": "Token Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "token_id",
+          "probability"
+        ],
+        "title": "SalientLogit",
+        "type": "object"
+      },
+      "SteerFeature": {
+        "description": "One feature intervention.\n\nThese field names are public: ``/api/steer-logits`` documents them in its swagger and\nforwards the array here untouched, so renaming one is an API break.",
+        "properties": {
+          "ablate": {
+            "default": false,
+            "title": "Ablate",
+            "type": "boolean"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "layer": {
+            "title": "Layer",
+            "type": "integer"
+          },
+          "steer_generated_tokens": {
+            "default": false,
+            "title": "Steer Generated Tokens",
+            "type": "boolean"
+          },
+          "steer_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steer Position"
+          },
+          "token_active_position": {
+            "title": "Token Active Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "layer",
+          "index",
+          "token_active_position"
+        ],
+        "title": "SteerFeature",
+        "type": "object"
+      },
+      "SteerRequest": {
+        "properties": {
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/SteerFeature"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "freeze_attention": {
+            "default": false,
+            "title": "Freeze Attention",
+            "type": "boolean"
+          },
+          "freq_penalty": {
+            "default": 0,
+            "title": "Freq Penalty",
+            "type": "number"
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/GraphChatMessage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messages"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "n_tokens": {
+            "default": 10,
+            "title": "N Tokens",
+            "type": "integer"
+          },
+          "prompt": {
+            "default": "",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "temperature": {
+            "default": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          },
+          "top_k": {
+            "default": 5,
+            "title": "Top K",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_id",
+          "features"
+        ],
+        "title": "SteerRequest",
+        "type": "object"
+      },
+      "SteerResponse": {
+        "description": "Default and steered generations, plus per-token logits for each.\n\nThe SCREAMING_SNAKE keys are the wire names, so they are spelled out as aliases rather than\nleft to the field names: ``/api/steer-logits`` returns this object nearly verbatim and its\nswagger documents them in this form.",
+        "properties": {
+          "DEFAULT_GENERATION": {
+            "title": "Default Generation",
+            "type": "string"
+          },
+          "DEFAULT_LOGITS_BY_TOKEN": {
+            "items": {
+              "$ref": "#/components/schemas/LogitsByToken"
+            },
+            "title": "Default Logits By Token",
+            "type": "array"
+          },
+          "STEERED_GENERATION": {
+            "title": "Steered Generation",
+            "type": "string"
+          },
+          "STEERED_LOGITS_BY_TOKEN": {
+            "items": {
+              "$ref": "#/components/schemas/LogitsByToken"
+            },
+            "title": "Steered Logits By Token",
+            "type": "array"
+          }
+        },
+        "required": [
+          "DEFAULT_GENERATION",
+          "STEERED_GENERATION",
+          "DEFAULT_LOGITS_BY_TOKEN",
+          "STEERED_LOGITS_BY_TOKEN"
+        ],
+        "title": "SteerResponse",
+        "type": "object"
+      },
+      "TopLogit": {
+        "properties": {
+          "prob": {
+            "title": "Prob",
+            "type": "number"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "prob"
+        ],
+        "title": "TopLogit",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/check-busy": {
+      "get": {
+        "description": "Check if the server is currently busy processing a request.",
+        "operationId": "check_busy_check_busy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckBusyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Check Busy"
+      }
+    },
+    "/forward-pass": {
+      "post": {
+        "description": "Handle forward pass requests to get salient logits",
+        "operationId": "forward_pass_handler_forward_pass_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "title": "X-Secret-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForwardPassRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardPassResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forward Pass Handler"
+      }
+    },
+    "/generate-graph": {
+      "post": {
+        "operationId": "generate_graph_generate_graph_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "title": "X-Secret-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphGenerationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphGenerationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Graph"
+      }
+    },
+    "/parse-chat-prompt": {
+      "post": {
+        "description": "Recover structured chat turns from a rendered prompt string.\n\nDeliberately does NOT take ``request_lock``: this is tokenizer-only string\nwork with no GPU involvement, and the webapp calls it while opening a modal,\nso a graph generation in flight must not turn it into a 503.\n\n``prompt`` echoes back the BOS-stripped input. A non-chat prompt has no\n``messages`` to carry the strip, and the caller wants to put the string back\nin an editor, so returning it here is what keeps the BOS literal out of the\nfrontend.\n\n``unsteerable_positions`` is the set ``/steer`` will silently drop features\nat, computed here the same way and from the same normalized prompt. A steer\nUI needs it to know which sliders would do nothing; without it the client has\nto guess from token strings, which is the token knowledge this endpoint\nexists to keep server-side.",
+        "operationId": "parse_chat_prompt_handler_parse_chat_prompt_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "title": "X-Secret-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseChatPromptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseChatPromptResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parse Chat Prompt Handler"
+      }
+    },
+    "/steer": {
+      "post": {
+        "description": "Handle steer requests",
+        "operationId": "steer_handler_steer_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "title": "X-Secret-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SteerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SteerResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Steer Handler"
+      }
+    }
+  }
+}

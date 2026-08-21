@@ -12,8 +12,7 @@ Brief description of testing that is done or added. If there are multiple or sub
 
 ---
 
-- [ ] I have read and agree to the [Contributor License Agreement](../CLA.md).
-      <sub>The CLA grants Neuronpedia (Decode Research) the right to use, distribute, and sublicense your
-      contribution, including under license terms that differ from the project's current
-      license. You keep the copyright to your work. You only need to agree once — check the box
-      on your first PR.</sub>
+<sub>By opening this pull request you contribute under the
+[Apache License, Version 2.0](../LICENSE), per section 5 of that license. There is nothing
+to sign, and you keep the copyright to your work. If your change includes code you did not
+write, please name its source and license above.</sub>

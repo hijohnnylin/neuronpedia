@@ -62,10 +62,7 @@ def _compute_node_influence(
     # Convert raw influence to cumulative fraction (matching circuit-tracer's format)
     sorted_scores, sorted_indices = torch.sort(raw_influence, descending=True)
     total = sorted_scores.sum()
-    if total > 0:
-        cumulative = torch.cumsum(sorted_scores, dim=0) / total
-    else:
-        cumulative = torch.zeros_like(sorted_scores)
+    cumulative = torch.cumsum(sorted_scores, dim=0) / total if total > 0 else torch.zeros_like(sorted_scores)
     final_scores = torch.zeros_like(raw_influence)
     final_scores[sorted_indices] = cumulative
 
@@ -136,7 +133,7 @@ def _attach_qk_tracing_results(
         return _to_cpu_list(ar.activations.dimensions[0].nodes_to_offsets(dim))
 
     def _ensure_entry(target_offset: int) -> dict[str, Any]:
-        entry = node_entries[target_offset].setdefault(
+        return node_entries[target_offset].setdefault(
             "qk_tracing_results",
             {
                 "pair_wise_contributors": [],
@@ -144,7 +141,6 @@ def _attach_qk_tracing_results(
                 "top_k_marginal_contributors": [],
             },
         )
-        return entry
 
     def _resolve_contributor_ids(
         dim: Any,
@@ -168,9 +164,7 @@ def _attach_qk_tracing_results(
             key = str(ni.key)
             indices_tuple = tuple(int(v) for v in ni.indices[0].tolist())
             act_off = offsets_in_activations[i]
-            activation = (
-                float(ar.activations.data[act_off].item()) if act_off >= 0 else 0.0
-            )
+            activation = float(ar.activations.data[act_off].item()) if act_off >= 0 else 0.0
             entry = make_node(key, indices_tuple, activation)
             entry_id = entry["node_id"]
             if entry_id not in pruned_ids and entry_id not in qk_only_nodes:
@@ -185,12 +179,8 @@ def _attach_qk_tracing_results(
             continue
         q_dim = pairs_ni.dimensions[0]
         k_dim = pairs_ni.dimensions[1]
-        q_ids = _resolve_contributor_ids(
-            q_dim, _node_offsets(q_dim), _activation_offsets(q_dim)
-        )
-        k_ids = _resolve_contributor_ids(
-            k_dim, _node_offsets(k_dim), _activation_offsets(k_dim)
-        )
+        q_ids = _resolve_contributor_ids(q_dim, _node_offsets(q_dim), _activation_offsets(q_dim))
+        k_ids = _resolve_contributor_ids(k_dim, _node_offsets(k_dim), _activation_offsets(k_dim))
         values = pairs_ni.value.detach().cpu().tolist()
         contributors: list[tuple[str, str, float]] = [
             (q_id, k_id, float(v)) for q_id, k_id, v in zip(q_ids, k_ids, values)
@@ -206,13 +196,9 @@ def _attach_qk_tracing_results(
             if target_offset < 0:
                 continue
             src_dim = marg_ni.dimensions[0]
-            src_ids = _resolve_contributor_ids(
-                src_dim, _node_offsets(src_dim), _activation_offsets(src_dim)
-            )
+            src_ids = _resolve_contributor_ids(src_dim, _node_offsets(src_dim), _activation_offsets(src_dim))
             values = marg_ni.value.detach().cpu().tolist()
-            contributors_1d: list[tuple[str, float]] = [
-                (sid, float(v)) for sid, v in zip(src_ids, values)
-            ]
+            contributors_1d: list[tuple[str, float]] = [(sid, float(v)) for sid, v in zip(src_ids, values)]
             _ensure_entry(target_offset)[out_key] = contributors_1d
 
 
@@ -232,28 +218,20 @@ def convert_to_neuronpedia_graph(
 ) -> dict[str, Any]:
     """Convert an lm-saes AttributionResult + pruned attribution into Neuronpedia graph JSON."""
 
-    logit_token_map = {
-        tid: tok for tid, tok in zip(ar.logit_token_ids, ar.logit_tokens)
-    }
-    logit_prob_map = {
-        tid: float(p.item()) for tid, p in zip(ar.logit_token_ids, ar.probs)
-    }
+    logit_token_map = dict(zip(ar.logit_token_ids, ar.logit_tokens))
+    logit_prob_map = {tid: float(p.item()) for tid, p in zip(ar.logit_token_ids, ar.probs)}
     n_layers = max((int(m["layer_idx"]) for m in sae_metadata.values()), default=-1) + 1
 
     edge_weights, (targets, sources) = pruned_attribution.nonzero()
     nodes = (sources + targets).unique()
     node_activations = ar.activations[nodes].data
 
-    def make_node(
-        node_key: str, indices_tuple: tuple[int, ...], activation: float
-    ) -> dict[str, Any]:
+    def make_node(node_key: str, indices_tuple: tuple[int, ...], activation: float) -> dict[str, Any]:
         indices = list(indices_tuple)
 
         if node_key == "hook_embed":
             pos = indices[0]
-            token_id = (
-                int(ar.prompt_token_ids[pos]) if pos < len(ar.prompt_token_ids) else -1
-            )
+            token_id = int(ar.prompt_token_ids[pos]) if pos < len(ar.prompt_token_ids) else -1
             token = ar.prompt_tokens[pos] if pos < len(ar.prompt_tokens) else ""
             node_id = f"E_{token_id}_{pos}"
             return {
@@ -292,11 +270,7 @@ def convert_to_neuronpedia_graph(
             hook_point_out = node_key.removesuffix(".error")
             metadata = sae_metadata.get(hook_point_out)
             is_lorsa = bool(metadata["is_lorsa"]) if metadata else False
-            layer_base = (
-                int(metadata["layer_idx"])
-                if metadata
-                else _parse_hook_layer(hook_point_out)
-            )
+            layer_base = int(metadata["layer_idx"]) if metadata else _parse_hook_layer(hook_point_out)
             layer = layer_base
             pos = indices[0]
             feature_type = "lorsa error" if is_lorsa else "mlp reconstruction error"
@@ -318,17 +292,12 @@ def convert_to_neuronpedia_graph(
             hook_point_out = node_key.removesuffix(".sae.hook_feature_acts")
             metadata = sae_metadata.get(hook_point_out)
             is_lorsa = bool(metadata["is_lorsa"]) if metadata else False
-            layer_base = (
-                int(metadata["layer_idx"])
-                if metadata
-                else _parse_hook_layer(hook_point_out)
-            )
+            layer_base = int(metadata["layer_idx"]) if metadata else _parse_hook_layer(hook_point_out)
             layer = layer_base
             pos = indices[0] if len(indices) > 0 else 0
             feature_idx = indices[1] if len(indices) > 1 else 0
             feature_type = "lorsa" if is_lorsa else "cross layer transcoder"
             cantor_value = cantor_pair(layer, feature_idx)
-            prefix = "" if is_lorsa else ""
             node_id = f"{layer}_{feature_type[:3]}_{feature_idx}_{pos}"
             return {
                 "node_id": node_id,
@@ -337,7 +306,7 @@ def convert_to_neuronpedia_graph(
                 "feature_type": feature_type,
                 "layer": layer,
                 "ctx_idx": pos,
-                "clerp": f"{prefix}F{cantor_value}",
+                "clerp": f"F{cantor_value}",
                 "activation": activation,
             }
 
@@ -402,8 +371,7 @@ def convert_to_neuronpedia_graph(
         }
 
     node_entries = [
-        make_node(str(ni.key), tuple(ni.indices[0].tolist()), float(act))
-        for ni, act in zip(nodes, node_activations)
+        make_node(str(ni.key), tuple(ni.indices[0].tolist()), float(act)) for ni, act in zip(nodes, node_activations)
     ]
     node_ids = [n["node_id"] for n in node_entries]
 
@@ -416,9 +384,7 @@ def convert_to_neuronpedia_graph(
             "target": node_ids[tgt],
             "weight": float(w),
         }
-        for w, src, tgt in zip(
-            edge_weight_values, source_node_offsets, target_node_offsets
-        )
+        for w, src, tgt in zip(edge_weight_values, source_node_offsets, target_node_offsets)
     ]
 
     influence_scores = _compute_node_influence(node_entries, links, ar.probs)
@@ -426,9 +392,7 @@ def convert_to_neuronpedia_graph(
         entry["influence"] = score
 
     qk_only_nodes: dict[str, dict[str, Any]] = {}
-    _attach_qk_tracing_results(
-        ar, nodes, node_ids, node_entries, make_node, qk_only_nodes
-    )
+    _attach_qk_tracing_results(ar, nodes, node_ids, node_entries, make_node, qk_only_nodes)
 
     feature_details: dict[str, str] = {}
     if np_transcoder_source_set:

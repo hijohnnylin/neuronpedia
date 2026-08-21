@@ -1,0 +1,126 @@
+name: Inference - GPU Tests (vLLM + CUDA)
+
+# vLLM/CUDA coverage for the inference app. The CPU workflow (inference-tests.yml) covers the
+# EagerModel path on ubuntu-latest; this one runs the tests that need a real GPU: the vLLM
+# backend, the cross-engine (EagerModel vs vLLM) parity, and the instruct/thinking and gated models.
+# It only triggers on inference changes (same paths as the CPU job).
+#
+# The *engine's* own tests are not run here. They live in decoderesearch/interp-engine and run in
+# that repo's CI, in the engine's venv, which -- unlike this one -- can install the MXFP4 `kernels`
+# loader, so its gpt-oss coverage does not silently skip. This job installs the engine as a pinned
+# wheel and tests this service's use of it.
+#
+# ---------------------------------------------------------------------------------------------
+# GPU RUNNER VENDOR DECISION (todo: ci-vendor)
+# ---------------------------------------------------------------------------------------------
+# Requirement: a fully-managed SaaS GPU runner selected via a single `runs-on:` label, with
+# CUDA preinstalled (so FlashInfer/vLLM's JIT finds nvcc -- the exact gap that makes the vLLM
+# tests skip on a bare GPU box), triggered only on inference/engine changes.
+#
+# Evaluated (2026-07):
+#   - machine.dev  -- turnkey. `runs-on: machine/gpu=l4` (or t4/a10g/l40s/rtx6000). CUDA 13 +
+#                     drivers + NVIDIA Container Toolkit preinstalled. Billed/sec, spot or
+#                     on-demand. L4 (24 GB VRAM, 4 vCPU): ~$0.006/min spot, ~$0.027/min
+#                     on-demand. $10 free trial. Single label, no infra to run. -> SELECTED.
+#   - Depot        -- GPU only on the Business plan and only against your *own* AWS GPU capacity
+#                     (custom AMI, contact sales). Not turnkey for us. Great CPU runners though.
+#   - Ubicloud     -- managed GH Actions runners are CPU-only today; GPU is a self-managed VM,
+#                     so "Ubicloud managed GPU runner" is not a drop-in `runs-on` label yet.
+#   - Self-hosted  -- zero marginal cost, but not "fully managed", and nothing is registered
+#                     against `[self-hosted, gpu]` today. The workflow that uses those labels
+#                     (model-expectations-manual.yml) is dispatch-only for exactly that reason:
+#                     it expects a box you attach yourself.
+#
+# Choice: machine.dev L4 as the managed default (label `machine/gpu=l4`, 24 GB VRAM is ample
+# for gpt2 + gemma-3-270m-it + Qwen3.5-0.8B under vLLM at gpu_memory_utilization<=0.5). The
+# label is read from the `INFERENCE_GPU_RUNS_ON` repo/org variable so you can switch vendors
+# (or point at a self-hosted box) without editing this file -- set it to e.g. `machine/gpu=l4`,
+# or configure a variable that expands to `["self-hosted","gpu"]`.
+#
+# Setup: connect the GitHub org to machine.dev (https://machine.dev), then set the repository
+# variable INFERENCE_GPU_RUNS_ON=machine/gpu=l4 (repo-level, not environment-level -- see the
+# `runs-on` note below) and the repository secret HF_TOKEN (for the gated gemma model).
+# ---------------------------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/inference/**"
+      - ".github/workflows/inference-gpu-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/inference/**"
+      - ".github/workflows/inference-gpu-tests.yml"
+
+concurrency:
+  group: inference-gpu-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./apps/inference
+
+jobs:
+  gpu:
+    # Managed GPU label from the INFERENCE_GPU_RUNS_ON variable; defaults to machine.dev L4.
+    # Keep this a *repository* (or org) variable: `runs-on` is evaluated before a job's
+    # environment is resolved, so an environment-scoped variable reads as empty here and
+    # silently falls back to the default label below.
+    runs-on: ${{ vars.INFERENCE_GPU_RUNS_ON || 'machine/gpu=l4' }}
+    # Managed GPU runners bill per minute, and a wedged vLLM EngineCore can hang a test
+    # indefinitely. Cap the job well above a normal run (~10 min incl. model downloads)
+    # so a hang costs minutes instead of GitHub's 6-hour default.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GPU sanity (driver present)
+        run: nvidia-smi || { echo "::error::No GPU visible on this runner"; exit 1; }
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies (inference + engine[vllm])
+        run: uv sync --python 3.12
+
+      # gpt2-small + res-jb SAEs + gemma-3-270m-it + Qwen3.5-0.8B + Qwen3-0.6B (~4GB) are
+      # downloaded on every cold run, so the cache is keyed on the files that name the models
+      # and editing the matrix invalidates it.
+      - name: Cache HF weights (test model matrix + res-jb SAEs)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface/hub
+          key: hf-inference-${{ hashFiles('apps/inference/tests/harness.py', 'apps/inference/tests/model_expectations.yaml', 'apps/inference/tests/integration/test_vllm_batch_layout.py') }}
+          restore-keys: |
+            hf-inference-
+
+      - name: Run inference GPU tests (vLLM + cross-engine parity + instruct/thinking/gated)
+        env:
+          # Provided as a repo/org secret. When absent, the suite warns (start + end) and skips
+          # @pytest.mark.gated tests instead of failing (see tests/conftest.py).
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_HUB_OFFLINE: "0"
+          TRANSFORMERS_OFFLINE: "0"
+          # Leave headroom on shared/small GPUs; harness also defaults to 0.5 for vLLM bring-up.
+          VLLM_GPU_MEMORY_UTILIZATION: "0.5"
+          # machine.dev images ship CUDA+nvcc, but keep the portable sampler path in CI too.
+          VLLM_USE_FLASHINFER_SAMPLER: "0"
+          # VLLM_ALLOW_INSECURE_SERIALIZATION is intentionally absent, and nothing sets it:
+          # the engine invokes its worker hooks by name via InterpWorkerExtension, so no
+          # callable is pickled. Setting it here would mask a regression to callable RPC,
+          # which only fails against a real out-of-process engine core -- i.e. only here.
+        # --durations: this job's runtime is dominated by model loads (a vLLM EngineCore boot
+        # is ~a minute), so keep the per-test times in the log to spot a regression.
+        #
+        # `not xl` is not redundant with the selector: xl is orthogonal to the others, so an xl
+        # row that is also gated (gemma-2-2b) would be pulled onto this runner by `or gated` and
+        # spend the job's budget downloading weights this runner is not sized for.
+        run: uv run pytest -m "(cuda or vllm or thinking or gated) and not xl" --durations=25

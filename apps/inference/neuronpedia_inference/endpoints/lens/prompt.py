@@ -1,18 +1,23 @@
-import asyncio
 import json
 import logging
 import unicodedata
-from collections.abc import Iterator
-from enum import Enum
+from collections.abc import AsyncIterator, Callable, Iterator
+from typing import NamedTuple, cast
 
-import nnsight
 import numpy as np
 import torch
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from nnterp import StandardizedTransformer
+from interp_engine import (
+    EagerModel,
+    GeneratedTurnSpans,
+    HookManager,
+    NoChatTemplateError,
+    ResidualBasisUnsupported,
+    VLLMModel,
+)
+from interp_engine import decode_residuals as engine_decode_residuals
 from pydantic import BaseModel
-from transformer_lens import HookedTransformer, HookedTransformerKeyValueCache
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.lens.lens_loader import (
@@ -23,145 +28,68 @@ from neuronpedia_inference.endpoints.lens.model_specific import (
     apply_final_logit_softcap,
     resolve_final_logit_softcap,
 )
-from neuronpedia_inference.inference_utils.steering import apply_generic_chat_template
+from neuronpedia_inference.endpoints.lens.residual_spec import (
+    BLOCK_OUTPUT,
+    LensResidualSpec,
+    LensSpaceUnknown,
+    block_output_point,
+    resolve_residual_spec,
+)
+from neuronpedia_inference.engine_adapter import (
+    BackendUnsupported,
+    assert_residual_available,
+    assert_steering_available,
+    get_tokenize,
+)
+from neuronpedia_inference.memory_cost import lens_cost
+from neuronpedia_inference.schemas import (
+    LensPromptRequest,
+    LensSteerToken,
+    LensType,
+    PublicFrameSchema,
+)
 from neuronpedia_inference.shared import (
     REQUEST_LOCK_TIMEOUT,
     STR_TO_DTYPE,
     Model,
-    request_lock,
+    RequestTooLarge,
+    budget,
+    limiter,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# `chat` used to be rendered through a generic ChatML fallback for a tokenizer with no
+# template of its own. The read-outs that came back were computed over `<|im_start|>`
+# scaffolding split into ordinary text, which is not a conversation the model has any
+# representation of — and `role`/`section` were null throughout, because span metadata
+# is derived from the real template. Refusing keeps the raw-text path, which is the one
+# a completion model is for.
+#
+# "no chat template" is now the engine's verdict rather than a field on the tokenizer, so this
+# fires only for a model with no chat format at all — not for one (DeepSeek-V4) that defines
+# its format in code and used to be refused here for having no Jinja template.
+NO_CHAT_TEMPLATE_ERROR = (
+    "This model has no chat template, so it cannot accept `chat` input. Send `prompt` (raw text) instead."
+)
+
 
 # --------------------------------------------------------------------------- #
-# Request / response models
+# Streamed NDJSON frames
+#
+# These are not a response body FastAPI can document -- the endpoint emits them one JSON
+# object per line -- so unlike the request models they stay here, next to the generator.
+#
+# They are `PublicFrameSchema` rather than `BaseSchema`, so their field names go out exactly
+# as written instead of being camelCased. The webapp forwards these frames verbatim into
+# `/api/lens/prompt` and into the stored share blobs, so the names below are the public
+# contract; see the note on the base class. `test_lens_frame_contract.py` pins them.
 # --------------------------------------------------------------------------- #
 
 
-class LensType(str, Enum):
-    LOGIT_LENS = "LOGIT_LENS"
-    JACOBIAN_LENS = "JACOBIAN_LENS"
-
-
-class LensChatMessage(BaseModel):
-    role: str
-    content: str
-
-
-class LensSteerToken(BaseModel):
-    """A single readout to steer on.
-
-    ``token`` is the EXACT decoded token string (whitespace preserved, e.g.
-    ``" cat"``) as it appeared in a read-out slice; the server resolves it back
-    to a vocab id via a cached reverse-decode map. ``type`` selects which lens's
-    readout direction to use: ``JACOBIAN_LENS`` uses the J-lens direction
-    ``J_bar_l^T @ w_t`` at each fitted layer (the residual-space direction whose
-    J-lens readout is this token), ``LOGIT_LENS`` uses the plain unembedding
-    direction ``w_t``.
-    """
-
-    token: str
-    type: LensType
-
-
-class LensPromptRequest(BaseModel):
-    model: str
-    # One or more lens types to compute. When both are requested, the model is
-    # run only once (the residuals are shared), so adding LOGIT_LENS alongside
-    # JACOBIAN_LENS is essentially free.
-    type: list[LensType]
-    # Provide exactly one of `prompt` (raw text) or `chat` (chat-formatted).
-    prompt: str | None = None
-    chat: list[LensChatMessage] | None = None
-    top_n: int = 10
-    # Layers to read out. Empty (default) = all available layers for the lens
-    # type. The model's final layer is ALWAYS included (decoded directly as the
-    # model's true output), regardless of this list.
-    layers: list[int] = []
-    max_seq_len: int | None = None
-    prepend_bos: bool = True
-    # Whether to enable "thinking" mode when applying a chat template (only
-    # relevant for `chat` requests on models whose chat template supports it).
-    enable_thinking: bool = False
-    # Whether to preserve historical reasoning (`<think>`) blocks when applying a
-    # chat template (only relevant for `chat` requests on models whose chat
-    # template supports it, e.g. Qwen3.6). Keeping historical think blocks (the
-    # default) stabilizes the chat-formatted token prefix across turns: without
-    # it, templates strip prior `<think>` blocks from history, shifting token
-    # positions every turn.
-    preserve_thinking: bool = True
-    # Stream results as NDJSON (one message per line). When false, the identical
-    # path runs and all messages are buffered into a single JSON object.
-    stream: bool = True
-    # Sampling temperature for generated tokens. 0 = greedy (argmax).
-    temperature: float = 1.0
-    # Number of tokens to generate after the prompt. 0 = lens over the prompt
-    # only (no generation).
-    num_completion_tokens: int = 0
-    # Token ids the client already has lens read-outs for (the previous
-    # response's prompt + generated tokens, in order). The server computes the
-    # longest common prefix with the freshly tokenized prompt and skips the
-    # (expensive) per-layer read-out + emission for those positions, so a
-    # follow-up turn only recomputes the new tokens. Position reuse is validated
-    # by token id, so a divergent prefix simply reuses less (never wrong).
-    cached_token_ids: list[int] = []
-    # Exact input token ids to read out over, bypassing tokenization. When
-    # provided (non-empty), `prompt`/`chat` are ignored, generation is disabled
-    # (``num_completion_tokens`` is forced to 0), and the read-out runs over
-    # exactly these ids. Used to faithfully reproduce a previously-computed run
-    # (e.g. a shared jlens link) without depending on chat-template / tokenizer
-    # drift — the lens read-out is a deterministic function of the token ids.
-    input_token_ids: list[int] = []
-    # Steering: readouts to additively inject (negatively, to suppress) into the
-    # residual stream at every position, during prefill AND generation. Empty
-    # (default) = no steering. When steering is active, prefix-reuse is disabled
-    # (the cached read-outs from an unsteered run are no longer valid).
-    steer_tokens: list[LensSteerToken] = []
-    # Layers to inject the steering direction at. Empty = the read-out layers.
-    steer_layers: list[int] = []
-    # Signed steering strength as a fraction of each position's residual norm
-    # (negative suppresses the readout). 0 = no steering.
-    steer_strength: float = 0.0
-    # When true, ABLATE the readout direction: project it out of the residual at
-    # every steered layer/position (h <- h - (h.d_hat) d_hat) instead of
-    # additively steering. Mutually exclusive with ``steer_strength`` (which is
-    # ignored when ablating).
-    steer_ablate: bool = False
-    # SWAP: when set, replace the source readout (``steer_tokens[0]``) with this
-    # target readout at every steered layer/position. The residual's projection
-    # onto the source direction is removed and re-added (same magnitude) along
-    # the target direction: ``h <- h - (h.s_hat) s_hat + (h.s_hat) t_hat``. This
-    # is the causal "lens-vector swap" intervention and takes precedence over
-    # ``steer_strength`` / ``steer_ablate`` when present. ``type`` should match
-    # the source readout's lens type.
-    swap_token: LensSteerToken | None = None
-    # Whether to apply the steer/swap intervention to GENERATED tokens too. When
-    # false (default), the intervention is applied only to the prompt positions
-    # (prefill); generation then proceeds from the steered prompt context but the
-    # newly generated positions are not themselves steered/swapped. When true,
-    # the intervention is also applied at each generated position as it is
-    # produced.
-    steer_generated_tokens: bool = False
-    # Whether to drop "non-word" tokens (punctuation / whitespace / symbol /
-    # special tokens) from each position's per-layer read-out BEFORE selecting
-    # the top-n, so the returned tokens are predominantly interesting word
-    # tokens. The model's TRUE top-1 (output) token at each layer is always
-    # preserved even when it is non-word. Probabilities are computed over the
-    # FULL vocab (filtering only changes WHICH tokens are selected, not their
-    # reported probabilities). Defaults to True.
-    filter_non_word_tokens: bool = True
-    # When true, if the server is already processing another request (the global
-    # model lock is held), return HTTP 429 immediately instead of queueing and
-    # waiting for the lock. This lets a client (e.g. the webapp) fail over to a
-    # different inference server for this model. Defaults to False, preserving
-    # the original behavior of waiting up to REQUEST_LOCK_TIMEOUT for the lock.
-    fail_if_busy: bool = False
-
-
-class LensTypeSlice(BaseModel):
+class LensTypeSlice(PublicFrameSchema):
     """Lens read-out for one (position, lens_type).
 
     All token references are STRINGS (decoded), never ids.
@@ -173,7 +101,7 @@ class LensTypeSlice(BaseModel):
     top_probs: list[list[float]]
 
 
-class LensMetaMessage(BaseModel):
+class LensMetaMessage(PublicFrameSchema):
     """First streamed message: the shared request context."""
 
     kind: str = "meta"
@@ -192,7 +120,7 @@ class LensMetaMessage(BaseModel):
     reuse_len: int = 0
 
 
-class LensPromptToken(BaseModel):
+class LensPromptToken(PublicFrameSchema):
     """A single chat-formatted prompt token (no lens read-out)."""
 
     position: int
@@ -201,9 +129,21 @@ class LensPromptToken(BaseModel):
     # on the next turn for prefix-reuse matching.
     id: int
     is_generated: bool = False
+    # True on the 2nd..nth position of a character split across tokens, whose whole
+    # glyph `token` repeats at every contributing position (see
+    # `_decode_display_tokens`). Anything rebuilding TEXT from a token stream must
+    # skip these, or one emoji comes back N times.
+    is_char_continuation: bool = False
+    # Per-token chat-span metadata (the single source of truth for message
+    # boundaries, computed server-side by the engine's Tokenize.message_spans).
+    # Null on raw-text / reproduction requests that carry no chat messages.
+    message_index: int | None = None
+    role: str | None = None
+    channel: str | None = None
+    section: str | None = None
 
 
-class LensPromptTokensMessage(BaseModel):
+class LensPromptTokensMessage(PublicFrameSchema):
     """Emitted right after `meta` and before inference begins.
 
     Carries the chat-formatted prompt tokens (no lens read-outs) so the client
@@ -215,7 +155,7 @@ class LensPromptTokensMessage(BaseModel):
     tokens: list[LensPromptToken]
 
 
-class LensTokenMessage(BaseModel):
+class LensTokenMessage(PublicFrameSchema):
     """One per token position: the token plus its per-type lens slices."""
 
     kind: str = "token"
@@ -226,9 +166,19 @@ class LensTokenMessage(BaseModel):
     id: int
     is_generated: bool
     results: list[LensTypeSlice]
+    # See LensPromptToken: true where `token` is repeating a character this position
+    # only holds part of, so text reconstruction skips it.
+    is_char_continuation: bool = False
+    # Per-token chat-span metadata (see LensPromptToken). Carried on token
+    # messages too so a full re-render from `tokens` alone groups correctly (the
+    # frontend replays shared runs from stored tokens, not the prompt message).
+    message_index: int | None = None
+    role: str | None = None
+    channel: str | None = None
+    section: str | None = None
 
 
-class LensDoneMessage(BaseModel):
+class LensDoneMessage(PublicFrameSchema):
     """Final streamed message."""
 
     kind: str = "done"
@@ -238,12 +188,16 @@ class LensDoneMessage(BaseModel):
     completion: str
 
 
-class LensPromptResponse(BaseModel):
-    """Non-streaming response: the same messages buffered into one object."""
+class LensErrorMessage(PublicFrameSchema):
+    """Emitted instead of `done` when the run fails partway through.
 
-    meta: LensMetaMessage
-    tokens: list[LensTokenMessage]
-    done: LensDoneMessage
+    A model rather than an inline dict so it is covered by the frame contract test like
+    every other frame; the stream has already started by the time this is reached, so the
+    failure cannot be reported as a status code.
+    """
+
+    kind: str = "error"
+    error: str
 
 
 # --------------------------------------------------------------------------- #
@@ -272,7 +226,18 @@ _REPLACEMENT_CHAR = "\ufffd"
 _MAX_MULTI_TOKEN_CHAR = 8
 
 
-def _decode_display_tokens(tokenizer, token_ids: list[int], cache: dict[int, str]) -> list[str]:
+class _DisplayToken(NamedTuple):
+    """One position's display string, plus whether it is repeating the previous one's.
+
+    ``continuation`` is what makes the repetition reversible: the string alone cannot be,
+    because two adjacent split emoji look exactly like one repeated across its fragments.
+    """
+
+    token: str
+    continuation: bool
+
+
+def _decode_display_tokens(tokenizer, token_ids: list[int], cache: dict[int, str]) -> list[_DisplayToken]:
     """Per-position display strings, repairing characters split across tokens.
 
     A single emoji (or other multi-byte codepoint) is often split across several
@@ -281,14 +246,17 @@ def _decode_display_tokens(tokenizer, token_ids: list[int], cache: dict[int, str
     run together to recover the real character, and assign that combined string
     to EVERY position in the run (so the emoji shows at each contributing token
     rather than a row of `).
+
+    Every position after the first in such a run is flagged a ``continuation``, so a
+    consumer rebuilding text emits the character once while the chips still each show it.
     """
     n = len(token_ids)
-    out: list[str] = [""] * n
+    out: list[_DisplayToken] = [_DisplayToken("", False)] * n
     i = 0
     while i < n:
         solo = _decode_token(tokenizer, int(token_ids[i]), cache)
         if _REPLACEMENT_CHAR not in solo:
-            out[i] = solo
+            out[i] = _DisplayToken(solo, False)
             i += 1
             continue
         # Broken fragment: greedily extend the run until it decodes cleanly.
@@ -302,11 +270,12 @@ def _decode_display_tokens(tokenizer, token_ids: list[int], cache: dict[int, str
             )
         if _REPLACEMENT_CHAR not in combined:
             for k in range(i, j + 1):
-                out[k] = combined
+                out[k] = _DisplayToken(combined, k > i)
             i = j + 1
         else:
-            # Unrecoverable; leave the lone replacement char for this position.
-            out[i] = solo
+            # Unrecoverable; leave the lone replacement char for this position. It stands
+            # for itself rather than continuing anything, so it is not a continuation.
+            out[i] = _DisplayToken(solo, False)
             i += 1
     return out
 
@@ -345,6 +314,36 @@ def _is_word_like_token(token: str) -> bool:
 # Built once per tokenizer (a full-vocab decode + classify) and reused across
 # requests, mirroring `_DECODE_INDEX_CACHE`.
 _WORD_MASK_CACHE: dict[int, torch.Tensor] = {}
+
+
+def _readout_vocab_size(tokenizer, model=None) -> int:
+    """Vocab dim of the model's logits / unembed, not the tokenizer's nominal size.
+
+    Llama-3.x pads the embedding table to a multiple of 256 (``128256``) while
+    ``tokenizer.vocab_size`` stays at ``128000``. The word-mask and done-message
+    ``vocab_size`` must match the live logits dim. Prefer a model-reported size
+    when available; otherwise take ``max(len(tokenizer), vocab_size)`` so added
+    special tokens / padding are not dropped.
+    """
+    if model is not None:
+        vs = getattr(model, "vocab_size", None)
+        if isinstance(vs, int) and vs > 0:
+            return int(vs)
+        cfg = getattr(model, "config", None)
+        if cfg is not None:
+            text_cfg = getattr(cfg, "text_config", None) or cfg
+            cfg_vs = getattr(text_cfg, "vocab_size", None)
+            if isinstance(cfg_vs, int) and cfg_vs > 0:
+                return int(cfg_vs)
+    tok_vs = int(getattr(tokenizer, "vocab_size", 0) or 0)
+    try:
+        tok_len = int(len(tokenizer))
+    except Exception:  # noqa: BLE001
+        tok_len = 0
+    size = max(tok_vs, tok_len)
+    if size <= 0:
+        raise ValueError("Could not resolve readout vocab size from tokenizer/model")
+    return size
 
 
 def _word_token_mask(tokenizer, vocab_size: int) -> torch.Tensor:
@@ -408,9 +407,9 @@ def _resolve_eos_token_ids(model, tokenizer) -> set[int]:
                 _add(item)
 
     _add(getattr(tokenizer, "eos_token_id", None))
-    # nnsight/nnterp wrap the HF model as `._model`; TransformerLens has neither
-    # a `._model` nor a `generation_config`, so this is a best-effort lookup.
-    hf = getattr(model, "_model", model)
+    # EagerModel wraps the raw HF model as ``.hf_model`` (which carries the
+    # ``generation_config``); best-effort lookup.
+    hf = getattr(model, "hf_model", model)
     gen_cfg = getattr(hf, "generation_config", None)
     _add(getattr(gen_cfg, "eos_token_id", None))
     return ids
@@ -431,61 +430,111 @@ def _coerce_token_ids(ids) -> list[int]:
     if hasattr(ids, "tolist"):
         ids = ids.tolist()
     # batched nested list [[...]] -> first row
-    if len(ids) > 0 and isinstance(ids[0], (list, tuple)):
+    if len(ids) > 0 and isinstance(ids[0], list | tuple):
         ids = ids[0]
     return [int(token_id) for token_id in ids]
 
 
+def _chat_template_kwargs(tok, request: LensPromptRequest) -> dict:
+    """Select the template kwargs to pass for this request (only those this model reads).
+
+    A renderer that doesn't know a kwarg will ignore or reject it, so each one is gated on the
+    engine's answer for this model. We ask the engine rather than grepping
+    ``tokenizer.chat_template`` ourselves because a model whose chat format lives in code
+    (DeepSeek-V4) has no template source to grep — see ``Tokenize.accepted_template_kwargs``.
+    Kept as a helper so ``build_token_ids`` and the span computation render with identical
+    arguments (and therefore identical token ids/positions).
+    """
+    # gpt-oss (harmony) has no on/off thinking switch — it uses `reasoning_effort`
+    # (low/medium/high). Map our boolean onto low/high, only where it is read.
+    accepted = tok.accepted_template_kwargs(("enable_thinking", "preserve_thinking", "reasoning_effort"))
+    kwargs: dict = {}
+    if "enable_thinking" in accepted:
+        kwargs["enable_thinking"] = request.enable_thinking
+    if "preserve_thinking" in accepted:
+        kwargs["preserve_thinking"] = request.preserve_thinking
+    if "reasoning_effort" in accepted:
+        kwargs["reasoning_effort"] = "high" if request.enable_thinking else "low"
+    return kwargs
+
+
+def _chat_args(tok, request: LensPromptRequest) -> tuple[list[dict[str, str]], bool, bool, dict]:
+    """Return ``(messages, add_generation_prompt, continue_final_message, template_kwargs)``.
+
+    If the final message is an assistant turn, treat it as a PREFILL: keep that turn open (no
+    end-of-turn token, no fresh assistant scaffold) so generation continues from the prefilled
+    text rather than starting a new assistant turn after it.
+    """
+    messages = [{"role": m.role, "content": m.content} for m in (request.chat or [])]
+    is_prefill = len(messages) > 0 and messages[-1]["role"] == "assistant"
+    return (
+        messages,
+        (not is_prefill),
+        is_prefill,
+        _chat_template_kwargs(tok, request),
+    )
+
+
 def build_token_ids(model, request: LensPromptRequest) -> list[int]:
-    """Build input token ids from either a raw prompt or a chat conversation."""
+    """Build input token ids from either a raw prompt or a chat conversation.
+
+    Chat rendering goes through the engine's ``Tokenize`` rather than the tokenizer directly:
+    it is the layer that knows whether this model renders chat from a Jinja template or from a
+    code formatter, and reading ``tokenizer.chat_template`` here would refuse a model that
+    renders chat perfectly well.
+    """
     tokenizer = model.tokenizer
     if tokenizer is None:
         raise ValueError("Tokenizer is not initialized")
 
     if request.chat is not None:
-        messages = [{"role": m.role, "content": m.content} for m in request.chat]
-        # If the final message is an assistant turn, treat it as a PREFILL: keep
-        # that turn open (no end-of-turn token, no fresh assistant scaffold) so
-        # generation continues from the prefilled text rather than starting a new
-        # assistant turn after it.
-        is_prefill = len(messages) > 0 and messages[-1]["role"] == "assistant"
-        chat_template = getattr(tokenizer, "chat_template", None)
-        if chat_template:
-            kwargs = {}
-            # Only pass `enable_thinking` if the chat template actually references
-            # it; templates that don't will otherwise ignore (or reject) it.
-            if "enable_thinking" in chat_template:
-                kwargs["enable_thinking"] = request.enable_thinking
-            # Likewise for `preserve_thinking` (e.g. Qwen3.6): only pass it when
-            # the template references it, so older templates don't reject it.
-            if "preserve_thinking" in chat_template:
-                kwargs["preserve_thinking"] = request.preserve_thinking
-            # gpt-oss (harmony format) has no on/off "thinking" switch — its chat
-            # template controls reasoning via `reasoning_effort` (low/medium/high)
-            # instead of `enable_thinking`. There is no way to fully disable the
-            # analysis (reasoning) channel, so map our boolean thinking flag onto
-            # the lowest / highest effort: disabled -> "low" (minimal reasoning),
-            # enabled -> "high". Only passed when the template references it, so
-            # non-gpt-oss templates are unaffected.
-            if "reasoning_effort" in chat_template:
-                kwargs["reasoning_effort"] = "high" if request.enable_thinking else "low"
-            ids = tokenizer.apply_chat_template(
-                messages,
-                tokenize=True,
-                add_generation_prompt=not is_prefill,
-                continue_final_message=is_prefill,
-                **kwargs,
-            )
-            return _coerce_token_ids(ids)
-        # Tokenizer has no chat template: fall back to a generic ChatML template.
-        text = apply_generic_chat_template(
+        tok = get_tokenize(model)
+        if not tok.has_chat_template():
+            raise NoChatTemplateError(NO_CHAT_TEMPLATE_ERROR)
+        messages, add_generation_prompt, is_prefill, kwargs = _chat_args(tok, request)
+        ids = tok.apply_chat_template(
             messages,
-            add_generation_prompt=not is_prefill,
+            tokenize=True,
+            add_generation_prompt=add_generation_prompt,
             continue_final_message=is_prefill,
+            **kwargs,
         )
-        return _encode_raw_text(tokenizer, text, request.prepend_bos)
+        return _coerce_token_ids(ids)
 
     return _encode_raw_text(tokenizer, request.prompt or "", request.prepend_bos)
+
+
+def compute_prompt_spans(model, request: LensPromptRequest, prompt_token_ids: list[int]) -> tuple[list, bool]:
+    """Return ``(spans, is_prefill)`` for the chat prompt, or ``([], False)`` if unavailable.
+
+    Uses the engine's ``Tokenize.message_spans`` (single source of truth for message boundaries),
+    rendered with the SAME args ``build_token_ids`` used, then verified to align 1:1 with
+    ``prompt_token_ids``. On any mismatch (raw-text request, truncation) we return no spans and
+    the frontend renders the tokens plainly. A chat request against a model that cannot render
+    chat never reaches here — it is rejected up front — so the check below is only a guard.
+    """
+    if request.chat is None:
+        return [], False
+    if model.tokenizer is None:
+        return [], False
+    try:
+        tok = get_tokenize(model)
+        if not tok.has_chat_template():
+            return [], False
+        messages, add_generation_prompt, is_prefill, kwargs = _chat_args(tok, request)
+        spans = tok.message_spans(
+            messages,
+            add_generation_prompt=add_generation_prompt,
+            continue_final_message=is_prefill,
+            **kwargs,
+        )
+    except Exception:  # noqa: BLE001 - template rendering is tokenizer-dependent
+        logger.exception("Failed to compute lens prompt spans")
+        return [], False
+    # Only trust the spans if they align exactly with the tokenized prompt.
+    if [int(s.token_id) for s in spans] != [int(t) for t in prompt_token_ids]:
+        return [], False
+    return spans, is_prefill
 
 
 # --------------------------------------------------------------------------- #
@@ -494,6 +543,13 @@ def build_token_ids(model, request: LensPromptRequest) -> list[int]:
 
 # One streamed position: (token_id, is_generated, {layer: residual[d_model]}).
 ResidualStep = tuple[int, bool, dict[int, torch.Tensor]]
+# Positions that became available together (one prefill, or one decode-time drain).
+# Batching is what the read-out is staged on: a batch's per-layer Jacobian transport
+# is one matmul regardless of how many positions it holds, so handing out positions
+# in groups instead of one at a time is the difference between reading every J_bar
+# once and reading it once per position. A batch never delays a position: it holds
+# exactly what the backend had ready at that moment.
+ResidualBatch = list[ResidualStep]
 
 
 def _sample_token(logits_row: torch.Tensor, temperature: float) -> int:
@@ -516,14 +572,6 @@ def _sample_token(logits_row: torch.Tensor, temperature: float) -> int:
         return int(logits_row.argmax())
     probs = torch.softmax(logits_row.float() / temperature, dim=-1)
     return int(torch.multinomial(probs, num_samples=1))
-
-
-def _make_capture_hook(captures: dict[int, torch.Tensor], layer: int):
-    def hook(_module, _inputs, output):
-        hidden = output[0] if isinstance(output, tuple) else output
-        captures[layer] = hidden.detach()
-
-    return hook
 
 
 # --------------------------------------------------------------------------- #
@@ -549,9 +597,7 @@ def _decoded_string_to_ids(tokenizer) -> dict[str, list[int]]:
     index: dict[str, list[int]] = {}
     for token_id in range(int(vocab_size)):
         try:
-            decoded = tokenizer.decode(
-                [token_id], clean_up_tokenization_spaces=False
-            )
+            decoded = tokenizer.decode([token_id], clean_up_tokenization_spaces=False)
         except Exception:  # noqa: BLE001
             continue
         index.setdefault(decoded, []).append(token_id)
@@ -583,10 +629,7 @@ def _check_token_id_in_range(token_id: int, vocab_size: int) -> None:
     context (all subsequent CUDA calls then fail until restart).
     """
     if not (0 <= token_id < vocab_size):
-        raise ValueError(
-            f"steer token_id {token_id} out of range for unembedding vocab "
-            f"size {vocab_size}"
-        )
+        raise ValueError(f"steer token_id {token_id} out of range for unembedding vocab size {vocab_size}")
 
 
 def _unembed_vector(model, token_id: int) -> torch.Tensor:
@@ -596,20 +639,26 @@ def _unembed_vector(model, token_id: int) -> torch.Tensor:
     host before indexing: an out-of-range id would otherwise trigger a
     device-side assert that poisons the entire CUDA context for the process.
     """
-    if isinstance(model, HookedTransformer):
-        weight = model.W_U  # W_U: [d_model, vocab]
-        vocab_size = weight.shape[1]
-        _check_token_id_in_range(token_id, vocab_size)
-        return weight[:, token_id].detach().float()
-    hf = model._model
-    _layers, _norm, head = _hf_decoder_modules(hf)
-    weight = head.weight  # lm_head: [vocab, d_model]
+    weight = model.arch.lm_head.weight  # lm_head: [vocab, d_model]
     vocab_size = weight.shape[0]
     _check_token_id_in_range(token_id, vocab_size)
     return weight[token_id].detach().float()
 
 
-def _build_steer_deltas(
+async def _unembed_vectors_by_id(model, token_ids: list[int]) -> dict[int, torch.Tensor]:
+    """Backend-aware ``{token_id: unembedding_row [d_model] float32}`` for jlens steering.
+
+    EagerModel indexes ``arch.lm_head.weight`` directly; the vLLM backend fetches the rows
+    via ``unembed_rows`` (``lm_head.weight``, or tied ``embed_tokens.weight`` on Gemma 2).
+    """
+    unique = list(dict.fromkeys(int(t) for t in token_ids))
+    if isinstance(model, VLLMModel):
+        rows = (await model.unembed_rows(unique)).float()
+        return {tid: rows[i] for i, tid in enumerate(unique)}
+    return {tid: _unembed_vector(model, tid) for tid in unique}
+
+
+async def _build_steer_deltas(
     model,
     lens: LoadedJacobianLens | None,
     steer_tokens: list[LensSteerToken],
@@ -620,56 +669,86 @@ def _build_steer_deltas(
     For a ``JACOBIAN_LENS`` token at a fitted layer ``l`` the direction is
     ``J_bar_l^T @ w_t`` (equivalently ``w_t @ J_bar_l``), the residual-space
     direction whose J-lens readout is the token; otherwise the plain unembedding
-    direction ``w_t``. Each per-layer direction is unit-normalized before
-    summing so multiple tokens reinforce sensibly.
+    direction ``w_t``.     Each per-layer direction is unit-normalized before
+    summing so multiple tokens reinforce sensibly. The unembedding rows come from
+    the eager model (``arch.lm_head``) or, on vLLM, the worker unembed weight
+    (``lm_head`` or tied ``embed_tokens``).
+
+    Wherever ``J_bar`` lives is where the multiply happens: in the vLLM worker via
+    ``lens_transport`` when the lens is resident there, otherwise on the lens's
+    ``transport_device``. What it must not do is follow the unembedding rows, which arrive
+    from vLLM as CPU tensors -- that meant widening a ``d_model**2`` ``J_bar`` to float32 on
+    the host and reading it back once per layer per token, 9.3s before the response even
+    started for a 63-layer swap on Qwen3.6-27B, which a swap pays twice (once for the source
+    directions, once for the target). The matmul is done at the lens dtype, which the
+    unit-normalization below makes moot anyway.
     """
     tokenizer = model.tokenizer
     if tokenizer is None:
         raise ValueError("Tokenizer is not initialized")
     index = _decoded_string_to_ids(tokenizer)
-    resolved = [
-        (_resolve_steer_token_id(index, spec.token), spec.type)
-        for spec in steer_tokens
-    ]
+    resolved = [(_resolve_steer_token_id(index, spec.token), spec.type) for spec in steer_tokens]
+    w_by_id = await _unembed_vectors_by_id(model, [tid for tid, _ in resolved])
+    if not w_by_id:
+        return {}
+
+    # Returned where the rows arrived, so the steering hooks see what they always saw.
+    out_device = next(iter(w_by_id.values())).device
+    compute_device = (lens.transport_device if lens is not None else None) or out_device
+
+    # [n_tokens, d_model] in `resolved` order, so one round trip covers every layer when the
+    # lens is in the worker. `transported` says which layers had a fitted J_bar; the rest come
+    # back untouched, which is what a non-Jacobian token wants anyway.
+    transported_by_layer: torch.Tensor | None = None
+    fitted: list[bool] = []
+    if lens is not None and lens.worker_resident and any(t == LensType.JACOBIAN_LENS for _, t in resolved):
+        stacked = torch.stack([w_by_id[tid] for tid, _ in resolved], dim=0)
+        transported_by_layer, fitted = await model.lens_transport(stacked, steer_layers)
 
     deltas: dict[int, torch.Tensor] = {}
-    for layer in steer_layers:
+    for layer_index, layer in enumerate(steer_layers):
         acc: torch.Tensor | None = None
-        for token_id, lens_type in resolved:
-            w = _unembed_vector(model, token_id)  # [d_model]
-            if (
-                lens_type == LensType.JACOBIAN_LENS
-                and lens is not None
-                and layer in lens.jacobians
-            ):
-                j_bar = lens.jacobian_on(layer, w.device).to(torch.float32)
-                direction = w @ j_bar  # J_bar^T @ w
+        for token_index, (token_id, lens_type) in enumerate(resolved):
+            w = w_by_id[token_id]
+            if lens_type != LensType.JACOBIAN_LENS or lens is None:
+                direction = w
+            elif transported_by_layer is not None:
+                direction = transported_by_layer[layer_index][token_index] if fitted[layer_index] else w
+            elif layer in lens.jacobians:
+                j_bar = lens.jacobian_on(layer, compute_device)
+                direction = (w.to(device=compute_device, dtype=j_bar.dtype) @ j_bar).float()  # J_bar^T @ w
             else:
                 direction = w
             norm = torch.linalg.vector_norm(direction)
             if norm > 0:
                 direction = direction / norm
-            acc = direction if acc is None else acc + direction
+            acc = direction if acc is None else acc + direction.to(acc.device)
         if acc is not None:
-            deltas[layer] = acc
+            deltas[layer] = acc.to(out_device)
     return deltas
 
 
 def _bos_skip_mask(
-    token_ids: list[int], bos_token_id: int | None, device
+    token_ids: list[int], bos_token_id: int | None, device, *, stacked: bool = False
 ) -> torch.Tensor | None:
     """Bool mask ``[1, seq, 1]`` marking BOS positions to leave unmodified.
 
     Returns ``None`` when there is no BOS id or the sequence contains none, so
     the caller skips masking entirely. Only the EXACT bos id is matched, so chat
     special tokens (turn markers, etc.) are still steered.
+
+    ``stacked`` adds the trailing axis a hyper-connection trunk needs, giving ``[1, seq, 1, 1]``
+    against a ``[batch, seq, streams, d_model]`` residual. The rank has to match the tensor rather
+    than merely broadcast against it: torch aligns from the right, so the flat mask would line its
+    sequence axis up with the STREAM axis and mask four positions' worth of nothing.
     """
     if bos_token_id is None:
         return None
     flags = [tid == bos_token_id for tid in token_ids]
     if not any(flags):
         return None
-    return torch.tensor(flags, dtype=torch.bool, device=device).view(1, -1, 1)
+    shape = (1, -1, 1, 1) if stacked else (1, -1, 1)
+    return torch.tensor(flags, dtype=torch.bool, device=device).view(*shape)
 
 
 # Per-layer cap on the additive steering vector, as a fraction of the
@@ -698,7 +777,7 @@ def _apply_steer(
     ``_MAX_STEER_INJECTION_FRACTION * ||h||`` so a large strength (or steering at
     many layers, which compounds) can't drive the residual to inf/nan.
 
-    ``skip_mask`` (bool, broadcastable to ``[..., seq, 1]``) marks positions to
+    ``skip_mask`` (bool, broadcastable against ``tensor``) marks positions to
     leave UNCHANGED (e.g. the BOS token, whose huge attention-sink norm makes the
     intervention spuriously large there).
     """
@@ -732,23 +811,6 @@ def _apply_steer(
     return steered
 
 
-def _make_steer_hook_hf(
-    delta: torch.Tensor,
-    strength: float,
-    ablate: bool = False,
-    skip_holder: dict | None = None,
-):
-    def hook(_module, _inputs, output):
-        hidden = output[0] if isinstance(output, tuple) else output
-        skip = skip_holder["mask"] if skip_holder is not None else None
-        steered = _apply_steer(hidden, delta, strength, ablate, skip_mask=skip)
-        if isinstance(output, tuple):
-            return (steered, *tuple(output[1:]))
-        return steered
-
-    return hook
-
-
 def _apply_swap(
     tensor: torch.Tensor,
     src_delta: torch.Tensor,
@@ -764,7 +826,7 @@ def _apply_swap(
     target with the same coefficient) and is parameter-free (the magnitude is
     the residual's own source projection).
 
-    ``skip_mask`` (bool, broadcastable to ``[..., seq, 1]``) marks positions to
+    ``skip_mask`` (bool, broadcastable against ``tensor``) marks positions to
     leave UNCHANGED (e.g. the BOS token).
     """
     s = src_delta.to(device=tensor.device, dtype=tensor.dtype)
@@ -782,77 +844,7 @@ def _apply_swap(
     return swapped
 
 
-def _make_swap_hook_hf(
-    src_delta: torch.Tensor,
-    tgt_delta: torch.Tensor,
-    skip_holder: dict | None = None,
-):
-    def hook(_module, _inputs, output):
-        hidden = output[0] if isinstance(output, tuple) else output
-        skip = skip_holder["mask"] if skip_holder is not None else None
-        swapped = _apply_swap(hidden, src_delta, tgt_delta, skip_mask=skip)
-        if isinstance(output, tuple):
-            return (swapped, *tuple(output[1:]))
-        return swapped
-
-    return hook
-
-
-def _hf_decoder_modules(hf):
-    """Locate (decoder_layers, final_norm, lm_head) on a HF causal-LM.
-
-    Handles the common decoder-only families (Llama/Qwen/Gemma/Mistral use
-    ``model.layers`` + ``model.norm`` + ``lm_head``; GPT-2/Falcon use
-    ``transformer.h`` + ``transformer.ln_f``; GPT-NeoX uses ``gpt_neox.*``).
-
-    Also handles multimodal wrappers (e.g. ``Gemma3ForConditionalGeneration``)
-    where the text decoder is nested one level deeper under
-    ``model.language_model`` rather than directly on ``model``.
-    """
-    base = (
-        getattr(hf, "model", None)
-        or getattr(hf, "transformer", None)
-        or getattr(hf, "gpt_neox", None)
-    )
-
-    def _decoder_in(obj):
-        """Return (layers, norm) if ``obj`` directly exposes a decoder stack."""
-        if obj is None:
-            return None, None
-        layers = getattr(obj, "layers", None) or getattr(obj, "h", None)
-        norm = (
-            getattr(obj, "norm", None)
-            or getattr(obj, "ln_f", None)
-            or getattr(obj, "final_layer_norm", None)
-        )
-        return layers, norm
-
-    layers, norm = _decoder_in(base)
-    # Multimodal wrappers (Gemma3/PaliGemma/etc.) nest the text decoder under
-    # ``language_model`` (or another ``model``/``text_model`` attribute).
-    if (layers is None or norm is None) and base is not None:
-        for attr in ("language_model", "text_model", "model"):
-            inner = getattr(base, attr, None)
-            inner_layers, inner_norm = _decoder_in(inner)
-            if inner_layers is not None and inner_norm is not None:
-                layers, norm = inner_layers, inner_norm
-                base = inner
-                break
-
-    head = (
-        getattr(hf, "lm_head", None)
-        or getattr(hf, "embed_out", None)
-        or getattr(base, "lm_head", None)
-    )
-    if layers is None or norm is None or head is None:
-        raise ValueError(
-            f"Could not locate decoder layers / final norm / lm_head on "
-            f"{type(hf).__name__} for the lens read-out."
-        )
-    return layers, norm, head
-
-
-def _iter_residuals(
+async def _iter_residuals(
     model,
     prompt_token_ids: list[int],
     union_layers: list[int],
@@ -866,24 +858,24 @@ def _iter_residuals(
     swap_deltas: dict[int, torch.Tensor] | None = None,
     steer_generated: bool = False,
     bos_token_id: int | None = None,
-) -> Iterator[ResidualStep]:
-    """Stream ``(token_id, is_generated, residuals)`` one position at a time.
+    residual: LensResidualSpec = BLOCK_OUTPUT,
+):
+    """Async-stream :data:`ResidualBatch` groups of ``(token_id, is_generated, residuals)``.
 
-    Prompt positions are yielded first (from the prefill), then each generated
-    token as it is produced by a KV-cached decode step. Generation stops at
-    ``num_completion_tokens`` or EOS (whichever first). ``residuals`` maps each
-    requested layer to its ``[d_model]`` residual at that position.
+    Prompt positions come first (from the prefill), then the generated tokens.
+    ``residuals`` maps each requested layer to its ``[d_model]`` residual -- one vector per layer
+    even on a hyper-connection trunk, where ``residual`` says which function of the stream stack the
+    lens was fitted on and both arms below collapse it before yielding. Each yielded batch is
+    everything that became available at once -- the whole prefill, then one group per decode step --
+    so the consumer can stage a batched read-out without ever holding a position back.
 
-    When ``steer_deltas`` is provided and ``steer_strength`` is non-zero, each
-    layer's residual is additively steered (at every position, prefill +
-    generation) before being captured/propagated, so both the generated tokens
-    and the read-outs reflect the steering. When ``swap_deltas`` is provided,
-    a SWAP intervention is applied instead (``steer_deltas`` holds the per-layer
-    source directions, ``swap_deltas`` the targets); swap takes precedence over
-    additive steering / ablation.
+    EagerModel runs the incremental KV-cached loop eagerly (per-token streaming, with
+    optional steer/swap write-hooks). The vLLM backend consumes the engine's
+    decode-time capture as it is produced, so it streams per token too; lens
+    INTERVENTION (steer/swap/ablate) is applied there by worker write-hooks.
     """
-    if isinstance(model, HookedTransformer):
-        yield from _iter_residuals_tlens(
+    if isinstance(model, EagerModel):
+        for step in _iter_residuals_engine(
             model,
             prompt_token_ids,
             union_layers,
@@ -896,32 +888,314 @@ def _iter_residuals(
             swap_deltas=swap_deltas,
             steer_generated=steer_generated,
             bos_token_id=bos_token_id,
-        )
+            residual=residual,
+        ):
+            yield step
         return
-    if isinstance(model, StandardizedTransformer):
-        yield from _iter_residuals_hf(
+    if isinstance(model, VLLMModel):
+        async for step in _iter_residuals_vllm(
             model,
             prompt_token_ids,
             union_layers,
             num_completion_tokens=num_completion_tokens,
             temperature=temperature,
-            eos_token_ids=eos_token_ids,
             steer_deltas=steer_deltas,
             steer_strength=steer_strength,
             steer_ablate=steer_ablate,
             swap_deltas=swap_deltas,
             steer_generated=steer_generated,
             bos_token_id=bos_token_id,
-        )
+            residual=residual,
+        ):
+            yield step
         return
     raise ValueError(
-        f"Lens endpoint does not support model type {type(model).__name__} "
-        "(only TransformerLens and nnsight/nnterp models)."
+        f"Lens endpoint does not support model type {type(model).__name__} (only the interp-engine and vLLM backends)."
     )
 
 
-def _iter_residuals_tlens(
-    model: HookedTransformer,
+def _build_vllm_lens_specs(
+    steer_deltas: dict[int, torch.Tensor] | None,
+    steer_strength: float,
+    steer_ablate: bool,
+    swap_deltas: dict[int, torch.Tensor] | None,
+    residual: LensResidualSpec = BLOCK_OUTPUT,
+    n_streams: int = 1,
+) -> list[dict]:
+    """Build the vLLM worker lens-intervention specs (steer/ablate/swap) per layer.
+
+    Mirrors the eager precedence in ``_iter_residuals_engine``: swap wins over
+    additive/ablation. Empty when there is no active intervention.
+
+    Every spec names the point the read-out is taken at, which is what lets an intervention reach a
+    hyper-connection trunk: ``resid_post`` is the worker's default and does not exist there, so a
+    spec that said nothing had nothing to aim at. On a conventional trunk ``point_name`` returns
+    exactly that default, so the two trunks share one code path rather than branching here.
+    """
+    swapping = bool(swap_deltas) and bool(steer_deltas)
+    steering = bool(steer_deltas) and (steer_strength != 0.0 or steer_ablate)
+    site: dict = {"point": residual.point_name(n_streams)}
+    if residual.write_stream is not None:
+        site["stream"] = int(residual.write_stream)
+    specs: list[dict] = []
+    if swapping and steer_deltas is not None and swap_deltas is not None:
+        for layer, tgt in swap_deltas.items():
+            src = steer_deltas.get(layer)
+            if src is not None:
+                specs.append(
+                    {
+                        **site,
+                        "layer": int(layer),
+                        "op": "swap",
+                        "delta": src.tolist(),
+                        "tgt": tgt.tolist(),
+                    }
+                )
+    elif steering and steer_deltas is not None:
+        for layer, delta in steer_deltas.items():
+            if steer_ablate:
+                specs.append({**site, "layer": int(layer), "op": "ablate", "delta": delta.tolist()})
+            else:
+                specs.append(
+                    {
+                        **site,
+                        "layer": int(layer),
+                        "op": "steer",
+                        "delta": delta.tolist(),
+                        "strength": steer_strength,
+                    }
+                )
+    return specs
+
+
+def _lens_max_tokens(num_completion_tokens: int) -> int:
+    """How many tokens to sample so that every requested position has a read-out.
+
+    A position's read-out comes from the forward pass that has that token as its *input*, and
+    nothing runs after the last token sampled. So sampling exactly ``n`` leaves the nth token
+    with no row and no read-out, and a request for 3 generated tokens displayed 2. Sampling one
+    extra runs that forward; the extra token itself sits past ``limit`` and is dropped by the
+    emit cap, on the same path that already discards an engine overrun.
+
+    ``num_completion_tokens == 0`` keeps its single throwaway token rather than growing to two:
+    an intervention-only request generates one to run the intervened forward, and that position
+    is not a result either.
+    """
+    return num_completion_tokens + 1 if num_completion_tokens > 0 else 1
+
+
+async def _iter_readout_vllm(
+    model: VLLMModel,
+    prompt_token_ids: list[int],
+    requested_types: list[LensType],
+    layers_by_type: dict[LensType, list[int]],
+    *,
+    num_completion_tokens: int,
+    temperature: float,
+    top_n: int,
+    softcap: float | None,
+    word_mask: torch.Tensor | None,
+    chunk_positions: int,
+    skip_before: int,
+    steer_deltas: dict[int, torch.Tensor] | None = None,
+    steer_strength: float = 0.0,
+    steer_ablate: bool = False,
+    swap_deltas: dict[int, torch.Tensor] | None = None,
+    steer_generated: bool = False,
+    bos_token_id: int | None = None,
+    residual: LensResidualSpec = BLOCK_OUTPUT,
+):
+    """vLLM lens stream, read out in the worker: yields batches of per-position top-k.
+
+    The residual-free counterpart of :func:`_iter_residuals_vllm`. Residuals are captured,
+    Jacobian-transported and unembedded in the worker process, so what comes back per
+    position is ``(top_idx, top_probs)`` per requested type rather than ``d_model`` floats
+    per layer. Driving it the other way -- capture out to this process, transport here, ship
+    the staged rows back for the unembed -- moved the same ~63 MB across ``collective_rpc``
+    twice for a 96-position 64-layer read-out, and that transport, not the GPU, was what the
+    endpoint's latency and its concurrency ceiling were made of.
+
+    Yields the same ``(token_id, is_generated, payload)`` triples the residual iterators do,
+    so the emit path downstream is shared; only the payload differs.
+
+    ``residual`` is where the lens was fitted, which decides both the point captured and -- on a
+    hyper-connection trunk, where the capture is a stream stack -- how the worker collapses it before
+    the transport. It travels as part of the read-out spec rather than being applied here, because on
+    this path the rows never leave the worker.
+    """
+    specs = [
+        {"layers": layers_by_type[lens_type], "jacobian": lens_type == LensType.JACOBIAN_LENS}
+        for lens_type in requested_types
+    ]
+    union_layers = sorted({layer for lens_type in requested_types for layer in layers_by_type[lens_type]})
+    n_streams = model.residual_basis.n_streams
+    points = [residual.address(layer, n_streams) for layer in union_layers]
+    prompt_len = len(prompt_token_ids)
+    intervention_specs = _build_vllm_lens_specs(
+        steer_deltas, steer_strength, steer_ablate, swap_deltas, residual, n_streams
+    )
+    lens_intervention = None
+    if intervention_specs:
+        skip = [i for i, tid in enumerate(prompt_token_ids) if bos_token_id is not None and tid == bos_token_id]
+        lens_intervention = {
+            "specs": intervention_specs,
+            "steer_generated": steer_generated,
+            "skip_positions": skip,
+            "prompt_len": prompt_len,
+        }
+    # As in `_iter_residuals_vllm`: an intervention-only request still generates one
+    # throwaway token to run the intervened forward, and that position is not a result.
+    limit = prompt_len if num_completion_tokens <= 0 else prompt_len + num_completion_tokens
+
+    slices: dict[int, list[tuple[torch.Tensor, torch.Tensor]]] = {}
+    emitted = max(0, int(skip_before))
+    async for first_position, idx_list, probs_list, gen_ids in model.lens_capture_readout_stream(
+        prompt_token_ids,
+        points,
+        specs,
+        top_n=top_n,
+        softcap=softcap,
+        word_mask=word_mask,
+        chunk_positions=chunk_positions,
+        skip_before=skip_before,
+        max_tokens=_lens_max_tokens(num_completion_tokens),
+        temperature=temperature,
+        lens_intervention=lens_intervention,
+        stream_reduce=residual.stream_reduce,
+        stream_index=residual.stream_index,
+    ):
+        # A yield may carry only the newly sampled ids (see `lens_capture_readout_stream`);
+        # those still matter here, because an id is half of what a position needs.
+        n_positions = idx_list[0].shape[0] // max(1, len(layers_by_type[requested_types[0]])) if idx_list else 0
+        for offset in range(n_positions):
+            per_type: list[tuple[torch.Tensor, torch.Tensor]] = []
+            for spec_index, lens_type in enumerate(requested_types):
+                n_layers = len(layers_by_type[lens_type])
+                k = idx_list[spec_index].shape[-1]
+                top_idx = idx_list[spec_index].view(n_positions, n_layers, k)[offset]
+                top_probs = probs_list[spec_index].view(n_positions, n_layers, k)[offset]
+                per_type.append((top_idx, top_probs))
+            slices[first_position + offset] = per_type
+
+        # A position needs BOTH its read-out and its token id; generation runs ahead of the
+        # read-outs, so emit only where the two have met (and never past the request's cap).
+        batch: list[tuple[int, bool, list[tuple[torch.Tensor, torch.Tensor]]]] = []
+        while emitted < limit and emitted in slices and emitted < prompt_len + len(gen_ids):
+            token_id = prompt_token_ids[emitted] if emitted < prompt_len else gen_ids[emitted - prompt_len]
+            batch.append((int(token_id), emitted >= prompt_len, slices.pop(emitted)))
+            emitted += 1
+        if batch:
+            yield batch
+
+
+async def _iter_residuals_vllm(
+    model: VLLMModel,
+    prompt_token_ids: list[int],
+    union_layers: list[int],
+    *,
+    num_completion_tokens: int,
+    temperature: float,
+    steer_deltas: dict[int, torch.Tensor] | None = None,
+    steer_strength: float = 0.0,
+    steer_ablate: bool = False,
+    swap_deltas: dict[int, torch.Tensor] | None = None,
+    steer_generated: bool = False,
+    bos_token_id: int | None = None,
+    residual: LensResidualSpec = BLOCK_OUTPUT,
+):
+    """vLLM residual stream: engine decode-time capture of resid_post at every position,
+    with optional jlens steer/ablate/swap intervention applied during generation.
+
+    ``num_completion_tokens == 0`` with no intervention captures the prefill only; otherwise
+    it generates and captures prompt + generated positions (the final sampled token is never
+    processed, so it has no residual -- universal autoregressive behavior). Intervention is
+    applied via decode-time worker write-hooks (norm-scaled+clamped steer / ablate / swap),
+    matching the eager path; BOS positions in the prefill are skipped.
+
+    Generation is consumed INCREMENTALLY (``capture_generation_stream``): every position is
+    yielded as soon as its residual row and its token id are both known, so the read-out
+    streams token-by-token like the eager path instead of waiting for the whole completion.
+    Positions from one drain are yielded as a single :data:`ResidualBatch`; the engine
+    outruns the read-out, so those batches naturally grow and the read-out stays batched
+    without holding anything back.
+
+    ``residual`` names the point to capture and, on a hyper-connection trunk, the reduction that
+    turns each ``[n, n_streams, d_model]`` block into the ``[n, d_model]`` rows the consumer stages.
+    Applied here rather than in the worker because this is the arm that ships residuals out; the
+    fused read-out reduces there instead, from the same declaration.
+    """
+    n_streams = model.residual_basis.n_streams
+    points = [residual.address(layer, n_streams) for layer in union_layers]
+    addresses = dict(zip(union_layers, points, strict=True))
+    prompt_len = len(prompt_token_ids)
+    specs = _build_vllm_lens_specs(steer_deltas, steer_strength, steer_ablate, swap_deltas, residual, n_streams)
+    lens_intervention = None
+    if specs:
+        skip = [i for i, tid in enumerate(prompt_token_ids) if bos_token_id is not None and tid == bos_token_id]
+        lens_intervention = {
+            "specs": specs,
+            "steer_generated": steer_generated,
+            "skip_positions": skip,
+            "prompt_len": prompt_len,
+        }
+
+    if num_completion_tokens <= 0 and lens_intervention is None:
+        caps = await model.capture(prompt_token_ids, points)
+        reduced = {layer: residual.reduce(caps[addresses[layer]], n_streams) for layer in union_layers}
+        yield [
+            (
+                int(prompt_token_ids[pos]),
+                False,
+                {layer: reduced[layer][pos] for layer in union_layers},
+            )
+            for pos in range(prompt_len)
+        ]
+        return
+
+    # Captured rows in forward order: the prefill's prompt_len rows, then one per decode
+    # step. Kept as per-row views so a position can be handed out the moment it lands.
+    rows: dict[int, list[torch.Tensor]] = {layer: [] for layer in union_layers}
+    gen_ids: list[int] = []
+    emitted = 0
+    # An intervention-only request (num_completion_tokens == 0) still has to generate one
+    # throwaway token to run the intervened forward; its position is not a result.
+    limit = prompt_len if num_completion_tokens <= 0 else prompt_len + num_completion_tokens
+
+    async for new_caps, token_ids in model.capture_generation_stream(
+        prompt_token_ids,
+        points,
+        max_tokens=_lens_max_tokens(num_completion_tokens),
+        temperature=temperature,
+        lens_intervention=lens_intervention,
+    ):
+        for layer in union_layers:
+            block = new_caps.get(addresses[layer])
+            if block is not None:
+                # Reduced per block rather than per row: on a stream stack this is an
+                # `n_streams`-way mean, and one call over the whole drain beats one per position.
+                rows[layer].extend(residual.reduce(block, n_streams).unbind(0))
+        gen_ids = token_ids
+        # A position needs BOTH its residual row and its token id; generation runs ahead
+        # of the drains, so take the smaller of the two (and never past the request's cap).
+        captured = min(len(rows[layer]) for layer in union_layers)
+        available = min(captured, prompt_len + len(gen_ids), limit)
+        batch: ResidualBatch = []
+        while emitted < available:
+            token_id = prompt_token_ids[emitted] if emitted < prompt_len else gen_ids[emitted - prompt_len]
+            batch.append(
+                (
+                    int(token_id),
+                    emitted >= prompt_len,
+                    {layer: rows[layer][emitted] for layer in union_layers},
+                )
+            )
+            emitted += 1
+        if batch:
+            yield batch
+
+
+def _iter_residuals_engine(
+    model: EagerModel,
     prompt_token_ids: list[int],
     union_layers: list[int],
     *,
@@ -934,227 +1208,173 @@ def _iter_residuals_tlens(
     swap_deltas: dict[int, torch.Tensor] | None = None,
     steer_generated: bool = False,
     bos_token_id: int | None = None,
-) -> Iterator[ResidualStep]:
-    device = model.cfg.device
+    residual: LensResidualSpec = BLOCK_OUTPUT,
+) -> Iterator[ResidualBatch]:
+    """Engine (raw HF) residual stream: KV-cached prefill + decode, capturing resid_post
+    per layer at every position, with optional additive-steer / swap interventions applied
+    via forward write-hooks (before the capture read-hooks, so read-outs reflect steering).
+
+    Yields the prefill's positions as one :data:`ResidualBatch`, then one per decode step.
+
+    This path hooks the decoder layer's own output rather than resolving an address, because it
+    interleaves capture with incremental decoding and re-installs its hooks per step. That tensor is
+    the block output on either kind of trunk, so ``residual`` supplies only the stream reduction on
+    the read and the stream to write on the intervention -- and any other capture point is refused
+    rather than silently read as this one.
+    """
+    if residual.capture_point != "block_output":
+        raise ValueError(
+            "The eager read-out captures each decoder layer's own output, so it cannot serve a lens "
+            f"fitted on {residual.capture_point!r}. Serve this lens on the vLLM backend, which "
+            "resolves the point through the engine's address table."
+        )
+    device = model.device
     captures: dict[int, torch.Tensor] = {}
-    name_to_layer = {f"blocks.{layer}.hook_resid_post": layer for layer in union_layers}
+    layer_module = {layer: model.arch.decoder_layers[layer] for layer in union_layers}
 
-    def hook_fn(tensor, hook):
-        captures[name_to_layer[hook.name]] = tensor.detach()
+    basis = model.residual_basis
+    n_streams = basis.n_streams
+    # What a write hook is handed here is the block's own output, which on a hyper-connection trunk
+    # is the whole `[batch, seq, streams, d_model]` stack rather than one residual. A lens fitted on
+    # one stream writes that stream; one fitted on the mean or the sum writes every stream at once.
+    # See `LensResidualSpec.write_stream` for why the second is the intervention it describes and
+    # not an approximation of it.
+    write_stream = residual.write_stream if n_streams > 1 else None
+    stacked_write = n_streams > 1 and write_stream is None
 
-    # Never intervene on the BOS token: its attention-sink residual has a huge
-    # norm, so the (un-normalized) steer/swap projection is spuriously large
-    # there and injects artifacts the read-out (which normalizes) never showed.
-    # We skip only the exact BOS id, so chat special tokens are still steered.
-    # ``skip_holder["mask"]`` is updated per forward (prompt mask, then per
-    # generated token) and read by the steer/swap hooks below.
-    skip_holder: dict = {"mask": _bos_skip_mask(prompt_token_ids, bos_token_id, device)}
-    gen_bos_mask = (
-        torch.ones((1, 1, 1), dtype=torch.bool, device=device) if bos_token_id is not None else None
-    )
+    skip_holder: dict = {"mask": _bos_skip_mask(prompt_token_ids, bos_token_id, device, stacked=stacked_write)}
 
-    # Steer/swap hooks run BEFORE the capture hooks at the same resid_post point,
-    # so the modified residual is both captured (read out) and propagated forward.
-    # They are kept separate from the capture hooks so we can drop them during
-    # generation when ``steer_generated`` is false (intervene on the prompt only).
     swapping = bool(swap_deltas) and bool(steer_deltas)
     steering = bool(steer_deltas) and (steer_strength != 0.0 or steer_ablate)
-    steer_fwd_hooks: list = []
-    if swapping and steer_deltas is not None and swap_deltas is not None:
 
-        def make_swap_hook(src: torch.Tensor, tgt: torch.Tensor):
-            def swap_hook(tensor, hook):  # noqa: ARG001
-                return _apply_swap(tensor, src, tgt, skip_mask=skip_holder["mask"])
+    def make_capture(layer: int):
+        def _cap(tensor: torch.Tensor) -> None:
+            captures[layer] = tensor.detach()
 
-            return swap_hook
+        return _cap
 
-        for layer, tgt in swap_deltas.items():
-            src = steer_deltas.get(layer)
-            if src is None:
-                continue
-            steer_fwd_hooks.append((f"blocks.{layer}.hook_resid_post", make_swap_hook(src, tgt)))
-    elif steering and steer_deltas is not None:
+    def make_steer(delta: torch.Tensor):
+        def _steer(tensor: torch.Tensor) -> torch.Tensor:
+            return _apply_steer(
+                tensor,
+                delta,
+                steer_strength,
+                steer_ablate,
+                skip_mask=skip_holder["mask"],
+            )
 
-        def make_steer_hook(delta: torch.Tensor):
-            def steer_hook(tensor, hook):  # noqa: ARG001
-                return _apply_steer(tensor, delta, steer_strength, steer_ablate, skip_mask=skip_holder["mask"])
+        return _steer
 
-            return steer_hook
+    def make_swap(src: torch.Tensor, tgt: torch.Tensor):
+        def _swap(tensor: torch.Tensor) -> torch.Tensor:
+            return _apply_swap(tensor, src, tgt, skip_mask=skip_holder["mask"])
 
-        for layer, delta in steer_deltas.items():
-            steer_fwd_hooks.append((f"blocks.{layer}.hook_resid_post", make_steer_hook(delta)))
-    capture_fwd_hooks = [(name, hook_fn) for name in name_to_layer]
-    # Prefill always applies the intervention to the prompt; generation only
-    # applies it when steer_generated is set.
-    prefill_fwd_hooks = steer_fwd_hooks + capture_fwd_hooks
-    gen_fwd_hooks = (steer_fwd_hooks if steer_generated else []) + capture_fwd_hooks
-    cache = HookedTransformerKeyValueCache.init_cache(model.cfg, device, 1)
+        return _swap
+
+    def scoped(write: Callable[[torch.Tensor], torch.Tensor]) -> Callable[[torch.Tensor], torch.Tensor]:
+        """Confine ``write`` to one stream of the stack, when the lens named one.
+
+        Out of place via ``replace_stream``, because the hook runs on a tensor the model still
+        holds. The selection is checked against the stream count rather than indexed directly:
+        indexing the wrong axis succeeds too, and returns a tensor of an entirely believable shape.
+        """
+        if write_stream is None:
+            return write
+        stream = write_stream
+
+        def _scoped(tensor: torch.Tensor) -> torch.Tensor:
+            return basis.replace_stream(tensor, stream, write(basis.select_stream(tensor, stream)))
+
+        return _scoped
+
+    def install(hm: HookManager, apply_intervention: bool) -> None:
+        # Write hooks first so the capture read hooks observe the modified residual.
+        if apply_intervention and swapping and steer_deltas is not None and swap_deltas is not None:
+            for layer, tgt in swap_deltas.items():
+                src = steer_deltas.get(layer)
+                if src is not None:
+                    hm.write(
+                        model.arch.decoder_layers[layer],
+                        scoped(make_swap(src, tgt)),
+                        point="output",
+                    )
+        elif apply_intervention and steering and steer_deltas is not None:
+            for layer, delta in steer_deltas.items():
+                hm.write(model.arch.decoder_layers[layer], scoped(make_steer(delta)), point="output")
+        for layer in union_layers:
+            hm.read(layer_module[layer], make_capture(layer), point="output")
+
+    def rows_for(layer: int) -> torch.Tensor:
+        """The layer's ``[seq, d_model]`` block for this forward, stream axis already collapsed."""
+        return residual.reduce(captures[layer][0], n_streams)
 
     tokens = torch.tensor([prompt_token_ids], device=device)
-    with torch.no_grad():
-        logits = model.run_with_hooks(
-            tokens,
-            return_type="logits",
-            fwd_hooks=prefill_fwd_hooks,
-            past_kv_cache=cache,
-        )
-    for pos, token_id in enumerate(prompt_token_ids):
-        yield (
+    with HookManager() as hm:
+        install(hm, apply_intervention=True)
+        with torch.no_grad():
+            out = model.hf_model(tokens, use_cache=True)
+    past = out.past_key_values
+    prefill = {layer: rows_for(layer) for layer in union_layers}
+    yield [
+        (
             int(token_id),
             False,
-            {layer: captures[layer][0, pos] for layer in union_layers},
+            {layer: prefill[layer][pos] for layer in union_layers},
         )
+        for pos, token_id in enumerate(prompt_token_ids)
+    ]
 
-    last_logits = logits[0, -1, :]
+    last_logits = out.logits[0, -1, :]
     generated = 0
     while generated < num_completion_tokens:
         next_id = _sample_token(last_logits, temperature)
         generated += 1
         captures.clear()
-        # Skip the intervention if this generated token is itself a BOS.
+        # Skip intervention on a generated BOS (its attention-sink residual norm is huge).
         skip_holder["mask"] = (
-            gen_bos_mask if (bos_token_id is not None and next_id == bos_token_id) else None
+            torch.ones((1, 1, 1, 1) if stacked_write else (1, 1, 1), dtype=torch.bool, device=device)
+            if (bos_token_id is not None and next_id == bos_token_id)
+            else None
         )
-        with torch.no_grad():
-            logits = model.run_with_hooks(
-                torch.tensor([[next_id]], device=device),
-                return_type="logits",
-                fwd_hooks=gen_fwd_hooks,
-                past_kv_cache=cache,
-            )
-        yield (
-            next_id,
-            True,
-            {layer: captures[layer][0, -1] for layer in union_layers},
-        )
-        if eos_token_ids and next_id in eos_token_ids:
-            break
-        last_logits = logits[0, -1, :]
-
-
-def _iter_residuals_hf(
-    model: StandardizedTransformer,
-    prompt_token_ids: list[int],
-    union_layers: list[int],
-    *,
-    num_completion_tokens: int,
-    temperature: float,
-    eos_token_ids: set[int] | None,
-    steer_deltas: dict[int, torch.Tensor] | None = None,
-    steer_strength: float = 0.0,
-    steer_ablate: bool = False,
-    swap_deltas: dict[int, torch.Tensor] | None = None,
-    steer_generated: bool = False,
-    bos_token_id: int | None = None,
-) -> Iterator[ResidualStep]:
-    # Reach through to the underlying HF model, bypassing nnsight tracing. nnsight
-    # loads weights lazily on the meta device, so ensure they are materialized.
-    if not getattr(model, "dispatched", False):
-        model.dispatch()
-    hf = model._model
-    layer_modules, _norm, _head = _hf_decoder_modules(hf)
-    device = next(hf.parameters()).device
-
-    captures: dict[int, torch.Tensor] = {}
-    # Never intervene on the BOS token (attention-sink norm makes the projection
-    # spuriously large). Only the exact BOS id is skipped, so chat special tokens
-    # are still steered. The holder is updated per forward (prompt, then per
-    # generated token) and read by the steer/swap hooks.
-    skip_holder: dict = {"mask": _bos_skip_mask(prompt_token_ids, bos_token_id, device)}
-    gen_bos_mask = (
-        torch.ones((1, 1, 1), dtype=torch.bool, device=device) if bos_token_id is not None else None
-    )
-
-    # Steer/swap hooks are registered BEFORE the capture hooks so the modified
-    # output is what gets captured (read out) and propagated to later layers.
-    swapping = bool(swap_deltas) and bool(steer_deltas)
-    steering = bool(steer_deltas) and (steer_strength != 0.0 or steer_ablate)
-    if swapping and steer_deltas is not None and swap_deltas is not None:
-        steer_handles = [
-            layer_modules[layer].register_forward_hook(
-                _make_swap_hook_hf(steer_deltas[layer], tgt, skip_holder=skip_holder)
-            )
-            for layer, tgt in swap_deltas.items()
-            if layer in steer_deltas
-        ]
-    elif steering and steer_deltas is not None:
-        steer_handles = [
-            layer_modules[layer].register_forward_hook(
-                _make_steer_hook_hf(delta, steer_strength, steer_ablate, skip_holder=skip_holder)
-            )
-            for layer, delta in steer_deltas.items()
-        ]
-    else:
-        steer_handles = []
-    capture_handles = [
-        layer_modules[layer].register_forward_hook(_make_capture_hook(captures, layer))
-        for layer in union_layers
-    ]
-    handles = steer_handles + capture_handles
-    try:
-        input_ids = torch.tensor([prompt_token_ids], device=device)
-        with torch.no_grad():
-            out = hf(input_ids=input_ids, use_cache=True)
-        past = out.past_key_values
-        for pos, token_id in enumerate(prompt_token_ids):
-            yield (
-                int(token_id),
-                False,
-                {layer: captures[layer][0, pos] for layer in union_layers},
-            )
-
-        # The intervention always applies to the prompt (prefill above). For
-        # generation it only applies when steer_generated is set; otherwise drop
-        # the steer/swap hooks here so the generated positions are not modified
-        # (the capture hooks stay so we still read out the generated tokens).
-        if not steer_generated:
-            for handle in steer_handles:
-                handle.remove()
-            steer_handles = []
-            handles = capture_handles
-
-        last_logits = out.logits[0, -1, :]
-        generated = 0
-        while generated < num_completion_tokens:
-            next_id = _sample_token(last_logits, temperature)
-            generated += 1
-            captures.clear()
-            # Skip the intervention if this generated token is itself a BOS.
-            skip_holder["mask"] = (
-                gen_bos_mask if (bos_token_id is not None and next_id == bos_token_id) else None
-            )
+        cur = torch.tensor([[next_id]], device=device)
+        with HookManager() as hm:
+            install(hm, apply_intervention=steer_generated)
             with torch.no_grad():
-                out = hf(
-                    input_ids=torch.tensor([[next_id]], device=device),
-                    past_key_values=past,
-                    use_cache=True,
-                )
-            past = out.past_key_values
-            yield (
-                next_id,
+                out = model.hf_model(cur, past_key_values=past, use_cache=True)
+        past = out.past_key_values
+        yield [
+            (
+                int(next_id),
                 True,
-                {layer: captures[layer][0, -1] for layer in union_layers},
+                {layer: rows_for(layer)[-1] for layer in union_layers},
             )
-            if eos_token_ids and next_id in eos_token_ids:
-                break
-            last_logits = out.logits[0, -1, :]
-    finally:
-        for handle in handles:
-            handle.remove()
+        ]
+        last_logits = out.logits[0, -1, :]
+        if eos_token_ids is not None and next_id in eos_token_ids:
+            break
 
 
-def _decode_residuals(model, residuals_2d: torch.Tensor) -> torch.Tensor:
+async def _decode_residuals(model, residuals_2d: torch.Tensor, softcap: float | None = None) -> torch.Tensor:
     """Decode ``[n_rows, d_model]`` residuals to ``[n_rows, vocab]`` logits using
-    the model's own final norm + unembedding (no Jacobian; caller applies that)."""
+    the model's own final norm + unembedding (no Jacobian; caller applies that).
+
+    EagerModel decodes eagerly (real final_norm + lm_head); the vLLM backend decodes
+    via the uniform worker ``compute_logits`` (reuses vLLM's own norm + lm_head).
+
+    The softcap is applied here rather than by the caller because the two backends
+    do not agree on whether it has already happened: vLLM applies the model's
+    configured cap inside ``compute_logits``, the eager ``lm_head`` does not. The
+    returned logits are softcapped exactly once either way.
+
+    ``logit_multiplier`` rides along for the same reason and from the same asymmetry: on Cohere,
+    Granite, Falcon-H1 and LLaDA the real forward scales its logits after ``lm_head``, and vLLM's
+    ``LogitsProcessor`` does too, while the eager ``lm_head`` does not. Read off the model rather than
+    passed in, because unlike the softcap there is no served-model override for it.
+    """
+    if isinstance(model, VLLMModel):
+        return await model.decode_residuals(residuals_2d)
     with torch.no_grad():
-        if isinstance(model, HookedTransformer):
-            param_dtype = model.W_U.dtype
-            return model.unembed(model.ln_final(residuals_2d.to(param_dtype)))
-        # nnsight/nnterp: use the dispatched HF modules directly.
-        hf = model._model
-        _layers, norm, head = _hf_decoder_modules(hf)
-        param = next(hf.parameters())
-        return head(norm(residuals_2d.to(device=param.device, dtype=param.dtype)))
+        return engine_decode_residuals(model, residuals_2d, softcap=softcap, multiplier=model.logit_multiplier)
 
 
 # --------------------------------------------------------------------------- #
@@ -1171,6 +1391,7 @@ def _compute_logits_for_types(
     layers_by_type: dict[LensType, list[int]],
     lens: LoadedJacobianLens | None,
     softcap: float | None,
+    residual: LensResidualSpec = BLOCK_OUTPUT,
 ) -> LayerLogitsByType:
     """Read out per-layer logits for every requested lens type in ONE forward pass.
 
@@ -1180,17 +1401,10 @@ def _compute_logits_for_types(
     model forward pass. The final layer (not fitted) is always decoded directly,
     giving the model's true output.
     """
-    if isinstance(model, HookedTransformer):
-        return _compute_logits_for_types_tlens(
-            model, token_ids, layers_by_type, lens, softcap
-        )
-    if isinstance(model, StandardizedTransformer):
-        return _compute_logits_for_types_nnsight(
-            model, token_ids, layers_by_type, lens, softcap
-        )
+    if isinstance(model, EagerModel):
+        return _compute_logits_for_types_engine(model, token_ids, layers_by_type, lens, softcap, residual)
     raise ValueError(
-        f"Lens endpoint does not support model type {type(model).__name__} "
-        "(only TransformerLens and nnsight/nnterp models)."
+        f"Lens endpoint does not support model type {type(model).__name__} (only the interp-engine backend)."
     )
 
 
@@ -1208,86 +1422,44 @@ def _common_prefix_len(token_ids: list[int], cached_token_ids: list[int]) -> int
     return n
 
 
-def _compute_logits_for_types_tlens(
-    model: HookedTransformer,
+def _compute_logits_for_types_engine(
+    model: EagerModel,
     token_ids: list[int],
     layers_by_type: dict[LensType, list[int]],
     lens: LoadedJacobianLens | None,
     softcap: float | None,
+    residual: LensResidualSpec = BLOCK_OUTPUT,
 ) -> LayerLogitsByType:
-    device = model.cfg.device
-    param_dtype = model.W_U.dtype
-    tokens = torch.tensor(token_ids, device=device).unsqueeze(0)
+    """Engine read-out: capture the lens's point once, decode each layer via real norm+lm_head.
 
+    JACOBIAN_LENS rows first transport the residual with the fitted lens (only for
+    layers the lens was fit on).
+
+    Unlike :func:`_iter_residuals_engine`, this goes through the engine's address table, so it can
+    serve any capture point ``residual`` names -- and collapses the stream stack where the trunk
+    carries one.
+    """
+    from interp_engine import run_with_cache
+
+    device = model.device
+    tokens = torch.tensor(token_ids, device=device).unsqueeze(0)
     union = _union_layers(layers_by_type)
-    wanted = {f"blocks.{layer}.hook_resid_post" for layer in union}
-    with torch.no_grad():
-        _, cache = model.run_with_cache(
-            tokens, names_filter=lambda name: name in wanted
-        )
-    residuals = {layer: cache[f"blocks.{layer}.hook_resid_post"][0] for layer in union}
+    n_streams = model.residual_basis.n_streams
+    point = residual.point_name(n_streams)
+    cache = run_with_cache(model, tokens, [(point, layer) for layer in union])
+    residuals = {layer: residual.reduce(cache.get(point, layer)[0], n_streams) for layer in union}
 
     out: LayerLogitsByType = {}
     for lens_type, layers in layers_by_type.items():
         use_jacobian = lens_type == LensType.JACOBIAN_LENS and lens is not None
         layer_logits: dict[int, torch.Tensor] = {}
         for layer in layers:
-            residual = residuals[layer]  # [seq, d_model]
+            rows = residuals[layer]
             if use_jacobian and lens is not None and layer in lens.jacobians:
-                residual = lens.transport(residual.float(), layer)
-            residual = residual.to(param_dtype)
-            with torch.no_grad():
-                logits = model.unembed(model.ln_final(residual))  # [seq, vocab]
+                rows = lens.transport(rows.float(), layer)
+            logits = engine_decode_residuals(model, rows, multiplier=model.logit_multiplier)
             logits = apply_final_logit_softcap(logits, softcap)
-            # Keep on-device: the vocab-sized ranking in the read-out runs on
-            # the GPU. Moving to CPU here would force that work onto the CPU.
-            # Keep the model dtype (no float32 upcast) to halve the resident
-            # vocab-sized tensors.
             layer_logits[layer] = logits.detach()
-        out[lens_type] = layer_logits
-    return out
-
-
-def _compute_logits_for_types_nnsight(
-    model: StandardizedTransformer,
-    token_ids: list[int],
-    layers_by_type: dict[LensType, list[int]],
-    lens: LoadedJacobianLens | None,
-    softcap: float | None,
-) -> LayerLogitsByType:
-    config = Config.get_instance()
-    model_dtype = STR_TO_DTYPE.get(config.model_dtype, torch.float32)
-    device = torch.device(getattr(model, "device", None) or config.device or "cpu")
-    tokens = torch.tensor(token_ids)
-    union = _union_layers(layers_by_type)
-
-    saves: dict[tuple[LensType, int], object] = {}
-    with model.trace(tokens):
-        hiddens = {layer: model.layers_output[layer] for layer in union}
-        for lens_type, layers in layers_by_type.items():
-            use_jacobian = lens_type == LensType.JACOBIAN_LENS and lens is not None
-            for layer in layers:
-                hidden = hiddens[layer]  # [1, seq, d_model]
-                if use_jacobian and lens is not None and layer in lens.jacobians:
-                    j_bar = lens.jacobian_on(layer, device).to(torch.float32)
-                    hidden = (hidden.to(torch.float32) @ j_bar.T).to(model_dtype)
-                logits = model.project_on_vocab(hidden)  # [1, seq, vocab]
-                if softcap is not None:
-                    logits = softcap * torch.tanh(logits / softcap)
-                # Use nnsight.save(...) (not the .save() method): the package
-                # disables nnsight PYMOUNT, so the method-based save is unavailable.
-                saves[(lens_type, layer)] = nnsight.save(logits)
-
-    out: LayerLogitsByType = {}
-    for lens_type, layers in layers_by_type.items():
-        layer_logits: dict[int, torch.Tensor] = {}
-        for layer in layers:
-            saved = saves[(lens_type, layer)]
-            tensor = saved[0] if saved.dim() == 3 else saved  # type: ignore[attr-defined]
-            # Keep on-device (see _compute_logits_for_types_tlens): the ranking
-            # in the read-out is GPU-resident. Keep the model dtype (no float32
-            # upcast) to halve the resident vocab-sized tensors.
-            layer_logits[layer] = tensor.detach()
         out[lens_type] = layer_logits
     return out
 
@@ -1332,6 +1504,13 @@ class _TypeReadoutState:
 
     def process(self, logits: torch.Tensor) -> LensTypeSlice:
         """logits: ``[n_layers, vocab]`` for ONE position."""
+        # float32 for logsumexp / topk stability, matching the vLLM worker's
+        # `worker_lens_readout`. A bf16 read-out is not merely rounded: `log_z`
+        # sums ~256k terms and `top_logits - log_z` cancels two large nearly
+        # equal values, both in a format with 8 mantissa bits. The result is a
+        # systematic overestimate that reports probabilities of exactly 1.0 and
+        # top-k rows summing above 1.
+        logits = logits.float()
         # `log_z` is computed over the FULL (unmasked) vocab, so the reported
         # probabilities stay the model's real probabilities; non-word filtering
         # only changes WHICH tokens are selected into the top-n.
@@ -1364,8 +1543,7 @@ class _TypeReadoutState:
         top_probs_np = top_probs.double().cpu().numpy()
 
         top_tokens = [
-            [_decode_token(self.tokenizer, int(token_id), self.decode_cache) for token_id in row]
-            for row in top_idx_np
+            [_decode_token(self.tokenizer, int(token_id), self.decode_cache) for token_id in row] for row in top_idx_np
         ]
 
         return LensTypeSlice(
@@ -1374,6 +1552,19 @@ class _TypeReadoutState:
             # Round to 4 decimals (0.01% resolution) to cut serialized payload
             # size. The client only renders integer percentages and normalized
             # per-layer heatmap weights, so extra precision is never visible.
+            top_probs=np.round(top_probs_np, 4).tolist(),
+        )
+
+    def from_topk(self, top_idx: torch.Tensor, top_probs: torch.Tensor) -> LensTypeSlice:
+        """Build a slice from worker-side top-k ids/probs (``[n_layers, top_n]``)."""
+        top_idx_np = top_idx.detach().cpu().numpy()
+        top_probs_np = top_probs.detach().double().cpu().numpy()
+        top_tokens = [
+            [_decode_token(self.tokenizer, int(token_id), self.decode_cache) for token_id in row] for row in top_idx_np
+        ]
+        return LensTypeSlice(
+            type=self.lens_type,
+            top_tokens=top_tokens,
             top_probs=np.round(top_probs_np, 4).tolist(),
         )
 
@@ -1412,60 +1603,170 @@ def _select_layers(
 # --------------------------------------------------------------------------- #
 
 
-# How many prompt positions to decode per batched read-out matmul. The
-# per-layer unembedding matmul against the (large) vocab re-streams the
-# ``lm_head`` weight from HBM, so it is memory-bound when decoding one position
-# at a time. Batching ``chunk_size * n_layers`` rows into a single matmul
-# amortizes that weight read across positions, crossing into compute-bound
-# territory (the win saturates once ``chunk_size * n_layers`` exceeds the GPU's
-# FLOP:byte ridge, ~150 on A100 / ~300 on H100). Generated tokens are produced
-# one at a time and are decoded individually (an effective chunk of 1).
+# What a position carries from the iterator to the emit path. Raw residuals on the eager
+# backend, where the read-out happens here; on vLLM the read-out itself -- one
+# ``(top_idx, top_probs)`` per requested type -- because the worker did it already.
+PositionPayload = dict[int, torch.Tensor] | list[tuple[torch.Tensor, torch.Tensor]]
+
+# How many positions to decode per batched read-out matmul. The per-layer
+# unembedding matmul against the (large) vocab re-streams the ``lm_head`` weight
+# from HBM, so it is memory-bound when decoding one position at a time. Batching
+# ``chunk_size * n_layers`` rows into a single matmul amortizes that weight read
+# across positions, crossing into compute-bound territory (the win saturates once
+# ``chunk_size * n_layers`` exceeds the GPU's FLOP:byte ridge, ~150 on A100 / ~300
+# on H100). It is kept small because the intermediate it bounds is vocab-sized:
+# ``chunk_size * n_layers * vocab``, which is 213 MB per chunk at gemma-2-2b's
+# 26 layers x 256k vocab. Both backends use it: eager decodes a chunk per matmul
+# here, and vLLM passes it to the worker as ``chunk_positions``.
 _READOUT_CHUNK_SIZE = 8
 
+# How many positions to STAGE (Jacobian-transport) per read-out batch, ahead of
+# splitting into read-out chunks. Sized independently of the chunk above because
+# the two are bound by different things: the transport's cost is re-reading each
+# layer's ``J_bar`` (10.6 MB at d_model=2304 in bf16, so ~265 MB for a 25-layer
+# sweep), and its intermediate is only ``batch * n_layers * d_model`` -- 31 MB
+# here, three orders of magnitude below the vocab-sized one. Staging at the
+# read-out chunk's granularity instead re-read every J_bar once per 8 positions,
+# which cost 0.7s of a 1.3s 398-token gemma-2-2b request (measured when J_bar was
+# held fp32, so twice the bytes below); staging 128 at a time makes it 0.05s.
+#
+# The re-read is from HBM now that the lens is device-resident, so the same 16x
+# reduction in sweeps is worth ~72ms rather than ~650ms on a 128-position batch. Still
+# worth batching, but it no longer gates the first read-out chunk on anything a user
+# would notice, which is what makes staging this far ahead of emission acceptable.
+#
+# The eager backend's, since it is the one that stages here. On vLLM this only sets how
+# many already-decoded positions the emit path assembles messages for at a time.
+_TRANSPORT_BATCH_SIZE = 128
 
-def _chunk_position_logits(
-    model,
+
+def _stack_chunk_residuals(
     lens_type: LensType,
     layers: list[int],
     residuals_list: list[dict[int, torch.Tensor]],
     lens: LoadedJacobianLens | None,
-    softcap: float | None,
-) -> list[torch.Tensor]:
-    """Decode several positions' per-layer residuals in ONE batched matmul.
-
-    Returns one ``[n_layers, vocab]`` logit tensor per input position. All
-    ``len(positions) * n_layers`` rows are stacked and decoded together so the
-    unembedding weight is read from HBM once for the whole chunk instead of once
-    per position. The read-out logits are kept in the model dtype (no float32
-    upcast): the unembedding matmul is already bf16, so widening afterwards only
-    doubles the vocab-sized tensor's bandwidth without recovering precision.
+) -> torch.Tensor:
+    """Stack per-position per-layer residuals to ``[n_positions * n_layers, d_model]``.
 
     For JACOBIAN_LENS, fitted layers are first transported with ``J_bar``; the
-    final (unfitted) layer is decoded directly (``J = I``), giving the model's
-    true output.
+    final (unfitted) layer is left as-is (``J = I``), giving the model's true output.
+
+    The transport is batched per LAYER (one ``[n_positions, d_model] @ [d_model,
+    d_model]`` matmul) rather than per position. ``J_bar`` is ``d_model**2``
+    values -- 10.6 MB at ``d_model=2304`` in bf16, far past any cache -- so a
+    per-position matvec re-streams the whole matrix for every position and the loop
+    is bound by memory bandwidth, not arithmetic.
+
+    Being bandwidth-bound is also why ``LoadedJacobianLens.transport`` casts the
+    residual down to the lens dtype instead of widening ``J_bar``: the residual block
+    is ``n_positions * d_model`` and the matrix is ``d_model**2``.
+
+    Everything is staged on the lens's ``transport_device`` -- including the layers that
+    are NOT transported, which have to share a device to stack with the ones that are.
+
+    The EAGER backend's staging. vLLM does the equivalent inside the worker, in
+    ``worker_lens_capture_readout``, because that is where its residuals are; a lens whose
+    matrices went to the worker leaves ``transport_device`` unset and never reaches here.
     """
     use_jacobian = lens_type == LensType.JACOBIAN_LENS and lens is not None
-    n_layers = len(layers)
-    rows: list[torch.Tensor] = []
-    for residuals in residuals_list:
-        for layer in layers:
-            residual = residuals[layer]  # [d_model]
-            if use_jacobian and lens is not None and layer in lens.jacobians:
-                residual = lens.transport(residual.float(), layer)
-            # Keep a uniform dtype across rows so transported (float32) and
-            # directly-decoded (model-dtype) layers can be stacked together;
-            # `_decode_residuals` recasts to the param dtype for the matmul, so
-            # this is numerically a no-op.
-            rows.append(residual.float())
-    stacked = torch.stack(rows, dim=0)  # [n_positions * n_layers, d_model]
-    logits = _decode_residuals(model, stacked)  # [n_positions * n_layers, vocab]
-    logits = apply_final_logit_softcap(logits, softcap)
-    vocab = logits.shape[-1]
-    logits = logits.view(len(residuals_list), n_layers, vocab)
-    return [logits[pos] for pos in range(len(residuals_list))]
+    stage_device = lens.transport_device if use_jacobian and lens is not None else None
+    # [n_layers][n_positions, d_model], each block sharing one J_bar.
+    blocks: list[torch.Tensor] = []
+    for layer in layers:
+        # Uniform float32 so transported and directly-decoded layers stack
+        # together; the decode path recasts to the param dtype for the matmul.
+        block = torch.stack([residuals[layer] for residuals in residuals_list], dim=0).float()
+        if stage_device is not None and block.device != stage_device:
+            block = block.to(stage_device)
+        if use_jacobian and lens is not None and layer in lens.jacobians:
+            block = lens.transport(block, layer)
+        blocks.append(block)
+    # [n_positions, n_layers, d_model] -> rows ordered position-major, which is
+    # the layout `_chunk_position_logits` / `_chunk_position_slices_vllm` unfold.
+    return torch.stack(blocks, dim=1).reshape(-1, blocks[0].shape[-1])
 
 
-def _build_messages(
+async def _chunk_position_logits(
+    model,
+    staged_rows: torch.Tensor,
+    n_layers: int,
+    softcap: float | None,
+) -> list[torch.Tensor]:
+    """Decode a chunk of already-staged rows in ONE batched matmul.
+
+    ``staged_rows`` is ``[n_positions * n_layers, d_model]`` in position-major
+    order (as produced by :func:`_stack_chunk_residuals`, already transported for
+    JACOBIAN_LENS). Returns one ``[n_layers, vocab]`` logit tensor per position.
+    All rows are decoded together so the unembedding weight is read from HBM once
+    for the whole chunk instead of once per position. The chunk is kept in the
+    model dtype: the unembedding matmul is already bf16, so widening every row at
+    once only doubles the vocab-sized tensor's bandwidth. The softmax does need
+    float32 to be correct, so ``_TypeReadoutState.process`` upcasts the one
+    position it is reading out rather than the whole chunk.
+
+    Used by the EagerModel path. The vLLM path uses
+    :func:`_chunk_position_slices_vllm` instead so vocab-sized logits never cross
+    ``collective_rpc``.
+    """
+    n_positions = staged_rows.shape[0] // n_layers
+    logits = await _decode_residuals(model, staged_rows, softcap)  # [n_rows, vocab]
+    logits = logits.view(n_positions, n_layers, logits.shape[-1])
+    return [logits[pos] for pos in range(n_positions)]
+
+
+def _to_wire_dtype(staged_rows: torch.Tensor) -> torch.Tensor:
+    """Cast staged rows to the dtype the worker will use, where that dtype is known.
+
+    ``model_dtype`` is ``"auto"`` by default and only resolves to something concrete inside
+    vLLM, so an unrecognised name keeps the float32 rather than guessing: casting down to a
+    dtype the model does not use would lose precision for real, where casting to the one it
+    does use loses none.
+    """
+    wire = STR_TO_DTYPE.get(str(Config.get_instance().model_dtype))
+    return staged_rows if wire is None else staged_rows.to(wire)
+
+
+async def _chunk_position_slices_vllm(
+    model: VLLMModel,
+    staged_rows: torch.Tensor,
+    n_layers: int,
+    softcap: float | None,
+    *,
+    state: _TypeReadoutState,
+    word_mask: torch.Tensor | None,
+) -> list[LensTypeSlice]:
+    """vLLM lens readout with the residuals shipped from here: one RPC per type x chunk.
+
+    The fallback path, used only when the lens could not be made worker-resident (see
+    :func:`place_jacobian_lens_on_worker`), because then this process is the only one that
+    can apply ``J_bar``. ``staged_rows`` is ``[n_positions * n_layers, d_model]``,
+    position-major and already transported. Only the norm + unembed + top-k run on the
+    worker, so the RPC returns ``[n_rows, top_n]`` instead of ``[n_rows, vocab]``.
+
+    Sent at the model dtype rather than the float32 the staging produces. ``worker_lens_readout``
+    opens with ``.to(param.device, param.dtype)``, so the extra precision is discarded on
+    arrival -- shipping it just doubles a payload that is 10 MB per call at 64 layers x 8
+    positions x d_model 5120. That payload is why this is the fallback and not the norm: it
+    made the RPC the read-out's serial resource, holding measured throughput near 0.5 req/s
+    with the GPU at ~18%.
+    """
+    n_positions = staged_rows.shape[0] // n_layers
+    top_idx, top_probs = await model.decode_residuals_topk(
+        _to_wire_dtype(staged_rows),
+        top_n=state.top_n,
+        softcap=softcap,
+        word_mask=word_mask,
+        rows_per_group=n_layers,
+    )
+    # [n_positions * n_layers, k] -> per position [n_layers, k] (k may be < top_n
+    # only if vocab is tiny; real models always have vocab >> top_n).
+    k = int(top_idx.shape[-1])
+    top_idx = top_idx.view(n_positions, n_layers, k)
+    top_probs = top_probs.view(n_positions, n_layers, k)
+    return [state.from_topk(top_idx[pos], top_probs[pos]) for pos in range(n_positions)]
+
+
+async def _build_messages(
     model,
     request: LensPromptRequest,
     requested_types: list[LensType],
@@ -1479,13 +1780,15 @@ def _build_messages(
     steer_ablate: bool = False,
     swap_deltas: dict[int, torch.Tensor] | None = None,
     steer_generated: bool = False,
-) -> Iterator[BaseModel]:
+    residual: LensResidualSpec = BLOCK_OUTPUT,
+) -> AsyncIterator[BaseModel]:
     """Yield the ordered stream of messages: meta -> token* -> done.
 
     A plain (synchronous) generator; the route wraps it to manage the model lock
     and NDJSON serialization. Residuals are produced incrementally (prefill, then
     one KV-cached decode step per generated token) and each position's lens slice
-    is emitted as soon as it is computed — true token-by-token streaming.
+    is emitted as soon as it is computed — token-by-token streaming, with the
+    read-out batched over whatever positions the backend already has ready.
 
     ``reuse_len`` is the number of leading prompt positions the client already
     has read-outs for (the token-id common prefix). The model is still prefilled
@@ -1500,6 +1803,38 @@ def _build_messages(
     union_layers = _union_layers(layers_by_type)
     eos_token_ids = _resolve_eos_token_ids(model, tokenizer)
     bos_token_id = getattr(tokenizer, "bos_token_id", None)
+
+    # Per-token chat spans (single source of truth for message boundaries):
+    # prompt positions come from the engine's message_spans (verified to align
+    # with the tokenized prompt); generated positions from an incremental tracker
+    # that follows the assistant turn (harmony channels + generic turn-end). Both
+    # are None when there is no chat context (raw-text / reproduction requests),
+    # in which case the frontend renders the tokens plainly.
+    prompt_spans, is_prefill = compute_prompt_spans(model, request, prompt_token_ids)
+    gen_message_index = (len(request.chat) - 1) if (is_prefill and request.chat) else None
+    # ``for_prompt`` reads the prompt's trailing scaffold so a thinking-enabled template (which
+    # ends on a dangling <think>) has its generated reasoning channelled correctly.
+    gen_tracker = GeneratedTurnSpans.for_prompt(
+        tokenizer,
+        [span.token_str for span in prompt_spans],
+        message_index=gen_message_index,
+    )
+
+    def _span_fields(pos: int, token_id: int, is_generated: bool, token_str: str) -> dict:
+        """Span metadata for one position. Must be called at most once per
+        generated position, in generation order (it advances the tracker)."""
+        if is_generated:
+            span = gen_tracker.process(pos, int(token_id), token_str)
+        elif 0 <= pos < len(prompt_spans):
+            span = prompt_spans[pos]
+        else:
+            return {}
+        return {
+            "message_index": span.message_index,
+            "role": span.role,
+            "channel": span.channel,
+            "section": span.section,
+        }
 
     yield LensMetaMessage(
         model=request.model,
@@ -1525,9 +1860,11 @@ def _build_messages(
         tokens=[
             LensPromptToken(
                 position=pos,
-                token=prompt_display[pos],
+                token=prompt_display[pos].token,
                 id=int(token_id),
                 is_generated=False,
+                is_char_continuation=prompt_display[pos].continuation,
+                **_span_fields(pos, int(token_id), False, prompt_display[pos].token),
             )
             for pos, token_id in enumerate(prompt_token_ids)
         ]
@@ -1543,135 +1880,225 @@ def _build_messages(
     # recovered character so the emoji shows at every contributing position.
     pending: list[LensTokenMessage] = []
 
-    def _emit(entry: LensTokenMessage, token_str: str) -> LensTokenMessage:
+    def _emit(entry: LensTokenMessage, token_str: str, *, continuation: bool = False) -> LensTokenMessage:
         entry.token = token_str
+        entry.is_char_continuation = continuation
         return entry
 
     def _flush_pending_as_is() -> list[LensTokenMessage]:
+        # An unrecoverable run: each position keeps its own lone replacement char, so none of
+        # them is repeating a neighbour's character.
         flushed = [_emit(p, _decode_token(tokenizer, p.id, decode_cache)) for p in pending]
         pending.clear()
         return flushed
 
-    def _emit_chunk(
-        buf: list[tuple[int, int, bool, dict[int, torch.Tensor]]],
-    ) -> Iterator[LensTokenMessage]:
-        """Decode a chunk of buffered positions in ONE batched read-out matmul,
-        then emit each position's token message in order (with multi-byte-char
-        repair). An empty chunk is a no-op."""
+    # Word-mask for the vLLM top-k path (built once; the eager path builds it
+    # lazily inside `_TypeReadoutState` from logits.shape[-1]). Must be sized to
+    # the model's logits vocab (padded embedding), not tokenizer.vocab_size alone.
+    vllm_word_mask: torch.Tensor | None = None
+    if isinstance(model, VLLMModel) and request.filter_non_word_tokens:
+        try:
+            vs = _readout_vocab_size(tokenizer, model)
+            vllm_word_mask = _word_token_mask(tokenizer, vs)
+            vocab_size = vs
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to build word-token mask for vLLM lens readout")
+            vllm_word_mask = None
+
+    async def _emit_chunk(
+        buf: list[tuple[int, int, bool, PositionPayload]],
+    ) -> "AsyncIterator[LensTokenMessage]":
+        """Emit token messages for a batch of positions, in order (with multi-byte-char repair).
+        An empty batch is a no-op.
+
+        On vLLM the read-out already happened, in the worker, so each position arrives holding
+        its per-type top-k and there is nothing here but message assembly.
+
+        On the eager path the work is here. The Jacobian transport is staged ONCE per lens type
+        for the WHOLE batch, so each layer's ``J_bar`` is read once no matter how many positions
+        arrived, and the vocab-sized read-out then walks the batch in ``_READOUT_CHUNK_SIZE``
+        chunks. Each chunk's messages are emitted as soon as that chunk is decoded --
+        chunk-major, not type-major. Ordering the loops the other way would hold the first
+        message until the entire batch (up to ``_TRANSPORT_BATCH_SIZE`` positions x every type)
+        had been decoded, which cost 0.18s of time-to-first-read-out on a 398-token gemma-2-2b
+        prompt.
+        """
         nonlocal vocab_size
         if not buf:
             return
 
-        residuals_list = [residuals for (_, _, _, residuals) in buf]
-        # Per-position results, computed type-by-type with a single batched
-        # read-out matmul per type across the whole chunk (the win in #2).
-        per_pos_results: list[list[LensTypeSlice]] = [[] for _ in buf]
+        # Read by the payload rather than the backend: which iterator ran is the thing that
+        # decides this, and the two payload shapes are what tell them apart.
+        precomputed = isinstance(buf[0][3], list)
         for lens_type in requested_types:
-            logits_list = _chunk_position_logits(
-                model, lens_type, layers_by_type[lens_type], residuals_list, lens, softcap
+            if lens_type in states:
+                continue
+            if vocab_size <= 0:
+                vocab_size = _readout_vocab_size(tokenizer, model)
+            states[lens_type] = _TypeReadoutState(
+                lens_type,
+                tokenizer,
+                vocab_size,
+                top_n=request.top_n,
+                decode_cache=decode_cache,
+                filter_non_word=request.filter_non_word_tokens,
             )
-            state = states.get(lens_type)
-            if state is None:
-                vocab_size = int(logits_list[0].shape[-1])
-                state = _TypeReadoutState(
-                    lens_type,
-                    tokenizer,
-                    vocab_size,
-                    top_n=request.top_n,
-                    decode_cache=decode_cache,
-                    filter_non_word=request.filter_non_word_tokens,
-                )
-                states[lens_type] = state
-            for i, logits in enumerate(logits_list):
-                per_pos_results[i].append(state.process(logits))
 
-        for i, (pos, token_id, is_generated, _residuals) in enumerate(buf):
-            entry = LensTokenMessage(
-                position=pos,
-                token="",
-                id=int(token_id),
-                is_generated=is_generated,
-                results=per_pos_results[i],
-            )
-            solo = _decode_token(tokenizer, int(token_id), decode_cache)
-            if _REPLACEMENT_CHAR not in solo:
-                # A self-contained token: flush any stuck fragment run first, then
-                # emit this token normally.
-                for flushed in _flush_pending_as_is():
-                    yield flushed
-                yield _emit(entry, solo)
+        staged_by_type: dict[LensType, torch.Tensor] = {}
+        if not precomputed:
+            residuals_list = [cast("dict[int, torch.Tensor]", payload) for (_, _, _, payload) in buf]
+            staged_by_type = {
+                lens_type: _stack_chunk_residuals(lens_type, layers_by_type[lens_type], residuals_list, lens)
+                for lens_type in requested_types
+            }
+
+        step = len(buf) if precomputed else _READOUT_CHUNK_SIZE
+        for start in range(0, len(buf), step):
+            end = min(start + step, len(buf))
+            chunk_results: list[list[LensTypeSlice]] = [[] for _ in range(end - start)]
+            if precomputed:
+                for i in range(end - start):
+                    payload = cast("list[tuple[torch.Tensor, torch.Tensor]]", buf[start + i][3])
+                    for spec_index, lens_type in enumerate(requested_types):
+                        top_idx, top_probs = payload[spec_index]
+                        chunk_results[i].append(states[lens_type].from_topk(top_idx, top_probs))
             else:
-                # A fragment: buffer it and see if the run now decodes cleanly.
-                pending.append(entry)
-                combined = tokenizer.decode(
-                    [p.id for p in pending], clean_up_tokenization_spaces=False
+                for lens_type in requested_types:
+                    state = states[lens_type]
+                    n_layers = len(layers_by_type[lens_type])
+                    rows = staged_by_type[lens_type][start * n_layers : end * n_layers]
+                    if isinstance(model, VLLMModel):
+                        slices = await _chunk_position_slices_vllm(
+                            model,
+                            rows,
+                            n_layers,
+                            softcap,
+                            state=state,
+                            word_mask=vllm_word_mask if request.filter_non_word_tokens else None,
+                        )
+                        for i, sl in enumerate(slices):
+                            chunk_results[i].append(sl)
+                        continue
+                    logits_list = await _chunk_position_logits(model, rows, n_layers, softcap)
+                    if vocab_size <= 0:
+                        vocab_size = int(logits_list[0].shape[-1])
+                        state.vocab_size = vocab_size
+                    for i, logits in enumerate(logits_list):
+                        chunk_results[i].append(state.process(logits))
+
+            for i, (pos, token_id, is_generated, _residuals) in enumerate(buf[start:end]):
+                solo = _decode_token(tokenizer, int(token_id), decode_cache)
+                entry = LensTokenMessage(
+                    position=pos,
+                    token="",
+                    id=int(token_id),
+                    is_generated=is_generated,
+                    results=chunk_results[i],
+                    **_span_fields(pos, int(token_id), is_generated, solo),
                 )
-                if _REPLACEMENT_CHAR not in combined:
-                    for p in pending:
-                        yield _emit(p, combined)
-                    pending.clear()
-                elif len(pending) >= _MAX_MULTI_TOKEN_CHAR:
+                if _REPLACEMENT_CHAR not in solo:
+                    # A self-contained token: flush any stuck fragment run first, then
+                    # emit this token normally.
                     for flushed in _flush_pending_as_is():
                         yield flushed
+                    yield _emit(entry, solo)
+                else:
+                    # A fragment: buffer it and see if the run now decodes cleanly.
+                    pending.append(entry)
+                    combined = tokenizer.decode([p.id for p in pending], clean_up_tokenization_spaces=False)
+                    if _REPLACEMENT_CHAR not in combined:
+                        for run_index, p in enumerate(pending):
+                            yield _emit(p, combined, continuation=run_index > 0)
+                        pending.clear()
+                    elif len(pending) >= _MAX_MULTI_TOKEN_CHAR:
+                        for flushed in _flush_pending_as_is():
+                            yield flushed
 
-            if is_generated:
-                completion_ids.append(int(token_id))
+                if is_generated:
+                    completion_ids.append(int(token_id))
 
-    # Prompt positions are buffered and decoded in chunks of ``_READOUT_CHUNK_SIZE``
-    # (one batched matmul per chunk); generated tokens arrive one at a time and are
-    # decoded individually so they keep streaming token-by-token.
-    chunk_buf: list[tuple[int, int, bool, dict[int, torch.Tensor]]] = []
-    for token_id, is_generated, residuals in _iter_residuals(
-        model,
-        prompt_token_ids,
-        union_layers,
-        num_completion_tokens=request.num_completion_tokens,
-        temperature=request.temperature,
-        eos_token_ids=eos_token_ids,
-        steer_deltas=steer_deltas,
-        steer_strength=steer_strength,
-        steer_ablate=steer_ablate,
-        swap_deltas=swap_deltas,
-        steer_generated=steer_generated,
-        bos_token_id=bos_token_id,
-    ):
-        # Skip the read-out + emission for positions the client already has
-        # (matched token-id prefix). Generated positions are always past the
-        # prompt, so they are never skipped.
-        if position < reuse_len:
-            if is_generated:
-                completion_ids.append(int(token_id))
+    # Positions are staged in batches of up to ``_TRANSPORT_BATCH_SIZE`` and read out
+    # a batch at a time. A batch is flushed at the end of every group the backend hands
+    # over (the prefill, then each decode-time drain), so nothing is ever held waiting
+    # on a later forward pass -- generated tokens still stream as they are produced,
+    # and only positions that were ALREADY available get batched together.
+    chunk_buf: list[tuple[int, int, bool, PositionPayload]] = []
+    # The worker can only read out what it can transport, so a lens that did not fit there
+    # keeps the older route: residuals out to this process, ``J_bar`` applied here, staged rows
+    # back for the unembed. Nothing to transport (logit lens alone) needs no lens at all.
+    worker_reads_out = isinstance(model, VLLMModel) and (
+        LensType.JACOBIAN_LENS not in requested_types or (lens is not None and lens.worker_resident)
+    )
+    if worker_reads_out:
+        assert isinstance(model, VLLMModel)
+        # The worker reads out as it captures, so positions arrive already decoded -- and the
+        # ones below `reuse_len` are dropped there, before the unembed, rather than being
+        # shipped here to be discarded. The counter therefore starts where the stream does.
+        position = reuse_len
+        batches = _iter_readout_vllm(
+            model,
+            prompt_token_ids,
+            requested_types,
+            layers_by_type,
+            num_completion_tokens=request.num_completion_tokens,
+            temperature=request.temperature,
+            top_n=request.top_n,
+            softcap=softcap,
+            word_mask=vllm_word_mask if request.filter_non_word_tokens else None,
+            chunk_positions=_READOUT_CHUNK_SIZE,
+            skip_before=reuse_len,
+            steer_deltas=steer_deltas,
+            steer_strength=steer_strength,
+            steer_ablate=steer_ablate,
+            swap_deltas=swap_deltas,
+            steer_generated=steer_generated,
+            bos_token_id=bos_token_id,
+            residual=residual,
+        )
+    else:
+        batches = _iter_residuals(
+            model,
+            prompt_token_ids,
+            union_layers,
+            num_completion_tokens=request.num_completion_tokens,
+            temperature=request.temperature,
+            eos_token_ids=eos_token_ids,
+            steer_deltas=steer_deltas,
+            steer_strength=steer_strength,
+            steer_ablate=steer_ablate,
+            swap_deltas=swap_deltas,
+            steer_generated=steer_generated,
+            bos_token_id=bos_token_id,
+            residual=residual,
+        )
+
+    async for batch in batches:
+        for token_id, is_generated, payload in batch:
+            # Skip the read-out + emission for positions the client already has
+            # (matched token-id prefix). Generated positions are always past the
+            # prompt, so they are never skipped.
+            if position < reuse_len:
+                if is_generated:
+                    completion_ids.append(int(token_id))
+                position += 1
+                continue
+
+            chunk_buf.append((position, int(token_id), is_generated, payload))
             position += 1
-            continue
+            if len(chunk_buf) >= _TRANSPORT_BATCH_SIZE:
+                async for msg in _emit_chunk(chunk_buf):
+                    yield msg
+                chunk_buf = []
 
-        if is_generated:
-            # Flush any buffered prompt positions first (to preserve order), then
-            # emit this generated token on its own.
-            yield from _emit_chunk(chunk_buf)
-            chunk_buf = []
-            yield from _emit_chunk([(position, int(token_id), True, residuals)])
-            position += 1
-            continue
-
-        chunk_buf.append((position, int(token_id), False, residuals))
-        position += 1
-        if len(chunk_buf) >= _READOUT_CHUNK_SIZE:
-            yield from _emit_chunk(chunk_buf)
-            chunk_buf = []
-
-    # Flush any remaining buffered prompt positions (last partial chunk).
-    yield from _emit_chunk(chunk_buf)
-    chunk_buf = []
+        async for msg in _emit_chunk(chunk_buf):
+            yield msg
+        chunk_buf = []
 
     # Any trailing fragments that never completed: emit them best-effort.
     for flushed in _flush_pending_as_is():
         yield flushed
 
-    completion = (
-        tokenizer.decode(completion_ids, clean_up_tokenization_spaces=False)
-        if completion_ids
-        else ""
-    )
+    completion = tokenizer.decode(completion_ids, clean_up_tokenization_spaces=False) if completion_ids else ""
     yield LensDoneMessage(
         seq_len=position,
         prompt_len=prompt_len,
@@ -1688,12 +2115,8 @@ def _build_messages(
 def warmup_lens() -> None:
     """Run one tiny (1-token) pass through the real lens code path at startup.
 
-    nnsight/nnterp lazily initializes internal state on the first ``model.trace``
-    that applies the Jacobian transport; on that very first trace the transported
-    layers come back degenerate (every transported layer collapses to uniform
-    ``1/vocab`` logits, while the directly-decoded final layer is fine). Doing a
-    throwaway pass here moves that one-time initialization to startup so the first
-    *real* JACOBIAN_LENS request is correct.
+    Moves any one-time initialization on the lens read-out path to startup so the
+    first *real* JACOBIAN_LENS request is correct/fast.
 
     Only runs when a Jacobian lens is loaded (LOGIT_LENS is always correct), and
     is fully best-effort: any failure is logged and swallowed so startup is never
@@ -1707,14 +2130,39 @@ def warmup_lens() -> None:
         model = Model.get_instance()
     except Exception:  # noqa: BLE001
         return
-    if not isinstance(model, (HookedTransformer, StandardizedTransformer)):
-        return
 
     tokenizer = getattr(model, "tokenizer", None)
     if tokenizer is None:
         return
 
     config = Config.get_instance()
+    np_model_id = getattr(config, "model_id", None)
+    hf_model_id = getattr(config, "custom_hf_model_id", None) or getattr(config, "override_model_id", None)
+
+    # Backend-independent one-time work, warmed before the EagerModel gate below because
+    # the vLLM path pays for all of it inline on its first request otherwise -- on the event
+    # loop, so it stalls every other request too. Two full-vocab Python decodes (~0.9s each
+    # at Qwen3.6-27B's 248k ids): the read-out's word mask, and the reverse index that
+    # steer/swap resolves its token strings through. The softcap reads the HF config, a 2.7s
+    # round trip cold since VLLMModel exposes no `.config` to read it from.
+    try:
+        _word_token_mask(tokenizer, _readout_vocab_size(tokenizer, model))
+    except Exception:  # noqa: BLE001
+        logger.exception("Word-mask warmup failed (non-fatal)")
+    try:
+        _decoded_string_to_ids(tokenizer)
+    except Exception:  # noqa: BLE001
+        logger.exception("Steer-token index warmup failed (non-fatal)")
+    try:
+        resolve_final_logit_softcap(model, np_model_id=np_model_id, hf_model_id=hf_model_id)
+    except Exception:  # noqa: BLE001
+        logger.exception("Softcap warmup failed (non-fatal)")
+
+    if not isinstance(model, EagerModel):
+        # The rest needs `run_with_cache`, which only the eager backend has.
+        logger.info("Lens warmup completed (shared paths only; %s has no in-process forward).", type(model).__name__)
+        return
+
     n_layers = config.num_layers
     if n_layers is None:
         return
@@ -1733,25 +2181,21 @@ def warmup_lens() -> None:
         # that needs it) is exercised; sharing one forward pass makes this cheap.
         requested_types = [LensType.JACOBIAN_LENS, LensType.LOGIT_LENS]
         layers_by_type = {
-            lens_type: _select_layers(lens_type, n_layers, lens, layers=[])
-            for lens_type in requested_types
+            lens_type: _select_layers(lens_type, n_layers, lens, layers=[]) for lens_type in requested_types
         }
-        softcap = resolve_final_logit_softcap(
+        softcap = resolve_final_logit_softcap(model, np_model_id=np_model_id, hf_model_id=hf_model_id)
+
+        _compute_logits_for_types(
             model,
-            np_model_id=getattr(config, "model_id", None),
-            hf_model_id=getattr(config, "custom_hf_model_id", None)
-            or getattr(config, "override_model_id", None),
+            token_ids,
+            layers_by_type,
+            lens,
+            softcap,
+            # Resolved here too, so a lens that cannot be read out on this model says so at startup
+            # rather than on someone's first request. The failure is caught and logged below, which
+            # is the right severity: LOGIT_LENS alone is unaffected and the pod should still serve.
+            resolve_residual_spec(lens.residual, model.residual_basis),
         )
-
-        _compute_logits_for_types(model, token_ids, layers_by_type, lens, softcap)
-
-        # Pre-build the non-word-token mask (a one-time full-vocab decode) so the
-        # first request that enables filtering doesn't pay for it inline.
-        try:
-            vocab_size = getattr(tokenizer, "vocab_size", None) or len(tokenizer)
-            _word_token_mask(tokenizer, int(vocab_size))
-        except Exception:  # noqa: BLE001
-            logger.exception("Word-mask warmup failed (non-fatal)")
 
         logger.info("Lens warmup completed (%d token(s)).", len(token_ids))
     except Exception:  # noqa: BLE001
@@ -1763,34 +2207,25 @@ def warmup_lens() -> None:
 # --------------------------------------------------------------------------- #
 
 
-async def _acquire_request_lock(fail_if_busy: bool = False) -> bool:
-    """Acquire the global model lock with the configured timeout.
+async def _acquire_request_lock(fail_if_busy: bool = False):
+    """Acquire a request slot; return the primitive to release later (or None).
 
-    Acquired in the route handler (not via a decorator) so we can return a
-    proper HTTP status BEFORE the streaming response body starts; the lock is
-    then held for the lifetime of the stream and released in the generator's
-    ``finally`` (Starlette iterates a StreamingResponse body after the handler
-    returns, so a decorator-scoped lock would be released before generation even
-    runs).
+    Acquired in the route handler (not via a decorator) so we can return a proper
+    HTTP status BEFORE the streaming response body starts; the slot is held for the
+    lifetime of the stream and released in the generator's ``finally`` (Starlette
+    iterates a StreamingResponse body after the handler returns, so a decorator-scoped
+    slot would be released before generation even runs). With the per-request demux the
+    lens hooks are per-request-safe, so this takes a NON-exclusive slot (concurrent on
+    vLLM; still one-at-a-time off vLLM via the single mutex).
 
-    Returns ``True`` if the lock was acquired. Returns ``False`` only when
-    ``fail_if_busy`` is set and the lock is already held, so the caller can fail
-    fast (e.g. respond 429 and let the client try a different server). The
-    ``locked()`` check and the (non-blocking, since the lock is free) acquire
-    below run with no ``await`` between them, so this reliably reports "busy"
-    without racing another request.
+    Returns the acquired primitive on success, or ``None`` only when ``fail_if_busy``
+    is set and no slot is immediately available (caller responds 429).
     """
-    if request_lock.locked():
-        if fail_if_busy:
-            return False
-        logger.warning(
-            "[LOCK] Lens request waiting for lock (another request in progress)..."
-        )
-    if REQUEST_LOCK_TIMEOUT > 0:
-        await asyncio.wait_for(request_lock.acquire(), timeout=REQUEST_LOCK_TIMEOUT)
-    else:
-        await request_lock.acquire()
-    return True
+    if fail_if_busy and limiter.is_busy(exclusive=False):
+        return None
+    if limiter.is_busy(exclusive=False):
+        logger.warning("[LIMITER] Lens request waiting for a slot (another request in progress)...")
+    return await limiter.acquire(exclusive=False, timeout=REQUEST_LOCK_TIMEOUT)
 
 
 @router.post("/lens/prompt")
@@ -1799,6 +2234,14 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
     model = Model.get_instance()
 
     # ---- validation (before the stream starts, so we can return proper 4xx) ---
+    # A lens read-out is a capture, so a GENERATION_ONLY pod cannot serve one. Checked here for the
+    # same reason as everything else in this block: once the stream has started, the only place left
+    # to report an error is inside a frame.
+    try:
+        assert_residual_available(model, "The logit lens", point=block_output_point(model))
+    except BackendUnsupported as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
     use_input_token_ids = len(request.input_token_ids) > 0
     # When exact token ids are supplied we read out over them verbatim (no
     # tokenization, no generation), so `prompt`/`chat` are not required.
@@ -1808,6 +2251,12 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
             status_code=400,
         )
 
+    # Checked here rather than left to `build_token_ids` so it reads as the client error
+    # it is, instead of a logged tokenization failure. A missing tokenizer is a different
+    # (server-side) fault and is left to `build_token_ids` to report.
+    if request.chat is not None and model.tokenizer is not None and not get_tokenize(model).has_chat_template():
+        return JSONResponse(content={"error": NO_CHAT_TEMPLATE_ERROR}, status_code=400)
+
     # De-duplicate the requested types while preserving order.
     requested_types: list[LensType] = list(dict.fromkeys(request.type))
     if not requested_types:
@@ -1816,25 +2265,16 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
             status_code=400,
         )
 
-    if not isinstance(model, (HookedTransformer, StandardizedTransformer)):
+    if not isinstance(model, EagerModel | VLLMModel):
         return JSONResponse(
-            content={
-                "error": (
-                    "The lens endpoint is only supported on TransformerLens and "
-                    "nnsight/nnterp models (not vLLM/chatspace)."
-                )
-            },
+            content={"error": ("The lens endpoint is only supported on the interp-engine and vLLM backends.")},
             status_code=400,
         )
 
     if request.temperature < 0:
-        return JSONResponse(
-            content={"error": "temperature must be >= 0"}, status_code=400
-        )
+        return JSONResponse(content={"error": "temperature must be >= 0"}, status_code=400)
     if request.num_completion_tokens < 0:
-        return JSONResponse(
-            content={"error": "num_completion_tokens must be >= 0"}, status_code=400
-        )
+        return JSONResponse(content={"error": "num_completion_tokens must be >= 0"}, status_code=400)
 
     lens: LoadedJacobianLens | None = None
     if LensType.JACOBIAN_LENS in requested_types:
@@ -1861,9 +2301,7 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
         return JSONResponse(content={"error": str(exc)}, status_code=400)
 
     if len(token_ids) == 0:
-        return JSONResponse(
-            content={"error": "Prompt produced zero tokens"}, status_code=400
-        )
+        return JSONResponse(content={"error": "Prompt produced zero tokens"}, status_code=400)
 
     # The lens endpoints use their own limit (config.lens_token_limit), separate
     # from config.token_limit used by the other endpoints. Reads-outs are
@@ -1884,6 +2322,9 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
     max_seq_len = request.max_seq_len or config.lens_token_limit
     token_ids = token_ids[:max_seq_len]
 
+    # Clamp generation length to the memory-safe sequence budget (prompt + generation).
+    request.num_completion_tokens = config.clamp_completion_tokens(len(token_ids), request.num_completion_tokens)
+
     # Longest common token-id prefix with what the client already has. Positions
     # in this prefix have identical preceding context (causal attention), so the
     # client's cached read-outs are still valid and we skip recomputing them.
@@ -1892,35 +2333,46 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
 
     n_layers = config.num_layers
     if n_layers is None:
-        return JSONResponse(
-            content={"error": "Model layer count not initialized"}, status_code=500
-        )
+        return JSONResponse(content={"error": "Model layer count not initialized"}, status_code=500)
 
     layers_by_type = {
-        lens_type: _select_layers(lens_type, n_layers, lens, request.layers)
-        for lens_type in requested_types
+        lens_type: _select_layers(lens_type, n_layers, lens, request.layers) for lens_type in requested_types
     }
+
+    # Which activation to read out, from the loaded lens's own declaration. Resolved from the store
+    # even for a LOGIT_LENS-only request, and deliberately: the two types are shown side by side, so
+    # reading the logit lens in the space the Jacobian lens was fitted in is what makes them
+    # comparable -- and at the lens's target layer, where J is the identity, what makes them agree.
+    declared = lens or JacobianLensStore.get()
+    try:
+        residual_spec = resolve_residual_spec(declared.residual if declared is not None else None, model.residual_basis)
+    except (LensSpaceUnknown, ResidualBasisUnsupported) as exc:
+        # 400 rather than 500: the missing fact lives in the artifact, and the message says how to
+        # put it there. Nothing about the server or the request is wrong.
+        return JSONResponse(content={"error": str(exc)}, status_code=400)
 
     # ---- steering / swap: resolve readouts -> per-layer injection directions ----
     # SWAP replaces the source readout (steer_tokens[0]) with `swap_token`; it
     # needs the source directions too, so it reuses the steer-delta builder.
     swap_active = request.swap_token is not None and len(request.steer_tokens) > 0
-    steer_active = len(request.steer_tokens) > 0 and (
-        request.steer_strength != 0.0 or request.steer_ablate
-    )
+    steer_active = len(request.steer_tokens) > 0 and (request.steer_strength != 0.0 or request.steer_ablate)
     steer_deltas: dict[int, torch.Tensor] = {}
     swap_deltas: dict[int, torch.Tensor] = {}
     if steer_active or swap_active:
+        # An intervention writes into the forward, which a graph-replay pod cannot do without a
+        # static write site -- and would not report, since a hook that never fires returns fluent,
+        # unsteered text. Asked here rather than at registration so the answer is a 400 before the
+        # stream opens, not an exception several frames into an RPC.
+        try:
+            assert_steering_available(model, "jlens steering, ablation and swap")
+        except BackendUnsupported as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
         # The client's explicit layer list is used verbatim: an empty list means
         # no steering/swap (e.g. the user deselected every layer).
         try:
-            steer_deltas = _build_steer_deltas(
-                model, lens, request.steer_tokens, request.steer_layers
-            )
+            steer_deltas = await _build_steer_deltas(model, lens, request.steer_tokens, request.steer_layers)
             if swap_active and request.swap_token is not None:
-                swap_deltas = _build_steer_deltas(
-                    model, lens, [request.swap_token], request.steer_layers
-                )
+                swap_deltas = await _build_steer_deltas(model, lens, [request.swap_token], request.steer_layers)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to build steering/swap vectors")
             return JSONResponse(content={"error": str(exc)}, status_code=400)
@@ -1932,8 +2384,7 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
     softcap = resolve_final_logit_softcap(
         model,
         np_model_id=getattr(config, "model_id", None),
-        hf_model_id=getattr(config, "custom_hf_model_id", None)
-        or getattr(config, "override_model_id", None),
+        hf_model_id=getattr(config, "custom_hf_model_id", None) or getattr(config, "override_model_id", None),
     )
 
     # ---- acquire the model lock up-front ----
@@ -1945,13 +2396,13 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
     # completes (or the client disconnects).
     try:
         acquired = await _acquire_request_lock(fail_if_busy=request.fail_if_busy)
-    except asyncio.TimeoutError:
-        logger.error("[LOCK] Timeout waiting for lock on lens request")
+    except TimeoutError:
+        logger.error("[LIMITER] Timeout waiting for a slot on lens request")
         return JSONResponse(
             content={"error": "Request timed out waiting for lock"},
             status_code=503,
         )
-    if not acquired:
+    if acquired is None:
         # Server is busy with another request and the client opted to fail fast
         # so it can fall back to another inference server for this model.
         return JSONResponse(
@@ -1959,10 +2410,57 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
             status_code=429,
         )
 
+    # ---- reserve VRAM alongside the slot ----
+    # Released in the generator's `finally`, together with the slot, so it covers the whole
+    # stream. Note the slot must be released by hand on every path out of here, since the
+    # generator that would normally do it never runs.
+    #
+    # TWO TERMS, and the second is the one that decides how many of these fit at once.
+    #
+    # The staged rows are device memory (see `lens_cost`), and only the positions this request
+    # will actually read out count: a follow-up turn reusing a long cached prefix stages the
+    # new tail, not the whole conversation. vLLM stages inside the worker, one read-out chunk
+    # at a time rather than a whole transport batch, so its rows are a rounding error.
+    #
+    # The CAPTURE is not chunked, and it is charged over the whole sequence. Reuse buys
+    # nothing here and `reuse_len` is deliberately not subtracted: `skip_before` drops cached
+    # positions from the read-out, but the forward still runs over them and the hooks still
+    # fire, so the harvest covers the conversation rather than its tail. That is why the
+    # failure showed up on the SECOND turn of a chat -- the first fit, and the reservation
+    # could not see the difference between them.
+    staging_batch = _READOUT_CHUNK_SIZE if isinstance(model, VLLMModel) else _TRANSPORT_BATCH_SIZE
+    staged_positions = min(
+        staging_batch,
+        max(1, len(token_ids) - reuse_len + request.num_completion_tokens),
+    )
+    lens_bytes = lens_cost(
+        staged_positions=staged_positions,
+        layer_counts=[len(layers) for layers in layers_by_type.values()],
+        d_model=int(getattr(model, "d_model", 0)) or (lens.d_model if lens is not None else 0),
+        capture_positions=len(token_ids) + max(0, request.num_completion_tokens),
+        # One capture site per DISTINCT layer: the types share a forward, so a layer both
+        # lenses read is captured once.
+        n_capture_points=len({layer for layers in layers_by_type.values() for layer in layers}),
+        n_streams=int(getattr(getattr(model, "residual_basis", None), "n_streams", 1) or 1),
+    )
+    try:
+        budget_claim = await budget.acquire(lens_bytes)
+    except RequestTooLarge as exc:
+        acquired.release()
+        logger.error("[BUDGET] lens request rejected: %s", exc)
+        return JSONResponse(content={"error": str(exc)}, status_code=400)
+    except TimeoutError:
+        acquired.release()
+        logger.error("[BUDGET] Timeout waiting for VRAM on lens request")
+        return JSONResponse(
+            content={"error": "Request timed out waiting for available memory"},
+            status_code=503,
+        )
+
     # ---- streaming body: holds the model lock for its whole lifetime ----
-    async def _ndjson_stream() -> Iterator[str]:
+    async def _ndjson_stream() -> AsyncIterator[str]:
         try:
-            for message in _build_messages(
+            async for message in _build_messages(
                 model,
                 request,
                 requested_types,
@@ -1976,6 +2474,7 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
                 steer_ablate=request.steer_ablate,
                 swap_deltas=swap_deltas,
                 steer_generated=request.steer_generated_tokens,
+                residual=residual_spec,
             ):
                 # Stop generating as soon as the client (or the proxy in front of
                 # it) goes away — e.g. the user pressed "Stop". Checked once per
@@ -1993,14 +2492,13 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
             # add latency if called on every (successful) request.
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-            yield json.dumps({"kind": "error", "error": str(exc)}) + "\n"
+            yield json.dumps(LensErrorMessage(error=str(exc)).model_dump(mode="json")) + "\n"
         finally:
-            request_lock.release()
+            await budget.release(budget_claim)
+            acquired.release()
 
     if request.stream:
-        return StreamingResponse(
-            _ndjson_stream(), media_type="application/x-ndjson"
-        )
+        return StreamingResponse(_ndjson_stream(), media_type="application/x-ndjson")
 
     # Non-streaming: run the identical path, buffer messages into one object.
     meta: dict | None = None

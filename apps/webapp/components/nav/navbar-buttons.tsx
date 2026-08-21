@@ -18,7 +18,6 @@ import { ChevronDown, ChevronDownIcon, ChevronUpIcon, MessagesSquare, Plus, RssI
 import Link from 'next/link';
 import { useState } from 'react';
 import InferenceActivationAllProvider from '../provider/inference-activation-all-provider';
-import ModelsDropdown from './models-dropdown';
 import ReleasesDropdown from './releases-dropdown';
 
 export default function NavBarButtons() {
@@ -186,7 +185,7 @@ export default function NavBarButtons() {
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
 
-      <ModelsDropdown isInBreadcrumb={false} />
+      {/* <ModelsDropdown isInBreadcrumb={false} /> */}
 
       <DropdownMenu.Root>
         <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
@@ -362,6 +361,18 @@ export default function NavBarButtons() {
         className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
         Exports
+      </Link>
+
+      <Link
+        href="https://interp-engine.org"
+        target="_blank"
+        rel="noreferrer"
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+      >
+        interp-engine
+        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+          NEW
+        </span>
       </Link>
 
       <DropdownMenu.Root>

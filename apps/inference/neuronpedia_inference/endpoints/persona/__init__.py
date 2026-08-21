@@ -1,2 +1,0 @@
-"""Persona monitoring endpoints."""
-

@@ -128,9 +128,7 @@ import shutil
 import sys
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("build_ct_source")
 
 
@@ -302,8 +300,7 @@ def _copy_upstream_extras(src_dir: Path, out_dir: Path, *, label: str) -> None:
         )
 
     log.info(
-        "[%s] upstream extras: %d copied, %d already-written skipped, "
-        "%d weight files skipped",
+        "[%s] upstream extras: %d copied, %d already-written skipped, %d weight files skipped",
         label,
         n_copied,
         n_skipped_written,
@@ -321,8 +318,7 @@ def _write_source_readme(
     tag = _SCHEME_TAG[scheme]
     sglang_note = {
         "W8A16": (
-            "loadable by sglang via `CompressedTensorsW8A16Fp8` (lazy-imports "
-            "vllm only on sm_<89; native sm_89+)"
+            "loadable by sglang via `CompressedTensorsW8A16Fp8` (lazy-imports vllm only on sm_<89; native sm_89+)"
         ),
         "FP8_DYNAMIC": (
             "loadable by sglang via `CompressedTensorsW8A8Fp8` (native, no "
@@ -417,9 +413,7 @@ def _make_recipe(scheme: str, ignore_modules: list[str]):
     )
 
     if scheme not in SUPPORTED_SCHEMES:
-        raise SystemExit(
-            f"unknown --scheme {scheme!r}; choices: {', '.join(SUPPORTED_SCHEMES)}"
-        )
+        raise SystemExit(f"unknown --scheme {scheme!r}; choices: {', '.join(SUPPORTED_SCHEMES)}")
 
     return QuantizationModifier(
         targets="Linear",
@@ -446,8 +440,8 @@ def build_compressed_tensors_source(
     `llmcompressor.oneshot`; CPU is supported but slow.
     """
     import torch
-    from torch import nn
     from accelerate import init_empty_weights
+    from torch import nn
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     try:
@@ -490,9 +484,7 @@ def build_compressed_tensors_source(
     inner = _text_decoder(full.model if hasattr(full, "model") else full)
     n_layers = len(inner.layers)
     if not 0 <= layer_index < n_layers:
-        raise ValueError(
-            f"layer_index={layer_index} out of range for {n_layers}-layer model"
-        )
+        raise ValueError(f"layer_index={layer_index} out of range for {n_layers}-layer model")
 
     log.info(
         "[source] truncating decoder to layers 0..%d (%d/%d kept)",
@@ -509,9 +501,7 @@ def build_compressed_tensors_source(
     text_config.architectures = ["Gemma3ForCausalLM"]
     text_config.torch_dtype = "bfloat16"
     if not hasattr(text_config, "tie_word_embeddings"):
-        text_config.tie_word_embeddings = bool(
-            getattr(full.config, "tie_word_embeddings", True)
-        )
+        text_config.tie_word_embeddings = bool(getattr(full.config, "tie_word_embeddings", True))
     # Per-layer config lists (`layer_types`, sliding-window patterns) MUST
     # match `num_hidden_layers` — newer transformers / huggingface_hub
     # validators raise:
@@ -531,9 +521,7 @@ def build_compressed_tensors_source(
     # `Gemma3ForCausalLM.model` are both `Gemma3TextModel`, so their
     # state_dict keys line up directly.
     inner_sd = inner.state_dict()
-    missing, unexpected = text_only.model.load_state_dict(
-        inner_sd, strict=False, assign=True
-    )
+    missing, unexpected = text_only.model.load_state_dict(inner_sd, strict=False, assign=True)
     if unexpected:
         log.warning("[source] unexpected keys when loading inner state: %s", unexpected)
     if missing:
@@ -543,9 +531,7 @@ def build_compressed_tensors_source(
     if text_config.tie_word_embeddings:
         text_only.tie_weights()
     elif lm_head_src is not None and not isinstance(lm_head_src, nn.Identity):
-        text_only.lm_head.load_state_dict(
-            lm_head_src.state_dict(), strict=True, assign=True
-        )
+        text_only.lm_head.load_state_dict(lm_head_src.state_dict(), strict=True, assign=True)
     else:
         log.warning(
             "[source] tie_word_embeddings=False but no lm_head on source — "
@@ -646,9 +632,7 @@ def _resolve_username(token: str | None, override: str | None) -> str:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument(
         "--source-model",
         default=DEFAULT_SOURCE,
@@ -677,10 +661,7 @@ def main() -> None:
     p.add_argument(
         "--output-dir",
         default=None,
-        help=(
-            "Local output dir. Default: ./quantized_models/<target-name>. "
-            "Created if missing."
-        ),
+        help=("Local output dir. Default: ./quantized_models/<target-name>. Created if missing."),
     )
     p.add_argument(
         "--target-name",
@@ -709,10 +690,7 @@ def main() -> None:
     p.add_argument(
         "--hf-username",
         default=None,
-        help=(
-            "HuggingFace username/org for the upload repo. If omitted, "
-            "derived from the token via whoami()."
-        ),
+        help=("HuggingFace username/org for the upload repo. If omitted, derived from the token via whoami()."),
     )
     p.add_argument(
         "--hf-token",
@@ -729,9 +707,7 @@ def main() -> None:
 
     tag = _SCHEME_TAG[args.scheme]
     upstream_basename = args.source_model.rsplit("/", 1)[-1].lower()
-    target_name = (
-        args.target_name or f"{upstream_basename}-{tag}-trunc{args.layer_index}"
-    )
+    target_name = args.target_name or f"{upstream_basename}-{tag}-trunc{args.layer_index}"
     out_dir = Path(args.output_dir or f"./quantized_models/{target_name}").resolve()
 
     log.info(
@@ -753,9 +729,7 @@ def main() -> None:
 
     if args.upload:
         if not args.hf_token:
-            raise SystemExit(
-                "--upload requires --hf-token or $HF_TOKEN to be set."
-            )
+            raise SystemExit("--upload requires --hf-token or $HF_TOKEN to be set.")
         username = _resolve_username(args.hf_token, args.hf_username)
         repo_id = f"{username}/{target_name}"
         upload_to_hf(

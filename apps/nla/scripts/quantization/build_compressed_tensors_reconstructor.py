@@ -147,9 +147,7 @@ import shutil
 import sys
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("build_ct_recon")
 
 
@@ -248,8 +246,7 @@ def _copy_upstream_extras(src_dir: Path, out_dir: Path, *, label: str) -> None:
         )
 
     log.info(
-        "[%s] upstream extras: %d copied, %d already-written skipped, "
-        "%d weight files skipped",
+        "[%s] upstream extras: %d copied, %d already-written skipped, %d weight files skipped",
         label,
         n_copied,
         n_skipped_written,
@@ -257,14 +254,11 @@ def _copy_upstream_extras(src_dir: Path, out_dir: Path, *, label: str) -> None:
     )
 
 
-def _write_reconstructor_readme(
-    out_dir: Path, reconstructor_id: str, scheme: str
-) -> None:
+def _write_reconstructor_readme(out_dir: Path, reconstructor_id: str, scheme: str) -> None:
     tag = _SCHEME_TAG[scheme]
     sglang_note = {
         "W8A16": (
-            "loadable by sglang via `CompressedTensorsW8A16Fp8` (lazy-imports "
-            "vllm only on sm_<89 hosts; native sm_89+)"
+            "loadable by sglang via `CompressedTensorsW8A16Fp8` (lazy-imports vllm only on sm_<89 hosts; native sm_89+)"
         ),
         "FP8_DYNAMIC": (
             "loadable by sglang via `CompressedTensorsW8A8Fp8` (native, no "
@@ -278,8 +272,7 @@ def _write_reconstructor_readme(
             "load it anywhere"
         ),
         "W4A16": (
-            "loadable by sglang via `CompressedTensorsWNA16` (portable, "
-            "Ampere+). HF transformers loads it anywhere"
+            "loadable by sglang via `CompressedTensorsWNA16` (portable, Ampere+). HF transformers loads it anywhere"
         ),
     }[scheme]
 
@@ -374,9 +367,7 @@ def _make_recipe(scheme: str, ignore_modules: list[str]):
             "scales, no calibration) if decode latency dominates."
         )
     if scheme not in SUPPORTED_SCHEMES:
-        raise SystemExit(
-            f"unknown --scheme {scheme!r}; choices: {', '.join(SUPPORTED_SCHEMES)}"
-        )
+        raise SystemExit(f"unknown --scheme {scheme!r}; choices: {', '.join(SUPPORTED_SCHEMES)}")
 
     return QuantizationModifier(
         targets="Linear",
@@ -435,8 +426,7 @@ def build_compressed_tensors_reconstructor(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     log.info(
-        "[reconstructor] running llmcompressor oneshot with scheme=%s, "
-        "ignore=%r…",
+        "[reconstructor] running llmcompressor oneshot with scheme=%s, ignore=%r…",
         scheme,
         ignore_modules,
     )
@@ -457,10 +447,7 @@ def build_compressed_tensors_reconstructor(
     log.info("[reconstructor] writing README…")
     _write_reconstructor_readme(out_dir, reconstructor_id, scheme)
 
-    log.info(
-        "[reconstructor] copying upstream extras "
-        "(nla_meta.yaml, value_head.safetensors, prompt templates, …)…"
-    )
+    log.info("[reconstructor] copying upstream extras (nla_meta.yaml, value_head.safetensors, prompt templates, …)…")
     _copy_upstream_extras(src_dir, out_dir, label="reconstructor")
 
     # Sanity-check the value_head landed in the output dir. The
@@ -551,16 +538,11 @@ def _resolve_scheme(quant: str | None, scheme: str | None) -> str:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument(
         "--reconstructor-model",
         default=DEFAULT_RECONSTRUCTOR,
-        help=(
-            f"Upstream reconstructor (HF repo or local dir). "
-            f"Default: {DEFAULT_RECONSTRUCTOR}."
-        ),
+        help=(f"Upstream reconstructor (HF repo or local dir). Default: {DEFAULT_RECONSTRUCTOR}."),
     )
     p.add_argument(
         "--quant",
@@ -589,10 +571,7 @@ def main() -> None:
     p.add_argument(
         "--output-dir",
         default=None,
-        help=(
-            "Local output dir. Default: ./quantized_models/<target-name>. "
-            "Created if missing."
-        ),
+        help=("Local output dir. Default: ./quantized_models/<target-name>. Created if missing."),
     )
     p.add_argument(
         "--target-name",
@@ -622,10 +601,7 @@ def main() -> None:
     p.add_argument(
         "--hf-username",
         default=None,
-        help=(
-            "HuggingFace username/org for the upload repo. If omitted, "
-            "derived from the token via whoami()."
-        ),
+        help=("HuggingFace username/org for the upload repo. If omitted, derived from the token via whoami()."),
     )
     p.add_argument(
         "--hf-token",
@@ -664,9 +640,7 @@ def main() -> None:
 
     if args.upload:
         if not args.hf_token:
-            raise SystemExit(
-                "--upload requires --hf-token or $HF_TOKEN to be set."
-            )
+            raise SystemExit("--upload requires --hf-token or $HF_TOKEN to be set.")
         username = _resolve_username(args.hf_token, args.hf_username)
         repo_id = f"{username}/{target_name}"
         upload_to_hf(
@@ -674,10 +648,7 @@ def main() -> None:
             repo_id,
             token=args.hf_token,
             private=args.hub_private,
-            commit_message=(
-                f"Upload {args.reconstructor_model} ({scheme}, "
-                f"compressed-tensors via llmcompressor)"
-            ),
+            commit_message=(f"Upload {args.reconstructor_model} ({scheme}, compressed-tensors via llmcompressor)"),
         )
     else:
         log.info(

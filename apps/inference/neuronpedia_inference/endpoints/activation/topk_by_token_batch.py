@@ -1,31 +1,25 @@
 import logging
 
-import nnsight
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
-from neuronpedia_inference_client.models.activation_topk_by_token_batch_post200_response import (
-    ActivationTopkByTokenBatchPost200Response,
-)
-from neuronpedia_inference_client.models.activation_topk_by_token_batch_post200_response_results_inner import (
-    ActivationTopkByTokenBatchPost200ResponseResultsInner,
-)
-from neuronpedia_inference_client.models.activation_topk_by_token_batch_post_request import (
-    ActivationTopkByTokenBatchPostRequest,
-)
-from neuronpedia_inference_client.models.activation_topk_by_token_post200_response_results_inner import (
-    ActivationTopkByTokenPost200ResponseResultsInner,
-)
-from neuronpedia_inference_client.models.activation_topk_by_token_post200_response_results_inner_top_features_inner import (
-    ActivationTopkByTokenPost200ResponseResultsInnerTopFeaturesInner,  # noqa: E501
-)
-from nnterp import StandardizedTransformer
-from transformer_lens import ActivationCache, HookedTransformer
+from interp_engine import special_token_positions
 
-# from transformer_lens.model_bridge import TransformerBridge
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.endpoints.activation.topk_by_token import build_token_results
+from neuronpedia_inference.engine_adapter import (
+    BackendUnsupported,
+    capture_padded_cache_async,
+)
+from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
+from neuronpedia_inference.memory_cost import activation_topk_by_token_batch_cost
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.schemas import (
+    ActivationTopkByTokenBatchRequest,
+    ActivationTopkByTokenBatchResponse,
+    ActivationTopkByTokenBatchResult,
+)
+from neuronpedia_inference.shared import LoadedModel, Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -41,20 +35,22 @@ def get_layer_num_from_sae_id(sae_id: str) -> int:
     return int(sae_id.split("-")[0]) if not sae_id.isdigit() else int(sae_id)
 
 
-@router.post("/activation/topk-by-token-batch")
-@with_request_lock()
+@router.post("/activation/topk-by-token-batch", responses={200: {"model": ActivationTopkByTokenBatchResponse}})
+@with_request_lock(exclusive=False, cost=activation_topk_by_token_batch_cost)
 async def activation_topk_by_token_batch(
-    request: ActivationTopkByTokenBatchPostRequest = Body(
+    request: ActivationTopkByTokenBatchRequest = Body(
         ...,
-        example={
-            "prompts": [
-                "The Jedi in Star Wars wield lightsabers.",
-                "The Force is strong with this one.",
-            ],
-            "model": "gpt2-small",
-            "source": "0-res-jb",
-            "ignore_bos": True,
-        },
+        examples=[
+            {
+                "prompts": [
+                    "The Jedi in Star Wars wield lightsabers.",
+                    "The Force is strong with this one.",
+                ],
+                "model": "gpt2-small",
+                "source": "0-res-jb",
+                "ignore_bos": True,
+            }
+        ],
     ),
 ):
     model = Model.get_instance()
@@ -70,9 +66,7 @@ async def activation_topk_by_token_batch(
 
     if len(prompts) > MAX_BATCH_SIZE:
         return JSONResponse(
-            content={
-                "error": f"Batch size {len(prompts)} exceeds maximum of {MAX_BATCH_SIZE}"
-            },
+            content={"error": f"Batch size {len(prompts)} exceeds maximum of {MAX_BATCH_SIZE}"},
             status_code=400,
         )
 
@@ -92,59 +86,41 @@ async def activation_topk_by_token_batch(
         if not prompt.startswith(bos_token):
             prompt = bos_token + prompt
 
-        if isinstance(model, StandardizedTransformer):
-            tokens = model.tokenizer(
-                prompt, add_special_tokens=False, return_tensors="pt"
-            )["input_ids"][0]
-        else:
-            tokens = model.to_tokens(
-                prompt,
-                prepend_bos=prepend_bos,
-                truncate=False,
-            )[0]
+        tokens = model.to_tokens(
+            prompt,
+            prepend_bos=prepend_bos,
+            truncate=False,
+        )[0]
 
-        batch_token_limit = config.token_limit / MAX_BATCH_SIZE
-        if len(tokens) > batch_token_limit:
-            logger.error(
-                "Text too long: %s tokens, max is %s",
-                len(tokens),
-                batch_token_limit,
-            )
-            return JSONResponse(
-                content={
-                    "error": f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
-                },
-                status_code=400,
-            )
+        batch_token_limit = config.activation_token_limit / MAX_BATCH_SIZE
+        too_long = reject_if_over_token_limit(len(tokens), batch_token_limit, suffix=" for batch requests")
+        if too_long is not None:
+            return too_long
 
-        if isinstance(model, StandardizedTransformer):
-            tokenizer = model.tokenizer
-            str_tokens = tokenizer.tokenize(prompt)
-            str_tokens = [tokenizer.convert_tokens_to_string([t]) for t in str_tokens]
-        else:
-            str_tokens = model.to_str_tokens(prompt, prepend_bos=prepend_bos)
+        str_tokens = model.to_str_tokens(prompt, prepend_bos=prepend_bos)
 
         all_tokens.append(tokens)
         all_str_tokens.append(str_tokens)
 
     # Process all prompts in batch
-    batch_results = process_topk_batch(
-        model, source, top_k, ignore_bos, all_tokens, all_str_tokens
-    )
+    try:
+        batch_results = await process_topk_batch(model, source, top_k, ignore_bos, all_tokens, all_str_tokens)
+    except BackendUnsupported as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
 
     logger.info("Returning %d results", len(batch_results))
 
-    return ActivationTopkByTokenBatchPost200Response(results=batch_results)
+    return ActivationTopkByTokenBatchResponse(results=batch_results)
 
 
-def process_topk_batch(
-    model: HookedTransformer | StandardizedTransformer,  # | TransformerBridge
+async def process_topk_batch(
+    model: LoadedModel,
     source: str,
     top_k: int,
     ignore_bos: bool,
     tokens_list: list[torch.Tensor],
     str_tokens_list: list[list[str]],
-) -> list[ActivationTopkByTokenBatchPost200ResponseResultsInner]:
+) -> list[ActivationTopkByTokenBatchResult]:
     """
     Process multiple token sequences in a single batch for GPU efficiency.
     Returns results in the same order as input.
@@ -158,18 +134,9 @@ def process_topk_batch(
     batch_size = len(tokens_list)
 
     # Create padded batch tensor
-    if isinstance(model, StandardizedTransformer):
-        pad_token_id = (
-            model.tokenizer.pad_token_id
-            if model.tokenizer.pad_token_id is not None
-            else model.tokenizer.eos_token_id
-        )
-    else:
-        pad_token_id = (
-            model.tokenizer.pad_token_id
-            if model.tokenizer.pad_token_id is not None
-            else model.tokenizer.eos_token_id
-        )
+    pad_token_id = (
+        model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
+    )
 
     padded_tokens = torch.full(
         (batch_size, max_len),
@@ -185,19 +152,8 @@ def process_topk_batch(
         padded_tokens[i, : len(tokens)] = tokens
         original_lengths.append(len(tokens))
 
-    # Run batch inference
-    if isinstance(model, StandardizedTransformer):
-        layer_num = get_layer_num_from_sae_id(source)
-        with model.trace(padded_tokens):
-            if "resid_post" in hook_name:
-                outputs = nnsight.save(model.layers_output[layer_num])
-            elif "hook_mlp_in" in hook_name:
-                outputs = nnsight.save(model.mlps_input[layer_num])
-            else:
-                raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
-        cache = {hook_name: outputs}
-    else:
-        _, cache = model.run_with_cache(padded_tokens)
+    # Run batch inference (backend-aware: eager batched forward, or per-prompt vLLM capture)
+    cache = await capture_padded_cache_async(model, padded_tokens, original_lengths, [hook_name])
 
     # Process each prompt separately to handle different lengths
     results = []
@@ -218,37 +174,27 @@ def process_topk_batch(
 
         # Get top k activations for each token
         # activations_by_index has shape [num_features, num_tokens]
-        # We want top k features for each token
-        top_k_values, top_k_indices = torch.topk(activations_by_index.T, k=top_k)
+        # We want top k features for each token. Clamped to the feature count: torch.topk
+        # raises when k exceeds the axis it reduces, which turned an over-large top_k into
+        # a 500.
+        effective_top_k = max(1, min(top_k, activations_by_index.shape[0]))
+        top_k_values, top_k_indices = torch.topk(activations_by_index.T, k=effective_top_k)
 
-        # Apply ignore_bos if needed
-        if ignore_bos:
-            str_tokens = str_tokens[1:]
-            top_k_values = top_k_values[1:]
-            top_k_indices = top_k_indices[1:]
-
-        # Build result for this prompt
-        token_results = []
-        for token_idx, (token, values, indices) in enumerate(
-            zip(str_tokens, top_k_values, top_k_indices)
-        ):
-            token_result = ActivationTopkByTokenPost200ResponseResultsInner(
-                token=token,  # type: ignore
-                token_position=token_idx,
-                top_features=[
-                    ActivationTopkByTokenPost200ResponseResultsInnerTopFeaturesInner(
-                        feature_index=int(idx.item()),
-                        activation_value=float(val.item()),
-                    )
-                    for val, idx in zip(values, indices)
-                ],
-            )
-            token_results.append(token_result)
+        # From the full id tensor, before any slicing, so it stays aligned with
+        # the ids it was derived from.
+        special_positions = set(special_token_positions(tokens_list[i][:seq_len], model.tokenizer))
+        str_tokens, token_results = build_token_results(
+            str_tokens,
+            top_k_values,
+            top_k_indices,
+            special_positions,
+            ignore_bos,
+        )
 
         results.append(
-            ActivationTopkByTokenBatchPost200ResponseResultsInner(
+            ActivationTopkByTokenBatchResult(
                 results=token_results,
-                tokens=str_tokens,  # type: ignore
+                tokens=str_tokens,
             )
         )
 
@@ -258,7 +204,7 @@ def process_topk_batch(
 def get_activations_by_index(
     sae_type: str,
     selected_layer: str,
-    cache: ActivationCache | dict[str, torch.Tensor],
+    cache: dict[str, torch.Tensor],
     hook_name: str,
 ) -> torch.Tensor:
     """
@@ -270,7 +216,5 @@ def get_activations_by_index(
         return torch.transpose(mlp_activation_data[0], 0, 1)
 
     activation_data = cache[hook_name].to(Config.get_instance().device)
-    feature_activation_data = (
-        SAEManager.get_instance().get_sae(selected_layer).encode(activation_data)
-    )
+    feature_activation_data = SAEManager.get_instance().get_sae(selected_layer).encode(activation_data)
     return torch.transpose(feature_activation_data.squeeze(0), 0, 1)

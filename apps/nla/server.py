@@ -39,7 +39,23 @@ Model                   DType     Layer   GPU+VRAM    NLA_MEM_FRACTION
 Qwen2.5-7B-Instruct   bfloat16     20      A40 48GB       0.38
 Gemma-3-12b           bfloat16     32      A100 80GB      0.31
 
-  NLA_MEM_FRACTION              — GPU memory fraction for KV cache (default: 0.38)
+  NLA_MEM_FRACTION              — fraction of the GPU the verbalizer engine may
+                                  occupy IN TOTAL: weights, activations, CUDA
+                                  graphs and KV pool together, NOT the KV pool
+                                  alone. The verbalizer loads first, so this is
+                                  effectively "leave (1 - fraction) of the card
+                                  for the reconstructor + source models, which
+                                  allocate outside it". KV pool is the remainder
+                                  after weights and overhead (default: 0.38).
+  NLA_VERBALIZER_MAX_MODEL_LEN  — context length the verbalizer engine sizes its
+                                  KV pool against. vLLM refuses to boot unless
+                                  the pool holds one request at this length, so
+                                  a long-context base (Gemma 3 at 131072) demands
+                                  GiB of pool for a length the verbalizer never
+                                  reaches: its prompt is a fixed template and its
+                                  output is capped by NLA_MAX_NEW_TOKENS_LIMIT.
+                                  Set it to (template + that limit) with slack.
+                                  Default: unset = the model's own maximum.
   NLA_MAX_CONCURRENT            — max concurrent SGLang verbalizer generations
                                   (default: 24). This is now a SERVER-WIDE bound:
                                   the verbalizer fan-outs of /explain and
@@ -168,8 +184,11 @@ concurrency gates above which bound the COUNT of in-flight requests):
   NLA_INT4_RECONSTRUCTOR        — if "1"/true, apply INT4 weight-only
                                   quantization to the reconstructor backbone
                                   via torchao (~75% saving vs bf16, ~50% vs
-                                  fp8). Loads via TorchAoConfig+device_map so
-                                  no bf16 GPU transient peak. The reconstructor
+                                  fp8). Unlike the fp8 path, the int4 pack op
+                                  has no CPU kernel, so the backbone transits
+                                  the GPU in bf16 before packing — budget for a
+                                  load-time peak of the full bf16 backbone on
+                                  the target device. The reconstructor
                                   output is a soft scalar score (MSE/cosine),
                                   so 5-15%% accumulated drift on its predicted
                                   activation is acceptable for relative
@@ -244,13 +263,16 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from queue import Queue
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
+import sentry_sdk
 import torch
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from interp_engine import check_cuda_driver
+from pydantic import BaseModel, ConfigDict, Field
 from transformers.generation.streamers import BaseStreamer
 
 # Configure the "nla" logger explicitly with its own handler and disable
@@ -272,21 +294,109 @@ if not logger.handlers:
     logger.addHandler(_handler)
 logger.propagate = False
 
-from nla_inference import SourceModel  # noqa: E402
-from nla_inference import NLAClient, NLAReconstructor, make_nla_config
+from chat_template_spans import (  # noqa: E402
+    compute_spans,
+    encode_with_special,
+    has_chat_template,
+    terminal_token_ids,
+)
+from eager_verbalizer import EagerVerbalizer  # noqa: E402
+from nla_inference import (  # noqa: E402
+    NLAClient,
+    NLAReconstructor,
+    SourceModel,
+    make_nla_config,
+    resolve_dtype_for_device,
+)
+from startup_memory import (  # noqa: E402
+    compute_serving_limits as _nla_compute_serving_limits,
+)
+from vllm_verbalizer import VLLMVerbalizer  # noqa: E402
 
 load_dotenv()
+
+if TYPE_CHECKING:
+    from sentry_sdk._types import Event, Hint
+
+# Callers authenticate with a shared secret in `x-secret-key`, and it reaches Sentry by two
+# routes. The obvious one is `request.headers`: the SDK redacts Authorization, Cookie and
+# X-Api-Key, but its list does not include this header. The other is stack-trace locals -- an
+# error inside a route serializes every frame's variables, and the raw ASGI `scope` (headers
+# included) is a local in roughly twenty of them, so scrubbing by header name alone still ships
+# the secret about twenty times over. The value sweep is what covers that; the key passes above
+# are still worth keeping, since they redact the header on transactions, which carry no locals.
+SENTRY_SCRUBBED_HEADERS = frozenset({"x-secret-key"})
+_SENTRY_HEADER_ATTR_PREFIX = "http.request.header."
+_SENTRY_FILTERED = "[Filtered]"
+
+
+def _redact_sentry_value(node: "Any", secret: str) -> None:
+    """Replace every occurrence of `secret` in a nested event payload, in place."""
+    if isinstance(node, dict):
+        pairs = list(node.items())
+    elif isinstance(node, list):
+        pairs = list(enumerate(node))
+    else:
+        return
+    for key, value in pairs:
+        if isinstance(value, str) and secret in value:
+            node[key] = value.replace(secret, _SENTRY_FILTERED)
+        else:
+            _redact_sentry_value(value, secret)
+
+
+def scrub_sentry_event(event: "Event", _hint: "Hint") -> "Event":
+    """Redact the auth header wherever it reaches an event: headers, span attributes, locals."""
+    request: Any = event.get("request")
+    headers = request.get("headers") if isinstance(request, dict) else None
+    if isinstance(headers, dict):
+        for key in headers:
+            if key.lower() in SENTRY_SCRUBBED_HEADERS:
+                headers[key] = _SENTRY_FILTERED
+
+    # Transactions carry the same headers again as span attributes, so scrubbing only `request`
+    # would still ship the secret on the sampled quarter of traffic.
+    contexts: Any = event.get("contexts") or {}
+    trace: Any = contexts.get("trace") or {}
+    spans: Any = event.get("spans") or []
+    for data in [trace.get("data"), *(span.get("data") for span in spans)]:
+        if not isinstance(data, dict):
+            continue
+        for key in data:
+            if key.lower().removeprefix(_SENTRY_HEADER_ATTR_PREFIX) in SENTRY_SCRUBBED_HEADERS:
+                data[key] = _SENTRY_FILTERED
+
+    # Guarded on non-empty: `"".replace` would rewrite every string in the event.
+    secret = os.environ.get("SECRET")
+    if secret:
+        _redact_sentry_value(event, secret)
+    return event
+
+
+# Error reporting. Off entirely without a DSN, so a local run needs no Sentry account. This has
+# to precede the `FastAPI(...)` below: the integration wraps route handlers as they are
+# registered, so an app built before init reports nothing.
+if os.getenv("SENTRY_DSN"):
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        environment=os.getenv("SENTRY_ENVIRONMENT", "development"),
+        release=os.getenv("SENTRY_RELEASE"),
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.25")),
+        profile_session_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.25")),
+        profile_lifecycle="trace",
+        before_send=scrub_sentry_event,
+        before_send_transaction=scrub_sentry_event,
+    )
 
 SECRET = os.environ.get("SECRET")
 
 # ─── NLA config from env ────────────────────────────────────────────────────
 
-VERBALIZER_MODEL = os.environ.get(
-    "NLA_VERBALIZER_MODEL", "kitft/nla-qwen2.5-7b-actor-step4200"
-)
-RECONSTRUCTOR_MODEL = os.environ.get(
-    "NLA_RECONSTRUCTOR_MODEL", "kitft/nla-qwen2.5-7b-critic-step4200"
-)
+VERBALIZER_MODEL = os.environ.get("NLA_VERBALIZER_MODEL", "kitft/nla-qwen2.5-7b-actor-step4200")
+# CUDA verbalizer backend: "vllm" (default, engine-owned VLLMModel + prompt_embeds)
+# or "sglang" (legacy in-process sgl.Engine; requires sglang installed).
+VERBALIZER_BACKEND = os.environ.get("NLA_VERBALIZER_BACKEND", "vllm").strip().lower()
+RECONSTRUCTOR_MODEL = os.environ.get("NLA_RECONSTRUCTOR_MODEL", "kitft/nla-qwen2.5-7b-critic-step4200")
 SOURCE_MODEL = os.environ.get("NLA_SOURCE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 
 TP_SIZE = int(os.environ.get("NLA_TP_SIZE", "1"))
@@ -299,29 +409,21 @@ MAX_CONCURRENT = int(os.environ.get("NLA_MAX_CONCURRENT", "24"))
 # pool occupancy.
 MAX_CONCURRENT_EXPLAINS = int(os.environ.get("NLA_MAX_CONCURRENT_EXPLAINS", "1"))
 if MAX_CONCURRENT_EXPLAINS < 1:
-    raise ValueError(
-        f"NLA_MAX_CONCURRENT_EXPLAINS must be >= 1, got {MAX_CONCURRENT_EXPLAINS}"
-    )
+    raise ValueError(f"NLA_MAX_CONCURRENT_EXPLAINS must be >= 1, got {MAX_CONCURRENT_EXPLAINS}")
 SOURCE_MAX_CONCURRENT = int(os.environ.get("NLA_SOURCE_MAX_CONCURRENT", "4"))
 # Per-request /score gate. Reconstructor forward passes are blocking torch
 # work; we offload them via run_in_executor and cap parallelism to keep
 # VRAM bounded and avoid starving the rest of the server. (N+1)th request
 # fails fast with 429.
-RECONSTRUCTOR_MAX_CONCURRENT = int(
-    os.environ.get("NLA_RECONSTRUCTOR_MAX_CONCURRENT", "4")
-)
+RECONSTRUCTOR_MAX_CONCURRENT = int(os.environ.get("NLA_RECONSTRUCTOR_MAX_CONCURRENT", "4"))
 if RECONSTRUCTOR_MAX_CONCURRENT < 1:
-    raise ValueError(
-        f"NLA_RECONSTRUCTOR_MAX_CONCURRENT must be >= 1, got {RECONSTRUCTOR_MAX_CONCURRENT}"
-    )
+    raise ValueError(f"NLA_RECONSTRUCTOR_MAX_CONCURRENT must be >= 1, got {RECONSTRUCTOR_MAX_CONCURRENT}")
 # Per-request /describe gate. Bounds the number of concurrent /describe
 # *requests* (orthogonal to NLA_MAX_CONCURRENT, which bounds verbalizer
 # streams across the whole server). (N+1)th request fails fast with 429.
 MAX_DESCRIBE_REQUESTS = int(os.environ.get("NLA_MAX_DESCRIBE_REQUESTS", "32"))
 if MAX_DESCRIBE_REQUESTS < 1:
-    raise ValueError(
-        f"NLA_MAX_DESCRIBE_REQUESTS must be >= 1, got {MAX_DESCRIBE_REQUESTS}"
-    )
+    raise ValueError(f"NLA_MAX_DESCRIBE_REQUESTS must be >= 1, got {MAX_DESCRIBE_REQUESTS}")
 # Reconstructor (HF) batch size — coalesces score() calls from streaming
 # fan-outs in /describe and /explain into one forward pass. Larger batches
 # amortize the per-call overhead (kernel launches, attention setup) but
@@ -330,6 +432,19 @@ if MAX_DESCRIBE_REQUESTS < 1:
 # 4 is a safe middle ground for a 7B-class reconstructor on a single GPU;
 # bump higher if you have headroom and lots of fan-out.
 RECONSTRUCTION_BATCH_SIZE = int(os.environ.get("NLA_RECONSTRUCTION_BATCH_SIZE", "8"))
+
+# Deliberately below the config above rather than inside the init block: which models this pod
+# serves is only known once these resolve, but init has to happen first so that a bad
+# NLA_MAX_CONCURRENT_EXPLAINS still crashes into a Sentry that is listening. This server takes no
+# CLI arguments, so its start args are the NLA_-prefixed environment -- scanned by prefix, which
+# also picks up the ones parsed further down (NLA_FP8_*, NLA_TORCH_COMPILE) and leaves SECRET and
+# HF_TOKEN out by construction. Only the three models are tags; the rest is read after the fact.
+if sentry_sdk.is_initialized():
+    sentry_sdk.set_tag("verbalizer_model", VERBALIZER_MODEL)
+    sentry_sdk.set_tag("source_model", SOURCE_MODEL)
+    sentry_sdk.set_tag("reconstructor_model", RECONSTRUCTOR_MODEL or "none")
+    sentry_sdk.set_tag("verbalizer_backend", VERBALIZER_BACKEND)
+    sentry_sdk.set_context("start_args", {k: v for k, v in os.environ.items() if k.startswith("NLA_")})
 
 
 def _parse_bool_env(name: str, default: bool) -> bool:
@@ -400,9 +515,9 @@ VERBALIZER_QUANTIZATION: str | None = "fp8" if FP8_VERBALIZER else None
 
 KV_CACHE_DTYPE: str | None = os.environ.get("NLA_KV_CACHE_DTYPE") or None
 _cuda_graph_max_bs_raw = os.environ.get("NLA_CUDA_GRAPH_MAX_BS")
-CUDA_GRAPH_MAX_BS: int | None = (
-    int(_cuda_graph_max_bs_raw) if _cuda_graph_max_bs_raw else None
-)
+CUDA_GRAPH_MAX_BS: int | None = int(_cuda_graph_max_bs_raw) if _cuda_graph_max_bs_raw else None
+_verbalizer_max_model_len_raw = os.environ.get("NLA_VERBALIZER_MAX_MODEL_LEN")
+VERBALIZER_MAX_MODEL_LEN: int | None = int(_verbalizer_max_model_len_raw) if _verbalizer_max_model_len_raw else None
 TORCH_COMPILE = _parse_bool_env("NLA_TORCH_COMPILE", default=False)
 
 if FP8_RECONSTRUCTOR and INT4_RECONSTRUCTOR:
@@ -417,18 +532,10 @@ OVERRIDE_D_MODEL = os.environ.get("NLA_OVERRIDE_D_MODEL")
 OVERRIDE_INJECTION_SCALE = os.environ.get("NLA_OVERRIDE_INJECTION_SCALE")
 OVERRIDE_INJECTION_CHAR = os.environ.get("NLA_OVERRIDE_INJECTION_CHAR")
 OVERRIDE_INJECTION_TOKEN_ID = os.environ.get("NLA_OVERRIDE_INJECTION_TOKEN_ID")
-OVERRIDE_INJECTION_LEFT_NEIGHBOR = os.environ.get(
-    "NLA_OVERRIDE_INJECTION_LEFT_NEIGHBOR"
-)
-OVERRIDE_INJECTION_RIGHT_NEIGHBOR = os.environ.get(
-    "NLA_OVERRIDE_INJECTION_RIGHT_NEIGHBOR"
-)
-OVERRIDE_VERBALIZER_PROMPT_TEMPLATE = os.environ.get(
-    "NLA_OVERRIDE_VERBALIZER_PROMPT_TEMPLATE"
-)
-OVERRIDE_RECONSTRUCTOR_PROMPT_TEMPLATE = os.environ.get(
-    "NLA_OVERRIDE_RECONSTRUCTOR_PROMPT_TEMPLATE"
-)
+OVERRIDE_INJECTION_LEFT_NEIGHBOR = os.environ.get("NLA_OVERRIDE_INJECTION_LEFT_NEIGHBOR")
+OVERRIDE_INJECTION_RIGHT_NEIGHBOR = os.environ.get("NLA_OVERRIDE_INJECTION_RIGHT_NEIGHBOR")
+OVERRIDE_VERBALIZER_PROMPT_TEMPLATE = os.environ.get("NLA_OVERRIDE_VERBALIZER_PROMPT_TEMPLATE")
+OVERRIDE_RECONSTRUCTOR_PROMPT_TEMPLATE = os.environ.get("NLA_OVERRIDE_RECONSTRUCTOR_PROMPT_TEMPLATE")
 OVERRIDE_EXTRACTION_LAYER = os.environ.get("NLA_OVERRIDE_EXTRACTION_LAYER")
 OVERRIDE_MSE_SCALE = os.environ.get("NLA_OVERRIDE_MSE_SCALE")
 
@@ -495,46 +602,90 @@ def _compute_default_devices() -> tuple[str, str, str]:
     return verb, recon, source
 
 
-_DEFAULT_VERB_DEVICE, _DEFAULT_RECON_DEVICE, _DEFAULT_SOURCE_DEVICE = (
-    _compute_default_devices()
+# Before the first CUDA call in the process. `torch.cuda.is_available()` inside
+# `_detect_device()` below does not raise when the driver is too old for this torch build
+# (the CUDA 13 wheels the engine installs) -- it answers False, which would quietly demote
+# the whole server to CPU with no hint as to why. The explicit NLA_*_DEVICE values are what
+# decide whether that is fatal: an all-CPU pinning was never going to touch the GPU. CLI
+# --*-device flags are parsed after this module loads, so they can't be consulted here;
+# use the env vars to run on CPU on a box whose driver is too old.
+check_cuda_driver(
+    [
+        device
+        for device in (
+            os.environ.get("NLA_VERBALIZER_DEVICE"),
+            os.environ.get("NLA_RECONSTRUCTOR_DEVICE"),
+            os.environ.get("NLA_SOURCE_DEVICE"),
+        )
+        if device
+    ],
+    cpu_hint=(
+        "To serve on CPU instead, set NLA_VERBALIZER_DEVICE, NLA_RECONSTRUCTOR_DEVICE, and NLA_SOURCE_DEVICE to cpu."
+    ),
 )
-VERBALIZER_DEVICE = _normalize_device(
-    os.environ.get("NLA_VERBALIZER_DEVICE", _DEFAULT_VERB_DEVICE)
-)
-RECONSTRUCTOR_DEVICE = _normalize_device(
-    os.environ.get("NLA_RECONSTRUCTOR_DEVICE", _DEFAULT_RECON_DEVICE)
-)
-SOURCE_DEVICE = _normalize_device(
-    os.environ.get("NLA_SOURCE_DEVICE", _DEFAULT_SOURCE_DEVICE)
-)
+
+_DEFAULT_VERB_DEVICE, _DEFAULT_RECON_DEVICE, _DEFAULT_SOURCE_DEVICE = _compute_default_devices()
+VERBALIZER_DEVICE = _normalize_device(os.environ.get("NLA_VERBALIZER_DEVICE", _DEFAULT_VERB_DEVICE))
+RECONSTRUCTOR_DEVICE = _normalize_device(os.environ.get("NLA_RECONSTRUCTOR_DEVICE", _DEFAULT_RECON_DEVICE))
+SOURCE_DEVICE = _normalize_device(os.environ.get("NLA_SOURCE_DEVICE", _DEFAULT_SOURCE_DEVICE))
+
+# Memory-derived DEFAULTS for the verbalizer fan-out + token budget (see
+# startup_memory.py for the tuning knobs). Explicit env vars still win; this only
+# fills the default when NLA_MAX_CONCURRENT / NLA_MAX_NEW_TOKENS_LIMIT are unset.
+# Called here rather than at import: it needs the resolved VERBALIZER_DEVICE above.
+_NLA_SERVING_LIMITS = _nla_compute_serving_limits(VERBALIZER_DEVICE)
+if "NLA_MAX_CONCURRENT" not in os.environ:
+    MAX_CONCURRENT = _NLA_SERVING_LIMITS.max_concurrent_requests
 
 
 # Globals
-nla_client: NLAClient | None = None
+nla_client: NLAClient | EagerVerbalizer | VLLMVerbalizer | None = None
 nla_reconstructor: NLAReconstructor | None = None
 source_model: SourceModel | None = None
+
+
+# Accessors for the three model globals above, mirroring `Model.get_instance()` in
+# apps/inference. Endpoints keep their own `is None` checks where they want a more specific
+# message, but these are what the shared helpers and the nested SSE generators use: a closure
+# cannot inherit its enclosing handler's narrowing of a global, so reading the global directly
+# there would turn "model not loaded" into an AttributeError 500 instead of this 503.
+def _require_source_model() -> SourceModel:
+    if source_model is None:
+        raise HTTPException(status_code=503, detail="Source model not loaded")
+    return source_model
+
+
+def _require_client() -> NLAClient | EagerVerbalizer | VLLMVerbalizer:
+    if nla_client is None:
+        raise HTTPException(status_code=503, detail="NLA client not loaded")
+    return nla_client
+
+
+# Request gates. Constructed here rather than left as None until lifespan() so they are never
+# Optional at the ~10 places that await them: asyncio.Semaphore has not bound a loop at
+# construction since Python 3.10, so building one at import is safe. lifespan() still REPLACES
+# each of these on startup, which is what keeps a semaphore from outliving the loop it bound to
+# when the app is started more than once (as the tests do).
+#
 # Bounds the number of concurrent /explain requests. Sized by
 # NLA_MAX_CONCURRENT_EXPLAINS (default 1 = legacy single-request behavior).
 # (N+1)th request gets HTTP 429 — same fail-fast contract as the old lock.
-# Initialized in lifespan() because asyncio.Semaphore needs a running loop.
-_explain_semaphore: asyncio.Semaphore | None = None
+_explain_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXPLAINS)
 # Server-wide gate on in-flight verbalizer streams (sglang KV-pool occupancy).
 # Sized by NLA_MAX_CONCURRENT. Shared across all /explain and /describe
 # fan-outs so the pool occupancy bound holds regardless of how many requests
-# are running in parallel. Initialized in lifespan().
-_verbalizer_semaphore: asyncio.Semaphore | None = None
+# are running in parallel.
+_verbalizer_semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 # Gate concurrent GPU work on the source model (model.generate, extract).
-# Initialized in lifespan() because asyncio.Semaphore needs a running loop.
-_source_semaphore: asyncio.Semaphore | None = None
+_source_semaphore = asyncio.Semaphore(SOURCE_MAX_CONCURRENT)
 # Bounds concurrent /score requests. Each /score does one reconstructor
 # forward pass via run_in_executor; sized by NLA_RECONSTRUCTOR_MAX_CONCURRENT.
-# (N+1)th request gets HTTP 429. Initialized in lifespan().
-_reconstructor_semaphore: asyncio.Semaphore | None = None
+# (N+1)th request gets HTTP 429.
+_reconstructor_semaphore = asyncio.Semaphore(RECONSTRUCTOR_MAX_CONCURRENT)
 # Bounds concurrent /describe requests. Sized by NLA_MAX_DESCRIBE_REQUESTS.
 # Distinct from _verbalizer_semaphore (which gates per-vector sglang
 # streams across the whole server). (N+1)th request gets HTTP 429.
-# Initialized in lifespan().
-_describe_semaphore: asyncio.Semaphore | None = None
+_describe_semaphore = asyncio.Semaphore(MAX_DESCRIBE_REQUESTS)
 
 
 def _cuda_idx(device: str) -> int | None:
@@ -573,11 +724,7 @@ def load_models():
     is_cuda = bool(cuda_idxs_for_models)
 
     if n_cuda == 0:
-        device_summary = (
-            f"verbalizer={VERBALIZER_DEVICE} "
-            f"reconstructor={RECONSTRUCTOR_DEVICE} "
-            f"source={SOURCE_DEVICE}"
-        )
+        device_summary = f"verbalizer={VERBALIZER_DEVICE} reconstructor={RECONSTRUCTOR_DEVICE} source={SOURCE_DEVICE}"
     else:
         device_summary = (
             f"verbalizer={VERBALIZER_DEVICE} "
@@ -603,9 +750,7 @@ def load_models():
     if OVERRIDE_INJECTION_LEFT_NEIGHBOR is not None:
         _overrides["injection_left_neighbor_id"] = int(OVERRIDE_INJECTION_LEFT_NEIGHBOR)
     if OVERRIDE_INJECTION_RIGHT_NEIGHBOR is not None:
-        _overrides["injection_right_neighbor_id"] = int(
-            OVERRIDE_INJECTION_RIGHT_NEIGHBOR
-        )
+        _overrides["injection_right_neighbor_id"] = int(OVERRIDE_INJECTION_RIGHT_NEIGHBOR)
     if OVERRIDE_VERBALIZER_PROMPT_TEMPLATE is not None:
         _overrides["verbalizer_prompt_template"] = OVERRIDE_VERBALIZER_PROMPT_TEMPLATE
 
@@ -617,25 +762,41 @@ def load_models():
         f"quantization={VERBALIZER_QUANTIZATION or 'none'}, "
         f"kv_cache_dtype={KV_CACHE_DTYPE or 'default'}, "
         f"cuda_graph_max_bs={CUDA_GRAPH_MAX_BS or 'default'}, "
+        f"max_model_len={VERBALIZER_MAX_MODEL_LEN or 'model default'}, "
         f"torch_compile={TORCH_COMPILE})"
     )
-    # sglang itself only runs on CUDA; on a no-CUDA box we leave `device`
-    # unset so NLAClient skips device validation and sglang fails (or runs
-    # whatever fallback it has) on its own. Embedding lookup is tiny
-    # (~300 MB for Qwen 7B), so CPU is fine when no GPU is available.
+    # CUDA verbalizer: the engine-owned vLLM prompt_embeds backend (default), or the
+    # legacy in-process sgl.Engine when NLA_VERBALIZER_BACKEND=sglang (requires sglang
+    # installed). On a no-CUDA box (MPS / CPU) fall back to the eager transformers
+    # verbalizer, which exposes the same interface but runs generate(inputs_embeds=...)
+    # directly (dev/test parity, not production throughput). Embedding lookup is tiny
+    # (~300 MB for Qwen 7B), so CPU is fine for the embed table when no GPU is available.
     verb_is_cuda = VERBALIZER_DEVICE.startswith("cuda")
-    nla_client = NLAClient(
-        VERBALIZER_MODEL,
-        nla_config=cfg,
-        embed_device=VERBALIZER_DEVICE if verb_is_cuda else "cpu",
-        device=VERBALIZER_DEVICE if verb_is_cuda else None,
-        tp_size=TP_SIZE,
-        mem_fraction_static=MEM_FRACTION,
-        quantization=VERBALIZER_QUANTIZATION,
-        kv_cache_dtype=KV_CACHE_DTYPE,
-        cuda_graph_max_bs=CUDA_GRAPH_MAX_BS,
-        enable_torch_compile=TORCH_COMPILE,
-    )
+    if verb_is_cuda:
+        verbalizer_cls = NLAClient if VERBALIZER_BACKEND == "sglang" else VLLMVerbalizer
+        print(f"[NLA] CUDA verbalizer backend: {verbalizer_cls.__name__}")
+        nla_client = verbalizer_cls(
+            VERBALIZER_MODEL,
+            nla_config=cfg,
+            embed_device=VERBALIZER_DEVICE,
+            device=VERBALIZER_DEVICE,
+            tp_size=TP_SIZE,
+            mem_fraction_static=MEM_FRACTION,
+            quantization=VERBALIZER_QUANTIZATION,
+            kv_cache_dtype=KV_CACHE_DTYPE,
+            cuda_graph_max_bs=CUDA_GRAPH_MAX_BS,
+            enable_torch_compile=TORCH_COMPILE,
+            max_model_len=VERBALIZER_MAX_MODEL_LEN,
+        )
+    else:
+        print(f"[NLA] No CUDA verbalizer device ({VERBALIZER_DEVICE}); using eager transformers verbalizer backend.")
+        nla_client = EagerVerbalizer(
+            VERBALIZER_MODEL,
+            nla_config=cfg,
+            embed_device="cpu",
+            device=VERBALIZER_DEVICE,
+            dtype=resolve_dtype_for_device(VERBALIZER_DEVICE),
+        )
     if is_cuda:
         _log_per_device_vram("after verbalizer", cuda_idxs_for_models)
 
@@ -651,6 +812,7 @@ def load_models():
                 mse_scale=float(OVERRIDE_MSE_SCALE) if OVERRIDE_MSE_SCALE else None,
                 reconstructor_prompt_template=OVERRIDE_RECONSTRUCTOR_PROMPT_TEMPLATE,
                 device=RECONSTRUCTOR_DEVICE,
+                dtype=resolve_dtype_for_device(RECONSTRUCTOR_DEVICE),
                 fp8=FP8_RECONSTRUCTOR,
                 int4=INT4_RECONSTRUCTOR,
             )
@@ -667,17 +829,14 @@ def load_models():
                     f"only zeros lm_head + final norm — it does NOT drop "
                     f"layers, so this is the actual count loaded)"
                 )
-            _log_per_device_vram(
-                f"after reconstructor{n_layers_msg}", cuda_idxs_for_models
-            )
+            _log_per_device_vram(f"after reconstructor{n_layers_msg}", cuda_idxs_for_models)
 
     if SOURCE_MODEL:
         extraction_layer = (
             int(OVERRIDE_EXTRACTION_LAYER)
             if OVERRIDE_EXTRACTION_LAYER is not None
             else nla_reconstructor.extraction_layer_index
-            if nla_reconstructor is not None
-            and nla_reconstructor.extraction_layer_index is not None
+            if nla_reconstructor is not None and nla_reconstructor.extraction_layer_index is not None
             else None
         )
         if extraction_layer is None:
@@ -696,6 +855,7 @@ def load_models():
                     SOURCE_MODEL,
                     layer_index=extraction_layer,
                     device=SOURCE_DEVICE,
+                    dtype=resolve_dtype_for_device(SOURCE_DEVICE),
                     truncate=TRUNCATE_SOURCE,
                     fp8=FP8_SOURCE,
                 )
@@ -707,9 +867,7 @@ def load_models():
                 _log_per_device_vram("after source model", cuda_idxs_for_models)
 
     if is_cuda:
-        _log_per_device_vram(
-            "TOTAL idle (post-load, no requests)", cuda_idxs_for_models
-        )
+        _log_per_device_vram("TOTAL idle (post-load, no requests)", cuda_idxs_for_models)
         print(
             "[VRAM] note: gap (nvidia-smi − torch in this process) = sglang's "
             "subprocess (verbalizer weights + KV pool live there) + CUDA "
@@ -718,42 +876,75 @@ def load_models():
         )
 
 
+def _serving_url() -> str:
+    """The address uvicorn was told to bind to (set in __main__ / env)."""
+    host = os.getenv("SERVER_HOST", "0.0.0.0")
+    port = os.getenv("SERVER_PORT", "5009")
+    display_host = "localhost" if host in ("0.0.0.0", "::", "") else host
+    return f"http://{display_host}:{port}"
+
+
+def _format_duration(seconds: float) -> str:
+    minutes, secs = divmod(int(seconds), 60)
+    return f"{minutes}m {secs}s" if minutes else f"{secs}s"
+
+
+def _print_banner(title: str, lines: list[str]) -> None:
+    """One visually obvious block, so the end of a long noisy startup is findable."""
+    bar = "=" * 100
+    body = "\n".join(f"  {line}" for line in lines)
+    print(f"\n{bar}\n  {title}\n{'-' * 100}\n{body}\n{bar}\n", flush=True)
+
+
+def _print_ready_banner(elapsed_seconds: float) -> None:
+    verb_status = VERBALIZER_MODEL if nla_client is not None else "not loaded"
+    recon_status = RECONSTRUCTOR_MODEL if nla_reconstructor is not None else "not loaded"
+    source_status = f"{SOURCE_MODEL} (truncate={TRUNCATE_SOURCE})" if source_model is not None else "not loaded"
+    _print_banner(
+        f"==== LOADING COMPLETE - SERVING ON {_serving_url()} ====",
+        [
+            f"verbalizer: {verb_status} @ {VERBALIZER_DEVICE} (backend={VERBALIZER_BACKEND})",
+            f"reconstructor: {recon_status} @ {RECONSTRUCTOR_DEVICE}",
+            f"source: {source_status} @ {SOURCE_DEVICE}",
+            f"concurrency: source={SOURCE_MAX_CONCURRENT} "
+            f"explain={MAX_CONCURRENT_EXPLAINS} verbalizer={MAX_CONCURRENT} "
+            f"score={RECONSTRUCTOR_MAX_CONCURRENT} describe={MAX_DESCRIBE_REQUESTS}",
+            f"startup took {_format_duration(elapsed_seconds)}",
+        ],
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _source_semaphore, _explain_semaphore, _verbalizer_semaphore
     global _reconstructor_semaphore, _describe_semaphore
+    global nla_client, nla_reconstructor, source_model
+    startup_started_at = time.monotonic()
     _source_semaphore = asyncio.Semaphore(SOURCE_MAX_CONCURRENT)
     _explain_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXPLAINS)
     _verbalizer_semaphore = asyncio.Semaphore(MAX_CONCURRENT)
     _reconstructor_semaphore = asyncio.Semaphore(RECONSTRUCTOR_MAX_CONCURRENT)
     _describe_semaphore = asyncio.Semaphore(MAX_DESCRIBE_REQUESTS)
     load_models()
-    print(
-        f"[NLA] source-model concurrency gate: max={SOURCE_MAX_CONCURRENT} "
-        f"(NLA_SOURCE_MAX_CONCURRENT)"
-    )
-    print(
-        f"[NLA] /explain concurrency gate: max={MAX_CONCURRENT_EXPLAINS} "
-        f"(NLA_MAX_CONCURRENT_EXPLAINS)"
-    )
-    print(
-        f"[NLA] verbalizer fan-out gate (server-wide): max={MAX_CONCURRENT} "
-        f"(NLA_MAX_CONCURRENT)"
-    )
-    print(
-        f"[NLA] /score concurrency gate: max={RECONSTRUCTOR_MAX_CONCURRENT} "
-        f"(NLA_RECONSTRUCTOR_MAX_CONCURRENT)"
-    )
-    print(
-        f"[NLA] /describe concurrency gate: max={MAX_DESCRIBE_REQUESTS} "
-        f"(NLA_MAX_DESCRIBE_REQUESTS)"
-    )
-    print(
-        f"[NLA] reconstruction batch size: {RECONSTRUCTION_BATCH_SIZE} "
-        f"(NLA_RECONSTRUCTION_BATCH_SIZE)"
-    )
+    # Boot the verbalizer's vLLM engine here rather than letting the first /explain
+    # pay for it (~75s). Must stay AFTER load_models(): vLLM sizes its KV pool from
+    # free VRAM at profiling time, so the source model and reconstructor have to be
+    # resident first or the pool grows and they no longer fit.
+    # Only the vLLM verbalizer has an engine to warm; the eager and sglang backends load
+    # their weights synchronously in load_models() above.
+    if isinstance(nla_client, VLLMVerbalizer):
+        _warm_t0 = time.monotonic()
+        print("[NLA] warming verbalizer vLLM engine...")
+        await nla_client.aload()
+        print(f"[NLA] verbalizer engine warm in {time.monotonic() - _warm_t0:.1f}s")
+    print(f"[NLA] source-model concurrency gate: max={SOURCE_MAX_CONCURRENT} (NLA_SOURCE_MAX_CONCURRENT)")
+    print(f"[NLA] /explain concurrency gate: max={MAX_CONCURRENT_EXPLAINS} (NLA_MAX_CONCURRENT_EXPLAINS)")
+    print(f"[NLA] verbalizer fan-out gate (server-wide): max={MAX_CONCURRENT} (NLA_MAX_CONCURRENT)")
+    print(f"[NLA] /score concurrency gate: max={RECONSTRUCTOR_MAX_CONCURRENT} (NLA_RECONSTRUCTOR_MAX_CONCURRENT)")
+    print(f"[NLA] /describe concurrency gate: max={MAX_DESCRIBE_REQUESTS} (NLA_MAX_DESCRIBE_REQUESTS)")
+    print(f"[NLA] reconstruction batch size: {RECONSTRUCTION_BATCH_SIZE} (NLA_RECONSTRUCTION_BATCH_SIZE)")
+    _print_ready_banner(time.monotonic() - startup_started_at)
     yield
-    global nla_client, nla_reconstructor
     if nla_client is not None:
         nla_client.shutdown()
         nla_client = None
@@ -798,14 +989,12 @@ MAX_INPUT_CHARS = int(os.environ.get("NLA_MAX_INPUT_CHARS", "65536"))
 # fan-out at NLA_MAX_CONCURRENT_EXPLAINS × MAX_POSITIONS_PER_REQUEST,
 # though the server-wide _verbalizer_semaphore (NLA_MAX_CONCURRENT) is the
 # binding constraint at peak.
-MAX_POSITIONS_PER_REQUEST = int(
-    os.environ.get("NLA_MAX_POSITIONS_PER_REQUEST", "512")
-)
+MAX_POSITIONS_PER_REQUEST = int(os.environ.get("NLA_MAX_POSITIONS_PER_REQUEST", "512"))
 # Max max_new_tokens accepted on /explain, /describe, /compare. Each
 # in-flight verbalizer stream's KV-cache slot scales linearly with this;
 # a runaway value (e.g. 32k) multiplies sglang's pool occupancy and
 # causes runtime OOM rather than a clean rejection.
-MAX_NEW_TOKENS_LIMIT = int(os.environ.get("NLA_MAX_NEW_TOKENS_LIMIT", "1024"))
+MAX_NEW_TOKENS_LIMIT = int(os.environ.get("NLA_MAX_NEW_TOKENS_LIMIT", str(_NLA_SERVING_LIMITS.max_new_tokens)))
 # Max activations per /describe call. Same fan-out bookkeeping as
 # MAX_POSITIONS_PER_REQUEST above.
 MAX_DESCRIBE_BATCH = int(os.environ.get("NLA_MAX_DESCRIBE_BATCH", "512"))
@@ -818,9 +1007,28 @@ MAX_COMPLETION_TOKENS = 512
 
 
 # ─── Request/Response models ────────────────────────────────────────────────
+#
+# These are the source of truth for the wire: FastAPI derives openapi.json from them and the
+# webapp's TypeScript types are generated from that.
+#
+# Field names stay snake_case. Unlike apps/inference and apps/autointerp, which alias to
+# camelCase, this server's names are load-bearing in two ways that make renaming them a data
+# migration rather than a refactor: `/api/nla/explain` stores ExplainResult records verbatim in
+# NlaExplainCache.resultJson, and those rows back permanent public share URLs; and `full_text`,
+# `token_id`, `layer_index` and `prompt_length` appear in published swagger on the `/api/nla/*`
+# routes. See the note in the repo's AGENTS.md on when aliasing is safe.
 
 
-class DescribeRequest(BaseModel):
+class NlaSchema(BaseModel):
+    """Base for every wire model here.
+
+    Deliberately has no ``alias_generator``: see the note above.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
+
+
+class DescribeRequest(NlaSchema):
     activations: list[list[float]] = Field(
         ...,
         description="List of activation vectors, each of length d_model",
@@ -832,21 +1040,17 @@ class DescribeRequest(BaseModel):
     stream: bool = Field(default=False, description="Stream results as SSE events")
 
 
-class DescriptionResult(BaseModel):
+class DescriptionResult(NlaSchema):
     description: str
-    mse: float | None = Field(
-        default=None, description="Reconstruction MSE (if reconstructor available)"
-    )
-    cosine_similarity: float | None = Field(
-        default=None, description="Cosine similarity (if reconstructor available)"
-    )
+    mse: float | None = Field(default=None, description="Reconstruction MSE (if reconstructor available)")
+    cosine_similarity: float | None = Field(default=None, description="Cosine similarity (if reconstructor available)")
 
 
-class DescribeResponse(BaseModel):
+class DescribeResponse(NlaSchema):
     results: list[DescriptionResult]
 
 
-class ScoreRequest(BaseModel):
+class ScoreRequest(NlaSchema):
     description: str = Field(
         ...,
         description="Text description to score",
@@ -858,41 +1062,65 @@ class ScoreRequest(BaseModel):
     )
 
 
-class ScoreResponse(BaseModel):
-    mse: float = Field(
-        description="Reconstruction MSE, range [0, 4]. ~0.2 good, ~1 mediocre, 2 orthogonal"
-    )
+class ScoreResponse(NlaSchema):
+    mse: float = Field(description="Reconstruction MSE, range [0, 4]. ~0.2 good, ~1 mediocre, 2 orthogonal")
     cosine_similarity: float
 
 
-class CompareRequest(BaseModel):
+class CompareRequest(NlaSchema):
     activation_a: list[float] = Field(..., description="First activation vector")
     activation_b: list[float] = Field(..., description="Second activation vector")
     temperature: float = Field(default=0.7, ge=0.0, le=5.0)
     max_new_tokens: int = Field(default=200, gt=0, le=MAX_NEW_TOKENS_LIMIT)
 
 
-class CompareResponse(BaseModel):
+class CompareResponse(NlaSchema):
     description: str = Field(description="Description of the difference vector (a - b)")
     diff_norm: float = Field(description="L2 norm of the difference vector")
     mse: float | None = Field(default=None)
     cosine_similarity: float | None = Field(default=None)
 
 
-class TokenizeRequest(BaseModel):
-    text: str = Field(
-        ...,
-        description="Input text to tokenize",
-        min_length=1,
+class ChatMessageInput(NlaSchema):
+    role: str = Field(..., description="Chat role, e.g. user / assistant / system")
+    content: str = Field(default="", description="Message text")
+    channel: str | None = Field(
+        default=None,
+        description="Optional harmony channel (analysis/final/commentary) for assistant turns.",
+    )
+
+
+class _ChatTemplateMixin(NlaSchema):
+    """Shared optional fields for endpoints that can accept structured chat
+    ``messages`` (rendered server-side via the model's real chat template) as an
+    alternative to a pre-rendered ``text`` string. When ``messages`` is provided,
+    per-token span metadata (role/section/channel/message_index) is attached to
+    the response so the frontend needs no per-family chat-format knowledge."""
+
+    messages: list[ChatMessageInput] | None = Field(
+        default=None,
+        description=(
+            "Structured chat messages. When set, the server applies the model's "
+            "chat template (ignoring `text`) and returns per-token spans."
+        ),
+    )
+    add_generation_prompt: bool = Field(default=True)
+    continue_final_message: bool = Field(default=False)
+    enable_thinking: bool | None = Field(default=None)
+
+
+class TokenizeRequest(_ChatTemplateMixin):
+    text: str | None = Field(
+        default=None,
+        description="Input text to tokenize (or provide `messages`).",
         max_length=MAX_INPUT_CHARS,
     )
 
 
-class CompletionRequest(BaseModel):
-    text: str = Field(
-        ...,
-        description="Prompt text to extend",
-        min_length=1,
+class CompletionRequest(_ChatTemplateMixin):
+    text: str | None = Field(
+        default=None,
+        description="Prompt text to extend (or provide `messages`).",
         max_length=MAX_INPUT_CHARS,
     )
     # completion_tokens is silently clamped server-side to MAX_COMPLETION_TOKENS
@@ -902,8 +1130,7 @@ class CompletionRequest(BaseModel):
         default=16,
         ge=1,
         description=(
-            "Number of tokens to generate as continuation "
-            f"(clamped server-side to 1-{MAX_COMPLETION_TOKENS})."
+            f"Number of tokens to generate as continuation (clamped server-side to 1-{MAX_COMPLETION_TOKENS})."
         ),
     )
     temperature: float = Field(default=0.7, ge=0.0, le=5.0)
@@ -949,11 +1176,7 @@ def _decode_with_fragments(tokenizer, ids: list[int]) -> list[tuple[str, int, in
         # tokens looking for a clean joined decode.
         joined = single
         run_end = i + 1
-        while (
-            run_end < n
-            and _REPLACEMENT_CHAR in joined
-            and (run_end - i) < _FRAGMENT_LOOKAHEAD
-        ):
+        while run_end < n and _REPLACEMENT_CHAR in joined and (run_end - i) < _FRAGMENT_LOOKAHEAD:
             run_end += 1
             joined = tokenizer.decode(ids[i:run_end])
         if _REPLACEMENT_CHAR in joined:
@@ -970,15 +1193,14 @@ def _decode_with_fragments(tokenizer, ids: list[int]) -> list[tuple[str, int, in
     return out
 
 
-class TokenInfo(BaseModel):
+class TokenInfo(NlaSchema):
     token: str
     token_id: int
     position: int
     fragment_index: int = Field(
         default=0,
         description=(
-            "0-based index within a multi-token byte fragment run. 0 for "
-            "tokens that decode cleanly on their own."
+            "0-based index within a multi-token byte fragment run. 0 for tokens that decode cleanly on their own."
         ),
     )
     fragment_count: int = Field(
@@ -990,26 +1212,29 @@ class TokenInfo(BaseModel):
             "every token in the run."
         ),
     )
+    # Per-token chat-span metadata, populated only when the request supplied
+    # structured `messages` (server-side chat templating). Null for raw-text.
+    role: str | None = Field(default=None)
+    section: str | None = Field(default=None, description='"header" | "content" | "footer" | "scaffold"')
+    channel: str | None = Field(default=None)
+    message_index: int | None = Field(default=None)
 
 
-class TokenizeResponse(BaseModel):
+class TokenizeResponse(NlaSchema):
     tokens: list[TokenInfo]
-    prompt_length: int = Field(
-        description="Number of tokens from the original input text"
-    )
+    prompt_length: int = Field(description="Number of tokens from the original input text")
     text: str = Field(description="Full text (original + any generated completion)")
 
 
-class ExtractRequest(BaseModel):
-    text: str = Field(
-        ...,
-        description="Input text to extract activations from",
-        min_length=1,
+class ExtractRequest(_ChatTemplateMixin):
+    text: str | None = Field(
+        default=None,
+        description="Input text to extract activations from (or provide `messages`).",
         max_length=MAX_INPUT_CHARS,
     )
 
 
-class TokenActivation(BaseModel):
+class TokenActivation(NlaSchema):
     token: str
     token_id: int
     position: int
@@ -1017,16 +1242,15 @@ class TokenActivation(BaseModel):
     l2_norm: float
 
 
-class ExtractResponse(BaseModel):
+class ExtractResponse(NlaSchema):
     layer_index: int
     tokens: list[TokenActivation]
 
 
-class ExplainRequest(BaseModel):
-    text: str = Field(
-        ...,
-        description="Input text to extract activations from",
-        min_length=1,
+class ExplainRequest(_ChatTemplateMixin):
+    text: str | None = Field(
+        default=None,
+        description="Input text to extract activations from (or provide `messages`).",
         max_length=MAX_INPUT_CHARS,
     )
     positions: list[int] | None = Field(
@@ -1049,7 +1273,7 @@ class ExplainRequest(BaseModel):
     stream: bool = Field(default=False, description="Stream results as SSE events")
 
 
-class ExplainResult(BaseModel):
+class ExplainResult(NlaSchema):
     token: str
     token_id: int
     position: int
@@ -1063,11 +1287,127 @@ class ExplainResult(BaseModel):
     )
     fragment_index: int = Field(default=0)
     fragment_count: int = Field(default=1)
+    # Per-token chat-span metadata (populated only when `messages` was supplied).
+    role: str | None = Field(default=None)
+    section: str | None = Field(default=None)
+    channel: str | None = Field(default=None)
+    message_index: int | None = Field(default=None)
 
 
-class ExplainResponse(BaseModel):
+class ExplainResponse(NlaSchema):
     layer_index: int
     results: list[ExplainResult]
+
+
+class NlaFrameSchema(NlaSchema):
+    """Marker base for a payload emitted as an SSE frame rather than a response body.
+
+    Streamed frames never reach ``openapi.json`` -- there is no single response body to
+    describe -- so nothing generated checks them, and four webapp files parse them field by
+    field. Declaring them here gives ``tests/test_frame_contract.py`` something to discover, so
+    a renamed field fails a test instead of silently reaching the browser as ``undefined``.
+
+    ``DescriptionResult`` and ``ExplainResult`` are also sent as final frames but stay on
+    ``NlaSchema``, because they are response-body models first and the spec already pins them.
+    """
+
+
+class CompletionPromptFrame(NlaFrameSchema):
+    """First frame of a ``/completion`` stream: the tokenized prompt."""
+
+    type: Literal["prompt"] = "prompt"
+    prompt_length: int
+    tokens: list[TokenInfo]
+
+
+class CompletionTokenFrame(NlaFrameSchema):
+    """One generated token."""
+
+    type: Literal["token"] = "token"
+    token: TokenInfo
+
+
+class CompletionDoneFrame(NlaFrameSchema):
+    """Final frame of a ``/completion`` stream, carrying the full text."""
+
+    type: Literal["done"] = "done"
+    text: str
+
+
+class DescribeProgressFrame(NlaFrameSchema):
+    """Partial verbalizer output for one vector in a ``/describe`` batch.
+
+    Must not carry a ``description``: consumers use that key's presence to tell a partial frame
+    from the final :class:`DescriptionResult`, and so does the server's own completion counter.
+    """
+
+    index: int
+    text: str
+    done: Literal[False] = False
+
+
+class ExplainMetaFrame(NlaFrameSchema):
+    """First frame of an ``/explain`` stream, before any position is described."""
+
+    layer_index: int
+    total: int
+    prompt_length: int
+
+
+class ExplainProgressFrame(NlaFrameSchema):
+    """Partial verbalizer output for one token position.
+
+    Must not carry a ``description``, for the same reason as :class:`DescribeProgressFrame`.
+    """
+
+    position: int
+    text: str
+    done: Literal[False] = False
+
+
+class HealthLimits(NlaSchema):
+    """The request caps this process was configured with, so a client can pre-validate."""
+
+    max_input_chars: int
+    max_positions_per_request: int
+    max_new_tokens: int
+    max_describe_batch: int
+    max_description_chars: int
+    max_completion_tokens: int
+
+
+class HealthResponse(NlaSchema):
+    """Liveness plus which components loaded and how they were configured.
+
+    Most fields are null until the lifespan finishes, and stay null for whichever of the
+    verbalizer / reconstructor / source model this process did not load.
+    """
+
+    status: str
+    verbalizer_model: str
+    d_model: int | None = None
+    verbalizer_quantization: str | None = None
+    verbalizer_kv_cache_dtype: str | None = None
+    verbalizer_cuda_graph_max_bs: int | None = None
+    verbalizer_torch_compile: bool | None = None
+    verbalizer_device: str | None = None
+    reconstructor_available: bool
+    reconstructor_fp8: bool | None = None
+    reconstructor_int4: bool | None = None
+    reconstructor_device: str | None = None
+    source_model: str | None = None
+    extraction_layer: int | None = None
+    source_truncated: bool | None = None
+    source_fp8: bool | None = None
+    source_device: str | None = None
+    completion_available: bool
+    num_cuda_devices: int
+    max_concurrent: int
+    max_concurrent_explains: int
+    source_max_concurrent: int
+    reconstructor_max_concurrent: int
+    max_describe_requests: int
+    limits: HealthLimits
 
 
 # ─── Reconstruction batcher ─────────────────────────────────────────────────
@@ -1111,9 +1451,7 @@ class _ReconstructionBatcher:
         self._total = total_submitters
         self._task = asyncio.create_task(self._run())
 
-    async def score(
-        self, description: str, vector: np.ndarray
-    ) -> tuple[float, float]:
+    async def score(self, description: str, vector: np.ndarray) -> tuple[float, float]:
         loop = asyncio.get_running_loop()
         fut: asyncio.Future = loop.create_future()
         # Order matters: decrement BEFORE enqueueing so the batcher loop
@@ -1174,9 +1512,7 @@ class _ReconstructionBatcher:
             vectors = [b[1] for b in batch]
             t0 = time.perf_counter()
             try:
-                results = await asyncio.to_thread(
-                    self._rec.score_batch, descriptions, vectors
-                )
+                results = await asyncio.to_thread(self._rec.score_batch, descriptions, vectors)
             except Exception as e:
                 logger.exception(
                     "reconstruction score_batch failed (batch_size=%d)",
@@ -1187,10 +1523,7 @@ class _ReconstructionBatcher:
                         fut.set_exception(e)
                 processed += len(batch)
                 continue
-            logger.info(
-                f"reconstruction batch: scored {len(batch)} item(s) in "
-                f"{time.perf_counter() - t0:.2f}s"
-            )
+            logger.info(f"reconstruction batch: scored {len(batch)} item(s) in {time.perf_counter() - t0:.2f}s")
             for (_, _, fut), r in zip(batch, results):
                 if not fut.done():
                     fut.set_result(r)
@@ -1200,28 +1533,97 @@ class _ReconstructionBatcher:
 # ─── Endpoints ──────────────────────────────────────────────────────────────
 
 
-@app.post("/tokenize", response_model=TokenizeResponse)
-async def tokenize(req: TokenizeRequest):
-    """Tokenize text using the source model's tokenizer."""
-    if source_model is None:
-        raise HTTPException(status_code=503, detail="Source model not loaded")
+def _encode_with_special(text: str) -> list[int]:
+    """The canonical NLA tokenization (matches /tokenize, /completion, extract)."""
+    return encode_with_special(_require_source_model().tokenizer, text)
 
-    ids = source_model.tokenizer(req.text, add_special_tokens=True)["input_ids"]
-    fragments = _decode_with_fragments(source_model.tokenizer, ids)
 
-    return TokenizeResponse(
-        tokens=[
+def _resolve_text_and_spans(req) -> tuple[str, list[dict] | None]:
+    """Return ``(text, spans_by_position)`` for a request.
+
+    If ``req.messages`` is set, render via the model's real chat template and
+    compute per-token spans (aligned to ``_encode_with_special``). Otherwise use
+    ``req.text`` with no spans (raw-text callers are unchanged).
+    """
+    messages = getattr(req, "messages", None)
+    if messages:
+        tokenizer = _require_source_model().tokenizer
+        if not has_chat_template(tokenizer):
+            raise HTTPException(
+                status_code=400,
+                detail="Source model tokenizer has no chat template; send `text` instead of `messages`.",
+            )
+        msgs = [m.model_dump(exclude_none=True) for m in messages]
+        tmpl_kwargs: dict = {}
+        if getattr(req, "enable_thinking", None) is not None:
+            tmpl_kwargs["enable_thinking"] = req.enable_thinking
+        try:
+            rendered, spans = compute_spans(
+                tokenizer,
+                msgs,
+                encode=_encode_with_special,
+                add_generation_prompt=getattr(req, "add_generation_prompt", True),
+                continue_final_message=getattr(req, "continue_final_message", False),
+                **tmpl_kwargs,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(status_code=400, detail=f"Failed to apply chat template: {e}") from e
+        if len(rendered) > MAX_INPUT_CHARS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rendered chat exceeds {MAX_INPUT_CHARS} chars.",
+            )
+        return rendered, [s.as_dict() for s in spans]
+    text = getattr(req, "text", None)
+    if not text:
+        raise HTTPException(status_code=400, detail="Provide either `text` or `messages`.")
+    return text, None
+
+
+def _span_at(spans: list[dict] | None, position: int) -> dict | None:
+    if spans is not None and 0 <= position < len(spans):
+        return spans[position]
+    return None
+
+
+def _make_token_infos(ids: list[int], spans: list[dict] | None) -> list[TokenInfo]:
+    fragments = _decode_with_fragments(_require_source_model().tokenizer, ids)
+    infos: list[TokenInfo] = []
+    for i, (tid, (text, fidx, fcount)) in enumerate(zip(ids, fragments)):
+        sp = _span_at(spans, i)
+        infos.append(
             TokenInfo(
                 token=text,
                 token_id=tid,
                 position=i,
                 fragment_index=fidx,
                 fragment_count=fcount,
+                role=sp["role"] if sp else None,
+                section=sp["section"] if sp else None,
+                channel=sp["channel"] if sp else None,
+                message_index=sp["message_index"] if sp else None,
             )
-            for i, (tid, (text, fidx, fcount)) in enumerate(zip(ids, fragments))
-        ],
+        )
+    return infos
+
+
+@app.post("/tokenize", responses={200: {"model": TokenizeResponse}})
+async def tokenize(req: TokenizeRequest):
+    """Tokenize text (or structured chat `messages`) using the source model's
+    tokenizer. When `messages` is provided, the model's chat template is applied
+    server-side and per-token span metadata is returned."""
+    if source_model is None:
+        raise HTTPException(status_code=503, detail="Source model not loaded")
+
+    text, spans = _resolve_text_and_spans(req)
+    ids = _encode_with_special(text)
+
+    return TokenizeResponse(
+        tokens=_make_token_infos(ids, spans),
         prompt_length=len(ids),
-        text=req.text,
+        text=text,
     )
 
 
@@ -1248,15 +1650,29 @@ class _TokenIdStreamer(BaseStreamer):
         self.queue.put(None)
 
 
-@app.post("/completion")
+def _sampling_kwargs(temperature: float) -> dict:
+    """`generate()` sampling kwargs. transformers rejects temperature=0 under
+    `do_sample=True`, so temperature<=0 means greedy decoding."""
+    if temperature and temperature > 0:
+        return {"do_sample": True, "temperature": float(temperature)}
+    return {"do_sample": False}
+
+
+def _source_terminal_token_ids() -> set[int]:
+    """`terminal_token_ids` bound to the loaded source model."""
+    if source_model is None:
+        return set()
+    return terminal_token_ids(source_model.tokenizer, source_model.model)
+
+
+@app.post("/completion", responses={200: {"model": TokenizeResponse}})
 async def completion(req: CompletionRequest):
     """Generate a continuation for the prompt and return tokens for the
     full (prompt + completion) text. Set `stream=true` to receive tokens
     incrementally as SSE events.
     """
-    if source_model is None:
-        raise HTTPException(status_code=503, detail="Source model not loaded")
-    if source_model.truncated:
+    model = _require_source_model()
+    if model.truncated:
         raise HTTPException(
             status_code=503,
             detail=(
@@ -1269,45 +1685,53 @@ async def completion(req: CompletionRequest):
 
     completion_tokens = max(1, min(MAX_COMPLETION_TOKENS, req.completion_tokens))
 
-    prompt_ids: list[int] = source_model.tokenizer(req.text, add_special_tokens=True)[
-        "input_ids"
-    ]
+    text, prompt_spans = _resolve_text_and_spans(req)
+    prompt_ids: list[int] = _encode_with_special(text)
     prompt_length = len(prompt_ids)
+
+    def _spans_with_generated(all_ids: list[int]) -> list[dict] | None:
+        # Generated (assistant) tokens can't be known by the prompt template;
+        # tag them as an assistant content run so span-driven grouping treats
+        # the continuation as the assistant turn. The terminating token gets
+        # `footer` so clients can tell the turn-end marker apart from real text.
+        if prompt_spans is None:
+            return None
+        terminal_ids = _source_terminal_token_ids()
+        extended = list(prompt_spans)
+        for pos in range(prompt_length, len(all_ids)):
+            extended.append(
+                {
+                    "role": "assistant",
+                    "section": "footer" if all_ids[pos] in terminal_ids else "content",
+                    "channel": None,
+                    "message_index": None,
+                }
+            )
+        return extended
 
     if not req.stream:
 
         def _do_generate() -> list[int]:
-            input_ids = torch.tensor([prompt_ids], device=source_model.device)
+            input_ids = torch.tensor([prompt_ids], device=model.device)
             with torch.inference_mode():
-                gen_ids = source_model.model.generate(
+                gen_ids = model.model.generate(
                     input_ids,
                     max_new_tokens=completion_tokens,
-                    do_sample=True,
-                    temperature=req.temperature,
+                    **_sampling_kwargs(req.temperature),
                 )
             ids_out = gen_ids[0].tolist()
             del input_ids, gen_ids
-            if source_model.device.startswith("cuda"):
+            if model.device.startswith("cuda"):
                 torch.cuda.empty_cache()
             return ids_out
 
         async with _source_semaphore:
             all_ids = await asyncio.to_thread(_do_generate)
 
-        full_text = source_model.tokenizer.decode(all_ids, skip_special_tokens=False)
-        fragments = _decode_with_fragments(source_model.tokenizer, all_ids)
+        full_text = model.tokenizer.decode(all_ids, skip_special_tokens=False)
 
         return TokenizeResponse(
-            tokens=[
-                TokenInfo(
-                    token=text,
-                    token_id=tid,
-                    position=i,
-                    fragment_index=fidx,
-                    fragment_count=fcount,
-                )
-                for i, (tid, (text, fidx, fcount)) in enumerate(zip(all_ids, fragments))
-            ],
+            tokens=_make_token_infos(all_ids, _spans_with_generated(all_ids)),
             prompt_length=prompt_length,
             text=full_text,
         )
@@ -1318,18 +1742,17 @@ async def completion(req: CompletionRequest):
     # generation lifetime.
     await _source_semaphore.acquire()
     try:
-        input_ids = torch.tensor([prompt_ids], device=source_model.device)
+        input_ids = torch.tensor([prompt_ids], device=model.device)
         streamer = _TokenIdStreamer()
 
         def _run_generate() -> None:
             try:
                 with torch.inference_mode():
-                    source_model.model.generate(
+                    model.model.generate(
                         input_ids,
                         max_new_tokens=completion_tokens,
-                        do_sample=True,
-                        temperature=req.temperature,
                         streamer=streamer,
+                        **_sampling_kwargs(req.temperature),
                     )
             except Exception:
                 logger.exception("/completion: generation thread failed")
@@ -1345,27 +1768,9 @@ async def completion(req: CompletionRequest):
 
     async def event_stream():
         try:
-            prompt_fragments = _decode_with_fragments(
-                source_model.tokenizer, prompt_ids
-            )
-            prompt_tokens = [
-                TokenInfo(
-                    token=text,
-                    token_id=tid,
-                    position=i,
-                    fragment_index=fidx,
-                    fragment_count=fcount,
-                )
-                for i, (tid, (text, fidx, fcount)) in enumerate(
-                    zip(prompt_ids, prompt_fragments)
-                )
-            ]
-            prompt_event = {
-                "type": "prompt",
-                "prompt_length": prompt_length,
-                "tokens": [t.model_dump() for t in prompt_tokens],
-            }
-            yield f"data: {json.dumps(prompt_event)}\n\n"
+            prompt_tokens = _make_token_infos(prompt_ids, prompt_spans)
+            prompt_event = CompletionPromptFrame(prompt_length=prompt_length, tokens=prompt_tokens)
+            yield f"data: {prompt_event.model_dump_json()}\n\n"
 
             loop = asyncio.get_running_loop()
             all_ids = list(prompt_ids)
@@ -1382,7 +1787,7 @@ async def completion(req: CompletionRequest):
             pending_positions: list[int] = []
 
             def _drain_pending(force_flush: bool) -> list[TokenInfo]:
-                tokenizer = source_model.tokenizer
+                tokenizer = model.tokenizer
                 emit: list[TokenInfo] = []
                 while pending_ids:
                     single = tokenizer.decode([pending_ids[0]])
@@ -1454,6 +1859,19 @@ async def completion(req: CompletionRequest):
                     pending_positions.clear()
                 return emit
 
+            # Generated tokens are the assistant continuation; tag them so
+            # span-driven grouping renders them as the assistant turn (only in
+            # chat mode, i.e. when the prompt carried spans). The terminating
+            # token is tagged `footer` so the client can drop the turn-end
+            # marker without matching literal token strings.
+            terminal_ids = _source_terminal_token_ids()
+
+            def _tag_generated(token_info: TokenInfo) -> TokenInfo:
+                if prompt_spans is not None:
+                    token_info.role = "assistant"
+                    token_info.section = "footer" if token_info.token_id in terminal_ids else "content"
+                return token_info
+
             while True:
                 # Block in a worker thread so we don't stall the event loop.
                 tid = await loop.run_in_executor(None, streamer.queue.get)
@@ -1464,84 +1882,64 @@ async def completion(req: CompletionRequest):
                 pending_positions.append(position)
                 position += 1
                 for token_info in _drain_pending(force_flush=False):
-                    yield f"data: {json.dumps({'type': 'token', 'token': token_info.model_dump()})}\n\n"
+                    yield f"data: {CompletionTokenFrame(token=_tag_generated(token_info)).model_dump_json()}\n\n"
 
             for token_info in _drain_pending(force_flush=True):
-                yield f"data: {json.dumps({'type': 'token', 'token': token_info.model_dump()})}\n\n"
+                yield f"data: {CompletionTokenFrame(token=_tag_generated(token_info)).model_dump_json()}\n\n"
 
-            full_text = source_model.tokenizer.decode(
-                all_ids, skip_special_tokens=False
-            )
-            yield f"data: {json.dumps({'type': 'done', 'text': full_text})}\n\n"
+            full_text = model.tokenizer.decode(all_ids, skip_special_tokens=False)
+            yield f"data: {CompletionDoneFrame(text=full_text).model_dump_json()}\n\n"
             yield "data: [DONE]\n\n"
         finally:
             # Don't block forever if the client disconnects mid-stream.
             await asyncio.get_running_loop().run_in_executor(None, thread.join, 30.0)
-            if source_model.device.startswith("cuda"):
+            if model.device.startswith("cuda"):
                 torch.cuda.empty_cache()
             _source_semaphore.release()
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-@app.get("/")
+@app.get("/", responses={200: {"model": HealthResponse}})
 async def root():
     """Health check."""
-    return {
-        "status": "ok",
-        "verbalizer_model": VERBALIZER_MODEL,
-        "d_model": nla_client.cfg.d_model if nla_client else None,
-        "verbalizer_quantization": nla_client.quantization
-        if nla_client is not None
-        else None,
-        "verbalizer_kv_cache_dtype": nla_client.kv_cache_dtype
-        if nla_client is not None
-        else None,
-        "verbalizer_cuda_graph_max_bs": nla_client.cuda_graph_max_bs
-        if nla_client is not None
-        else None,
-        "verbalizer_torch_compile": nla_client.enable_torch_compile
-        if nla_client is not None
-        else None,
-        "verbalizer_device": nla_client.device if nla_client is not None else None,
-        "reconstructor_available": nla_reconstructor is not None,
-        "reconstructor_fp8": nla_reconstructor.fp8
-        if nla_reconstructor is not None
-        else None,
-        "reconstructor_int4": nla_reconstructor.int4
-        if nla_reconstructor is not None
-        else None,
-        "reconstructor_device": nla_reconstructor.device
-        if nla_reconstructor is not None
-        else None,
-        "source_model": SOURCE_MODEL if source_model is not None else None,
-        "extraction_layer": source_model.layer_index
-        if source_model is not None
-        else None,
-        "source_truncated": source_model.truncated
-        if source_model is not None
-        else None,
-        "source_fp8": source_model.fp8 if source_model is not None else None,
-        "source_device": source_model.device if source_model is not None else None,
-        "completion_available": source_model is not None and not source_model.truncated,
-        "num_cuda_devices": _num_cuda_devices(),
-        "max_concurrent": MAX_CONCURRENT,
-        "max_concurrent_explains": MAX_CONCURRENT_EXPLAINS,
-        "source_max_concurrent": SOURCE_MAX_CONCURRENT,
-        "reconstructor_max_concurrent": RECONSTRUCTOR_MAX_CONCURRENT,
-        "max_describe_requests": MAX_DESCRIBE_REQUESTS,
-        "limits": {
-            "max_input_chars": MAX_INPUT_CHARS,
-            "max_positions_per_request": MAX_POSITIONS_PER_REQUEST,
-            "max_new_tokens": MAX_NEW_TOKENS_LIMIT,
-            "max_describe_batch": MAX_DESCRIBE_BATCH,
-            "max_description_chars": MAX_DESCRIPTION_CHARS,
-            "max_completion_tokens": MAX_COMPLETION_TOKENS,
-        },
-    }
+    return HealthResponse(
+        status="ok",
+        verbalizer_model=VERBALIZER_MODEL,
+        d_model=nla_client.cfg.d_model if nla_client else None,
+        verbalizer_quantization=nla_client.quantization if nla_client is not None else None,
+        verbalizer_kv_cache_dtype=nla_client.kv_cache_dtype if nla_client is not None else None,
+        verbalizer_cuda_graph_max_bs=nla_client.cuda_graph_max_bs if nla_client is not None else None,
+        verbalizer_torch_compile=nla_client.enable_torch_compile if nla_client is not None else None,
+        verbalizer_device=nla_client.device if nla_client is not None else None,
+        reconstructor_available=nla_reconstructor is not None,
+        reconstructor_fp8=nla_reconstructor.fp8 if nla_reconstructor is not None else None,
+        reconstructor_int4=nla_reconstructor.int4 if nla_reconstructor is not None else None,
+        reconstructor_device=nla_reconstructor.device if nla_reconstructor is not None else None,
+        source_model=SOURCE_MODEL if source_model is not None else None,
+        extraction_layer=source_model.layer_index if source_model is not None else None,
+        source_truncated=source_model.truncated if source_model is not None else None,
+        source_fp8=source_model.fp8 if source_model is not None else None,
+        source_device=source_model.device if source_model is not None else None,
+        completion_available=source_model is not None and not source_model.truncated,
+        num_cuda_devices=_num_cuda_devices(),
+        max_concurrent=MAX_CONCURRENT,
+        max_concurrent_explains=MAX_CONCURRENT_EXPLAINS,
+        source_max_concurrent=SOURCE_MAX_CONCURRENT,
+        reconstructor_max_concurrent=RECONSTRUCTOR_MAX_CONCURRENT,
+        max_describe_requests=MAX_DESCRIBE_REQUESTS,
+        limits=HealthLimits(
+            max_input_chars=MAX_INPUT_CHARS,
+            max_positions_per_request=MAX_POSITIONS_PER_REQUEST,
+            max_new_tokens=MAX_NEW_TOKENS_LIMIT,
+            max_describe_batch=MAX_DESCRIBE_BATCH,
+            max_description_chars=MAX_DESCRIPTION_CHARS,
+            max_completion_tokens=MAX_COMPLETION_TOKENS,
+        ),
+    )
 
 
-@app.post("/describe", response_model=DescribeResponse)
+@app.post("/describe", responses={200: {"model": DescribeResponse}})
 async def describe(req: DescribeRequest):
     """Describe activation vector(s) in natural language, with optional MSE scores.
 
@@ -1551,14 +1949,12 @@ async def describe(req: DescribeRequest):
       - Final:   {"index": i, "description": "...", "mse": ..., "cosine_similarity": ...}
       - End:     [DONE]
     """
-    if nla_client is None:
-        raise HTTPException(status_code=503, detail="NLA client not loaded")
+    client = _require_client()
 
     # Request-level fail-fast — orthogonal to the per-vector verbalizer gate
     # below. Without this, a flash crowd of /describe callers would each
     # consume HTTP connections + per-task buffers while waiting on
     # _verbalizer_semaphore, with no upper bound on the wait queue.
-    assert _describe_semaphore is not None  # set in lifespan()
     if _describe_semaphore.locked():
         raise HTTPException(
             status_code=429,
@@ -1576,12 +1972,12 @@ async def describe(req: DescribeRequest):
     )
 
     vectors = []
-    for i, vec_data in enumerate(req.activations):
+    for vec_data in req.activations:
         v = np.array(vec_data, dtype=np.float32)
-        if v.shape[0] != nla_client.cfg.d_model:
+        if v.shape[0] != client.cfg.d_model:
             raise HTTPException(
                 status_code=400,
-                detail=f"Vector length {v.shape[0]} != d_model {nla_client.cfg.d_model}",
+                detail=f"Vector length {v.shape[0]} != d_model {client.cfg.d_model}",
             )
         vectors.append(v)
 
@@ -1601,12 +1997,9 @@ async def describe(req: DescribeRequest):
                     queue: asyncio.Queue = asyncio.Queue()
                     # Server-wide verbalizer gate — shared with /explain and any other
                     # concurrent /describe so total in-flight streams ≤ MAX_CONCURRENT.
-                    assert _verbalizer_semaphore is not None  # set in lifespan()
                     verb_sema = _verbalizer_semaphore
                     batcher = (
-                        _ReconstructionBatcher(
-                            nla_reconstructor, n, RECONSTRUCTION_BATCH_SIZE
-                        )
+                        _ReconstructionBatcher(nla_reconstructor, n, RECONSTRUCTION_BATCH_SIZE)
                         if nla_reconstructor is not None
                         else None
                     )
@@ -1619,25 +2012,17 @@ async def describe(req: DescribeRequest):
                             async with verb_sema:
                                 t0 = time.perf_counter()
                                 last_out: dict = {"text": ""}
-                                async for out in nla_client.async_generate_stream(
+                                async for out in client.async_generate_stream(
                                     v,
                                     temperature=req.temperature,
                                     max_new_tokens=req.max_new_tokens,
                                 ):
                                     last_out = out
                                     await queue.put(
-                                        json.dumps(
-                                            {
-                                                "index": idx,
-                                                "text": out["text"],
-                                                "done": False,
-                                            }
-                                        )
+                                        DescribeProgressFrame(index=idx, text=out["text"]).model_dump_json()
                                     )
-                                logger.info(
-                                    f"/describe: [{idx + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s"
-                                )
-                                description = nla_client._extract_text(
+                                logger.info(f"/describe: [{idx + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s")
+                                description = client._extract_text(
                                     last_out,
                                     True,
                                     context=f"/describe index={idx}",
@@ -1668,10 +2053,7 @@ async def describe(req: DescribeRequest):
                             if needs_skip and batcher is not None:
                                 batcher.skip()
 
-                    tasks = [
-                        asyncio.create_task(_stream_one(v, i))
-                        for i, v in enumerate(vectors)
-                    ]
+                    tasks = [asyncio.create_task(_stream_one(v, i)) for i, v in enumerate(vectors)]
                     try:
                         done_count = 0
                         while done_count < n:
@@ -1699,15 +2081,13 @@ async def describe(req: DescribeRequest):
         results = []
         for i, v in enumerate(vectors):
             t0 = time.perf_counter()
-            description = await nla_client.async_generate(
+            description = await client.async_generate(
                 v,
                 temperature=req.temperature,
                 max_new_tokens=req.max_new_tokens,
                 context=f"/describe index={i}",
             )
-            logger.info(
-                f"/describe: [{i + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s"
-            )
+            logger.info(f"/describe: [{i + 1}/{n}] generated in {time.perf_counter() - t0:.2f}s")
 
             mse = None
             cos = None
@@ -1715,8 +2095,7 @@ async def describe(req: DescribeRequest):
                 t0 = time.perf_counter()
                 mse, cos = nla_reconstructor.score(description, v)
                 logger.info(
-                    f"/describe: [{i + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} "
-                    f"in {time.perf_counter() - t0:.2f}s"
+                    f"/describe: [{i + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} in {time.perf_counter() - t0:.2f}s"
                 )
 
             results.append(
@@ -1736,7 +2115,7 @@ async def describe(req: DescribeRequest):
             _describe_semaphore.release()
 
 
-@app.post("/score", response_model=ScoreResponse)
+@app.post("/score", responses={200: {"model": ScoreResponse}})
 async def score(req: ScoreRequest):
     """Score an existing text description against the original activation vector.
 
@@ -1761,10 +2140,7 @@ async def score(req: ScoreRequest):
             ),
         )
 
-    logger.info(
-        f"/score: description={req.description[:80]!r}... "
-        f"activation_shape=({len(req.activation)},)"
-    )
+    logger.info(f"/score: description={req.description[:80]!r}... activation_shape=({len(req.activation)},)")
 
     async with _reconstructor_semaphore:
         t0 = time.perf_counter()
@@ -1791,13 +2167,11 @@ async def score(req: ScoreRequest):
                 return reconstructor.score(description, v)
 
         mse, cos = await loop.run_in_executor(None, _blocking_score)
-        logger.info(
-            f"/score: mse={mse:.3f} cos={cos:.3f} in {time.perf_counter() - t0:.2f}s"
-        )
+        logger.info(f"/score: mse={mse:.3f} cos={cos:.3f} in {time.perf_counter() - t0:.2f}s")
         return ScoreResponse(mse=mse, cosine_similarity=cos)
 
 
-@app.post("/compare", response_model=CompareResponse)
+@app.post("/compare", responses={200: {"model": CompareResponse}})
 async def compare(req: CompareRequest):
     """Describe the difference between two activation vectors (a - b)."""
     if nla_client is None:
@@ -1841,10 +2215,7 @@ async def compare(req: CompareRequest):
     if nla_reconstructor is not None:
         t0 = time.perf_counter()
         mse, cos = nla_reconstructor.score(description, diff)
-        logger.info(
-            f"/compare: scored mse={mse:.3f} cos={cos:.3f} "
-            f"in {time.perf_counter() - t0:.2f}s"
-        )
+        logger.info(f"/compare: scored mse={mse:.3f} cos={cos:.3f} in {time.perf_counter() - t0:.2f}s")
 
     return CompareResponse(
         description=description,
@@ -1854,9 +2225,7 @@ async def compare(req: CompareRequest):
     )
 
 
-def _resolve_positions(
-    positions: list[int] | None, n_tokens: int, *, reverse: bool = False
-) -> list[int]:
+def _resolve_positions(positions: list[int] | None, n_tokens: int, *, reverse: bool = False) -> list[int]:
     """Resolve position indices, supporting Python-style negative indexing."""
     if not positions:
         indices = list(range(n_tokens))
@@ -1897,15 +2266,14 @@ async def _generate_explain_result(
     needs_skip = batcher is not None
     try:
         t0 = time.perf_counter()
-        description = await nla_client.async_generate(
+        description = await _require_client().async_generate(
             v,
             temperature=req.temperature,
             max_new_tokens=req.max_new_tokens,
             context=f"/explain token={tok['token']!r} pos={idx}",
         )
         logger.info(
-            f"/explain: [{i + 1}/{n}] token={tok['token']!r} pos={idx} "
-            f"generated in {time.perf_counter() - t0:.2f}s"
+            f"/explain: [{i + 1}/{n}] token={tok['token']!r} pos={idx} generated in {time.perf_counter() - t0:.2f}s"
         )
 
         mse = None
@@ -1922,8 +2290,7 @@ async def _generate_explain_result(
             t0 = time.perf_counter()
             mse, cos = nla_reconstructor.score(description, v)
             logger.info(
-                f"/explain: [{i + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} "
-                f"in {time.perf_counter() - t0:.2f}s"
+                f"/explain: [{i + 1}/{n}] scored mse={mse:.3f} cos={cos:.3f} in {time.perf_counter() - t0:.2f}s"
             )
 
         return ExplainResult(
@@ -1937,13 +2304,17 @@ async def _generate_explain_result(
             generated=is_generated,
             fragment_index=tok.get("fragment_index", 0),
             fragment_count=tok.get("fragment_count", 1),
+            role=tok.get("role"),
+            section=tok.get("section"),
+            channel=tok.get("channel"),
+            message_index=tok.get("message_index"),
         )
     finally:
         if needs_skip and batcher is not None:
             batcher.skip()
 
 
-@app.post("/explain", response_model=ExplainResponse)
+@app.post("/explain", responses={200: {"model": ExplainResponse}})
 async def explain(req: ExplainRequest):
     """Extract activations and describe them in natural language.
 
@@ -1968,10 +2339,7 @@ async def explain(req: ExplainRequest):
     if _explain_semaphore.locked():
         raise HTTPException(
             status_code=429,
-            detail=(
-                f"All {MAX_CONCURRENT_EXPLAINS} /explain slot(s) in use. "
-                "Please retry."
-            ),
+            detail=(f"All {MAX_CONCURRENT_EXPLAINS} /explain slot(s) in use. Please retry."),
         )
 
     if req.stream:
@@ -1993,17 +2361,24 @@ async def explain(req: ExplainRequest):
 
 
 async def _explain_inner(req: ExplainRequest):
+    # Bound once here rather than read from the globals below: /explain streams through nested
+    # generators, and a closure can't inherit the caller's `is None` narrowing.
+    model = _require_source_model()
+    client = _require_client()
+    t_total = time.perf_counter()
+
+    text, spans = _resolve_text_and_spans(req)
     logger.info(
-        f"/explain start: text_len={len(req.text)} text={req.text[:80]!r}... "
+        f"/explain start: text_len={len(text)} text={text[:80]!r}... "
+        f"messages={len(req.messages) if req.messages else 0} "
         f"positions={req.positions} reverse={req.reverse} "
         f"stream={req.stream} temp={req.temperature} "
         f"max_new_tokens={req.max_new_tokens}"
     )
-    t_total = time.perf_counter()
 
     t0 = time.perf_counter()
     async with _source_semaphore:
-        tokens = await asyncio.to_thread(source_model.extract, req.text)
+        tokens = await asyncio.to_thread(model.extract, text)
     if not tokens:
         raise HTTPException(status_code=400, detail="No tokens extracted")
     n_tokens = len(tokens)
@@ -2012,16 +2387,17 @@ async def _explain_inner(req: ExplainRequest):
     # ExplainResult.token doesn't surface `\ufffd` for byte-split glyphs.
     # `position`/`token_id` (and the activation vector) are untouched —
     # explanations remain per-position, just with human-readable labels.
-    fragments = _decode_with_fragments(
-        source_model.tokenizer, [tok["token_id"] for tok in tokens]
-    )
-    for tok, (text, fidx, fcount) in zip(tokens, fragments):
-        tok["token"] = text
+    fragments = _decode_with_fragments(model.tokenizer, [tok["token_id"] for tok in tokens])
+    for i, (tok, (text_frag, fidx, fcount)) in enumerate(zip(tokens, fragments)):
+        tok["token"] = text_frag
         tok["fragment_index"] = fidx
         tok["fragment_count"] = fcount
-    logger.info(
-        f"/explain: extracted {n_tokens} tokens in {time.perf_counter() - t0:.2f}s"
-    )
+        sp = _span_at(spans, i)
+        tok["role"] = sp["role"] if sp else None
+        tok["section"] = sp["section"] if sp else None
+        tok["channel"] = sp["channel"] if sp else None
+        tok["message_index"] = sp["message_index"] if sp else None
+    logger.info(f"/explain: extracted {n_tokens} tokens in {time.perf_counter() - t0:.2f}s")
 
     indices = _resolve_positions(req.positions, n_tokens, reverse=req.reverse)
     n = len(indices)
@@ -2047,19 +2423,17 @@ async def _explain_inner(req: ExplainRequest):
             batcher: _ReconstructionBatcher | None = None
             try:
                 # First event: metadata
-                yield f"data: {json.dumps({'layer_index': source_model.layer_index, 'total': n, 'prompt_length': prompt_length})}\n\n"
+                meta = ExplainMetaFrame(layer_index=model.layer_index, total=n, prompt_length=prompt_length)
+                yield f"data: {meta.model_dump_json()}\n\n"
 
                 # Multiplex streaming from all positions concurrently via a queue
                 queue: asyncio.Queue = asyncio.Queue()
                 # Server-wide verbalizer gate — shared across all parallel
                 # /explain and /describe fan-outs so sglang's KV-pool
                 # occupancy stays capped at NLA_MAX_CONCURRENT in total.
-                assert _verbalizer_semaphore is not None  # set in lifespan()
                 verb_sema = _verbalizer_semaphore
                 batcher = (
-                    _ReconstructionBatcher(
-                        nla_reconstructor, n, RECONSTRUCTION_BATCH_SIZE
-                    )
+                    _ReconstructionBatcher(nla_reconstructor, n, RECONSTRUCTION_BATCH_SIZE)
                     if nla_reconstructor is not None
                     else None
                 )
@@ -2072,26 +2446,20 @@ async def _explain_inner(req: ExplainRequest):
                             v = np.array(tok["activation"], dtype=np.float32)
                             t0 = time.perf_counter()
                             last_out: dict = {"text": ""}
-                            async for out in nla_client.async_generate_stream(
+                            async for out in client.async_generate_stream(
                                 v,
                                 temperature=req.temperature,
                                 max_new_tokens=req.max_new_tokens,
                             ):
                                 last_out = out
                                 await queue.put(
-                                    json.dumps(
-                                        {
-                                            "position": tok["position"],
-                                            "text": out["text"],
-                                            "done": False,
-                                        }
-                                    )
+                                    ExplainProgressFrame(position=tok["position"], text=out["text"]).model_dump_json()
                                 )
                             logger.info(
                                 f"/explain: [{pos_i + 1}/{n}] token={tok['token']!r} pos={idx} "
                                 f"generated in {time.perf_counter() - t0:.2f}s"
                             )
-                            description = nla_client._extract_text(
+                            description = client._extract_text(
                                 last_out,
                                 True,
                                 context=f"/explain token={tok['token']!r} pos={idx}",
@@ -2118,16 +2486,17 @@ async def _explain_inner(req: ExplainRequest):
                                     generated=idx >= prompt_length,
                                     fragment_index=tok.get("fragment_index", 0),
                                     fragment_count=tok.get("fragment_count", 1),
+                                    role=tok.get("role"),
+                                    section=tok.get("section"),
+                                    channel=tok.get("channel"),
+                                    message_index=tok.get("message_index"),
                                 ).model_dump_json()
                             )
                     finally:
                         if needs_skip and batcher is not None:
                             batcher.skip()
 
-                tasks = [
-                    asyncio.create_task(_stream_one(tokens[idx], idx, i))
-                    for i, idx in enumerate(indices)
-                ]
+                tasks = [asyncio.create_task(_stream_one(tokens[idx], idx, i)) for i, idx in enumerate(indices)]
                 done_count = 0
                 while done_count < n:
                     item = await queue.get()
@@ -2138,10 +2507,7 @@ async def _explain_inner(req: ExplainRequest):
                         done_count += 1
                 # Ensure all tasks are finished
                 await asyncio.gather(*tasks)
-                logger.info(
-                    f"/explain done (stream): {n} position(s) in "
-                    f"{time.perf_counter() - t_total:.2f}s"
-                )
+                logger.info(f"/explain done (stream): {n} position(s) in {time.perf_counter() - t_total:.2f}s")
                 yield "data: [DONE]\n\n"
             finally:
                 if batcher is not None:
@@ -2190,28 +2556,26 @@ async def _explain_inner(req: ExplainRequest):
         if batcher is not None:
             await batcher.aclose()
 
-    logger.info(
-        f"/explain done: {n} position(s) in "
-        f"{time.perf_counter() - t_total:.2f}s"
-    )
+    logger.info(f"/explain done: {n} position(s) in {time.perf_counter() - t_total:.2f}s")
 
     return ExplainResponse(
-        layer_index=source_model.layer_index,
+        layer_index=model.layer_index,
         results=list(results),
     )
 
 
-@app.post("/extract", response_model=ExtractResponse)
+@app.post("/extract", responses={200: {"model": ExtractResponse}})
 async def extract(req: ExtractRequest):
     """Extract per-token activation vectors from the source model."""
     if source_model is None:
         raise HTTPException(status_code=503, detail="Source model not loaded")
 
-    logger.info(f"/extract: text={req.text[:80]!r}...")
+    text, _ = _resolve_text_and_spans(req)
+    logger.info(f"/extract: text={text[:80]!r}...")
 
     t0 = time.perf_counter()
     async with _source_semaphore:
-        results = await asyncio.to_thread(source_model.extract, req.text)
+        results = await asyncio.to_thread(source_model.extract, text)
     logger.info(f"/extract: {len(results)} tokens in {time.perf_counter() - t0:.2f}s")
 
     return ExtractResponse(
@@ -2238,7 +2602,27 @@ if __name__ == "__main__":
         "--mem-fraction",
         type=float,
         default=None,
-        help="GPU memory fraction for KV cache (default: 0.38, or NLA_MEM_FRACTION env)",
+        help=(
+            "Fraction of the GPU the verbalizer engine may occupy IN TOTAL — "
+            "weights, activations, CUDA graphs and KV pool together, not the KV "
+            "pool alone. The reconstructor and source models load afterwards and "
+            "live outside it, so leave them room. Default: 0.38 (or "
+            "NLA_MEM_FRACTION env)."
+        ),
+    )
+    parser.add_argument(
+        "--verbalizer-max-model-len",
+        type=int,
+        default=None,
+        help=(
+            "Context length the verbalizer engine sizes its KV pool against. "
+            "vLLM refuses to boot unless the pool holds one request at this "
+            "length, so a long-context base model (Gemma 3 at 131072) demands "
+            "GiB of pool the verbalizer never uses. A prompt template plus "
+            "--max-new-tokens worth of output is the real ceiling. "
+            "Default: unset = the model's own maximum (or "
+            "NLA_VERBALIZER_MAX_MODEL_LEN env)."
+        ),
     )
     parser.add_argument(
         "--tp-size",
@@ -2363,8 +2747,9 @@ if __name__ == "__main__":
         default=None,
         help=(
             "Use INT4 weight-only quantization for the reconstructor backbone "
-            "via torchao (~75%% VRAM saving vs bf16, ~50%% vs fp8). Loads "
-            "via TorchAoConfig+device_map (streaming, no bf16 GPU peak). "
+            "via torchao (~75%% VRAM saving vs bf16, ~50%% vs fp8). The int4 "
+            "pack op has no CPU kernel, so the backbone transits the GPU in "
+            "bf16 first — peak load memory is the full bf16 backbone. "
             "Adds ~5-15%% drift to predicted activation — acceptable for "
             "soft scoring (relative ranking) but absolute MSE values shift "
             "vs an fp8/bf16 baseline. Mutually exclusive with "
@@ -2394,6 +2779,8 @@ if __name__ == "__main__":
         KV_CACHE_DTYPE = args.kv_cache_dtype
     if args.cuda_graph_max_bs is not None:
         CUDA_GRAPH_MAX_BS = args.cuda_graph_max_bs
+    if args.verbalizer_max_model_len is not None:
+        VERBALIZER_MAX_MODEL_LEN = args.verbalizer_max_model_len
     if args.torch_compile is not None:
         TORCH_COMPILE = args.torch_compile
     if args.verbalizer_device is not None:
@@ -2404,9 +2791,8 @@ if __name__ == "__main__":
         SOURCE_DEVICE = _normalize_device(args.source_device)
 
     if FP8_RECONSTRUCTOR and INT4_RECONSTRUCTOR:
-        raise ValueError(
-            "--fp8-reconstructor and --int4-reconstructor are mutually "
-            "exclusive — pick at most one."
-        )
+        raise ValueError("--fp8-reconstructor and --int4-reconstructor are mutually exclusive — pick at most one.")
 
+    os.environ.setdefault("SERVER_HOST", args.host)
+    os.environ.setdefault("SERVER_PORT", str(args.port))
     uvicorn.run(app, host=args.host, port=args.port)

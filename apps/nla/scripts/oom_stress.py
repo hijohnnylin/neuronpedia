@@ -49,7 +49,6 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent / "benchmark"))
 import lib  # noqa: E402
 
-
 # ─── Result types ───────────────────────────────────────────────────────────
 
 
@@ -113,10 +112,7 @@ def _looks_like_oom(status: int | None, body_text: str | None) -> bool:
     """
     if status in (502, 503, 504):
         return True
-    if status is not None and 500 <= status < 600 and body_text:
-        if _OOM_RE.search(body_text):
-            return True
-    return False
+    return bool(status is not None and 500 <= status < 600 and body_text and _OOM_RE.search(body_text))
 
 
 # ─── Fire one /explain ──────────────────────────────────────────────────────
@@ -141,11 +137,7 @@ async def _one_call(
         body = res["body"]
         if status == 200:
             return _Outcome(elapsed, status, None, False)
-        body_text = (
-            body.get("detail")
-            if isinstance(body, dict) and "detail" in body
-            else str(body)
-        )
+        body_text = body.get("detail") if isinstance(body, dict) and "detail" in body else str(body)
         return _Outcome(
             elapsed_s=elapsed,
             status=status,
@@ -229,15 +221,9 @@ async def _run_scenario(
     elapseds = [o.elapsed_s for o in outcomes]
     n_ok = sum(1 for o in outcomes if o.error is None)
     n_429 = sum(1 for o in outcomes if o.status == 429)
-    n_5xx = sum(
-        1 for o in outcomes if o.status is not None and 500 <= o.status < 600
-    )
-    n_4xx_other = sum(
-        1 for o in outcomes if o.status is not None and 400 <= o.status < 500 and o.status != 429
-    )
-    n_timeout = sum(
-        1 for o in outcomes if o.error is not None and "timeout:" in o.error
-    )
+    n_5xx = sum(1 for o in outcomes if o.status is not None and 500 <= o.status < 600)
+    n_4xx_other = sum(1 for o in outcomes if o.status is not None and 400 <= o.status < 500 and o.status != 429)
+    n_timeout = sum(1 for o in outcomes if o.error is not None and "timeout:" in o.error)
     n_oom = sum(1 for o in outcomes if o.oom_detected)
     # "Other" = something failed but isn't accounted for by the above buckets.
     accounted = n_ok + n_429 + n_5xx + n_4xx_other + n_timeout
@@ -383,10 +369,7 @@ def _print_summary(results: list[ScenarioResult]) -> None:
                 flag,
             ]
         )
-    widths = [
-        max(len(c) for c in [h] + [row[i] for row in rows])
-        for i, h in enumerate(headers)
-    ]
+    widths = [max(len(c) for c in [h] + [row[i] for row in rows]) for i, h in enumerate(headers)]
     fmt = " | ".join(f"{{:>{w}}}" for w in widths)
     print(fmt.format(*headers))
     print("-+-".join("-" * w for w in widths))
@@ -447,15 +430,11 @@ async def amain(args: argparse.Namespace) -> int:
     for tt in sorted(set(text_tokens)):
         text, actual = await lib.build_prompt_exact(client, tt)
         prompts[tt] = (text, actual)
-        print(
-            f"  text_tokens={tt} → {len(text)} chars, actual ~{actual} tokens"
-        )
+        print(f"  text_tokens={tt} → {len(text)} chars, actual ~{actual} tokens")
 
     # Filter scenarios where positions > actual tokens (build_prompt_exact may
     # have produced slightly fewer tokens than requested).
-    matrix = [
-        s for s in matrix if s["positions"] <= prompts[s["text_tokens"]][1]
-    ]
+    matrix = [s for s in matrix if s["positions"] <= prompts[s["text_tokens"]][1]]
     print(f"[oom_stress] running {len(matrix)} scenario(s)...")
 
     results: list[ScenarioResult] = []
@@ -480,9 +459,7 @@ async def amain(args: argparse.Namespace) -> int:
             )
             results.append(r)
             if args.stop_on_oom and (r.n_oom > 0 or r.vram_risk or r.n_5xx > 0):
-                print(
-                    "[oom_stress] stop-on-oom: aborting remaining scenarios"
-                )
+                print("[oom_stress] stop-on-oom: aborting remaining scenarios")
                 aborted = True
                 break
     except KeyboardInterrupt:
@@ -530,8 +507,7 @@ async def amain(args: argparse.Namespace) -> int:
         )
         print(f"\n[oom_stress] wrote report → {args.output}")
 
-    rc = 1 if bad else 0
-    return rc
+    return 1 if bad else 0
 
 
 def main() -> None:

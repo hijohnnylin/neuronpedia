@@ -1,0 +1,156 @@
+"""The wire format for this server.
+
+These models are the source of truth: FastAPI derives ``/openapi.json`` from them, and
+everything downstream -- the committed ``openapi.json``, the TypeScript types the webapp
+compiles against, the published client SDKs -- is generated outward from that. So a
+change to a request or response shape is written here and nowhere else.
+
+Class names become the schema keys in ``openapi.json`` and therefore the type names in the
+published SDKs, so they mirror the URL path they belong to: ``POST /v1/activation/topk-by-token``
+carries ``ActivationTopkByTokenRequest`` and ``ActivationTopkByTokenResponse``. Renaming one
+is a breaking change for SDK consumers, though not for the wire format -- schema names never
+appear in a request or response body.
+"""
+
+from neuronpedia_inference.schemas.activation import (
+    ActivationAllBatchRequest,
+    ActivationAllBatchResponse,
+    ActivationAllBatchResult,
+    ActivationAllFeature,
+    ActivationAllRequest,
+    ActivationAllResponse,
+    ActivationAttentionRequest,
+    ActivationAttentionResponse,
+    ActivationRawLayer,
+    ActivationRawPromptResult,
+    ActivationRawRequest,
+    ActivationRawResponse,
+    ActivationSingleBatchRequest,
+    ActivationSingleBatchResponse,
+    ActivationSingleBatchResult,
+    ActivationSingleRequest,
+    ActivationSingleResponse,
+    ActivationSourceRequest,
+    ActivationSourceResponse,
+    ActivationSourceResult,
+    ActivationTopkByTokenBatchRequest,
+    ActivationTopkByTokenBatchResponse,
+    ActivationTopkByTokenBatchResult,
+    ActivationTopkByTokenFeature,
+    ActivationTopkByTokenRequest,
+    ActivationTopkByTokenResponse,
+    ActivationTopkByTokenResult,
+    ActivationValues,
+)
+from neuronpedia_inference.schemas.chat_template import (
+    ApplyChatTemplateRequest,
+    ApplyChatTemplateResponse,
+    ChatMessage,
+    TokenSpan,
+)
+from neuronpedia_inference.schemas.common import (
+    BaseSchema,
+    HealthResponse,
+    NPFeature,
+    NPLogprob,
+    NPLogprobTop,
+    PublicFrameSchema,
+)
+from neuronpedia_inference.schemas.lens import (
+    LensChatMessage,
+    LensPromptRequest,
+    LensSteerToken,
+    LensType,
+)
+from neuronpedia_inference.schemas.steer import (
+    NPSteerChatMessage,
+    NPSteerChatResult,
+    NPSteerCompletionOutput,
+    NPSteerFeature,
+    NPSteerMethod,
+    NPSteerType,
+    NPSteerVector,
+    SteerAssistantAxis,
+    SteerAssistantAxisTurn,
+    SteerCompletionChatRequest,
+    SteerCompletionChatResponse,
+    SteerCompletionRequest,
+    SteerCompletionResponse,
+)
+from neuronpedia_inference.schemas.tokenize import TokenizeRequest, TokenizeResponse
+from neuronpedia_inference.schemas.util import (
+    SimilarityMatrixRequest,
+    SimilarityMatrixResponse,
+    UtilSaeTopkByDecoderCossimFeature,
+    UtilSaeTopkByDecoderCossimRequest,
+    UtilSaeTopkByDecoderCossimResponse,
+    UtilSaeVectorRequest,
+    UtilSaeVectorResponse,
+)
+
+__all__ = [
+    "ActivationAllBatchRequest",
+    "ActivationAllBatchResponse",
+    "ActivationAllBatchResult",
+    "ActivationAllFeature",
+    "ActivationAllRequest",
+    "ActivationAllResponse",
+    "ActivationAttentionRequest",
+    "ActivationAttentionResponse",
+    "ActivationRawLayer",
+    "ActivationRawPromptResult",
+    "ActivationRawRequest",
+    "ActivationRawResponse",
+    "ActivationSingleBatchRequest",
+    "ActivationSingleBatchResponse",
+    "ActivationSingleBatchResult",
+    "ActivationSingleRequest",
+    "ActivationSingleResponse",
+    "ActivationSourceRequest",
+    "ActivationSourceResponse",
+    "ActivationSourceResult",
+    "ActivationTopkByTokenBatchRequest",
+    "ActivationTopkByTokenBatchResponse",
+    "ActivationTopkByTokenBatchResult",
+    "ActivationTopkByTokenFeature",
+    "ActivationTopkByTokenRequest",
+    "ActivationTopkByTokenResponse",
+    "ActivationTopkByTokenResult",
+    "ActivationValues",
+    "ApplyChatTemplateRequest",
+    "ApplyChatTemplateResponse",
+    "BaseSchema",
+    "ChatMessage",
+    "HealthResponse",
+    "LensChatMessage",
+    "LensPromptRequest",
+    "LensSteerToken",
+    "LensType",
+    "NPFeature",
+    "NPLogprob",
+    "NPLogprobTop",
+    "NPSteerChatMessage",
+    "NPSteerChatResult",
+    "NPSteerCompletionOutput",
+    "NPSteerFeature",
+    "NPSteerMethod",
+    "NPSteerType",
+    "NPSteerVector",
+    "PublicFrameSchema",
+    "SimilarityMatrixRequest",
+    "SimilarityMatrixResponse",
+    "SteerAssistantAxis",
+    "SteerAssistantAxisTurn",
+    "SteerCompletionChatRequest",
+    "SteerCompletionChatResponse",
+    "SteerCompletionRequest",
+    "SteerCompletionResponse",
+    "TokenSpan",
+    "TokenizeRequest",
+    "TokenizeResponse",
+    "UtilSaeTopkByDecoderCossimFeature",
+    "UtilSaeTopkByDecoderCossimRequest",
+    "UtilSaeTopkByDecoderCossimResponse",
+    "UtilSaeVectorRequest",
+    "UtilSaeVectorResponse",
+]

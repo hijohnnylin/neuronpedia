@@ -1,0 +1,560 @@
+{
+  "components": {
+    "schemas": {
+      "ExplainDefaultRequest": {
+        "description": "Request model for generating explanations of neuron/feature behavior",
+        "properties": {
+          "activations": {
+            "description": "List of activation records to analyze",
+            "items": {
+              "$ref": "#/components/schemas/NPActivation"
+            },
+            "title": "Activations",
+            "type": "array"
+          },
+          "model": {
+            "description": "Model identifier to use for explanation generation",
+            "title": "Model",
+            "type": "string"
+          },
+          "openrouterKey": {
+            "description": "API key for OpenRouter service",
+            "title": "Openrouterkey",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activations",
+          "openrouterKey",
+          "model"
+        ],
+        "title": "ExplainDefaultRequest",
+        "type": "object"
+      },
+      "ExplainDefaultResponse": {
+        "description": "A natural-language explanation of what the given activations have in common",
+        "properties": {
+          "explanation": {
+            "description": "The generated explanation for the given set of activations",
+            "title": "Explanation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "explanation"
+        ],
+        "title": "ExplainDefaultResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "NPActivation": {
+        "description": "An activation record containing tokens and their corresponding activation values",
+        "properties": {
+          "tokens": {
+            "description": "List of tokens for this text",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tokens",
+            "type": "array"
+          },
+          "values": {
+            "description": "Activation values corresponding to each token",
+            "items": {
+              "type": "number"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tokens",
+          "values"
+        ],
+        "title": "NPActivation",
+        "type": "object"
+      },
+      "ScoreEmbeddingBreakdownItem": {
+        "description": "One scored example from an embedding run. With exception of fixing similarity to change to number instead of array of number, type is copied from https://github.com/EleutherAI/sae-auto-interp/blob/3659ff3bfefbe2628d37484e5bcc0087a5b10a27/sae_auto_interp/scorers/embedding/embedding.py#L20",
+        "properties": {
+          "distance": {
+            "description": "Quantile or neighbor distance",
+            "title": "Distance",
+            "type": "integer"
+          },
+          "similarity": {
+            "description": "What is the similarity of the example to the explanation",
+            "title": "Similarity",
+            "type": "number"
+          },
+          "text": {
+            "description": "The text that was used to evaluate the similarity",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "distance",
+          "similarity"
+        ],
+        "title": "ScoreEmbeddingBreakdownItem",
+        "type": "object"
+      },
+      "ScoreEmbeddingRequest": {
+        "description": "Request model for scoring explanations using embedding similarity",
+        "properties": {
+          "activations": {
+            "description": "List of activation records to analyze",
+            "items": {
+              "$ref": "#/components/schemas/NPActivation"
+            },
+            "title": "Activations",
+            "type": "array"
+          },
+          "explanation": {
+            "description": "The explanation to evaluate",
+            "title": "Explanation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activations",
+          "explanation"
+        ],
+        "title": "ScoreEmbeddingRequest",
+        "type": "object"
+      },
+      "ScoreEmbeddingResponse": {
+        "description": "An embedding-similarity score, with the per-example results it was computed from",
+        "properties": {
+          "breakdown": {
+            "description": "Detailed breakdown of the embedding outputs",
+            "items": {
+              "$ref": "#/components/schemas/ScoreEmbeddingBreakdownItem"
+            },
+            "title": "Breakdown",
+            "type": "array"
+          },
+          "score": {
+            "description": "The score from 0 to 1",
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "score",
+          "breakdown"
+        ],
+        "title": "ScoreEmbeddingResponse",
+        "type": "object"
+      },
+      "ScoreFuzzDetectionBreakdownItem": {
+        "description": "One scored example from a fuzz or detection run. Type copied from https://github.com/EleutherAI/sae-auto-interp/blob/3659ff3bfefbe2628d37484e5bcc0087a5b10a27/sae_auto_interp/scorers/classifier/sample.py#L19",
+        "properties": {
+          "activations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "List of floats",
+            "title": "Activations"
+          },
+          "correct": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Whether the prediction is correct",
+            "title": "Correct"
+          },
+          "distance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quantile or neighbor distance",
+            "title": "Distance"
+          },
+          "groundTruth": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the example is activating or not",
+            "title": "Groundtruth"
+          },
+          "highlighted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Whether the sample is highlighted",
+            "title": "Highlighted"
+          },
+          "prediction": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": false,
+            "description": "Whether the model predicted the example activating or not",
+            "title": "Prediction"
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 0.0,
+            "description": "The probability of the example activating",
+            "title": "Probability"
+          },
+          "strTokens": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "List of strings",
+            "title": "Strtokens"
+          }
+        },
+        "title": "ScoreFuzzDetectionBreakdownItem",
+        "type": "object"
+      },
+      "ScoreFuzzDetectionRequest": {
+        "description": "Request model for scoring explanations using fuzzing or detection methods",
+        "properties": {
+          "activations": {
+            "description": "List of activation records to analyze",
+            "items": {
+              "$ref": "#/components/schemas/NPActivation"
+            },
+            "title": "Activations",
+            "type": "array"
+          },
+          "explanation": {
+            "description": "The explanation to evaluate",
+            "title": "Explanation",
+            "type": "string"
+          },
+          "model": {
+            "description": "Model identifier to use for scoring",
+            "title": "Model",
+            "type": "string"
+          },
+          "openrouterKey": {
+            "description": "API key for OpenRouter service",
+            "title": "Openrouterkey",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ScoreFuzzDetectionType"
+          }
+        },
+        "required": [
+          "activations",
+          "explanation",
+          "openrouterKey",
+          "model",
+          "type"
+        ],
+        "title": "ScoreFuzzDetectionRequest",
+        "type": "object"
+      },
+      "ScoreFuzzDetectionResponse": {
+        "description": "A fuzz or detection score, with the per-example results it was computed from",
+        "properties": {
+          "breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreFuzzDetectionBreakdownItem"
+            },
+            "title": "Breakdown",
+            "type": "array"
+          },
+          "score": {
+            "description": "The score from 0 to 1",
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "score",
+          "breakdown"
+        ],
+        "title": "ScoreFuzzDetectionResponse",
+        "type": "object"
+      },
+      "ScoreFuzzDetectionType": {
+        "description": "Type of scoring method, either fuzz or detection",
+        "enum": [
+          "FUZZ",
+          "DETECTION"
+        ],
+        "title": "ScoreFuzzDetectionType",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "SimpleSecretAuth": {
+        "in": "header",
+        "name": "X-SECRET-KEY",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "contact": {
+      "email": "johnny@neuronpedia.org"
+    },
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    "title": "Neuronpedia - AutoInterp Server",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/explain/default": {
+      "post": {
+        "operationId": "explainDefaultPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": {
+                "activations": [
+                  {
+                    "tokens": [
+                      "The",
+                      "cat",
+                      "sat",
+                      "on",
+                      "the",
+                      "mat"
+                    ],
+                    "values": [
+                      0.0,
+                      0.8,
+                      0.0,
+                      0.0,
+                      0.0,
+                      0.0
+                    ]
+                  },
+                  {
+                    "tokens": [
+                      "I",
+                      " like",
+                      " felines"
+                    ],
+                    "values": [
+                      0,
+                      0,
+                      0.9
+                    ]
+                  }
+                ],
+                "model": "openai/gpt-4o-mini",
+                "openrouter_key": "YOUR_OPENROUTER_KEY"
+              },
+              "schema": {
+                "$ref": "#/components/schemas/ExplainDefaultRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainDefaultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Explanation Endpoint"
+      }
+    },
+    "/v1/score/embedding": {
+      "post": {
+        "operationId": "scoreEmbeddingPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreEmbeddingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreEmbeddingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Score Embedding Endpoint"
+      }
+    },
+    "/v1/score/fuzz-detection": {
+      "post": {
+        "operationId": "scoreFuzzDetectionPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreFuzzDetectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreFuzzDetectionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Score Fuzz Detection Endpoint"
+      }
+    }
+  },
+  "security": [
+    {
+      "SimpleSecretAuth": []
+    }
+  ]
+}

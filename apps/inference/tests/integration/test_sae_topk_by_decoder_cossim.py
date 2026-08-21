@@ -1,12 +1,10 @@
 from fastapi.testclient import TestClient
-from neuronpedia_inference_client.models.np_feature import NPFeature
-from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post200_response import (
-    UtilSaeTopkByDecoderCossimPost200Response,
-)
-from neuronpedia_inference_client.models.util_sae_topk_by_decoder_cossim_post_request import (
-    UtilSaeTopkByDecoderCossimPostRequest,
-)
 
+from neuronpedia_inference.schemas import (
+    NPFeature,
+    UtilSaeTopkByDecoderCossimRequest,
+    UtilSaeTopkByDecoderCossimResponse,
+)
 from tests.conftest import (
     INVALID_SAE_SOURCE,
     MODEL_ID,
@@ -24,7 +22,7 @@ def test_sae_topk_by_decoder_cossim_with_feature(client: TestClient):
     """
     Test the endpoint with a valid feature input.
     """
-    request = UtilSaeTopkByDecoderCossimPostRequest(
+    request = UtilSaeTopkByDecoderCossimRequest(
         feature=NPFeature(
             source=SAE_SELECTED_SOURCES[0],
             index=FEATURE_INDEX,
@@ -43,7 +41,7 @@ def test_sae_topk_by_decoder_cossim_with_feature(client: TestClient):
 
     assert response.status_code == 200
     data = response.json()
-    response_model = UtilSaeTopkByDecoderCossimPost200Response(**data)
+    response_model = UtilSaeTopkByDecoderCossimResponse(**data)
 
     # Verify topk results
     assert len(response_model.topk_decoder_cossim_features) == NUM_RESULTS  # type: ignore
@@ -59,13 +57,12 @@ def test_sae_topk_by_decoder_cossim_with_feature(client: TestClient):
     ):
         assert actual.feature.source == SAE_SELECTED_SOURCES[0]
         assert actual.feature.model == MODEL_ID
-        assert (
-            actual.feature.index == expected["index"]
-        ), f"Feature {i}: expected index {expected['index']}, got {actual.feature.index}"
-        assert (
-            abs(actual.cosine_similarity - expected["similarity"])
-            < COSSIM_ABS_TOLERANCE
-        ), f"Feature {i}: expected similarity {expected['similarity']}, got {actual.cosine_similarity}"
+        assert actual.feature.index == expected["index"], (
+            f"Feature {i}: expected index {expected['index']}, got {actual.feature.index}"
+        )
+        assert abs(actual.cosine_similarity - expected["similarity"]) < COSSIM_ABS_TOLERANCE, (
+            f"Feature {i}: expected similarity {expected['similarity']}, got {actual.cosine_similarity}"
+        )
 
 
 def test_sae_topk_by_decoder_cossim_with_vector(client: TestClient):
@@ -74,7 +71,7 @@ def test_sae_topk_by_decoder_cossim_with_vector(client: TestClient):
     """
     test_vector = [1.0] * 768
 
-    request = UtilSaeTopkByDecoderCossimPostRequest(
+    request = UtilSaeTopkByDecoderCossimRequest(
         vector=test_vector,
         source=SAE_SELECTED_SOURCES[0],
         model=MODEL_ID,
@@ -89,7 +86,7 @@ def test_sae_topk_by_decoder_cossim_with_vector(client: TestClient):
 
     assert response.status_code == 200
     data = response.json()
-    response_model = UtilSaeTopkByDecoderCossimPost200Response(**data)
+    response_model = UtilSaeTopkByDecoderCossimResponse(**data)
 
     # Verify response structure
     assert response_model.feature is None  # No input feature
@@ -107,13 +104,12 @@ def test_sae_topk_by_decoder_cossim_with_vector(client: TestClient):
     ):
         assert actual.feature.source == SAE_SELECTED_SOURCES[0]
         assert actual.feature.model == MODEL_ID
-        assert (
-            actual.feature.index == expected["index"]
-        ), f"Vector test feature {i}: expected index {expected['index']}, got {actual.feature.index}"
-        assert (
-            abs(actual.cosine_similarity - expected["similarity"])
-            < COSSIM_ABS_TOLERANCE
-        ), f"Vector test feature {i}: expected similarity {expected['similarity']}, got {actual.cosine_similarity}"
+        assert actual.feature.index == expected["index"], (
+            f"Vector test feature {i}: expected index {expected['index']}, got {actual.feature.index}"
+        )
+        assert abs(actual.cosine_similarity - expected["similarity"]) < COSSIM_ABS_TOLERANCE, (
+            f"Vector test feature {i}: expected similarity {expected['similarity']}, got {actual.cosine_similarity}"
+        )
 
 
 def test_sae_topk_by_decoder_cossim_input_validation_errors(client: TestClient):
@@ -123,7 +119,7 @@ def test_sae_topk_by_decoder_cossim_input_validation_errors(client: TestClient):
     test_vector = [1.0] * 768
 
     # Test both feature and vector provided
-    request_both = UtilSaeTopkByDecoderCossimPostRequest(
+    request_both = UtilSaeTopkByDecoderCossimRequest(
         feature=NPFeature(
             source=SAE_SELECTED_SOURCES[0],
             index=FEATURE_INDEX,
@@ -142,17 +138,14 @@ def test_sae_topk_by_decoder_cossim_input_validation_errors(client: TestClient):
     )
 
     assert response_both.status_code == 400
-    assert (
-        "exactly one of feature or vector must be provided"
-        in response_both.json()["error"]
-    )
+    assert "exactly one of feature or vector must be provided" in response_both.json()["error"]
 
 
 def test_sae_topk_by_decoder_cossim_invalid_source(client: TestClient):
     """
     Test the endpoint with an invalid SAE source.
     """
-    request = UtilSaeTopkByDecoderCossimPostRequest(
+    request = UtilSaeTopkByDecoderCossimRequest(
         feature=NPFeature(
             source=INVALID_SAE_SOURCE,
             index=FEATURE_INDEX,

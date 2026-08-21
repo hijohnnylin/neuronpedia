@@ -1,29 +1,32 @@
 import logging
-from typing import Any
+from typing import cast
 
-import einops
-import nnsight
 import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
-from neuronpedia_inference_client.models.activation_single_batch_post200_response import (
-    ActivationSingleBatchPost200Response,
-)
-from neuronpedia_inference_client.models.activation_single_batch_post200_response_results_inner import (
-    ActivationSingleBatchPost200ResponseResultsInner,
-)
-from neuronpedia_inference_client.models.activation_single_batch_post_request import (
-    ActivationSingleBatchPostRequest,
-)
-from neuronpedia_inference_client.models.activation_single_post200_response_activation import (
-    ActivationSinglePost200ResponseActivation,
-)
-from nnterp import StandardizedTransformer
-from transformer_lens import ActivationCache, HookedTransformer
+from interp_engine import special_token_positions
 
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.endpoints.activation.single import (
+    get_layer_num_from_sae_id,
+    process_feature_activations,
+    process_neuron_activations,
+)
+from neuronpedia_inference.engine_adapter import (
+    BackendUnsupported,
+    calculate_dfa_for_values,
+    capture_padded_cache_async,
+)
+from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
+from neuronpedia_inference.memory_cost import activation_single_batch_cost
 from neuronpedia_inference.sae_manager import SAEManager
-from neuronpedia_inference.shared import Model, with_request_lock
+from neuronpedia_inference.schemas import (
+    ActivationSingleBatchRequest,
+    ActivationSingleBatchResponse,
+    ActivationSingleBatchResult,
+    ActivationValues,
+)
+from neuronpedia_inference.shared import LoadedModel, Model, with_request_lock
 
 logger = logging.getLogger(__name__)
 
@@ -33,20 +36,22 @@ router = APIRouter()
 MAX_BATCH_SIZE = 4
 
 
-@router.post("/activation/single-batch")
-@with_request_lock()
+@router.post("/activation/single-batch", responses={200: {"model": ActivationSingleBatchResponse}})
+@with_request_lock(exclusive=False, cost=activation_single_batch_cost)
 async def activation_single_batch(
-    request: ActivationSingleBatchPostRequest = Body(
+    request: ActivationSingleBatchRequest = Body(
         ...,
-        example={
-            "prompts": [
-                "The Jedi in Star Wars wield lightsabers.",
-                "The Force is strong with this one.",
-            ],
-            "model": "gpt2-small",
-            "source": "0-res-jb",
-            "index": "14057",
-        },
+        examples=[
+            {
+                "prompts": [
+                    "The Jedi in Star Wars wield lightsabers.",
+                    "The Force is strong with this one.",
+                ],
+                "model": "gpt2-small",
+                "source": "0-res-jb",
+                "index": "14057",
+            }
+        ],
     ),
 ):
     model = Model.get_instance()
@@ -63,9 +68,7 @@ async def activation_single_batch(
 
     if len(prompts) > MAX_BATCH_SIZE:
         return JSONResponse(
-            content={
-                "error": f"Batch size {len(prompts)} exceeds maximum of {MAX_BATCH_SIZE}"
-            },
+            content={"error": f"Batch size {len(prompts)} exceeds maximum of {MAX_BATCH_SIZE}"},
             status_code=400,
         )
 
@@ -73,13 +76,9 @@ async def activation_single_batch(
     if (request.source is not None and request.index is not None) == (
         request.vector is not None and request.hook is not None
     ):
-        logger.error(
-            "Invalid request data: exactly one of layer/index or vector must be provided"
-        )
+        logger.error("Invalid request data: exactly one of layer/index or vector must be provided")
         return JSONResponse(
-            content={
-                "error": "Invalid request data: exactly one of layer/index or vector must be provided"
-            },
+            content={"error": "Invalid request data: exactly one of layer/index or vector must be provided"},
             status_code=400,
         )
 
@@ -105,67 +104,53 @@ async def activation_single_batch(
             if not prompt.startswith(bos_token):
                 prompt = bos_token + prompt
 
-            if isinstance(model, StandardizedTransformer):
-                tokens = model.tokenizer(
-                    prompt, add_special_tokens=False, return_tensors="pt"
-                )["input_ids"][0]
-            else:
-                tokens = model.to_tokens(
-                    prompt,
-                    prepend_bos=prepend_bos,
-                    truncate=False,
-                )[0]
+            tokens = model.to_tokens(
+                prompt,
+                prepend_bos=prepend_bos,
+                truncate=False,
+            )[0]
 
-            batch_token_limit = config.token_limit / MAX_BATCH_SIZE
-            if len(tokens) > batch_token_limit:
-                logger.error(
-                    "Text too long: %s tokens, max is %s",
-                    len(tokens),
-                    batch_token_limit,
-                )
-                return JSONResponse(
-                    content={
-                        "error": f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
-                    },
-                    status_code=400,
-                )
+            batch_token_limit = config.activation_token_limit / MAX_BATCH_SIZE
+            too_long = reject_if_over_token_limit(len(tokens), batch_token_limit, suffix=" for batch requests")
+            if too_long is not None:
+                return too_long
 
-            if isinstance(model, StandardizedTransformer):
-                tokenizer = model.tokenizer
-                str_tokens: list[str] = tokenizer.tokenize(prompt)
-                str_tokens = [
-                    tokenizer.convert_tokens_to_string([t]) for t in str_tokens
-                ]
-            else:
-                str_tokens: list[str] = model.to_str_tokens(
-                    prompt, prepend_bos=prepend_bos
-                )  # type: ignore
+            str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
 
             all_tokens.append(tokens)
             all_str_tokens.append(str_tokens)
 
         # Process all prompts in batch
-        results = process_activations_batch(model, source, index, all_tokens)
+        try:
+            results = await process_activations_batch(model, source, index, all_tokens)
 
-        # Calculate DFA if enabled (for each result)
-        if sae_manager.is_dfa_enabled(source):
-            for i, (result, tokens) in enumerate(zip(results, all_tokens)):
-                dfa_result = calculate_dfa(
-                    model,
-                    sae,
-                    layer_num,
-                    index,
-                    result.max_value_index,
-                    tokens,
-                )
-                result.dfa_values = dfa_result["dfa_values"]  # type: ignore
-                result.dfa_target_index = dfa_result["dfa_target_index"]  # type: ignore
-                result.dfa_max_value = dfa_result["dfa_max_value"]  # type: ignore
+            # Calculate DFA if enabled (for each result)
+            if sae_manager.is_dfa_enabled(source):
+                for result, tokens in zip(results, all_tokens):
+                    # `n_values` because `process_activations_batch` may have dropped the
+                    # leading BOS from `values`, which shifts `max_value_index` off the
+                    # attention pattern's own indexing (see `calculate_dfa_for_values`).
+                    dfa_result = await calculate_dfa_for_values(
+                        model,
+                        sae,
+                        layer_num,
+                        index,
+                        result.max_value_index,
+                        tokens,
+                        n_values=len(result.values),
+                    )
+                    result.dfa_values = dfa_result["dfa_values"]  # type: ignore
+                    result.dfa_target_index = dfa_result["dfa_target_index"]  # type: ignore
+                    result.dfa_max_value = dfa_result["dfa_max_value"]  # type: ignore
+        except BackendUnsupported as e:
+            return JSONResponse(content={"error": str(e)}, status_code=400)
 
     else:
-        vector = request.vector
-        hook = request.hook
-        prepend_bos = model.cfg.tokenizer_prepends_bos
+        # Both are set on this path: the check above rejects any request that does not supply
+        # exactly one of (source, index) / (vector, hook).
+        vector = cast(list[float], request.vector)
+        hook = cast(str, request.hook)
+        prepend_bos = model.tok.tokenizer_prepends_bos
 
         all_tokens = []
         all_str_tokens = []
@@ -176,70 +161,61 @@ async def activation_single_batch(
                 prepend_bos=prepend_bos,
                 truncate=False,
             )[0]
-            batch_token_limit = config.token_limit / MAX_BATCH_SIZE
-            if len(tokens) > batch_token_limit:
-                logger.error(
-                    "Text too long: %s tokens, max is %s",
-                    len(tokens),
-                    batch_token_limit,
-                )
-                return JSONResponse(
-                    content={
-                        "error": f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
-                    },
-                    status_code=400,
-                )
+            batch_token_limit = config.activation_token_limit / MAX_BATCH_SIZE
+            too_long = reject_if_over_token_limit(len(tokens), batch_token_limit, suffix=" for batch requests")
+            if too_long is not None:
+                return too_long
 
             str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
             all_tokens.append(tokens)
             all_str_tokens.append(str_tokens)
 
         # Process all prompts in batch
-        results = process_vector_activations_batch(
-            vector, all_tokens, hook, model, sae_manager.device
-        )
+        try:
+            results = await process_vector_activations_batch(vector, all_tokens, hook, model, sae_manager.device)
+        except BackendUnsupported as e:
+            return JSONResponse(content={"error": str(e)}, status_code=400)
 
     logger.info("Returning %d results", len(results))
 
     # Build response in the same order as input
     response_results = [
-        ActivationSingleBatchPost200ResponseResultsInner(
-            activation=result, tokens=str_tokens
-        )
-        for result, str_tokens in zip(results, all_str_tokens)
+        _build_result(model, result, tokens, str_tokens)
+        for result, tokens, str_tokens in zip(results, all_tokens, all_str_tokens)
     ]
 
-    return ActivationSingleBatchPost200Response(results=response_results)
+    return ActivationSingleBatchResponse(results=response_results)
 
 
-def _get_safe_dtype(dtype: torch.dtype) -> torch.dtype:
+def _build_result(
+    model: LoadedModel,
+    result: ActivationValues,
+    tokens: torch.Tensor,
+    str_tokens: list[str],
+) -> ActivationSingleBatchResult:
+    """Assemble one prompt's result, keeping tokens aligned with values.
+
+    The feature path drops the BOS activation (``process_saelens_activations``, shared with
+    ``/activation/single``), which leaves ``values`` one shorter than the tokenization, so
+    ``tokens`` is trimmed to match. A mask over a misaligned array describes the wrong tokens,
+    which is what would make ``tokens_is_special`` meaningless.
     """
-    Convert float16 to float32, leave other dtypes unchanged.
-    """
-    return torch.float32 if dtype == torch.float16 else dtype
+    special_positions = set(special_token_positions(tokens, model.tokenizer))
+    tokens_is_special = [i in special_positions for i in range(len(str_tokens))]
+
+    if len(str_tokens) > len(result.values):
+        str_tokens = str_tokens[1:]
+        tokens_is_special = tokens_is_special[1:]
+
+    return ActivationSingleBatchResult(activation=result, tokens=str_tokens, tokens_is_special=tokens_is_special)
 
 
-def _safe_cast(tensor: torch.Tensor, target_dtype: torch.dtype) -> torch.Tensor:
-    """
-    Safely cast a tensor to the target dtype, creating a copy if needed.
-    Convert float16 to float32, leave other dtypes unchanged.
-    """
-    safe_dtype = _get_safe_dtype(tensor.dtype)
-    if safe_dtype != tensor.dtype or safe_dtype != target_dtype:
-        return tensor.to(target_dtype)
-    return tensor
-
-
-def get_layer_num_from_sae_id(sae_id: str) -> int:
-    return int(sae_id.split("-")[0]) if not sae_id.isdigit() else int(sae_id)
-
-
-def process_activations_batch(
-    model: HookedTransformer | StandardizedTransformer,  # | TransformerBridge
+async def process_activations_batch(
+    model: LoadedModel,
     layer: str,
     index: int,
     tokens_list: list[torch.Tensor],
-) -> list[ActivationSinglePost200ResponseActivation]:
+) -> list[ActivationValues]:
     """
     Process multiple token sequences in a single batch for GPU efficiency.
     Returns results in the same order as input.
@@ -256,18 +232,9 @@ def process_activations_batch(
     batch_size = len(tokens_list)
 
     # Create padded batch tensor and attention mask
-    if isinstance(model, StandardizedTransformer):
-        pad_token_id = (
-            model.tokenizer.pad_token_id
-            if model.tokenizer.pad_token_id is not None
-            else model.tokenizer.eos_token_id
-        )
-    else:
-        pad_token_id = (
-            model.tokenizer.pad_token_id
-            if model.tokenizer.pad_token_id is not None
-            else model.tokenizer.eos_token_id
-        )
+    pad_token_id = (
+        model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
+    )
 
     padded_tokens = torch.full(
         (batch_size, max_len),
@@ -287,19 +254,9 @@ def process_activations_batch(
         bos_indices = (tokens == bos_token_id).nonzero(as_tuple=True)[0].tolist()
         all_bos_indices.append(bos_indices)
 
-    # Run batch inference
-    if isinstance(model, StandardizedTransformer):
-        layer_num = get_layer_num_from_sae_id(layer)
-        with model.trace(padded_tokens):
-            if "resid_post" in hook_name:
-                outputs = nnsight.save(model.layers_output[layer_num])
-            elif "hook_mlp_in" in hook_name:
-                outputs = nnsight.save(model.mlps_input[layer_num])
-            else:
-                raise ValueError(f"Unsupported hook name for nnsight: {hook_name}")
-        cache = {hook_name: outputs}
-    else:
-        _, cache = model.run_with_cache(padded_tokens)
+    # Run batch inference (backend-aware). Right-padded + causal attention => real positions
+    # are unaffected by trailing pad tokens (eager batched forward, or per-prompt vLLM capture).
+    cache = await capture_padded_cache_async(model, padded_tokens, original_lengths, [hook_name])
 
     # Process each result separately
     results = []
@@ -310,9 +267,7 @@ def process_activations_batch(
         if sae_type == "neurons":
             # Extract single sequence from batch
             seq_cache = {hook_name: cache[hook_name][i : i + 1, :seq_len]}
-            result = process_neuron_activations(
-                seq_cache, hook_name, index, sae_manager.device
-            )
+            result = process_neuron_activations(seq_cache, hook_name, index, sae_manager.device)
         elif sae_manager.get_sae(layer) is not None:
             # Extract single sequence from batch
             seq_cache = {hook_name: cache[hook_name][i : i + 1, :seq_len]}
@@ -332,91 +287,13 @@ def process_activations_batch(
     return results
 
 
-def process_neuron_activations(
-    cache: ActivationCache | dict[str, torch.Tensor],
-    hook_name: str,
-    index: int,
-    device: str,
-) -> ActivationSinglePost200ResponseActivation:
-    mlp_activation_data = cache[hook_name].to(device)
-    values = torch.transpose(mlp_activation_data[0], 0, 1)[index].detach().tolist()
-    max_value = max(values)
-    return ActivationSinglePost200ResponseActivation(
-        values=values,
-        max_value=max_value,
-        max_value_index=values.index(max_value),
-    )
-
-
-def process_feature_activations(
-    sae: Any,
-    sae_type: str,
-    cache: ActivationCache | dict[str, torch.Tensor],
-    hook_name: str,
-    index: int,
-    bos_indices: list[int],
-) -> ActivationSinglePost200ResponseActivation:
-    if sae_type == "saelens-1":
-        return process_saelens_activations(sae, cache, hook_name, index, bos_indices)
-    raise ValueError(f"Unsupported SAE type: {sae_type}")
-
-
-def process_saelens_activations(
-    sae: Any,
-    cache: ActivationCache | dict[str, torch.Tensor],
-    hook_name: str,
-    index: int,
-    bos_indices: list[int],
-) -> ActivationSinglePost200ResponseActivation:
-    # if the cache[hook_name] is not on the same device as the sae, move it to the sae's device
-    cached_value = cache[hook_name]
-    if cached_value.device != sae.device:
-        cached_value = cached_value.to(sae.device)
-    feature_acts = sae.encode(cached_value)
-    values = torch.transpose(feature_acts.squeeze(0), 0, 1)[index].detach().tolist()
-
-    # zero out all values that are the BOS token
-    for idx in bos_indices:
-        values[idx] = 0
-
-    max_value = max(values)
-    return ActivationSinglePost200ResponseActivation(
-        values=values,
-        max_value=max_value,
-        max_value_index=values.index(max_value),
-    )
-
-
-def process_vector_activations(
-    vector: torch.Tensor | list[float],
-    cache: ActivationCache | dict[str, torch.Tensor],
-    hook_name: str,
-    device: torch.device,
-) -> ActivationSinglePost200ResponseActivation:
-    if not isinstance(vector, torch.Tensor):
-        vector = torch.tensor(vector, device=device)
-    # not normalizing it for now
-    # vector = vector / torch.linalg.norm(vector)
-    activations = cache[hook_name].to(device)
-    # ensure vector has the same dtype as activations
-    vector = vector.to(dtype=activations.dtype)
-    feature_acts = torch.matmul(activations, vector)
-    values = feature_acts.squeeze(0).detach().tolist()
-    max_value = max(values)
-    return ActivationSinglePost200ResponseActivation(
-        values=values,
-        max_value=max_value,
-        max_value_index=values.index(max_value),
-    )
-
-
-def process_vector_activations_batch(
+async def process_vector_activations_batch(
     vector: torch.Tensor | list[float],
     tokens_list: list[torch.Tensor],
     hook_name: str,
-    model: HookedTransformer | StandardizedTransformer,  # | TransformerBridge
-    device: torch.device,
-) -> list[ActivationSinglePost200ResponseActivation]:
+    model: LoadedModel,
+    device: str | torch.device,
+) -> list[ActivationValues]:
     """
     Process multiple token sequences with a custom vector in a single batch for GPU efficiency.
     Returns results in the same order as input.
@@ -429,18 +306,9 @@ def process_vector_activations_batch(
     batch_size = len(tokens_list)
 
     # Create padded batch tensor
-    if isinstance(model, StandardizedTransformer):
-        pad_token_id = (
-            model.tokenizer.pad_token_id
-            if model.tokenizer.pad_token_id is not None
-            else model.tokenizer.eos_token_id
-        )
-    else:
-        pad_token_id = (
-            model.tokenizer.pad_token_id
-            if model.tokenizer.pad_token_id is not None
-            else model.tokenizer.eos_token_id
-        )
+    pad_token_id = (
+        model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
+    )
 
     padded_tokens = torch.full(
         (batch_size, max_len),
@@ -456,8 +324,8 @@ def process_vector_activations_batch(
         padded_tokens[i, : len(tokens)] = tokens
         original_lengths.append(len(tokens))
 
-    # Run batch inference
-    _, cache = model.run_with_cache(padded_tokens)
+    # Run batch inference (backend-aware)
+    cache = await capture_padded_cache_async(model, padded_tokens, original_lengths, [hook_name])
 
     # Get activations for the batch
     activations = cache[hook_name].to(device)
@@ -477,7 +345,7 @@ def process_vector_activations_batch(
         values = feature_acts.squeeze(0).detach().tolist()
         max_value = max(values)
 
-        result = ActivationSinglePost200ResponseActivation(
+        result = ActivationValues(
             values=values,
             max_value=max_value,
             max_value_index=values.index(max_value),
@@ -485,67 +353,3 @@ def process_vector_activations_batch(
         results.append(result)
 
     return results
-
-
-def calculate_dfa(
-    model: HookedTransformer,
-    sae: Any,
-    layer_num: int,
-    index: int,
-    max_value_index: int,
-    tokens: torch.Tensor,
-) -> dict[str, list[float] | int | float]:
-    _, cache = model.run_with_cache(tokens)
-    v = cache["v", layer_num]  # [batch, src_pos, n_heads, d_head]
-    attn_weights = cache["pattern", layer_num]  # [batch, n_heads, dest_pos, src_pos]
-
-    # Determine the safe dtype for operations
-    v_dtype = _get_safe_dtype(v.dtype)
-    attn_weights_dtype = _get_safe_dtype(attn_weights.dtype)
-    sae_dtype = _get_safe_dtype(sae.W_enc.dtype)
-
-    # Use the highest precision dtype
-    op_dtype = max(v_dtype, attn_weights_dtype, sae_dtype, key=lambda x: x.itemsize)
-
-    # Check if the model uses GQA
-    use_gqa = (
-        hasattr(model.cfg, "n_key_value_heads")
-        and model.cfg.n_key_value_heads is not None
-        and model.cfg.n_key_value_heads < model.cfg.n_heads
-    )
-
-    if use_gqa:
-        n_query_heads = attn_weights.shape[1]
-        n_kv_heads = v.shape[2]
-        expansion_factor = n_query_heads // n_kv_heads
-        v = v.repeat_interleave(expansion_factor, dim=2)
-
-    # Cast tensors to operation dtype
-    v = _safe_cast(v, op_dtype)
-    attn_weights = _safe_cast(attn_weights, op_dtype)
-
-    v_cat = einops.rearrange(
-        v, "batch src_pos n_heads d_head -> batch src_pos (n_heads d_head)"
-    )
-    attn_weights_bcast = einops.repeat(
-        attn_weights,
-        "batch n_heads dest_pos src_pos -> batch dest_pos src_pos (n_heads d_head)",
-        d_head=model.cfg.d_head,
-    )
-    decomposed_z_cat = attn_weights_bcast * v_cat.unsqueeze(1)
-
-    # Cast SAE weights to operation dtype
-    W_enc = _safe_cast(sae.W_enc[:, index], op_dtype)
-
-    per_src_pos_dfa = einops.einsum(
-        decomposed_z_cat,
-        W_enc,
-        "batch dest_pos src_pos d_model, d_model -> batch dest_pos src_pos",
-    )
-    per_src_dfa = per_src_pos_dfa[torch.arange(1), torch.tensor([max_value_index]), :]
-    dfa_values = per_src_dfa[0].tolist()
-    return {
-        "dfa_values": dfa_values,
-        "dfa_target_index": max_value_index,
-        "dfa_max_value": max(dfa_values),
-    }

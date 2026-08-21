@@ -1,0 +1,33 @@
+# Assistant-axis persona asset: how this fit was produced, and what it ships.
+#
+# Everything here is a property of THIS FIT, not of the model architecture or of the
+# assistant-axis feature, so it travels with the .pt files rather than living in
+# persona_data.py. A new asset fitted at a different layer, with different PCs, or under
+# different rendering conditions needs a new manifest and no code change.
+#
+# Fitted on casperhansen/llama-3.3-70b-instruct-awq, an AWQ quantization of these
+# weights. The directory is named for the unquantized checkpoint because that is what is
+# normally served; the quantized id is a symlink beside it, so either resolves here.
+
+# The PCA was fitted with an empty system turn, so a caller-supplied system prompt has to
+# be blanked before rendering or the activations land off-distribution. On Llama 3 a
+# non-empty system turn additionally makes the chat template inject its knowledge-cutoff
+# preamble, which was not present during fitting.
+blank_system_prompt: true
+
+# Labels for the principal components, in component order. Length defines how many PCs
+# are reported: this fit surfaces only PC1, whose components_[0] is replaced at load time
+# by the (flipped, normalized) contrast vector for the layer. Two further components were
+# fitted but are not surfaced -- they were "- Collective / + Individual" and
+# "- Passionate / + Robotic".
+pc_titles:
+  - "- Role-playing ↔️ + Assistant-like"
+
+# Per-layer contrast vectors, indexed by layer. PC1 above is read out of this.
+contrast_vectors: contrast_vectors.pt
+
+# The layers this asset was fitted at. The first is the one persona monitoring runs on;
+# a projection onto these PCs is only meaningful at the layer they were fitted at.
+pca:
+  - layer: 40
+    file: pca/roles_layer40-min.pt

@@ -1,0 +1,92 @@
+Neuronpedia
+Copyright 2025 Decode Research (Neuronpedia)
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License in the LICENSE file at the root of this repository, or at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+
+================================================================================
+Earlier releases
+================================================================================
+
+Neuronpedia was distributed under the MIT License before the switch to Apache
+2.0. That text is preserved in LICENSE-MIT, and it still governs the releases
+made under it -- relicensing changes the terms going forward, not the terms you
+already received. Code contributed under MIT is sublicensed here under Apache
+2.0, which MIT permits.
+
+Neuronpedia has had contributions from people other than the copyright holder.
+Portions of this software were contributed under the MIT License by, among
+others, Sean Sica, Shayan Sadeghieh, Shubham Kumar, and Roy Hvaara. This list is
+a courtesy and is not exhaustive.
+
+
+================================================================================
+Third-party software
+================================================================================
+
+Third-party components used only by the graph server are listed separately in
+apps/graph/NOTICE.
+
+--------------------------------------------------------------------------------
+jlens (Jacobian lens)
+https://github.com/anthropics/jacobian-lens
+Copyright 2026 Anthropic PBC
+Licensed under the Apache License, Version 2.0.
+
+Companion code for "Verbalizable Representations Form a Global Workspace in
+Language Models". Vendored under utils/neuronpedia-utils/neuronpedia_utils/jlens:
+
+  * jlens/ is a verbatim copy of the upstream library. Every file retains its
+    original Anthropic PBC copyright header, and the upstream LICENSE is
+    reproduced beside it.
+  * fit_lens.py is a modified copy of the upstream demo/fit_lens.py. The
+    interactive visualisation was removed and multi-GPU loading was added; the
+    file carries a notice to that effect, as Apache 2.0 section 4(b) requires.
+
+The upstream project ships no NOTICE file, so there is none to reproduce here.
+
+--------------------------------------------------------------------------------
+d3-jetpack
+https://github.com/gka/d3-jetpack
+Copyright 2019, Gregor Aisch
+All rights reserved.
+Licensed under the BSD 3-Clause License.
+
+apps/webapp/app/[modelId]/graph/d3-jetpack.ts is a TypeScript port of Anthropic's
+fork of d3-jetpack, published alongside the attribution-graphs work at
+https://transformer-circuits.pub/2025/attribution-graphs/ as
+static_js/lib/jetpack_2024-07-20.js.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the author nor the names of contributors may be used to
+  endorse or promote products derived from this software without specific prior
+  written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

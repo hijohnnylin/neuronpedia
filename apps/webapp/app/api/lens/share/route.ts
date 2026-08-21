@@ -18,6 +18,7 @@ import {
   LensMetaMessage,
   LensTokenMessage,
   LensType,
+  MAX_LENS_COMPLETION_TOKENS,
   MAX_LENS_STEER_STRENGTH,
 } from '@/lib/utils/lens';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
@@ -108,7 +109,7 @@ const shareRequestSchema = yup.object({
   prompt: yup.string().max(MAX_SHARE_PROMPT_CHARS).default(''),
   topN: yup.number().integer().min(1).max(10).required(),
   temperature: yup.number().min(0).max(2).required(),
-  numCompletionTokens: yup.number().integer().min(0).max(256).required(),
+  numCompletionTokens: yup.number().integer().min(0).max(MAX_LENS_COMPLETION_TOKENS).required(),
   // Number of leading prompt tokens (the remainder were generated). Persisted so
   // a reloaded share can mark the prompt→generated boundary; optional for
   // backward-compat.
@@ -263,7 +264,7 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                 type: integer
  *                 description: Number of generated tokens in the run.
  *                 minimum: 0
- *                 maximum: 256
+ *                 maximum: 2048
  *               activeLensModeTab:
  *                 type: string
  *                 description: The lens display mode tab that was active when sharing.

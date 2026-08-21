@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "utils/agent-hooks/ruff-format.sh",
+        "timeout": 30
+      },
+      {
+        "command": "utils/agent-hooks/pyright-track.sh",
+        "timeout": 10
+      },
+      {
+        "command": "utils/agent-hooks/openapi-track.sh",
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": "utils/agent-hooks/pyright-stop.sh",
+        "timeout": 120,
+        "loop_limit": 2
+      },
+      {
+        "command": "utils/agent-hooks/openapi-stop.sh",
+        "timeout": 180,
+        "loop_limit": 2
+      }
+    ]
+  }
+}
