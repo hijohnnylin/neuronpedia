@@ -235,8 +235,7 @@ def _parse_static_points(raw: str | None) -> Any:
         points = json.loads(raw)
     except json.JSONDecodeError as exc:
         raise ValueError(
-            f"STATIC_POINTS={raw!r} is not 'auto', 'sae', 'sae+auto', or JSON "
-            '(e.g. \'auto\' or [["resid_post", 7]]).'
+            f"STATIC_POINTS={raw!r} is not 'auto', 'sae', 'sae+auto', or JSON (e.g. 'auto' or [[\"resid_post\", 7]])."
         ) from exc
     if isinstance(points, list) and not points:
         raise ValueError(
