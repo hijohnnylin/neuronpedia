@@ -196,7 +196,7 @@ export default function TabMicroscope({
           </span>
           <div className="text-sm font-medium leading-normal text-slate-500">
             <span>
-              A <FeatureTooltip s={false} /> is something that activates in the {`AI's brain`} when it see a specific
+              A <FeatureTooltip s={false} /> is something that activates in the {`AI's brain`} when it sees a specific
               concept or idea, like
               {` "words about cats"`}.<br />
               For example, when you send an AI the message {`"I like cats"`}, it activates the {`"words about cats"`}{' '}
