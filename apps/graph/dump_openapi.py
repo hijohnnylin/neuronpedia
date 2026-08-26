@@ -22,7 +22,7 @@ from pathlib import Path
 # before the import below, which is what reads them.
 os.environ.setdefault("SECRET", "openapi-dump-placeholder")
 os.environ.setdefault("HF_TOKEN", "openapi-dump-placeholder")
-# Any name from TLENS_MODEL_ID_TO_NP_MODEL_ID will do -- which model is loaded does not appear
+# Any name from HF_MODEL_ID_TO_NP_MODEL_ID will do -- which model is loaded does not appear
 # anywhere in the spec, and nothing is loaded here regardless.
 os.environ.setdefault("MODEL_ID", "google/gemma-2-2b")
 

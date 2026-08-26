@@ -103,6 +103,8 @@ This loads 28 transcoder modules + 28 Lorsa modules (one per layer). The 8x/k64 
 
 Values keep underscores (`interp_engine`, not `interp-engine`) because they are passed straight through to circuit-tracer's own `backend=` literal.
 
+One endpoint is narrower than the rest: [`/steer`](#example-request---steering-interventions-with-top-logits) generates on `interp_engine` only, and refuses the other two with an error naming what the pod loaded. Its sampling parameters (`temperature`, `freq_penalty`) are TransformerLens', which `neuronpedia_graph/steer_generation.py` translates into `transformers`' terms; carrying a second spelling of them for engines no pod runs bought nothing. Graph generation is unaffected on every engine.
+
 Under CRM both options run llamascopium's attribution itself, unmodified.
 
 The two agree to a few parts per million on the adjacency matrix in `float32`, and select the same graph nodes, QK tracing included (`tests/test_crm_backend_parity.py`, opt in with `RUN_CRM_PARITY=1`) — which is what makes `interp_engine` the default. In `bfloat16` this attribution is not reproducible to better than ~0.3 relative *within* a single backend, so compare in `float32` if you are checking a change.

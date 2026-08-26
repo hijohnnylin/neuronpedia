@@ -59,13 +59,13 @@ def parse_args():
     parser.add_argument(
         "--model_id",
         default="google/gemma-2-2b",
-        help="The ID of the transformerlens model to use. Default is google/gemma-2-2b.",
+        help="The HuggingFace ID of the model to load. Default is google/gemma-2-2b.",
     )
     parser.add_argument(
         "--model_dtype",
         default="bfloat16",
         choices=["bfloat16", "float16", "float32"],
-        help="The dtype of the transformerlens model to use. Default is bfloat16.",
+        help="The dtype to load the model in. Default is bfloat16.",
     )
     parser.add_argument(
         "--device",
@@ -80,7 +80,8 @@ def parse_args():
             "not change what the graph contains. interp_engine (default) hooks the HuggingFace "
             "model in place, reaching any AutoModelForCausalLM; transformerlens converts the "
             "weights, so it only reaches architectures it has a conversion for; nnsight is "
-            "circuit-tracer only. Values are underscored to match the libraries' own literals."
+            "circuit-tracer only. Values are underscored to match the libraries' own literals. "
+            "The /steer endpoint generates on interp_engine only; graph generation runs on all three."
         ),
     )
     parser.add_argument(

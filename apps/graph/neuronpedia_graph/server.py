@@ -46,6 +46,7 @@ from neuronpedia_graph.schemas import (
     SteerResponse,
     TopLogit,
 )
+from neuronpedia_graph.steer_generation import generate_default, generate_steered
 
 load_dotenv()
 
@@ -255,7 +256,10 @@ TRANSCODER_SET_TO_SOURCE_URL_ARRAYS = {
     ],
 }
 
-TLENS_MODEL_ID_TO_NP_MODEL_ID = {
+# HuggingFace model ID to the Neuronpedia model ID a graph is labelled with. Not TransformerLens'
+# list, despite the name it used to carry -- every engine loads these. `build_model` raises a
+# KeyError on an unlisted one, which is why the startup error below quotes the list.
+HF_MODEL_ID_TO_NP_MODEL_ID = {
     "google/gemma-2-2b": "gemma-2-2b",
     "google/gemma-3-4b-it": "gemma-3-4b-it",
     "meta-llama/Llama-3.2-1B": "llama3.1-8b",
@@ -392,8 +396,8 @@ async def lifespan(_app: FastAPI):
     print(f"Model: {model_id_env}")
     if not model_id_env:
         raise ValueError(
-            "TransformerLens model name is required. Please specify a model as a command line argument. Valid models: "
-            + ", ".join(TLENS_MODEL_ID_TO_NP_MODEL_ID.keys())
+            "MODEL_ID is required. Pass --model_id, or set MODEL_ID. Models a graph can be labelled "
+            "with: " + ", ".join(HF_MODEL_ID_TO_NP_MODEL_ID.keys())
         )
     loaded_model_arg = model_id_env
 
@@ -642,17 +646,13 @@ async def steer_handler(req_data: SteerRequest):
         # set the seed
         if req_data.seed is not None:
             torch.manual_seed(req_data.seed)
-        default_tokenized = model.generate(
+        default_tokenized = generate_default(
+            model,
             req_data.prompt,
-            do_sample=True,
-            use_past_kv_cache=False,
-            verbose=False,
-            stop_at_eos=True,
             max_new_tokens=req_data.n_tokens,
             temperature=req_data.temperature,
             freq_penalty=req_data.freq_penalty,
-            return_type="tokens",
-        )[0]
+        )
 
         default_tokenized_str_tokens = [model.tokenizer.decode([token]) for token in default_tokenized]
 
@@ -661,20 +661,19 @@ async def steer_handler(req_data: SteerRequest):
         # reset the seed
         if req_data.seed is not None:
             torch.manual_seed(req_data.seed)
-        (steered_tokenized, steered_logits, _) = model.feature_intervention_generate(
+        steered_tokenized, steered_logits = generate_steered(
+            model,
             req_data.prompt,
             intervention_tuples,
-            freeze_attention=req_data.freeze_attention,
-            do_sample=True,
-            verbose=False,
-            stop_at_eos=True,
+            # One more than the default run asks for, as this endpoint has always requested. The
+            # loops below index the steered tokens by the *default* run's length, so a steered run
+            # that is shorter reads off the end.
             max_new_tokens=req_data.n_tokens + 1,
             temperature=req_data.temperature,
             freq_penalty=req_data.freq_penalty,
-            return_type="tokens",
+            freeze_attention=req_data.freeze_attention,
         )
 
-        steered_tokenized = steered_tokenized[0]
         steered_tokenized_str_tokens = [model.tokenizer.decode([token]) for token in steered_tokenized]
         steered_generation = "".join(steered_tokenized_str_tokens)
 
@@ -848,12 +847,12 @@ async def generate_graph(req_data: GraphGenerationRequest):
     print(f"Thread {threading.get_ident()}: Lock acquired.")
     try:
         prompt = req_data.prompt
-        tlens_model_id = req_data.model_id
-        if tlens_model_id is None or tlens_model_id != loaded_model_arg:
+        requested_model_id = req_data.model_id
+        if requested_model_id is None or requested_model_id != loaded_model_arg:
             request_lock.release()
             raise HTTPException(
                 status_code=400,
-                detail=f"Model '{tlens_model_id}' is not available. Only '{loaded_model_arg}' is currently loaded.",
+                detail=f"Model '{requested_model_id}' is not available. Only '{loaded_model_arg}' is currently loaded.",
             )
 
         batch_size = req_data.batch_size
@@ -864,7 +863,7 @@ async def generate_graph(req_data: GraphGenerationRequest):
         slug_identifier = req_data.slug_identifier or f"generated-{int(time.time())}"
         max_feature_nodes = req_data.max_feature_nodes
         print(f"Thread {threading.get_ident()}: Processing request for prompt: '{prompt[:50]}...' with parameters:")
-        print(f"  model_id: {tlens_model_id}")
+        print(f"  model_id: {requested_model_id}")
         print(f"  batch_size: {batch_size}")
         print(f"  max_n_logits: {max_n_logits}")
         print(f"  desired_logit_prob: {desired_logit_prob}")
@@ -957,7 +956,7 @@ async def generate_graph(req_data: GraphGenerationRequest):
                 _used_nodes,
                 _used_edges,
                 slug_identifier,
-                TLENS_MODEL_ID_TO_NP_MODEL_ID[tlens_model_id],
+                HF_MODEL_ID_TO_NP_MODEL_ID[requested_model_id],
                 node_threshold,
                 tokenizer,
             )
