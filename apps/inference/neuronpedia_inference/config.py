@@ -326,6 +326,10 @@ def get_saelens_neuronpedia_directory_df():
             "conversion_func",
         ],
         inplace=True,
+        # The SAELens directory's columns vary by release, and a fork that has not yet
+        # grown one of these turns a startup into a KeyError naming a column nobody asked
+        # about. Dropping what is present is the whole intent here.
+        errors="ignore",
     )
     df["neuronpedia_id_list"] = df["neuronpedia_id"].apply(lambda x: list(x.items()))
     df_exploded = df.explode("neuronpedia_id_list")
@@ -333,6 +337,10 @@ def get_saelens_neuronpedia_directory_df():
         df_exploded["neuronpedia_id_list"].tolist(), index=df_exploded.index
     )
     df_exploded = df_exploded.drop(columns=["neuronpedia_id_list"])
+    # Rows whose neuronpedia_id is null are SAELens entries with no Neuronpedia mapping.
+    # They cannot match a configured set, and leaving them in means every downstream
+    # consumer has to repeat the None guard the neuronpedia_set lambda already carries.
+    df_exploded = df_exploded.loc[df_exploded["neuronpedia_id"].notna()]
     df_exploded = df_exploded.reset_index(drop=True)
     df_exploded["neuronpedia_set"] = df_exploded["neuronpedia_id"].apply(
         lambda x: "-".join(x.split("/")[-1].split("-")[1:]) if x is not None else None

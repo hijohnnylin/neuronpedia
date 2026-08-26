@@ -174,3 +174,50 @@ class TestSaeLensDirectory:
 
         assert isinstance(json_output, list)
         assert {entry["set"] for entry in json_output} >= set(selected_sets)
+
+
+class TestValidModelIds:
+    """`get_valid_model_ids` expands every configured id through `np_model_to_hf.json`.
+
+    A pod is reachable under either spelling of its model, and which one a caller uses is
+    not something the caller can be expected to know. These read the real mapping file at
+    the repo root rather than stubbing it, because the mapping being present and correct is
+    half of what makes the expansion work.
+    """
+
+    def test_short_id_expands_to_its_hf_repo_id(self, config: Config):
+        # gpt2-small -> openai-community/gpt2, from np_model_to_hf.json.
+        assert config.get_valid_model_ids() == {"gpt2-small", "openai-community/gpt2"}
+
+    def test_custom_hf_and_override_are_both_included(self):
+        config = build_config(
+            [
+                {
+                    "model": "google/gemma-3-4b-it",
+                    "local": False,
+                    "set": "gemmascope-2-transcoder-16k",
+                    "type": "saelens-1",
+                    "saes": ["23-gemmascope-2-transcoder-16k"],
+                }
+            ],
+            model_id="gemma-3-4b-it",
+            custom_hf_model_id="google/gemma-3-4b-it",
+            sae_sets=["gemmascope-2-transcoder-16k"],
+        )
+
+        # The SAE config names the HF id, --model_id names the short one, and the alias
+        # table closes the loop in both directions, so either spelling resolves.
+        assert config.get_valid_model_ids() == {
+            "gemma-3-4b-it",
+            "google/gemma-3-4b-it",
+        }
+
+    def test_expansion_runs_in_both_directions(self):
+        # Configured as the HF id this time. The short id has to come back even though
+        # nothing in the config mentions it, which is the reverse lookup in model_id_aliases.
+        config = build_config(
+            [sae_set("res-jb", RES_JB_SAES)],
+            model_id="openai-community/gpt2",
+        )
+
+        assert config.get_valid_model_ids() >= {"gpt2-small", "openai-community/gpt2"}
