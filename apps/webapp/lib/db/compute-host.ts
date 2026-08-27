@@ -120,9 +120,23 @@ function buildWhere(target: ResolveTarget): Prisma.ComputeHostWhereInput {
     return { ...base, nlaSourceId: target.nlaSourceId };
   }
   if (target.sourceSetName) {
+    const setLink = {
+      sourceSets: { some: { sourceSetName: target.sourceSetName, sourceSetModelId: target.modelId } },
+    };
+    if (target.service !== ComputeService.INFERENCE) {
+      return { ...base, ...setLink };
+    }
+    // An inference host is linked to the individual sources it loaded, not to
+    // the sets they belong to, so a set matches when the host serves any source
+    // in it -- which is how this resolved before the registry existed.
+    // Registration does also write a direct set link, so accept either: rows
+    // backfilled from InferenceHostSource have only the source side.
     return {
       ...base,
-      sourceSets: { some: { sourceSetName: target.sourceSetName, sourceSetModelId: target.modelId } },
+      OR: [
+        setLink,
+        { sources: { some: { sourceModelId: target.modelId, source: { setName: target.sourceSetName } } } },
+      ],
     };
   }
   if (target.sourceId) {

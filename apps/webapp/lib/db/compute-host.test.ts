@@ -71,6 +71,23 @@ describe('resolveHosts', () => {
     });
   });
 
+  it('matches an inference host on a source set through the sources it serves', async () => {
+    findMany.mockResolvedValue([]);
+    const modelId = freshModel();
+    await resolveHosts({ service: ComputeService.INFERENCE, modelId, sourceSetName: 'gemmascope-res-16k' });
+
+    // Inference hosts are linked per source, so asking only for a set link finds
+    // nothing -- which is how every set-name lookup broke against backfilled rows.
+    expect(findMany.mock.calls[0][0].where).toMatchObject({
+      service: ComputeService.INFERENCE,
+      modelId,
+      OR: [
+        { sourceSets: { some: { sourceSetName: 'gemmascope-res-16k', sourceSetModelId: modelId } } },
+        { sources: { some: { sourceModelId: modelId, source: { setName: 'gemmascope-res-16k' } } } },
+      ],
+    });
+  });
+
   it('falls back to model-wide inference hosts when a source has none of its own', async () => {
     findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([host('https://wildcard')]);
 
