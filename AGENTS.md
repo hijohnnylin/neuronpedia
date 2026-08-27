@@ -155,17 +155,83 @@ Never run, and never wrap in a script an agent will run:
 - `prisma migrate dev` (and the `migrate:*` npm scripts) — writes a new migration file against one
   developer's local database, which is how the committed history and production drift apart
 - `prisma migrate reset` / `make db-reset` — drops the database outright
-- `prisma db push` — applies the schema with no migration file, silently diverging the committed
-  history from the live database
+- `prisma db push` / the `db:push` script — applies the schema with no migration file. It creates
+  tables but never runs a migration's data steps, so any backfill is skipped and the new tables
+  come up empty
 - `prisma db seed` / `make db-init` against a database `db-status` reports as non-empty
+- `scripts/baseline-migrations.sh` — rewrites migration history so `migrate deploy` skips work.
+  Correct exactly once per database that predates `migrate`, and wrong every other time
 - `npm run build` **from inside `apps/webapp`** — its script is
-  `prisma generate && prisma db push && next build`, so it migrates the database as a side effect
-  of building. Use `npm run build:simple`, or `make webapp-build`, which runs `build:localhost`
-  and does not push.
+  `prisma generate && prisma migrate deploy && next build`, so it migrates the database as a side
+  effect of building. Use `npm run build:simple`, or `make webapp-build`, which runs
+  `build:localhost` and touches no database.
 
 So when a schema change is needed on an existing database: edit `schema.prisma`, run
 `prisma generate` so the types compile, and stop there. Say that a migration is required and let a
 human create and apply it.
+
+## GPU servers are database rows
+
+Inference, graph and NLA hosts are not configured with environment variables. They live in the
+`ComputeHost` table and are resolved through `apps/webapp/lib/db/compute-host.ts`. Use
+`resolveHost` / `resolveHosts` for a URL, or `computeFetch` when you want failover handled for you.
+Do not add a new `USE_LOCALHOST_*` flag or read a host out of `lib/env.ts`; only the shared secrets
+live there.
+
+Registration goes through `POST /api/compute-host/register`. `new_pod.py` calls it once the pod
+answers, and `make host-register` does it by hand; both need an admin API key. Locally, register a
+server you started yourself with `make host-add` (and see it with `make host-list`), which writes to
+Postgres directly and needs no key.
+
+Inference pods are launched with whole SAE sets, but the resolver matches a request's individual
+`sourceId`, so the route expands each set name into its member sources and links both. This is why
+registration cannot be done from the pod: only the webapp can read which sources a set contains.
+
+Registration is declarative. The sources sent replace what the host was recorded as serving, so
+re-registering with a shorter list stops traffic for what was dropped.
+
+Nothing maps a HuggingFace id to a Neuronpedia model id -- `Model` stores `tlensId` and
+`openRouterId`, not the HuggingFace one, and stripping the org is wrong (`openai-community/gpt2` is
+`gpt2-small` here). A pod config therefore has to state its model id under `neuronpedia.model_id` in
+`pods.yaml` before it can register itself.
+
+A registering host states which deployment it means to join, and the route refuses it when that
+disagrees with `NEURONPEDIA_ENVIRONMENT`. `make host-add` refuses outright to write to a database
+that is not on this machine, unless given `--remote`: developing against the production database is
+normal here, so the mistake worth catching is a laptop's `127.0.0.1` landing in production's
+registry and taking real traffic.
+
+A row means the host is ready to serve. The deploy tool registers once the model is loaded and
+deletes the row to stop traffic, so there is no status column -- a host that is not ready should be
+absent, not present and skipped.
+
+There is no health state either, and no heartbeats. `computeFetch` shuffles the candidates, fails
+over on a 5xx, 408, 429, a timeout or a thrown error, and returns any other 4xx as-is since a
+malformed request fails the same way everywhere. Failures are not remembered between requests: a
+host that is down refuses connections cheaply, so the memory would only save that cheap retry on a
+fraction of traffic.
+
+Every attempt is capped by `ATTEMPT_TIMEOUT_MS[service]`, overridable per call with `timeoutMs`.
+The cap is what makes failover reachable at all -- a host that accepts the connection and then
+hangs would otherwise hold the serverless function until the platform kills it, and the remaining
+hosts would never be tried. An abort from the caller's own signal is not treated as a host fault
+and is not retried elsewhere, since the client has already gone.
+
+Note that inference does not go through `computeFetch`. It resolves a URL with `resolveHost` /
+`resolveTwoHosts` and fetches directly, because its streaming endpoints need the `ReadableStream`
+intact; those calls carry the caller's `AbortSignal` instead.
+
+What a host serves depends on the service, and the schema mirrors that. An inference process loads
+a list of SAE sets and a graph process loads a transcoder and a lorsa set, so both link through
+join tables. An NLA process bakes its verbalizer, reconstructor and extraction layer into startup
+config and no request field can select another, so it serves exactly one `NlaSource` and carries a
+`nlaSourceId` column instead. A CHECK constraint requires that column for NLA and forbids it
+everywhere else; pointing two NLA sources at one host would return HTTP 200 with numbers from the
+wrong model, so let the constraint stop you rather than working around it.
+
+Routing is deliberately forgiving. A host that fails a request is sorted last for 30 seconds rather
+than removed, so the last host standing is still tried. There are no heartbeats — liveness is
+discovered by making the request.
 
 ## Environment (GPU / network)
 

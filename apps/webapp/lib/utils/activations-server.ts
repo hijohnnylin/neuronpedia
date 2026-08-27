@@ -1,7 +1,8 @@
-import { getOneRandomServerHostForModel } from '@/lib/db/inference-host-source';
+import { resolveHost } from '@/lib/db/compute-host';
 import { getTransformerLensModelIdIfExists } from '@/lib/db/model';
 import { INFERENCE_SERVER_SECRET } from '@/lib/env';
 import { throwIfInferenceError } from '@/lib/utils/inference';
+import { ComputeService } from '@prisma/client';
 
 export const ACTIVATION_RAW_MAX_PROMPT_CHAR_LENGTH = 8000;
 export const ACTIVATION_RAW_MAX_PROMPTS_PER_BATCH = 16;
@@ -46,7 +47,7 @@ export type ActivationRawResponse = {
  */
 export async function getRawActivations(request: ActivationRawRequest): Promise<ActivationRawResponse> {
   const transformerLensModelId = await getTransformerLensModelIdIfExists(request.model);
-  const host = await getOneRandomServerHostForModel(request.model);
+  const host = await resolveHost({ service: ComputeService.INFERENCE, modelId: request.model });
 
   const response = await fetch(`${host}/v1/activation/raw`, {
     method: 'POST',

@@ -1,8 +1,9 @@
 import { prisma } from '@/lib/db';
-import { getAllServerHostsForModel } from '@/lib/db/inference-host-source';
-import { ASSET_BASE_URL, DEFAULT_CREATOR_USER_ID, USE_LOCALHOST_INFERENCE } from '@/lib/env';
+import { resolveHosts } from '@/lib/db/compute-host';
+import { ASSET_BASE_URL, DEFAULT_CREATOR_USER_ID } from '@/lib/env';
 import { JlensShareLockedToken } from '@/lib/utils/jlens-share';
 import { JLENS_METADATA_PATH } from '@/lib/utils/lens';
+import { ComputeService } from '@prisma/client';
 import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import JlensPageClient, { JlensShareData } from './jlens-page-client';
@@ -54,16 +55,12 @@ export default async function Page({
   // available, the page still renders cached/shared results, but live actions
   // (sending messages, steering/swapping, toggling the server-side non-word
   // filter) are gated behind a "model unavailable" notice.
-  // In localhost mode all inference is routed to the local host regardless of
-  // the DB host table, so treat the model as available without a DB lookup.
-  let inferenceAvailable = USE_LOCALHOST_INFERENCE;
-  if (!inferenceAvailable) {
-    try {
-      const hosts = await getAllServerHostsForModel(modelId);
-      inferenceAvailable = hosts.length > 0;
-    } catch {
-      inferenceAvailable = false;
-    }
+  let inferenceAvailable = false;
+  try {
+    const hosts = await resolveHosts({ service: ComputeService.INFERENCE, modelId });
+    inferenceAvailable = hosts.length > 0;
+  } catch {
+    inferenceAvailable = false;
   }
 
   // When `?shareId=` is present, resolve the shared run server-side and pass it
