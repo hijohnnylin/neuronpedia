@@ -21,23 +21,24 @@ import {
 } from '@/lib/utils/steer';
 import { AuthenticatedUser } from '@/lib/with-user';
 import { NeuronPartial, NeuronPartialWithRelations } from '@/prisma/generated/zod';
-import { InferenceEngine, SteerOutputType } from '@prisma/client';
+import { ComputeService, SteerOutputType } from '@prisma/client';
 import * as Sentry from '@sentry/nextjs';
 import createClient from 'openapi-fetch';
-import {
-  getAllInstanceHostsForModel,
-  getAllServerHostsForModel,
-  getFirstInstanceHostForModel,
-  getOneRandomServerHostForModel,
-  getOneRandomServerHostForSource,
-  getOneRandomServerHostForSourceSet,
-  getTwoRandomServerHostsForModel,
-  getTwoRandomServerHostsForSourceSet,
-  LOCALHOST_INFERENCE_HOST,
-} from '../db/inference-host-source';
-import { INFERENCE_SERVER_SECRET, USE_LOCALHOST_INFERENCE } from '../env';
+import { resolveHost, resolveHosts, resolveTwoHosts } from '../db/compute-host';
+import { INFERENCE_SERVER_SECRET } from '../env';
 import { LensPromptRequest } from './lens';
 import { NeuronIdentifier } from './neuron-identifier';
+
+// Every lookup in this file is for the inference service; the rest of the
+// target varies.
+const inferenceTarget = (
+  modelId: string,
+  narrow?: { sourceId?: string; sourceSetName?: string; user?: AuthenticatedUser | null },
+) => ({
+  service: ComputeService.INFERENCE,
+  modelId,
+  ...narrow,
+});
 
 /**
  * An error the inference server returned, carrying its status and message.
@@ -102,7 +103,7 @@ export const rethrowAsInferenceError = async (error: unknown): Promise<never> =>
 // The /v1 prefix is part of the paths in the spec, so it is not in the base URL.
 export const makeInferenceServerApiWithServerHost = (serverHost: string) =>
   createClient<paths>({
-    baseUrl: USE_LOCALHOST_INFERENCE ? LOCALHOST_INFERENCE_HOST : serverHost,
+    baseUrl: serverHost,
     headers: {
       'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
       'Accept-Encoding': 'gzip',
@@ -229,14 +230,12 @@ export const getCosSimForFeature = async (
   // get if it's a feature/vector first
   const result = await getNeuronOnly(feature.modelId, feature.layer, feature.index);
 
-  if (result?.hasVector) {
-    // if it's a vector, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-
-    var [serverHost, _] = await getTwoRandomServerHostsForModel(targetModelId);
-  } else {
-    // if it's not a vector, then we need to use the source set's host
-    var serverHost = await getOneRandomServerHostForSource(targetModelId, targetSourceId, user);
-  }
+  // A vector needs no SAE loaded, so any host serving the model will do.
+  const serverHost = await resolveHost(
+    result?.hasVector
+      ? inferenceTarget(targetModelId)
+      : inferenceTarget(targetModelId, { sourceId: targetSourceId, user }),
+  );
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(targetModelId);
 
@@ -329,14 +328,12 @@ export const getActivationForFeature = async (
   // get if it's a feature/vector first
   const result = await getNeuronOnly(feature.modelId, feature.layer, feature.index);
 
-  if (result?.hasVector) {
-    // if it's a vector, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-
-    var [serverHost, _] = await getTwoRandomServerHostsForModel(feature.modelId);
-  } else {
-    // if it's not a vector, then we need to use the source set's host
-    var serverHost = await getOneRandomServerHostForSource(feature.modelId, feature.layer, user);
-  }
+  // A vector needs no SAE loaded, so any host serving the model will do.
+  const serverHost = await resolveHost(
+    result?.hasVector
+      ? inferenceTarget(feature.modelId)
+      : inferenceTarget(feature.modelId, { sourceId: feature.layer, user }),
+  );
 
   const modelIdForSearcher = replaceSteerModelIdIfNeeded(feature.modelId);
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelIdForSearcher);
@@ -439,10 +436,7 @@ export const runInferenceActivationSource = async (
   prompts: string[],
   user: AuthenticatedUser | null,
 ) => {
-  const serverHost = await getOneRandomServerHostForSource(modelId, source, user);
-  if (!serverHost) {
-    throw new Error('No server host found');
-  }
+  const serverHost = await resolveHost(inferenceTarget(modelId, { sourceId: source, user }));
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
@@ -466,10 +460,7 @@ export const runInferenceActivationAll = async (
   user: AuthenticatedUser | null,
 ) => {
   // TODO: we don't currently support search-all on different instances
-  const serverHost = await getOneRandomServerHostForSourceSet(modelId, sourceSetName, user);
-  if (!serverHost) {
-    throw new Error('No server host found');
-  }
+  const serverHost = await resolveHost(inferenceTarget(modelId, { sourceSetName, user }));
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
@@ -523,16 +514,12 @@ export const steerCompletion = async (
   // get the sae set's host
   const firstFeatureLayer = steerFeatures[0].layer;
 
-  let serverHost: string | null = null;
-  if (hasVector) {
-    // if we have the vectors, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-    serverHost = await getOneRandomServerHostForModel(modelId);
-  } else {
-    serverHost = await getOneRandomServerHostForSourceSet(modelId, getSourceSetNameFromSource(firstFeatureLayer), user);
-  }
-  if (!serverHost) {
-    throw new Error('No server host found');
-  }
+  // Vectors need no SAE loaded, so any host serving the model will do.
+  const serverHost = await resolveHost(
+    hasVector
+      ? inferenceTarget(modelId)
+      : inferenceTarget(modelId, { sourceSetName: getSourceSetNameFromSource(firstFeatureLayer), user }),
+  );
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
@@ -595,27 +582,15 @@ export const steerCompletionChat = async (
   // record start time
   const startTime = new Date().getTime();
 
-  if (isAssistantAxis) {
-    // The axis is a vector, so any instance of the model can serve it: take the first one
-    // registered for the model rather than requiring a particular engine.
-    const assistantAxisHost = await getFirstInstanceHostForModel(modelId);
-    if (!assistantAxisHost) {
-      throw new Error('No hosts found.');
-    }
-    var [serverHostDefault, serverHostSteered] = [assistantAxisHost, assistantAxisHost];
-  } else if (hasVector || steerFeatures.length === 0) {
-    // if we have the vectors, then we can use any server that has the same modelId, since we don't need the SAE to be loaded
-    [serverHostDefault, serverHostSteered] = await getTwoRandomServerHostsForModel(modelId);
-  } else {
-    // get the sae set's host
-    const firstFeatureLayer = steerFeatures[0].layer;
-    // if we have just one server, then just use that server
-    [serverHostDefault, serverHostSteered] = await getTwoRandomServerHostsForSourceSet(
-      modelId,
-      getSourceSetNameFromSource(firstFeatureLayer),
-      user,
-    );
-  }
+  // The axis is a vector and vectors need no SAE loaded, so in both of the first
+  // two cases any host serving the model will do. The pair runs the default and
+  // steered completions concurrently, and collapses to one host when only one
+  // is registered.
+  const [serverHostDefault, serverHostSteered] = await resolveTwoHosts(
+    isAssistantAxis || hasVector || steerFeatures.length === 0
+      ? inferenceTarget(modelId)
+      : inferenceTarget(modelId, { sourceSetName: getSourceSetNameFromSource(steerFeatures[0].layer), user }),
+  );
 
   // make the promises to run
   // check if we need to replace "gemma-2-2b-it" with "gemma-2-2b", since we don't have SAEs for "-it"
@@ -762,10 +737,7 @@ export const getActivationsTopKByToken = async (
   user: AuthenticatedUser | null,
 ) => {
   const sourceSet = getSourceSetNameFromSource(layer);
-  const serverHost = await getOneRandomServerHostForSourceSet(modelId, sourceSet, user);
-  if (!serverHost) {
-    throw new Error('No server host found');
-  }
+  const serverHost = await resolveHost(inferenceTarget(modelId, { sourceSetName: sourceSet, user }));
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
@@ -799,36 +771,17 @@ export const getActivationsTopKByToken = async (
 export type InferenceAttentionResult = ActivationAttentionResponse;
 
 // Runs custom-text attention for a single (layer, head) on the model's inference
-// server. Attention heads aren't tied to a Source, so we use any model-level host
-// on a supported engine (TransformerLens or NNsight; not nnsight-vllm/chatspace).
-// The /activation/attention endpoint isn't in the typed client, so we call it with a raw fetch
-// (like the lens endpoint); the response is still typed from the spec.
+// server. Attention heads aren't tied to a Source, so any host serving the model
+// will do. The /activation/attention endpoint isn't in the typed client, so we
+// call it with a raw fetch (like the lens endpoint); the response is still typed
+// from the spec.
 export const getAttentionForHead = async (
   modelId: string,
   layer: number,
   headIndex: number,
   prompt: string,
 ): Promise<InferenceAttentionResult> => {
-  let host: string | null = null;
-  if (USE_LOCALHOST_INFERENCE) {
-    host = LOCALHOST_INFERENCE_HOST;
-  } else {
-    for (const engine of [InferenceEngine.TRANSFORMER_LENS, InferenceEngine.NNSIGHT]) {
-      // eslint-disable-next-line no-await-in-loop
-      let hosts = await getAllInstanceHostsForModel(modelId, engine);
-      if (hosts.length === 0) {
-        // eslint-disable-next-line no-await-in-loop
-        hosts = [...new Set(await getAllServerHostsForModel(modelId, engine))];
-      }
-      if (hosts.length > 0) {
-        host = hosts[Math.floor(Math.random() * hosts.length)];
-        break;
-      }
-    }
-  }
-  if (!host) {
-    throw new Error('No inference server host found for this model.');
-  }
+  const host = await resolveHost(inferenceTarget(modelId));
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
@@ -848,7 +801,7 @@ export const getAttentionForHead = async (
 };
 
 export const tokenizeText = async (modelId: string, text: string, prependBos: boolean) => {
-  const serverHost = await getOneRandomServerHostForModel(modelId);
+  const serverHost = await resolveHost(inferenceTarget(modelId));
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
   const result = await makeInferenceServerApiWithServerHost(serverHost).POST('/v1/tokenize', {
@@ -867,10 +820,7 @@ export const getVectorFromInstance = async (
   source: string,
   index: string,
 ): Promise<UtilSaeVectorResponse> => {
-  const serverHost = await getOneRandomServerHostForSource(modelId, source, null);
-  if (!serverHost) {
-    throw new Error('No server host found');
-  }
+  const serverHost = await resolveHost(inferenceTarget(modelId, { sourceId: source }));
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
   return unwrapInferenceResponse(
@@ -913,25 +863,9 @@ export const lensPromptStream = async (
 ): Promise<Response> => {
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
-  // Build the ordered list of candidate hosts to try.
-  let hosts: string[];
-  if (USE_LOCALHOST_INFERENCE) {
-    hosts = [LOCALHOST_INFERENCE_HOST];
-  } else {
-    // Use every instance registered against the model (not just those linked to
-    // a Source via InferenceHostSourceOnSource) so all interchangeable jlens
-    // instances are candidates. Fall back to the source-linked hosts if none.
-    hosts = await getAllInstanceHostsForModel(modelId);
-    if (hosts.length === 0) {
-      hosts = [...new Set(await getAllServerHostsForModel(modelId))];
-    }
-    // Shuffle (Fisher-Yates) so load is spread across hosts rather than always
-    // hammering the first one.
-    for (let i = hosts.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [hosts[i], hosts[j]] = [hosts[j], hosts[i]];
-    }
-  }
+  // Any host serving the model is a candidate: jlens serves any request from
+  // any instance. Already ordered and shuffled by the resolver.
+  const hosts = await resolveHosts(inferenceTarget(modelId));
   if (hosts.length === 0) {
     throw new Error('No server host found');
   }

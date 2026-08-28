@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { AuthenticatedUser } from '@/lib/with-user';
-import { InferenceEngine, Source, SourceRelease, SourceSet, Visibility } from '@prisma/client';
+import { Source, SourceRelease, SourceSet, Visibility } from '@prisma/client';
 import { DEFAULT_CREATOR_USER_ID } from '../env';
 
 import {
@@ -55,31 +55,6 @@ export const getSourceSet = async (modelId: string, sourceSetName: string, user:
     },
   };
   return prisma.sourceSet.findUnique(query);
-};
-
-export const getSourceInferenceHosts = async (
-  modelId: string,
-  sourceId: string,
-  user: AuthenticatedUser | null = null,
-  engine: InferenceEngine = InferenceEngine.TRANSFORMER_LENS,
-) => {
-  const canAccess = await userCanAccessModelAndSourceSet(modelId, getSourceSetNameFromSource(sourceId), user, true);
-  if (!canAccess) {
-    return null;
-  }
-
-  return prisma.inferenceHostSourceOnSource.findMany({
-    where: {
-      sourceModelId: modelId,
-      sourceId,
-      inferenceHost: {
-        engine,
-      },
-    },
-    include: {
-      inferenceHost: true,
-    },
-  });
 };
 
 export const getSource = async (modelId: string, sourceId: string, user: AuthenticatedUser | null = null) => {

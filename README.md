@@ -154,6 +154,13 @@ This subsection shows you how to run an inference instance locally so you can do
    > ➡️ The server picks its own backend and device: vLLM on CUDA where the architecture supports it, otherwise eager PyTorch. Models are read from your normal Hugging Face cache at `~/.cache/huggingface`, so weights you've already downloaded are reused.
 
 4. Wait for it to load (first time will take longer). When you see `Initialized: True`, the local inference server is now ready on `localhost:5002`
+5. Tell the webapp about it. The webapp looks up every GPU server in the `ComputeHost` table, so a server it has never been told about is invisible to it:
+
+   ```
+   make host-add SERVICE=INFERENCE MODEL=gpt2-small URL=http://127.0.0.1:5002 SOURCES=6-res-jb
+   ```
+
+   Leave `SOURCES` off to say "this host can serve anything for the model", which is what jlens and steering with vectors need. `make host-list` shows what is registered and `make host-remove` takes one away.
 
 #### Using the Inference Server
 
@@ -236,6 +243,11 @@ The graph server powers the attribution graph generation functionality, built on
    ```
 
 5. Wait for it to load. The graph server is then ready on `localhost:5004`
+6. Register it with the webapp, which routes graph requests by source set:
+
+   ```
+   make host-add SERVICE=GRAPH MODEL=gemma-2-2b URL=http://127.0.0.1:5004 SOURCE_SETS=gemmascope-transcoder-16k
+   ```
 
 For example requests, see the [Graph Server README](apps/graph/README.md#example-request---output-graph-json-directly).
 

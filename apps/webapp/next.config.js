@@ -87,8 +87,7 @@ const nextConfig = {
   },
   // https://github.com/mjmlio/mjml/issues/2562
   // https://github.com/vercel/next.js/issues/50042
-  // runpod-sdk needs to be external because it requires its own package.json at runtime
-  serverExternalPackages: ['mjml', 'runpod-sdk'],
+  serverExternalPackages: ['mjml'],
   // https://github.com/aws-amplify/amplify-js/issues/11030
   webpack: (config, { webpack, isServer, nextRuntime }) => {
     // https://github.com/handlebars-lang/handlebars.js/issues/953

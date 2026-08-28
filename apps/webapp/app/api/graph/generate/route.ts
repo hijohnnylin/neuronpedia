@@ -1,13 +1,8 @@
 import { CLTGraph } from '@/app/[modelId]/graph/graph-types';
 import { ATTRIBUTION_GRAPH_SCHEMA, makeGraphPublicAccessGraphUrl, NP_GRAPH_BUCKET } from '@/app/[modelId]/graph/utils';
 import { prisma } from '@/lib/db';
-import {
-  getGraphServerRunpodHostForSourceSet,
-  getIsRunpodServerlessHostForSourceSet,
-} from '@/lib/db/graph-host-source';
 import { getModelById } from '@/lib/db/model';
 import {
-  checkRunpodQueueJobs,
   generateGraphAndUploadToS3,
   getGraphTokenize,
   GRAPH_ANONYMOUS_USER_ID,
@@ -18,8 +13,6 @@ import {
   graphGenerateSchemaClient,
   LORSA_MAX_TOKENS,
   LORSA_MODELS,
-  MAX_RUNPOD_JOBS_IN_QUEUE,
-  RUNPOD_BUSY_ERROR,
 } from '@/lib/utils/graph';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
@@ -301,29 +294,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     const signedUrl = await getSignedUrl(s3Client, command, {
       expiresIn: 3600, // 1 hour
     });
-
-    // check the queue
-    const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(
-      validatedData.modelId,
-      validatedData.sourceSetName,
-    );
-    if (isRunpodServerlessHost) {
-      const host = await getGraphServerRunpodHostForSourceSet(validatedData.modelId, validatedData.sourceSetName);
-      if (!host) {
-        throw new Error('No runpod serverless host found.');
-      }
-      const queueNumber = await checkRunpodQueueJobs(host);
-      if (queueNumber > MAX_RUNPOD_JOBS_IN_QUEUE) {
-        // console.log('larger than queue but continuing');
-        return NextResponse.json(
-          {
-            error: RUNPOD_BUSY_ERROR,
-            message: RUNPOD_BUSY_ERROR,
-          },
-          { status: 503 },
-        );
-      }
-    }
 
     await generateGraphAndUploadToS3(
       validatedData.prompt,

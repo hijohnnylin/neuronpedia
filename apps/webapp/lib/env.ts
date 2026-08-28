@@ -89,11 +89,13 @@ export const EMBEDDING_PROVIDER = EmbeddingProviderSchema.parse(process.env.EMBE
 // export const KV_REST_API_READ_ONLY_TOKEN = process.env.KV_REST_API_READ_ONLY_TOKEN || '';
 
 // Support Servers
+//
+// Inference, graph and NLA hosts live in the ComputeHost table, not here --
+// register a local one with `make host-add`. Only their shared secrets are
+// config. Autointerp and sparsity are still single-server env vars.
+
 // Inference Server
-export const USE_LOCALHOST_INFERENCE = process.env.USE_LOCALHOST_INFERENCE === 'true';
-export const LOCALHOST_INFERENCE_HOST_OVERRIDE = process.env.LOCALHOST_INFERENCE_HOST_OVERRIDE || '';
 export const INFERENCE_SERVER_SECRET = process.env.INFERENCE_SERVER_SECRET || '';
-export const INFERENCE_RUNPOD_API_KEY = process.env.INFERENCE_RUNPOD_API_KEY || '';
 
 export const NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH = process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH
   ? parseInt(process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH, 10)
@@ -105,10 +107,6 @@ export const AUTOINTERP_SERVER = process.env.AUTOINTERP_SERVER || '';
 export const AUTOINTERP_SERVER_SECRET = process.env.AUTOINTERP_SERVER_SECRET || '';
 
 // Graph Server
-// If USE_LOCALHOST_GRAPH is true, it will always use the localhost graph server.
-// Else it will check for the server in GraphHostSource table, and use the Runpod server if it exists, otherwise use the regular hostUrl.
-export const USE_LOCALHOST_GRAPH = process.env.USE_LOCALHOST_GRAPH === 'true';
-export const LOCALHOST_GRAPH_HOST_OVERRIDE = process.env.LOCALHOST_GRAPH_HOST_OVERRIDE || '';
 export const GRAPH_SERVER_SECRET = process.env.GRAPH_SERVER_SECRET || '';
 
 // Sparsity Server
@@ -117,16 +115,7 @@ export const SPARSITY_SERVER = process.env.SPARSITY_SERVER || 'http://localhost:
 export const SPARSITY_SERVER_SECRET = process.env.SPARSITY_SERVER_SECRET || '';
 
 // NLA Server
-export const USE_LOCALHOST_NLA = process.env.USE_LOCALHOST_NLA === 'true';
-export const LOCALHOST_NLA_HOST_OVERRIDE = process.env.LOCALHOST_NLA_HOST_OVERRIDE || '';
 export const NLA_SERVER_SECRET = process.env.NLA_SERVER_SECRET || '';
-
-// Runpod Graph
-// export const USE_RUNPOD_GRAPH = process.env.USE_RUNPOD_GRAPH === 'true';
-// if (USE_RUNPOD_GRAPH && USE_LOCALHOST_GRAPH) {
-//   throw new Error('USE_LOCALHOST_GRAPH and USE_RUNPOD_GRAPH cannot both be true.');
-// }
-export const GRAPH_RUNPOD_SECRET = process.env.GRAPH_RUNPOD_SECRET || '';
 
 // Authentication Methods
 // Apple
@@ -147,6 +136,11 @@ export const IS_LOCALHOST = process.env.NEXT_PUBLIC_URL === 'http://localhost:30
 export const IS_ACTUALLY_NEURONPEDIA_ORG =
   process.env.NEXT_PUBLIC_URL === 'https://neuronpedia.org' ||
   process.env.NEXT_PUBLIC_URL === 'https://www.neuronpedia.org';
+
+// Which deployment this webapp is. A registering compute host states which
+// deployment it means to join, and registration fails if the two disagree, so
+// a pod aimed at the wrong webapp cannot quietly start taking its traffic.
+export const NEURONPEDIA_ENVIRONMENT = process.env.NEURONPEDIA_ENVIRONMENT || 'dev';
 
 // Misc
 export const NODE_ENV = process.env.NODE_ENV || '';

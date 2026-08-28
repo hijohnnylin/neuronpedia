@@ -48,7 +48,6 @@ import {
   GraphTokenizeResponse,
   LORSA_MAX_TOKENS,
   LORSA_MODELS,
-  RUNPOD_BUSY_ERROR,
 } from '@/lib/utils/graph';
 import * as RadixSelect from '@radix-ui/react-select';
 import * as RadixSlider from '@radix-ui/react-slider';
@@ -60,6 +59,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 
 import { ChatMessage } from '@/lib/utils/steer';
+
+// Sentinel for the "every graph host was busy" case, which reaches us as a 503
+// and gets a friendlier message than a generic failure.
+const AT_CAPACITY_ERROR = 'AT_CAPACITY';
 
 const BORING_TOKENS = ['<strong>', '<em>', '<code>', '<b>', '<i>', '<think>', '</think>', '<|im_start|>', '<|im_end|>'];
 const BORING_SYMBOLS = ['*', '**', '`', '```', '-', '–', '—', '_', '__', '~', '='];
@@ -448,9 +451,8 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
         if (response.status === 429) {
           throw new Error('Rate limit exceeded. Users are limited to 10 graphs per hour - please try again later.');
         }
-        if (responseData.error === RUNPOD_BUSY_ERROR) {
-          // TODO special limit display
-          throw new Error('Oops - looks like we are at capacity right now. Please try again in a minute!');
+        if (response.status === 503) {
+          throw new Error(AT_CAPACITY_ERROR);
         }
         throw new Error(responseData.message || responseData.error || 'Failed to generate graph.');
       }
@@ -458,7 +460,7 @@ export default function GenerateGraphModal({ showGenerateModal }: { showGenerate
       setGenerationResult(responseData as GenerateGraphResponse);
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-      if (e instanceof Error && e.message === RUNPOD_BUSY_ERROR) {
+      if (e instanceof Error && e.message === AT_CAPACITY_ERROR) {
         setError(
           <>
             Oops - looks like we are at capacity right now, please try again in a minute. You can also go to{' '}

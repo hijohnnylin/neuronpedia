@@ -7,14 +7,9 @@ import type {
   SalientLogit,
   SteerFeature,
 } from '@/lib/api/graph-types';
-import { GRAPH_RUNPOD_SECRET } from '@/lib/env';
+import { ComputeService } from '@prisma/client';
 import * as yup from 'yup';
-import {
-  getAuthHeaderForGraphServerRequest,
-  getGraphServerRequestUrlForSourceSet,
-  getIsRunpodServerlessHostForSourceSet,
-  wrapRequestBodyForRunpodIfNeeded,
-} from '../db/graph-host-source';
+import { computeFetch } from '../db/compute-host';
 import {
   STEER_FREEZE_ATTENTION,
   STEER_FREQUENCY_PENALTY,
@@ -28,9 +23,6 @@ import {
   STEER_TOPK_LOGITS,
   STEER_TOPK_LOGITS_MAX,
 } from './steer';
-
-export const MAX_RUNPOD_JOBS_IN_QUEUE = 1000;
-export const RUNPOD_BUSY_ERROR = 'RUNPOD_BUSY';
 
 export const GRAPH_MAX_PROMPT_LENGTH_CHARS = 10000;
 export const GRAPH_BATCH_SIZE = 48;
@@ -164,26 +156,14 @@ export const graphGenerateSchemaClient = yup.object({
   slug: yup.string(),
 });
 
-export const checkRunpodQueueJobs = async (host: string) => {
-  const response = await fetch(`${host}/health`, {
-    headers: {
-      Authorization: `Bearer ${GRAPH_RUNPOD_SECRET}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`RunPod health check failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  if (data.jobs !== undefined && data.jobs.inQueue !== undefined) {
-    return data.jobs.inQueue;
-  }
-  throw new Error('RunPod health check failed: jobs not found');
-};
-
 export type { SalientLogit };
+
+// POST to the graph server for a source set, with failover across its hosts.
+const graphFetch = (modelId: string, sourceSetName: string, action: string, body: unknown) =>
+  computeFetch({ service: ComputeService.GRAPH, modelId, sourceSetName }, `/${action}`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 
 // `/forward-pass` on the graph server. The name is the webapp's, kept because every caller and
 // route uses it; the shape is the generated one.
@@ -192,11 +172,6 @@ export type GraphTokenizeResponse = ForwardPassResponse;
 // Structured chat turn sent to the graph server, which applies the model's real
 // chat template server-side (the frontend does no chat-template special-casing).
 export type { GraphChatMessage };
-
-export interface GraphGenerateRunpodResponse {
-  error?: string;
-  output: GraphTokenizeResponse;
-}
 
 export const getGraphTokenize = async (
   prompt: string,
@@ -209,26 +184,13 @@ export const getGraphTokenize = async (
   // the rendered string is returned as `prompt`.
   messages?: GraphChatMessage[] | null,
 ): Promise<GraphTokenizeResponse> => {
-  const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
   const action = 'forward-pass';
-  const body = {
+  const response = await graphFetch(modelId, sourceSetName, action, {
     ...(messages && messages.length > 0 ? { messages } : { prompt }),
     max_n_logits: maxNLogits,
     desired_logit_prob: desiredLogitProb,
     request_type: action,
-  };
-
-  const response = await fetch(
-    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
-      },
-      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
-    },
-  );
+  });
 
   const responseText = await response.text();
   let json;
@@ -244,10 +206,6 @@ export const getGraphTokenize = async (
   }
   if (!response.ok) {
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
-  }
-
-  if (isRunpodServerlessHost) {
-    json = json.output;
   }
 
   const salientLogits: SalientLogit[] = json.salient_logits.map((logit: SalientLogit) => ({
@@ -281,21 +239,8 @@ export const getGraphParseChatPrompt = async (
   modelId: string,
   sourceSetName: string,
 ): Promise<GraphParseChatPromptResponse> => {
-  const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
   const action = 'parse-chat-prompt';
-  const body = { prompt, request_type: action };
-
-  const response = await fetch(
-    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
-      },
-      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
-    },
-  );
+  const response = await graphFetch(modelId, sourceSetName, action, { prompt, request_type: action });
 
   const responseText = await response.text();
   let json;
@@ -311,9 +256,6 @@ export const getGraphParseChatPrompt = async (
   }
   if (!response.ok) {
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
-  }
-  if (isRunpodServerlessHost) {
-    json = json.output;
   }
 
   const messages = Array.isArray(json.messages) ? (json.messages as GraphChatMessage[]) : null;
@@ -347,7 +289,6 @@ export const generateGraphAndUploadToS3 = async (
   // holds the rendered string, which is what gets stored).
   messages?: GraphChatMessage[] | null,
 ) => {
-  const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
   const action = 'generate-graph';
   const isLorsa = LORSA_MODELS.includes(modelId);
   const batchSize = isLorsa ? LORSA_BATCH_SIZE : GRAPH_BATCH_SIZE;
@@ -373,17 +314,7 @@ export const generateGraphAndUploadToS3 = async (
         }
       : {}),
   };
-  const response = await fetch(
-    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
-      },
-      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
-    },
-  );
+  const response = await graphFetch(modelId, sourceSetName, action, body);
 
   const json = await response.json();
   if (json.error) {
@@ -487,8 +418,6 @@ export const steerLogits = async (
   freqPenalty: number,
   seed: number | null,
 ) => {
-  const isRunpodServerlessHost = await getIsRunpodServerlessHostForSourceSet(modelId, sourceSetName);
-
   const action = 'steer';
   // TODO: clean up model id usage
   const mappedModelId = GRAPH_GENERATION_ENABLED_MODELS.includes(modelId)
@@ -507,28 +436,14 @@ export const steerLogits = async (
     request_type: action,
   };
 
-  const response = await fetch(
-    `${await getGraphServerRequestUrlForSourceSet(modelId, sourceSetName, action, isRunpodServerlessHost)}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaderForGraphServerRequest(isRunpodServerlessHost),
-      },
-      body: JSON.stringify(wrapRequestBodyForRunpodIfNeeded(body, isRunpodServerlessHost)),
-    },
-  );
+  const response = await graphFetch(modelId, sourceSetName, action, body);
 
-  let json = await response.json();
+  const json = await response.json();
   if (json.error) {
     throw new Error(json.error);
   }
   if (!response.ok) {
     throw new Error(`External API returned ${response.status}: ${response.statusText}`);
-  }
-
-  if (isRunpodServerlessHost) {
-    json = json.output;
   }
 
   const validatedResponse = SteerResponseSchema.validateSync(json);

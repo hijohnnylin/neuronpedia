@@ -121,8 +121,9 @@ model User {
   jlensShares                  JlensShare[]
   jlensSharePutRequests        JlensSharePutRequest[]
 
-  samples Sample[]
-  probes  Probe[]
+  samples     Sample[]
+  probes      Probe[]
+  personaAxes PersonaAxis[]
 
   isProblemEditor      Boolean              @default(false)
   problemNodesCreated  ProblemNode[]        @relation(name: "problemNodeCreatedBy")
@@ -230,38 +231,38 @@ model JlensShare {
   description String?
 
   // Sidebar predicted-token selections: [{ key: string, type: LensType }].
-  lockedTokens Json @default("[]")
+  lockedTokens        Json    @default("[]")
   // Selected chat token positions (indices into the token stream).
-  selectedPositions Int[] @default([])
+  selectedPositions   Int[]   @default([])
   // Active lens mode tab: 'JACOBIAN_LENS' | 'LOGIT_LENS' | 'DIFF'.
-  activeLensModeTab String
-  topN              Int
-  hideNonWordTokens Boolean @default(true)
+  activeLensModeTab   String
+  topN                Int
+  hideNonWordTokens   Boolean @default(true)
   // Run settings, restored on load (the same values the advanced panel + steer
   // panel control). Defaulted so pre-existing shares migrate cleanly.
-  temperature        Float @default(0)
-  numCompletionTokens Int  @default(256)
+  temperature         Float   @default(0)
+  numCompletionTokens Int     @default(256)
 
   // Optional steered run saved with this share. The heavy steered token stream
   // + meta live in the S3 blob alongside the main run; these columns hold the
   // small config used to re-run / re-enter steer mode. Null when the share has
   // no active steered run.
   // Exact decoded token string being steered (e.g. " cat").
-  steerToken String?
+  steerToken     String?
   // Lens type of the steered readout: 'JACOBIAN_LENS' | 'LOGIT_LENS'.
-  steerType String?
+  steerType      String?
   // Model layer numbers the steer was injected at.
-  steerLayers Int[] @default([])
+  steerLayers    Int[]    @default([])
   // Signed steer strength (negative suppresses the readout).
-  steerStrength Float?
+  steerStrength  Float?
   // When true, the steer ablates (projects out) the readout direction instead
   // of additively steering — mutually exclusive with steerStrength.
-  steerAblate Boolean?
+  steerAblate    Boolean?
   // Intervention mode: 'steer' (add/suppress) or 'swap' (replace the source
   // readout with `swapToken`). Null for pre-swap shares.
-  steerMode String?
+  steerMode      String?
   // The target token for a swap (e.g. " Rugby"). Null for plain steers.
-  swapToken String?
+  swapToken      String?
   // Whether the steer/swap intervention was applied to generated tokens too.
   steerGenerated Boolean?
 
@@ -402,6 +403,7 @@ model Model {
   evals                Eval[]
   sourceInferenceHosts InferenceHostSource[]
   graphHostSources     GraphHostSource[]
+  computeHosts         ComputeHost[]
   graphMetadata        GraphMetadata[]
   jlensShares          JlensShare[]
   nlaSources           NlaSource[]
@@ -409,8 +411,9 @@ model Model {
   headMetrics          ModelHeadMetrics[]
   headSequences        ModelHeadSequence[]
 
-  samples Sample[]
-  probes  Probe[]
+  samples     Sample[]
+  probes      Probe[]
+  personaAxes PersonaAxis[]
 
   @@unique([defaultSourceSetName, id])
   @@unique([defaultSourceId, id])
@@ -482,6 +485,93 @@ model ModelHeadSequence {
   @@index([modelId, layer, headIndex])
   @@index([modelId])
   @@index([modelId, datasetName, nSequences, dtype, attnImplementation], name: "ModelHeadSequence_runConfigKey_idx")
+}
+
+// Which support server a ComputeHost runs. One machine running two services is
+// two rows.
+enum ComputeService {
+  INFERENCE
+  GRAPH
+  NLA
+  AUTOINTERP
+  SPARSITY
+}
+
+// Set by the deploy tool: STARTING while provisioning, HEALTHY once the server
+// answers, DRAINING before teardown.
+// Routing registry for the GPU support servers. Rows are written by the deploy
+// tool at pod-up and pod-down, never by the pods themselves.
+model ComputeHost {
+  id String @id @default(cuid())
+
+  // Fleet profile that launched this host, e.g. "inference-gemma-2-2b-a".
+  name String
+
+  // Base URL, no trailing slash. The resolver appends the path.
+  hostUrl String
+
+  service ComputeService
+
+  // A row means "ready to serve": the deploy tool registers once the model is
+  // loaded and deletes the row to stop traffic. There is no health state here
+  // either -- a not-yet-ready host is indistinguishable from an absent one, and
+  // liveness is discovered by making the request and failing over.
+  //
+  // "runpod" | "local-ssh". Tells the reaper which provider client to use.
+  provider String?
+
+  // Provider-side instance id. Required for automated teardown.
+  providerRef String?
+
+  modelId String
+  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  // For INFERENCE. Empty means the host serves any request for the model
+  // (jlens, steering, assistant axis).
+  sources ComputeHostOnSource[]
+
+  // For GRAPH.
+  sourceSets ComputeHostOnSourceSet[]
+
+  // For NLA, and only for NLA. An NLA process bakes its verbalizer,
+  // reconstructor and extraction layer into startup config, and no request
+  // field can select another, so a host serves exactly one NlaSource -- a
+  // column, not a join table. A CHECK constraint ties it to service = NLA.
+  nlaSourceId String?
+  nlaSource   NlaSource? @relation(fields: [modelId, nlaSourceId], references: [modelId, id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Re-registration upserts rather than duplicating on pod restart.
+  @@unique([hostUrl, service])
+  @@index([service, modelId])
+}
+
+model ComputeHostOnSource {
+  sourceId      String
+  sourceModelId String
+  source        Source @relation(fields: [sourceId, sourceModelId], references: [id, modelId], onDelete: Cascade)
+
+  computeHostId String
+  computeHost   ComputeHost @relation(fields: [computeHostId], references: [id], onDelete: Cascade)
+
+  @@id([sourceId, sourceModelId, computeHostId])
+  @@index([sourceModelId])
+  @@index([sourceModelId, sourceId])
+}
+
+model ComputeHostOnSourceSet {
+  sourceSetName    String
+  sourceSetModelId String
+  sourceSet        SourceSet @relation(fields: [sourceSetName, sourceSetModelId], references: [name, modelId], onDelete: Cascade)
+
+  computeHostId String
+  computeHost   ComputeHost @relation(fields: [computeHostId], references: [id], onDelete: Cascade)
+
+  @@id([sourceSetName, sourceSetModelId, computeHostId])
+  @@index([sourceSetModelId])
+  @@index([sourceSetModelId, sourceSetName])
 }
 
 model GraphHostSource {
@@ -561,6 +651,7 @@ model Source {
 
   inferenceEnabled Boolean                       @default(false)
   inferenceHosts   InferenceHostSourceOnSource[]
+  computeHosts     ComputeHostOnSource[]
 
   saelensConfig  Json?
   saelensRelease String?
@@ -630,6 +721,7 @@ model SourceSet {
   hasGraphs        Boolean                      @default(false)
   graphEnabled     Boolean                      @default(false)
   graphHostSources GraphHostSourceOnSourceSet[]
+  computeHosts     ComputeHostOnSourceSet[]
   graphMetadata    GraphMetadata[]
 
   similarityMatrixEnabled Boolean @default(false)
@@ -1308,6 +1400,7 @@ model NlaSource {
   servers     String[]
   norm        Float    @default(0.0)
 
+  computeHosts  ComputeHost[]
   cachedEntries NlaExplainCache[]
   createdAt     DateTime          @default(now())
 
@@ -1425,8 +1518,10 @@ model Sample {
   conversationTokenizedStr String[]
   finalResponseStartIndex  Int
 
-  // HNSW index managed manually via SQL (Prisma can't create pgvector indexes):
-  //   CREATE INDEX "Sample_conversationEmbedding_idx" ON "Sample" USING hnsw ("conversationEmbedding" vector_cosine_ops);
+  // Written and read by nothing today, and deliberately unindexed. Add an HNSW
+  // index in a migration before using it for similarity search -- pgvector
+  // cannot answer a `<=>` query without one, and `prisma db push` deletes any
+  // index the schema does not declare.
   conversationEmbedding Unsupported("vector(256)")?
 
   userId    String
@@ -1517,4 +1612,100 @@ model ProcessLock {
   startedAt DateTime @default(now())
   expiresAt DateTime // is ignorable/deleted after expiresAt
   details   Json?
+}
+
+enum PersonaAxisNormalize {
+  L2
+  NONE
+}
+
+model PersonaAxis {
+  id      String @id @default(cuid())
+  modelId String
+  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  // The id a request names this axis by, conventionally `<author>_<name>`. Two groups fitting
+  // the same trait is expected rather than a collision, which is why the author is part of the
+  // name.
+  name   String
+  author String
+
+  // A row is never edited: a recalibration inserts the next version and retires this one, so a
+  // reading stored against this row's `id` stays interpretable against the constants that
+  // produced it. Live rows are the ones with no `retiredAt`, and there should be exactly one per
+  // name.
+  //
+  // That last part is maintained by whoever writes an axis -- retire and insert in one
+  // transaction -- and deliberately not by the partial unique index that would enforce it.
+  // Prisma cannot express one, so it would live only inside a migration file, leaving this model
+  // no longer a description of the table it defines. The trade is cheap because two live rows is
+  // not a correctness failure: a reading records the axis `id` and `version` it was measured
+  // with, so history stays pinned whatever the live set does, and a reader takes the highest live
+  // version. All the index would buy is failing the second insert instead of ignoring it.
+  version   Int       @default(1)
+  retiredAt DateTime?
+
+  layer Int
+
+  // What each end of the axis means. These are fields rather than halves of one display string:
+  // the poles are structure, and a reader needs them separately to label a reading.
+  polePositive            String
+  poleNegative            String
+  polePositiveDescription String?
+  poleNegativeDescription String?
+
+  // For an axis whose natural label is not just its two poles. Nothing parses it.
+  displayName String?
+  // A known limitation, shown beside the axis's values.
+  caveat      String?
+
+  // Float[] rather than pgvector: these are one per model dimension (4096 for Llama-3.1-8B), and
+  // pgvector's indexes stop at 2000 dimensions. Nothing searches over axes, so the index is no
+  // loss. Fitted as float32, stored as float8, which round-trips exactly.
+  direction    Float[]
+  // Subtracted from the activation before and after normalizing. Empty in every fit so far
+  // except the 70B's, and equivalent to each other when normalize is NONE.
+  preNormMean  Float[]              @default([])
+  postNormMean Float[]              @default([])
+  normalize    PersonaAxisNormalize @default(NONE)
+
+  // Where the axis reads zero, and one divisor per pole. Separate divisors because a fitted axis
+  // is rarely symmetric about its centre: under a shared divisor a tighter pole is squeezed
+  // towards zero and reads flat whatever the prompt.
+  center   Float @default(0)
+  scalePos Float @default(1)
+  scaleNeg Float @default(1)
+
+  // Inverse-CDF of the fitting corpus, per pole, which is what turns a raw ratio into a bounded
+  // percentile. All three or none: two of them cannot be interpreted without the third. Levels
+  // are the grid the tables are sampled at, and may be left empty for an evenly spaced one.
+  quantileLevels Float[] @default([])
+  quantilesPos   Float[] @default([])
+  quantilesNeg   Float[] @default([])
+
+  // How a conversation has to be templated for this axis's numbers to mean anything. A
+  // projection onto a fitted direction only holds if inference renders the conversation the way
+  // the fit did, so these travel with the axis. `templateKwargs` is a flat string map; Llama 3.1
+  // injects the current date, so a fit on it pins `date_string` or drifts as the calendar moves.
+  blankSystemPrompt Boolean @default(false)
+  templateKwargs    Json?
+
+  // How the fit went, e.g. r_squared and turn_bias. Recorded for provenance; nothing reads it.
+  provenance Json?
+
+  // Where this axis is published for anyone to fetch, if it has been. The same artifact a caller
+  // can hand to inference as a path instead of sending the vectors inline. Named after
+  // `Source.hfRepoId` / `hfFolderId`, which point at SAE weights the same way.
+  hfRepoId   String?
+  hfFolderId String?
+
+  visibility Visibility @default(PRIVATE)
+  creatorId  String
+  creator    User       @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([modelId, name, version])
+  @@index([modelId, visibility])
+  @@index([creatorId])
 }

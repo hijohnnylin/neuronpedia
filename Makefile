@@ -21,6 +21,7 @@ LOAD_ROOT_ENV = set -a; if [ -f .env ]; then . ./.env; fi; set +a;
 
 .PHONY: help init-env install-nodejs \
 	db-init db-check db-status db-reset \
+	host-add host-list host-remove \
 	webapp-install webapp-dev webapp-build webapp-run webapp-openapi sdk-dry-run \
 	inference-install inference-dev inference-list-configs inference-openapi \
 	autointerp-install autointerp-dev autointerp-openapi \
@@ -110,6 +111,65 @@ db-init: ## Database: create the schema, seed it, and apply pgvector tuning
 	@cd apps/webapp && npx --no-install env-cmd -f .env.localhost --use-shell \
 		'psql "$$POSTGRES_URL_NON_POOLING" -q -f prisma/pgvector-init/pgvector.sql'
 	@echo "Database ready."
+
+HOST_CLI = cd apps/webapp && npx --no-install env-cmd -f .env.localhost --use-shell \
+	'ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/compute-host.ts'
+
+host-add: ## Hosts: register a local GPU server. Required: SERVICE, MODEL, URL. Optional: SOURCES, SOURCE_SETS, NLA_SOURCE, NAME
+	@if [ -z "$(SERVICE)" ] || [ -z "$(MODEL)" ] || [ -z "$(URL)" ]; then \
+		echo "Error: SERVICE, MODEL and URL are all required."; \
+		echo "  e.g. make host-add SERVICE=INFERENCE MODEL=gpt2-small URL=http://127.0.0.1:5002 SOURCES=6-res-jb"; \
+		exit 1; \
+	fi
+	@$(HOST_CLI) add --service $(SERVICE) --model $(MODEL) --url $(URL) \
+		$(if $(NAME),--name $(NAME),) \
+		$(if $(SOURCES),--sources $(SOURCES),) \
+		$(if $(SOURCE_SETS),--source-sets $(SOURCE_SETS),) \
+		$(if $(NLA_SOURCE),--nla-source $(NLA_SOURCE),)
+
+host-list: ## Hosts: show registered GPU servers. Optional: SERVICE
+	@$(HOST_CLI) list $(if $(SERVICE),--service $(SERVICE),)
+
+host-remove: ## Hosts: deregister a GPU server. Required: SERVICE, URL
+	@if [ -z "$(SERVICE)" ] || [ -z "$(URL)" ]; then \
+		echo "Error: SERVICE and URL are both required."; \
+		exit 1; \
+	fi
+	@$(HOST_CLI) remove --service $(SERVICE) --url $(URL)
+
+# host-add writes to the local database directly, which a deployed environment
+# will not accept from a laptop. These two go through the admin API instead.
+REGISTER_CLI = python3 apps/inference/scripts/register_host.py
+
+host-register: ## Hosts: register a GPU server with a deployed webapp over the API. Required: SERVICE, MODEL, URL. Optional: SOURCES, SOURCE_SETS, NLA_SOURCE, NAME, PROVIDER, PROVIDER_REF, WEBAPP, ENVIRONMENT
+	@if [ -z "$(SERVICE)" ] || [ -z "$(MODEL)" ] || [ -z "$(URL)" ]; then \
+		echo "Error: SERVICE, MODEL and URL are all required."; \
+		echo "  e.g. make host-register SERVICE=INFERENCE MODEL=gemma-2-2b \\"; \
+		echo "         URL=https://abc123-5002.proxy.runpod.net SOURCE_SETS=gemmascope-res-16k"; \
+		echo "  Needs NEURONPEDIA_ADMIN_API_KEY (an admin key, from Settings)."; \
+		exit 1; \
+	fi
+	@$(REGISTER_CLI) register --service $(SERVICE) --model $(MODEL) --url $(URL) \
+		$(if $(NAME),--name $(NAME),) \
+		$(if $(SOURCES),--sources $(SOURCES),) \
+		$(if $(SOURCE_SETS),--source-sets $(SOURCE_SETS),) \
+		$(if $(NLA_SOURCE),--nla-source $(NLA_SOURCE),) \
+		$(if $(PROVIDER),--provider $(PROVIDER),) \
+		$(if $(PROVIDER_REF),--provider-ref $(PROVIDER_REF),) \
+		$(if $(WEBAPP),--webapp $(WEBAPP),) \
+		$(if $(ENVIRONMENT),--environment $(ENVIRONMENT),)
+
+host-parity: ## Hosts: check the ComputeHost registry routes everything the old tables did. Read-only. Optional: ENV_FILE
+	@cd apps/webapp && npx --no-install env-cmd -f $(if $(ENV_FILE),$(ENV_FILE),.env.localhost) --use-shell \
+		'ts-node -r tsconfig-paths/register --compiler-options {\"module\":\"CommonJS\"} scripts/compute-host-parity.ts'
+
+host-deregister: ## Hosts: remove a GPU server from a deployed webapp over the API. Required: SERVICE, URL. Optional: WEBAPP
+	@if [ -z "$(SERVICE)" ] || [ -z "$(URL)" ]; then \
+		echo "Error: SERVICE and URL are both required."; \
+		exit 1; \
+	fi
+	@$(REGISTER_CLI) deregister --service $(SERVICE) --url $(URL) \
+		$(if $(WEBAPP),--webapp $(WEBAPP),)
 
 db-reset: ## Database: DROP the schema and rebuild it - this deletes your local data!
 	@echo "WARNING: This will delete all data in your local Neuronpedia database!"

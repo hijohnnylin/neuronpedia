@@ -14,8 +14,6 @@ This is the attribution graph generation server. `--attribution-engine` selects 
 - [Example Request - CRM Graph with Lorsa Features](#example-request---crm-graph-with-lorsa-features)
 - [Example Request - Output Graph JSON to S3 with presigned URL](#example-request---output-graph-json-to-s3-with-presigned-url)
 - [Example Request - Steering (Interventions) With Top Logits](#example-request---steering-interventions-with-top-logits)
-- [Runpod Serverless](#runpod-serverless)
-
 ### Install
 
 ```
@@ -444,7 +442,3 @@ FastAPI has a built-in docs + endpoint tester. After running the server, to see 
 Notes/Caveats:
 
 - If you set a SECRET (not set by default) in your `.env` file, you'll need to add a `x-secret-key` header.
-
-### Runpod Serverless
-
-The `apps/graph/runpod` directory contains a [Runpod Serverless](https://docs.runpod.io/serverless/overview) worker that does the same as `apps/graph` - it just in a format the Runpod expects. It has its own `README.md`.
