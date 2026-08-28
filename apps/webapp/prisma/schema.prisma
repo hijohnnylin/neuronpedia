@@ -401,8 +401,6 @@ model Model {
   sourceSets           SourceSet[]
   steerOutputs         SteerOutput[]
   evals                Eval[]
-  sourceInferenceHosts InferenceHostSource[]
-  graphHostSources     GraphHostSource[]
   computeHosts         ComputeHost[]
   graphMetadata        GraphMetadata[]
   jlensShares          JlensShare[]
@@ -497,8 +495,6 @@ enum ComputeService {
   SPARSITY
 }
 
-// Set by the deploy tool: STARTING while provisioning, HEALTHY once the server
-// answers, DRAINING before teardown.
 // Routing registry for the GPU support servers. Rows are written by the deploy
 // tool at pod-up and pod-down, never by the pods themselves.
 model ComputeHost {
@@ -574,83 +570,13 @@ model ComputeHostOnSourceSet {
   @@index([sourceSetModelId, sourceSetName])
 }
 
-model GraphHostSource {
-  id                  String  @id @default(cuid())
-  name                String
-  hostUrl             String?
-  runpodServerlessUrl String?
-
-  modelId String
-  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
-
-  sourceSets GraphHostSourceOnSourceSet[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([modelId])
-}
-
-model GraphHostSourceOnSourceSet {
-  sourceSetName    String
-  sourceSetModelId String
-  sourceSet        SourceSet @relation(fields: [sourceSetName, sourceSetModelId], references: [name, modelId], onDelete: Cascade)
-
-  graphHostSourceId String
-  graphHostSource   GraphHostSource @relation(fields: [graphHostSourceId], references: [id], onDelete: Cascade)
-
-  @@id([sourceSetName, sourceSetModelId, graphHostSourceId])
-  @@index([sourceSetModelId])
-  @@index([sourceSetModelId, sourceSetName])
-}
-
-enum InferenceEngine {
-  TRANSFORMER_LENS
-  NNSIGHT
-  CSPACE
-}
-
-model InferenceHostSource {
-  id      String          @id @default(cuid())
-  name    String
-  hostUrl String
-  engine  InferenceEngine @default(TRANSFORMER_LENS)
-
-  modelId String
-  model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
-
-  sources InferenceHostSourceOnSource[]
-
-  runpodServerlessUrl String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([modelId])
-  @@index([engine])
-}
-
-model InferenceHostSourceOnSource {
-  sourceId      String
-  sourceModelId String
-  source        Source @relation(fields: [sourceId, sourceModelId], references: [id, modelId], onDelete: Cascade)
-
-  inferenceHostId String
-  inferenceHost   InferenceHostSource @relation(fields: [inferenceHostId], references: [id], onDelete: Cascade)
-
-  @@id([sourceId, sourceModelId, inferenceHostId])
-  @@index([sourceModelId])
-  @@index([sourceModelId, sourceId])
-}
-
 model Source {
   id      String
   modelId String
 
   hasDashboards Boolean @default(true)
 
-  inferenceEnabled Boolean                       @default(false)
-  inferenceHosts   InferenceHostSourceOnSource[]
+  inferenceEnabled Boolean               @default(false)
   computeHosts     ComputeHostOnSource[]
 
   saelensConfig  Json?
@@ -718,9 +644,8 @@ model SourceSet {
   releases     SourceRelease? @relation(fields: [releaseName], references: [name], onDelete: Cascade)
 
   // we may have graphs even if we are not actively allowing generation of new graphs for this sourceSet
-  hasGraphs        Boolean                      @default(false)
-  graphEnabled     Boolean                      @default(false)
-  graphHostSources GraphHostSourceOnSourceSet[]
+  hasGraphs        Boolean                  @default(false)
+  graphEnabled     Boolean                  @default(false)
   computeHosts     ComputeHostOnSourceSet[]
   graphMetadata    GraphMetadata[]
 
@@ -1397,7 +1322,6 @@ model NlaSource {
   av          String
   ar          String
   layerNum    Int
-  servers     String[]
   norm        Float    @default(0.0)
 
   computeHosts  ComputeHost[]

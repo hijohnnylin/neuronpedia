@@ -128,9 +128,9 @@ function buildWhere(target: ResolveTarget): Prisma.ComputeHostWhereInput {
     }
     // An inference host is linked to the individual sources it loaded, not to
     // the sets they belong to, so a set matches when the host serves any source
-    // in it -- which is how this resolved before the registry existed.
-    // Registration does also write a direct set link, so accept either: rows
-    // backfilled from InferenceHostSource have only the source side.
+    // in it. Registration does also write a direct set link, so accept either:
+    // the rows carried over from the pre-registry tables have only the source
+    // side, and matching on the set link alone would miss them.
     return {
       ...base,
       OR: [

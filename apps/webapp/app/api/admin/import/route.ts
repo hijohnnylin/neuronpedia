@@ -141,41 +141,9 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
             }
           }
 
-          /* INFERENCE HOST SOURCES */
-          try {
-            const inferenceHostSourceLines = await downloadFileJsonlParsedLines(`${path}/inference_hosts.jsonl`);
-            for (const line of inferenceHostSourceLines) {
-              await prisma.inferenceHostSource.upsert({
-                where: { id: line.id },
-                update: line,
-                create: line,
-              });
-            }
-          } catch (error) {
-            console.error('Error importing inference host sources:', error);
-          }
-
-          /* INFERENCE HOST SOURCE CONNECTIONS */
-          try {
-            const inferenceHostOnSourceLines = await downloadFileJsonlParsedLines(
-              `${path}/inference_hosts_on_source.jsonl`,
-            );
-            for (const line of inferenceHostOnSourceLines) {
-              await prisma.inferenceHostSourceOnSource.upsert({
-                where: {
-                  sourceId_sourceModelId_inferenceHostId: {
-                    inferenceHostId: line.inferenceHostId,
-                    sourceId: line.sourceId,
-                    sourceModelId: line.sourceModelId,
-                  },
-                },
-                update: line,
-                create: line,
-              });
-            }
-          } catch (error) {
-            console.error('Error importing inference host source connections:', error);
-          }
+          /* GPU hosts are deliberately not imported. They are specific to the
+             environment that runs them, and the exported rows carried a blank
+             host URL anyway. Register your own with `make host-add`. */
 
           /* FEATURES */
           const featuresPaths = await getFilesInPath(`${path}/features`, '.jsonl.gz');

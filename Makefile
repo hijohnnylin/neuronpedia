@@ -159,10 +159,6 @@ host-register: ## Hosts: register a GPU server with a deployed webapp over the A
 		$(if $(WEBAPP),--webapp $(WEBAPP),) \
 		$(if $(ENVIRONMENT),--environment $(ENVIRONMENT),)
 
-host-parity: ## Hosts: check the ComputeHost registry routes everything the old tables did. Read-only. Optional: ENV_FILE
-	@cd apps/webapp && npx --no-install env-cmd -f $(if $(ENV_FILE),$(ENV_FILE),.env.localhost) --use-shell \
-		'ts-node -r tsconfig-paths/register --compiler-options {\"module\":\"CommonJS\"} scripts/compute-host-parity.ts'
-
 host-deregister: ## Hosts: remove a GPU server from a deployed webapp over the API. Required: SERVICE, URL. Optional: WEBAPP
 	@if [ -z "$(SERVICE)" ] || [ -z "$(URL)" ]; then \
 		echo "Error: SERVICE and URL are both required."; \
