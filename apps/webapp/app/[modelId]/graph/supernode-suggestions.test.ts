@@ -146,6 +146,51 @@ describe('suggestSupernodes', () => {
     );
   });
 
+  it('recovers a human-authored Dallas subgroup from a reduced public graph fixture', () => {
+    // Reduced from the Response Dallas supernode in:
+    // https://transformer-circuits.pub/2025/attribution-graphs/graph_data/capital-state-dallas.json
+    const left = makeNode('2_16536263_-0', { rawId: '2_16536263_10', layer: '2', ctxIdx: 10 });
+    const right = makeNode('2_23133920_-0', { rawId: '2_23133920_10', layer: '2', ctxIdx: 10 });
+    const austinDecoy = makeNode('10_8513782_-0', { rawId: '10_8513782_11', layer: '10', ctxIdx: 11 });
+    const incoming = [
+      ['E_28948388_10', 2.2459492683410645, 1.5262408256530762],
+      ['1_21862382_10', 1.710408091545105, 1.098325490951538],
+      ['1_4418612_10', 0.6796928644180298, 0.5530434846878052],
+      ['1_13686348_10', 0.2643650770187378, 0.29762279987335205],
+    ] as const;
+    const outgoing = [
+      ['3_27636071_10', 1.0517706871032715, 0.6656948328018188],
+      ['3_22886075_10', 0.8075348138809204, 0.5080311894416809],
+      ['4_1348861_10', 0.5275150537490845, 0.29129698872566223],
+      ['15_21568836_11', 0.6396480202674866, 0.13760587573051453],
+    ] as const;
+    const contextNodes = [...incoming, ...outgoing].map(([id]) => makeNode(id, { featureType: 'embedding' }));
+    const decoyContext = [
+      makeNode('6_24231446_11', { featureType: 'embedding' }),
+      makeNode('15_2811388_11', { featureType: 'embedding' }),
+    ];
+    const contextById = new Map(contextNodes.map((node) => [node.node_id, node]));
+    const links = [
+      ...incoming.flatMap(([id, leftWeight, rightWeight]) => [
+        makeLink(contextById.get(id)!, left, leftWeight, false),
+        makeLink(contextById.get(id)!, right, rightWeight, false),
+      ]),
+      ...outgoing.flatMap(([id, leftWeight, rightWeight]) => [
+        makeLink(left, contextById.get(id)!, leftWeight, false),
+        makeLink(right, contextById.get(id)!, rightWeight, false),
+      ]),
+      makeLink(decoyContext[0], austinDecoy, 0.4334683120250702, false),
+      makeLink(austinDecoy, decoyContext[1], 1.7817903757095337, false),
+    ];
+    const input = graph([...contextNodes, ...decoyContext, left, right, austinDecoy], links);
+
+    const result = suggestSupernodes(input, [left.nodeId!, right.nodeId!, austinDecoy.nodeId!]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].memberNodeIds).toEqual([left.nodeId, right.nodeId]);
+    expect(result[0].minCohesion).toBeGreaterThan(0.9);
+  });
+
   it('excludes unsupported, missing, zero-degree, and already grouped nodes', () => {
     const upstream = [makeNode('up-1', { featureType: 'embedding' }), makeNode('up-2', { featureType: 'embedding' })];
     const eligible = makeNode('eligible');
