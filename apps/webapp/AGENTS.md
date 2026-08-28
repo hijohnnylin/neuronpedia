@@ -30,9 +30,11 @@ These have a project-specific source. Reaching for the library default is the co
 you touched anything with a `*.test.ts` beside it — verbose so the results stream in one per test
 instead of arriving as a silent block.
 
-`lint:fix` is only eslint. The gate `webapp-lint.yml` enforces is `npm run lint`, which is
-`eslint --quiet . && tsc --noEmit` — so a type error passes `lint:fix` and fails CI. Run the full
-`npm run lint` before finishing.
+`lint:fix` is only eslint. `webapp-lint.yml` enforces three separate gates: `npm run lint`
+(`eslint --quiet . && tsc --noEmit`), `npm test`, and `npm run format:check` — so a type error
+passes `lint:fix` and fails CI, and so does a formatting drift that no lint rule mentions. Run all
+three before finishing. They live in one job whose name is load-bearing, so the check reads
+"webapp lint and typecheck" while doing rather more than that.
 
 Current test coverage here is unit-only, pure
 functions, no database and no running inference server. However, that could be extended in the future and if needed - ask first before doing so.

@@ -1,4 +1,6 @@
-name: Webapp - Lint
+# This title is only a label in the Actions list and is safe to change. The job name below is
+# not -- see the note on it. They differ on purpose, so do not "tidy" them into agreement.
+name: Webapp - Checks
 defaults:
   run:
     working-directory: ./apps/webapp
