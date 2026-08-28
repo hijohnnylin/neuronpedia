@@ -19,7 +19,7 @@ import torch
 from transformers import GPT2Config, GPT2LMHeadModel
 
 from neuronpedia_graph.steer_generation import (
-    _hf_kwargs,
+    _generation_kwargs,
     _SequenceCollector,
     _TransformerLensSampling,
     generate_default,
@@ -84,7 +84,7 @@ class FakeInterpEngineModel:
 
 def test_temperature_zero_asks_for_greedy_decoding():
     """The steer modal sends 0 by default, and `transformers` raises on it where TL means argmax."""
-    kwargs = _hf_kwargs(NEW_TOKENS, temperature=0.0, freq_penalty=0.0)
+    kwargs = _generation_kwargs(NEW_TOKENS, temperature=0.0, freq_penalty=0.0)
     assert kwargs["do_sample"] is False
     assert "logits_processor" not in kwargs
     # `generate` logs a line for every flag it was handed and will not use, and none of the sampling
@@ -94,7 +94,7 @@ def test_temperature_zero_asks_for_greedy_decoding():
 
 def test_sampling_ignores_the_checkpoints_own_generation_config():
     """Qwen3 ships temperature 0.6 / top_p 0.95 / top_k 20; TransformerLens applies none of them."""
-    kwargs = _hf_kwargs(NEW_TOKENS, temperature=0.7, freq_penalty=0.0)
+    kwargs = _generation_kwargs(NEW_TOKENS, temperature=0.7, freq_penalty=0.0)
     assert kwargs["do_sample"] is True
     assert kwargs["temperature"] == 1.0
     assert kwargs["top_k"] == 0
