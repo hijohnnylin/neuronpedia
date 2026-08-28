@@ -170,7 +170,8 @@ async def completion_chat(request: SteerCompletionChatRequest):
                 n_layers=int(model.n_layers),
             )
         except AxisRequestError as exc:
-            return JSONResponse(content={"error": str(exc)}, status_code=exc.status_code)
+            logger.warning("Axis request validation failed", exc_info=True)
+            return JSONResponse(content={"error": "Invalid axis request"}, status_code=exc.status_code)
 
     # Every requested axis has to agree about how the conversation is rendered, because those
     # conditions are applied before generation and so change the text itself. There is no way to
