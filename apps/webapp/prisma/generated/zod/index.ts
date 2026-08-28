@@ -162,7 +162,7 @@ export const ProbeLogScalarFieldEnumSchema = z.enum(['id','action','modelId','us
 
 export const ProcessLockScalarFieldEnumSchema = z.enum(['name','startedAt','expiresAt','details']);
 
-export const PersonaAxisScalarFieldEnumSchema = z.enum(['id','modelId','name','author','version','retiredAt','layer','polePositive','poleNegative','polePositiveDescription','poleNegativeDescription','displayName','caveat','direction','preNormMean','postNormMean','normalize','center','scalePos','scaleNeg','quantileLevels','quantilesPos','quantilesNeg','blankSystemPrompt','templateKwargs','provenance','hfRepoId','hfFolderId','visibility','creatorId','createdAt']);
+export const VectorScalarFieldEnumSchema = z.enum(['id','modelId','name','author','layers','polePositive','poleNegative','polePositiveDescription','poleNegativeDescription','displayName','caveat','values','projectionType','projectionParams','hfRepoId','hfFolderId','visibility','creatorId','createdAt']);
 
 export const SortOrderSchema = z.enum(['asc','desc']);
 
@@ -224,9 +224,9 @@ export const ProbeLogActionSchema = z.enum(['NEW_PROBE','NEW_SAMPLE','SAMPLE_ACC
 
 export type ProbeLogActionType = `${z.infer<typeof ProbeLogActionSchema>}`
 
-export const PersonaAxisNormalizeSchema = z.enum(['L2','NONE']);
+export const ProjectionTypeSchema = z.enum(['AXIS_PROJECTION']);
 
-export type PersonaAxisNormalizeType = `${z.infer<typeof PersonaAxisNormalizeSchema>}`
+export type ProjectionTypeType = `${z.infer<typeof ProjectionTypeSchema>}`
 
 /////////////////////////////////////////
 // MODELS
@@ -467,7 +467,7 @@ export type UserRelations = {
   jlensSharePutRequests: JlensSharePutRequestWithRelations[];
   samples: SampleWithRelations[];
   probes: ProbeWithRelations[];
-  personaAxes: PersonaAxisWithRelations[];
+  vectors: VectorWithRelations[];
   problemNodesCreated: ProblemNodeWithRelations[];
   problemNodesApproved: ProblemNodeWithRelations[];
   problemEdgesCreated: ProblemEdgeWithRelations[];
@@ -509,7 +509,7 @@ export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.
   jlensSharePutRequests: z.lazy(() => JlensSharePutRequestWithRelationsSchema).array(),
   samples: z.lazy(() => SampleWithRelationsSchema).array(),
   probes: z.lazy(() => ProbeWithRelationsSchema).array(),
-  personaAxes: z.lazy(() => PersonaAxisWithRelationsSchema).array(),
+  vectors: z.lazy(() => VectorWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
@@ -552,7 +552,7 @@ export type UserPartialRelations = {
   jlensSharePutRequests?: JlensSharePutRequestPartialWithRelations[];
   samples?: SamplePartialWithRelations[];
   probes?: ProbePartialWithRelations[];
-  personaAxes?: PersonaAxisPartialWithRelations[];
+  vectors?: VectorPartialWithRelations[];
   problemNodesCreated?: ProblemNodePartialWithRelations[];
   problemNodesApproved?: ProblemNodePartialWithRelations[];
   problemEdgesCreated?: ProblemEdgePartialWithRelations[];
@@ -594,7 +594,7 @@ export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations>
   jlensSharePutRequests: z.lazy(() => JlensSharePutRequestPartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
-  personaAxes: z.lazy(() => PersonaAxisPartialWithRelationsSchema).array(),
+  vectors: z.lazy(() => VectorPartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -636,7 +636,7 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
   jlensSharePutRequests: z.lazy(() => JlensSharePutRequestPartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
-  personaAxes: z.lazy(() => PersonaAxisPartialWithRelationsSchema).array(),
+  vectors: z.lazy(() => VectorPartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -1307,7 +1307,7 @@ export type ModelRelations = {
   headSequences: ModelHeadSequenceWithRelations[];
   samples: SampleWithRelations[];
   probes: ProbeWithRelations[];
-  personaAxes: PersonaAxisWithRelations[];
+  vectors: VectorWithRelations[];
 };
 
 export type ModelWithRelations = z.infer<typeof ModelSchema> & ModelRelations
@@ -1332,7 +1332,7 @@ export const ModelWithRelationsSchema: z.ZodType<ModelWithRelations> = ModelSche
   headSequences: z.lazy(() => ModelHeadSequenceWithRelationsSchema).array(),
   samples: z.lazy(() => SampleWithRelationsSchema).array(),
   probes: z.lazy(() => ProbeWithRelationsSchema).array(),
-  personaAxes: z.lazy(() => PersonaAxisWithRelationsSchema).array(),
+  vectors: z.lazy(() => VectorWithRelationsSchema).array(),
 }))
 
 // MODEL PARTIAL RELATION SCHEMA
@@ -1358,7 +1358,7 @@ export type ModelPartialRelations = {
   headSequences?: ModelHeadSequencePartialWithRelations[];
   samples?: SamplePartialWithRelations[];
   probes?: ProbePartialWithRelations[];
-  personaAxes?: PersonaAxisPartialWithRelations[];
+  vectors?: VectorPartialWithRelations[];
 };
 
 export type ModelPartialWithRelations = z.infer<typeof ModelPartialSchema> & ModelPartialRelations
@@ -1383,7 +1383,7 @@ export const ModelPartialWithRelationsSchema: z.ZodType<ModelPartialWithRelation
   headSequences: z.lazy(() => ModelHeadSequencePartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
-  personaAxes: z.lazy(() => PersonaAxisPartialWithRelationsSchema).array(),
+  vectors: z.lazy(() => VectorPartialWithRelationsSchema).array(),
 })).partial()
 
 export type ModelWithPartialRelations = z.infer<typeof ModelSchema> & ModelPartialRelations
@@ -1408,7 +1408,7 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
   headSequences: z.lazy(() => ModelHeadSequencePartialWithRelationsSchema).array(),
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
-  personaAxes: z.lazy(() => PersonaAxisPartialWithRelationsSchema).array(),
+  vectors: z.lazy(() => VectorPartialWithRelationsSchema).array(),
 }).partial())
 
 /////////////////////////////////////////
@@ -4242,95 +4242,74 @@ export const ProcessLockPartialSchema = ProcessLockSchema.partial()
 export type ProcessLockPartial = z.infer<typeof ProcessLockPartialSchema>
 
 /////////////////////////////////////////
-// PERSONA AXIS SCHEMA
+// VECTOR SCHEMA
 /////////////////////////////////////////
 
-export const PersonaAxisSchema = z.object({
-  normalize: PersonaAxisNormalizeSchema,
+export const VectorSchema = z.object({
+  projectionType: ProjectionTypeSchema,
   visibility: VisibilitySchema,
   id: z.string().cuid(),
   modelId: z.string(),
   name: z.string(),
   author: z.string(),
-  version: z.number().int(),
-  retiredAt: z.coerce.date().nullable(),
-  layer: z.number().int(),
-  polePositive: z.string(),
-  poleNegative: z.string(),
+  layers: z.number().int().array(),
+  polePositive: z.string().nullable(),
+  poleNegative: z.string().nullable(),
   polePositiveDescription: z.string().nullable(),
   poleNegativeDescription: z.string().nullable(),
   displayName: z.string().nullable(),
   caveat: z.string().nullable(),
-  direction: z.number().array(),
-  preNormMean: z.number().array(),
-  postNormMean: z.number().array(),
-  center: z.number(),
-  scalePos: z.number(),
-  scaleNeg: z.number(),
-  quantileLevels: z.number().array(),
-  quantilesPos: z.number().array(),
-  quantilesNeg: z.number().array(),
-  blankSystemPrompt: z.boolean(),
-  templateKwargs: NullableJsonValue.optional(),
-  provenance: NullableJsonValue.optional(),
+  values: z.number().array(),
+  projectionParams: InputJsonValue,
   hfRepoId: z.string().nullable(),
   hfFolderId: z.string().nullable(),
   creatorId: z.string(),
   createdAt: z.coerce.date(),
 })
 
-export type PersonaAxis = z.infer<typeof PersonaAxisSchema>
+export type Vector = z.infer<typeof VectorSchema>
 
 /////////////////////////////////////////
-// PERSONA AXIS PARTIAL SCHEMA
+// VECTOR PARTIAL SCHEMA
 /////////////////////////////////////////
 
-export const PersonaAxisPartialSchema = PersonaAxisSchema.partial()
+export const VectorPartialSchema = VectorSchema.partial()
 
-export type PersonaAxisPartial = z.infer<typeof PersonaAxisPartialSchema>
+export type VectorPartial = z.infer<typeof VectorPartialSchema>
 
-// PERSONA AXIS RELATION SCHEMA
+// VECTOR RELATION SCHEMA
 //------------------------------------------------------
 
-export type PersonaAxisRelations = {
+export type VectorRelations = {
   model: ModelWithRelations;
   creator: UserWithRelations;
 };
 
-export type PersonaAxisWithRelations = Omit<z.infer<typeof PersonaAxisSchema>, "templateKwargs" | "provenance"> & {
-  templateKwargs?: NullableJsonInput;
-  provenance?: NullableJsonInput;
-} & PersonaAxisRelations
+export type VectorWithRelations = z.infer<typeof VectorSchema> & VectorRelations
 
-export const PersonaAxisWithRelationsSchema: z.ZodType<PersonaAxisWithRelations> = PersonaAxisSchema.merge(z.object({
+export const VectorWithRelationsSchema: z.ZodType<VectorWithRelations> = VectorSchema.merge(z.object({
   model: z.lazy(() => ModelWithRelationsSchema),
   creator: z.lazy(() => UserWithRelationsSchema),
 }))
 
-// PERSONA AXIS PARTIAL RELATION SCHEMA
+// VECTOR PARTIAL RELATION SCHEMA
 //------------------------------------------------------
 
-export type PersonaAxisPartialRelations = {
+export type VectorPartialRelations = {
   model?: ModelPartialWithRelations;
   creator?: UserPartialWithRelations;
 };
 
-export type PersonaAxisPartialWithRelations = Omit<z.infer<typeof PersonaAxisPartialSchema>, "templateKwargs" | "provenance"> & {
-  templateKwargs?: NullableJsonInput;
-  provenance?: NullableJsonInput;
-} & PersonaAxisPartialRelations
+export type VectorPartialWithRelations = z.infer<typeof VectorPartialSchema> & VectorPartialRelations
 
-export const PersonaAxisPartialWithRelationsSchema: z.ZodType<PersonaAxisPartialWithRelations> = PersonaAxisPartialSchema.merge(z.object({
+export const VectorPartialWithRelationsSchema: z.ZodType<VectorPartialWithRelations> = VectorPartialSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
   creator: z.lazy(() => UserPartialWithRelationsSchema),
 })).partial()
 
-export type PersonaAxisWithPartialRelations = Omit<z.infer<typeof PersonaAxisSchema>, "templateKwargs" | "provenance"> & {
-  templateKwargs?: NullableJsonInput;
-  provenance?: NullableJsonInput;
-} & PersonaAxisPartialRelations
+export type VectorWithPartialRelations = z.infer<typeof VectorSchema> & VectorPartialRelations
 
-export const PersonaAxisWithPartialRelationsSchema: z.ZodType<PersonaAxisWithPartialRelations> = PersonaAxisSchema.merge(z.object({
+export const VectorWithPartialRelationsSchema: z.ZodType<VectorWithPartialRelations> = VectorSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
   creator: z.lazy(() => UserPartialWithRelationsSchema),
 }).partial())

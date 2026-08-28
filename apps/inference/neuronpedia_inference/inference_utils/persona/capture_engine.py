@@ -1,12 +1,12 @@
-"""Eager (interp-engine / EagerModel) per-turn activation capture for persona.
+"""Eager (interp-engine / EagerModel) per-turn activation capture for readout axes.
 
-The vLLM persona path captures a mid-layer hidden state via the engine's
+The vLLM readout path captures mid-layer hidden states via the engine's
 `VLLMModel.capture(...)`. This module provides the eager equivalent (same
-per-message mean activations) so assistant-axis works on the EagerModel backend
-(CUDA-eager / MPS / CPU): capture `resid_post` at a layer for the chat-templated
-conversation and mean-pool per message.
+per-message mean activations) so axis readouts work on the EagerModel backend
+(CUDA-eager / MPS / CPU): capture `resid_post` at one or more layers for the
+chat-templated conversation and mean-pool per message.
 
-The projection onto persona PCs (`pc_projection`) and the assistant-turn selection
+The projection onto axis directions (`project_axis`) and the assistant-turn selection
 are backend-agnostic and stay in the caller; this module only returns the
 per-message mean activations, aligned 1:1 with the input conversation.
 """
@@ -30,12 +30,21 @@ def _content(msg: Any) -> str:
     return msg.content if hasattr(msg, "content") else msg["content"]
 
 
-def _per_message_spans(tok: Tokenize, msgs: list[dict]) -> tuple[list[int], list[tuple[int, int]]]:
+def _per_message_spans(
+    tok: Tokenize,
+    msgs: list[dict],
+    template_kwargs: dict[str, str] | None = None,
+) -> tuple[list[int], list[tuple[int, int]]]:
     """Contiguous ``[start, end)`` token spans, one per message, from the engine.
 
     Each message's span is the block of tokens the model's chat renderer adds when that message
     is appended, so the spans partition the full rendered sequence and align 1:1 with ``msgs``
     (including any system message).
+
+    ``template_kwargs`` has to be whatever the endpoint rendered the generation prompt with, or
+    this renders a different conversation than the one that was generated from. Llama 3.1's
+    template injects a date into the system block, so an axis that pins ``date_string`` would
+    otherwise be measured against today's date here and the fit's date there.
 
     ``Tokenize.message_partition`` keeps the prefix-delta arithmetic this used to do inline,
     verbatim, for a model rendered by a Jinja template -- so every model served today pools over
@@ -44,32 +53,34 @@ def _per_message_spans(tok: Tokenize, msgs: list[dict]) -> tuple[list[int], list
     hold: dropping historical reasoning rewrites earlier turns once a later user turn exists, so
     appending a message is not purely additive and the deltas would land in the wrong places.
     """
-    return tok.message_partition(msgs)
+    return tok.message_partition(msgs, **(template_kwargs or {}))
 
 
 def capture_turn_means_engine(
     model: EagerModel,
     conversation: list[Any],
-    layer: int,
+    layers: list[int],
     specs: list[SteerSpec] | None = None,
-) -> torch.Tensor:
-    """Mean ``resid_post[layer]`` per conversation message -> ``[n_messages, hidden]``.
+    template_kwargs: dict[str, str] | None = None,
+) -> dict[int, torch.Tensor]:
+    """Mean ``resid_post`` per conversation message, per layer -> ``{layer: [n_messages, hidden]}``.
+
+    Several layers in one forward, not one forward per layer: axes fitted at different depths
+    are read off the same pass, so the cost of a second axis is memory rather than compute.
 
     When ``specs`` is provided, the capture runs under engine steering (post-cap
     activations); otherwise it's the unsteered (pre-cap) base model.
     """
     msgs = [{"role": _role(m), "content": _content(m)} for m in conversation]
 
-    full_ids, spans = _per_message_spans(model.tok, msgs)
+    full_ids, spans = _per_message_spans(model.tok, msgs, template_kwargs)
     tokens = torch.tensor(full_ids, dtype=torch.long, device=model.device).unsqueeze(0)
 
+    wanted = sorted(set(layers))
     ctx = engine_steer(model, specs) if specs else nullcontext()
     with ctx:
-        cache = run_with_cache(model, tokens, [("resid_post", layer)])
-    acts = cache.get("resid_post", layer)[0]  # [seq, hidden]
-    seq, hidden = acts.shape
-
-    return _pool_spans(acts, spans)
+        cache = run_with_cache(model, tokens, [("resid_post", layer) for layer in wanted])
+    return {layer: _pool_spans(cache.get("resid_post", layer)[0], spans) for layer in wanted}
 
 
 def _pool_spans(acts: torch.Tensor, spans: list[tuple[int, int]]) -> torch.Tensor:
@@ -91,6 +102,7 @@ def turn_means_from_generation_capture(
     prompt_msgs: list[Any],
     prompt_token_ids: Sequence[int],
     acts: torch.Tensor,
+    template_kwargs: dict[str, str] | None = None,
 ) -> torch.Tensor | None:
     """Per-message means from activations captured DURING generation.
 
@@ -110,7 +122,7 @@ def turn_means_from_generation_capture(
     re-capturing rather than pooling over misaligned positions.
     """
     msgs = [{"role": _role(m), "content": _content(m)} for m in prompt_msgs]
-    full_ids, spans = _per_message_spans(tok, msgs)
+    full_ids, spans = _per_message_spans(tok, msgs, template_kwargs)
     prompt_ids = [int(t) for t in prompt_token_ids]
     n_rows = int(acts.shape[0])
     if not spans or len(full_ids) >= min(len(prompt_ids), n_rows):
@@ -123,23 +135,25 @@ def turn_means_from_generation_capture(
 async def capture_turn_means_vllm(
     backend: VLLMModel,
     conversation: list[Any],
-    layer: int,
+    layers: list[int],
     steering_spec: object | None = None,
-) -> torch.Tensor:
-    """Per-message mean ``resid_post[layer]`` on the engine VLLMModel.
+    template_kwargs: dict[str, str] | None = None,
+) -> dict[int, torch.Tensor]:
+    """Per-message mean ``resid_post`` per layer on the engine VLLMModel.
 
-    Native-extraction analogue of :func:`capture_turn_means_engine`. When
-    ``steering_spec`` (an engine ``SteeringSpec``) is given, captures under steering
-    (post-cap).
+    Native-extraction analogue of :func:`capture_turn_means_engine`, and likewise one request
+    for every layer asked for. When ``steering_spec`` (an engine ``SteeringSpec``) is given,
+    captures under steering (post-cap).
     """
     msgs = [{"role": _role(m), "content": _content(m)} for m in conversation]
-    full_ids, spans = _per_message_spans(backend.tok, msgs)
+    full_ids, spans = _per_message_spans(backend.tok, msgs, template_kwargs)
 
-    # One Address, used to ask and to read back: `capture` keys its result by Address, so a
-    # second spelling of the same point here is a KeyError rather than a mismatch anything warns
-    # about -- which is what a `("resid_post", layer)` tuple left over from the old Point type did.
-    point = Address("resid_post", layer)
+    # Addresses built once and used to ask and to read back: `capture` keys its result by
+    # Address, so a second spelling of the same point here is a KeyError rather than a mismatch
+    # anything warns about -- which is what a `("resid_post", layer)` tuple left over from the
+    # old Point type did.
+    points = {layer: Address("resid_post", layer) for layer in sorted(set(layers))}
     # Per-request steering: capture() registers the steering under the same request id,
     # so this is concurrency-safe (no global steering state clobbered by other requests).
-    caps = await backend.capture(full_ids, [point], steering_spec=steering_spec)
-    return _pool_spans(caps[point], spans)
+    caps = await backend.capture(full_ids, list(points.values()), steering_spec=steering_spec)
+    return {layer: _pool_spans(caps[point], spans) for layer, point in points.items()}

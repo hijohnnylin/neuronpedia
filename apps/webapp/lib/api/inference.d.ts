@@ -1110,6 +1110,175 @@ export interface components {
      */
     LensType: 'LOGIT_LENS' | 'JACOBIAN_LENS';
     /**
+     * NPAxis
+     * @description A readout axis supplied with the request, rather than named by id from this server's assets.
+     *
+     *     Either send `source` on its own, or send `direction` and `layer` with as much of the rest as
+     *     the axis has. With everything else defaulted the reading is the dot product of the direction
+     *     with the mean residual-stream activation over each assistant turn, which is the axis you can
+     *     build without a calibration corpus. The optional fields refine that in three steps::
+     *
+     *         h          = mean resid_post activation over the assistant turn, at `layer`
+     *         x          = h - preNormMean                    # default: no-op
+     *         x          = x / max(||x||, 1e-12)              # only when normalize is "l2"
+     *         raw        = dot(x - postNormMean, direction)
+     *         value      = (raw - center) / (raw >= center ? scalePos : scaleNeg)
+     *         percentile = interpolated against quantilesPos / quantilesNeg, bounded to [-1, 1]
+     *
+     *     So `value` is in the axis's own units until `center` and the two scales put it on a readable
+     *     one, and a `percentile` is reported only once the quantile tables say what the fitting corpus
+     *     looked like. `value` is never clipped: a reading past 1 says the axis is being read off the
+     *     distribution it was fitted on, which is a signal rather than something to pin to the boundary.
+     *
+     *     Nothing here says whether a pole is one you would rather see. That is an editorial call about
+     *     a trait rather than a property of a fit, so it belongs to whatever displays the reading.
+     */
+    NPAxis: {
+      /**
+       * Author
+       * @description Who fitted this axis. Reported as-is
+       */
+      author?: string | null;
+      /**
+       * Caveat
+       * @description A known limitation, worth showing beside this axis's values
+       */
+      caveat?: string | null;
+      /**
+       * Center
+       * @description Where the axis reads zero, in raw projection units
+       * @default 0
+       */
+      center: number;
+      /**
+       * Direction
+       * @description The fitted direction. Required without `source`, and must be the model's hidden size
+       */
+      direction?: number[] | null;
+      /**
+       * Displayname
+       * @description A label for an axis whose two poles are not one. Nothing parses it
+       */
+      displayName?: string | null;
+      /**
+       * Id
+       * @description What this axis is reported under, and unique across `axes` and `customAxes` in one request. Conventionally `<author>_<name>`, though nothing here parses it.
+       */
+      id: string;
+      /**
+       * Layer
+       * @description Layer to read `resid_post` at. Required without `source`
+       */
+      layer?: number | null;
+      /** @default none */
+      normalize: components['schemas']['NPAxisNormalize'];
+      /**
+       * Polenegative
+       * @description Name of the - pole, e.g. "respectful"
+       */
+      poleNegative?: string | null;
+      /** Polenegativedescription */
+      poleNegativeDescription?: string | null;
+      /**
+       * Polepositive
+       * @description Name of the + pole, e.g. "toxic"
+       */
+      polePositive?: string | null;
+      /** Polepositivedescription */
+      polePositiveDescription?: string | null;
+      /**
+       * Postnormmean
+       * @description Subtracted after normalizing. Interchangeable with `preNormMean` when normalize is none
+       */
+      postNormMean?: number[] | null;
+      /**
+       * Prenormmean
+       * @description Subtracted from the activation before normalizing. Rarely needed
+       */
+      preNormMean?: number[] | null;
+      /**
+       * Quantilelevels
+       * @description Levels the two tables are sampled at. Defaults to evenly spaced 0 to 1
+       */
+      quantileLevels?: number[] | null;
+      /** Quantilesneg */
+      quantilesNeg?: number[] | null;
+      /**
+       * Quantilespos
+       * @description Distance from `center` at each level of this pole's half of the fitting corpus, ascending. Sent with `quantilesNeg`, and the two are what a percentile is read off.
+       */
+      quantilesPos?: number[] | null;
+      render?: components['schemas']['NPAxisRender'];
+      /**
+       * Scaleneg
+       * @description Divisor below `center`. May not be zero
+       * @default 1
+       */
+      scaleNeg: number;
+      /**
+       * Scalepos
+       * @description Divisor above `center`. May not be zero
+       * @default 1
+       */
+      scalePos: number;
+      /** @description Fetch the axis from a published artifact instead of sending it inline */
+      source?: components['schemas']['NPAxisSource'] | null;
+    };
+    /**
+     * NPAxisNormalize
+     * @description How an activation is scaled before it is projected onto a readout axis.
+     * @enum {string}
+     */
+    NPAxisNormalize: 'l2' | 'none';
+    /**
+     * NPAxisRender
+     * @description How a conversation has to be templated for an axis's numbers to mean anything.
+     *
+     *     A projection onto a fitted direction only holds if the conversation reaches the model rendered
+     *     the way it was during fitting, so these conditions travel with the axis. They are applied
+     *     before generation and so change the text itself, which is why every axis in one request has to
+     *     agree about them.
+     */
+    NPAxisRender: {
+      /**
+       * Blanksystemprompt
+       * @description The fit used an empty system turn, so a caller-supplied system prompt is blanked before rendering.
+       * @default false
+       */
+      blankSystemPrompt: boolean;
+      /**
+       * Templatekwargs
+       * @description Extra keyword arguments for the chat template. Llama 3.1 injects the current date into its system block, so a fit on that model pins `date_string` or drifts off distribution as the calendar moves.
+       */
+      templateKwargs?: {
+        [key: string]: string;
+      };
+    };
+    /**
+     * NPAxisSource
+     * @description A published axis to fetch, instead of sending its vectors inline.
+     *
+     *     The artifact is one folder holding `axis.yaml` and `axis.safetensors`. Everything about the
+     *     axis comes from there, so nothing but `id` may be sent beside this.
+     */
+    NPAxisSource: {
+      /**
+       * Hffolder
+       * @description Folder within that repo holding the two files
+       */
+      hfFolder: string;
+      /**
+       * Hfrepoid
+       * @description Hugging Face model repo, e.g. "neuronpedia/persona-axes"
+       */
+      hfRepoId: string;
+      /**
+       * Revision
+       * @description Branch, tag or commit sha to read. Defaults to the repo's default branch, and the commit it resolved to comes back as `sourceRevision` on the readout -- an artifact that changes under you changes what its readings mean, so pin one to compare across time.
+       */
+      revision?: string | null;
+    };
+    /**
      * NPFeature
      * @description A feature in Neuronpedia, identified by model, source, and index.
      */
@@ -1269,43 +1438,98 @@ export interface components {
       tokens: string[];
     };
     /**
-     * SteerAssistantAxis
-     * @description Persona monitoring for one steer type, across the assistant's turns.
+     * SteerAxisReadout
+     * @description One axis read across the assistant's turns, for one steer type.
+     *
+     *     Keyed by `id` rather than by `title`: a title is a display string that may be reworded,
+     *     and these readouts are persisted by callers.
      */
-    SteerAssistantAxis: {
+    SteerAxisReadout: {
       /**
-       * Pctitles
-       * @description List of principal component titles/descriptions
+       * Author
+       * @description Who fitted this axis; the `<author>_` prefix of `id`
        */
-      pcTitles?: string[] | null;
+      author: string;
+      /**
+       * Caveat
+       * @description A known limitation of this axis, worth showing beside its values
+       */
+      caveat?: string | null;
+      /**
+       * Id
+       * @description Axis id, as requested in `axes` or `customAxes`
+       */
+      id: string;
+      /**
+       * Layer
+       * @description Layer the axis was fitted and read at
+       */
+      layer?: number | null;
+      /**
+       * Polenegative
+       * @description What a negative reading means, e.g. "respectful"
+       */
+      poleNegative?: string | null;
+      /** Polenegativedescription */
+      poleNegativeDescription?: string | null;
+      /**
+       * Polepositive
+       * @description What a positive reading means, e.g. "toxic". Absent when the axis names no poles
+       */
+      polePositive?: string | null;
+      /** Polepositivedescription */
+      polePositiveDescription?: string | null;
+      /**
+       * Sourcerevision
+       * @description The commit this axis was read from, for an axis fetched with `source`. What makes a reading reproducible: the same revision is the same axis, whatever the branch has moved on to since.
+       */
+      sourceRevision?: string | null;
+      /**
+       * Title
+       * @description Display label for the axis
+       */
+      title: string;
       /** Turns */
-      turns?: components['schemas']['SteerAssistantAxisTurn'][] | null;
+      turns?: components['schemas']['SteerAxisTurn'][] | null;
       type?: components['schemas']['NPSteerType'] | null;
     };
     /**
-     * SteerAssistantAxisTurn
-     * @description One assistant turn's projection onto the persona axes.
+     * SteerAxisTurn
+     * @description One assistant turn's reading on a single axis, as a measurement and as a percentile.
+     *
+     *     `value` is calibrated against the axis's own spread, so it passes 1 for roughly 2% of turns
+     *     by construction and is never clipped -- how far past the calibration corpus a turn sits is
+     *     what says an axis is being read off distribution. `percentile` is the same reading expressed
+     *     as the share of that corpus it is past, which cannot leave [-1, 1]. Display the percentile
+     *     and keep the value: a gauge reading "102%" looks broken, and a clipped value would delete
+     *     the diagnostic. `percentile` is absent for an axis whose asset ships no quantile tables.
      */
-    SteerAssistantAxisTurn: {
+    SteerAxisTurn: {
       /**
-       * Pcvalues
-       * @description Dict mapping PC title to projection value (pre-cap)
+       * Percentile
+       * @description Where `value` falls in the axis's calibration corpus, signed by pole and bounded to [-1, 1]: 0.97 is further along this pole than 97% of that corpus. Absent when the axis ships no quantile tables.
        */
-      pcValues?: {
-        [key: string]: number;
-      } | null;
+      percentile?: number | null;
       /**
-       * Pcvaluespostcap
-       * @description Dict mapping PC title to projection value (post-cap)
+       * Percentilepostcap
+       * @description `percentile` for this turn measured under steering (post-cap)
        */
-      pcValuesPostCap?: {
-        [key: string]: number;
-      } | null;
+      percentilePostCap?: number | null;
       /**
        * Snippet
        * @description Truncated conversation content for this turn
        */
       snippet?: string | null;
+      /**
+       * Value
+       * @description Axis value for this turn (pre-cap)
+       */
+      value?: number | null;
+      /**
+       * Valuepostcap
+       * @description Axis value for this turn measured under steering (post-cap)
+       */
+      valuePostCap?: number | null;
     };
     /**
      * SteerCompletionChatRequest
@@ -1313,17 +1537,17 @@ export interface components {
      */
     SteerCompletionChatRequest: {
       /**
+       * Customaxes
+       * @description Readout axes to report for the generated turns, sent inline or fetched from a published artifact. This server ships none of its own, so every axis a request wants measured is named and defined here. Two entries sharing an id is a 400.
+       */
+      customAxes?: components['schemas']['NPAxis'][] | null;
+      /**
        * Features
        * @description Features to steer towards or away from
        */
       features?: components['schemas']['NPSteerFeature'][] | null;
       /** Freqpenalty */
       freqPenalty: number;
-      /**
-       * Isassistantaxis
-       * @default false
-       */
-      isAssistantAxis: boolean | null;
       /**
        * Model
        * @description Name of the model
@@ -1379,10 +1603,10 @@ export interface components {
      */
     SteerCompletionChatResponse: {
       /**
-       * Assistantaxis
-       * @description Persona monitoring data for assistant turns, one entry per steer type
+       * Axes
+       * @description Axis readouts for the assistant turns, one entry per requested axis per steer type
        */
-      assistantAxis?: components['schemas']['SteerAssistantAxis'][] | null;
+      axes?: components['schemas']['SteerAxisReadout'][] | null;
       input: components['schemas']['NPSteerChatResult'];
       /** Outputs */
       outputs: components['schemas']['NPSteerChatResult'][];

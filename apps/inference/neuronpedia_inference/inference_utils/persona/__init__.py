@@ -1,18 +1,27 @@
-"""Persona monitoring utilities (backend-agnostic capture + PCA projection)."""
+"""Readout axes: asset loading, backend-agnostic capture, and projection."""
 
-from .persona_data import (
-    PersonaData,
-    PersonaFit,
-    PersonaPCA,
-    initialize_persona_data,
+from .axis_data import (
+    AxisAsset,
+    RenderConditions,
+    load_axis,
+    project_axis,
+    project_axis_with_percentile,
 )
-from .projection import _truncate_content, pc_projection
+from .axis_request import (
+    AxisRequestError,
+    asset_from_payload,
+    resolve_request_axes,
+)
+from .snippets import truncate_content
 
 __all__ = [
-    "PersonaData",
-    "PersonaFit",
-    "PersonaPCA",
-    "initialize_persona_data",
-    "pc_projection",
-    "_truncate_content",
+    "AxisAsset",
+    "AxisRequestError",
+    "RenderConditions",
+    "asset_from_payload",
+    "load_axis",
+    "project_axis",
+    "project_axis_with_percentile",
+    "resolve_request_axes",
+    "truncate_content",
 ]

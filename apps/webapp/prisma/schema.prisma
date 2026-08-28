@@ -121,9 +121,9 @@ model User {
   jlensShares                  JlensShare[]
   jlensSharePutRequests        JlensSharePutRequest[]
 
-  samples     Sample[]
-  probes      Probe[]
-  personaAxes PersonaAxis[]
+  samples Sample[]
+  probes  Probe[]
+  vectors Vector[]
 
   isProblemEditor      Boolean              @default(false)
   problemNodesCreated  ProblemNode[]        @relation(name: "problemNodeCreatedBy")
@@ -385,33 +385,33 @@ model Model {
   instruct         Boolean @default(false)
 
   /// @zod.number.int().min(0)
-  layers               Int
+  layers           Int
   /// @zod.number.int().min(0)
-  neuronsPerLayer      Int
-  createdAt            DateTime              @default(now())
+  neuronsPerLayer  Int
+  createdAt        DateTime            @default(now())
   /// @zod.custom.use(z.string().trim().min(1))
-  owner                String
-  updatedAt            DateTime              @default(now()) @updatedAt
+  owner            String
+  updatedAt        DateTime            @default(now()) @updatedAt
   /// @zod.string.url()
-  website              String?
-  explanations         Explanation[]
-  creator              User                  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  neurons              Neuron[]
-  savedSearches        SavedSearch[]
-  sourceSets           SourceSet[]
-  steerOutputs         SteerOutput[]
-  evals                Eval[]
-  computeHosts         ComputeHost[]
-  graphMetadata        GraphMetadata[]
-  jlensShares          JlensShare[]
-  nlaSources           NlaSource[]
-  nlaExplainCaches     NlaExplainCache[]
-  headMetrics          ModelHeadMetrics[]
-  headSequences        ModelHeadSequence[]
+  website          String?
+  explanations     Explanation[]
+  creator          User                @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  neurons          Neuron[]
+  savedSearches    SavedSearch[]
+  sourceSets       SourceSet[]
+  steerOutputs     SteerOutput[]
+  evals            Eval[]
+  computeHosts     ComputeHost[]
+  graphMetadata    GraphMetadata[]
+  jlensShares      JlensShare[]
+  nlaSources       NlaSource[]
+  nlaExplainCaches NlaExplainCache[]
+  headMetrics      ModelHeadMetrics[]
+  headSequences    ModelHeadSequence[]
 
-  samples     Sample[]
-  probes      Probe[]
-  personaAxes PersonaAxis[]
+  samples Sample[]
+  probes  Probe[]
+  vectors Vector[]
 
   @@unique([defaultSourceSetName, id])
   @@unique([defaultSourceId, id])
@@ -644,10 +644,10 @@ model SourceSet {
   releases     SourceRelease? @relation(fields: [releaseName], references: [name], onDelete: Cascade)
 
   // we may have graphs even if we are not actively allowing generation of new graphs for this sourceSet
-  hasGraphs        Boolean                  @default(false)
-  graphEnabled     Boolean                  @default(false)
-  computeHosts     ComputeHostOnSourceSet[]
-  graphMetadata    GraphMetadata[]
+  hasGraphs     Boolean                  @default(false)
+  graphEnabled  Boolean                  @default(false)
+  computeHosts  ComputeHostOnSourceSet[]
+  graphMetadata GraphMetadata[]
 
   similarityMatrixEnabled Boolean @default(false)
 
@@ -1315,14 +1315,14 @@ model NlaSource {
   modelId String
   model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
-  displayName String   @default("")
-  description String   @default("")
-  url         String   @default("")
-  author      String   @default("")
+  displayName String @default("")
+  description String @default("")
+  url         String @default("")
+  author      String @default("")
   av          String
   ar          String
   layerNum    Int
-  norm        Float    @default(0.0)
+  norm        Float  @default(0.0)
 
   computeHosts  ComputeHost[]
   cachedEntries NlaExplainCache[]
@@ -1538,88 +1538,98 @@ model ProcessLock {
   details   Json?
 }
 
-enum PersonaAxisNormalize {
-  L2
-  NONE
+// ── Vectors ───────────────────────────────────────────────────────────
+
+/// Which shape `Vector.projectionParams` holds, and so which projection inference runs.
+///
+/// One member today. A probe is the next: its parameters contradict an axis's rather than extend
+/// them -- many layers instead of one, a token-selection rule instead of a fixed turn mean, a bias
+/// added before instead of a centre subtracted after -- which is what earns a member rather than
+/// more optional keys.
+enum ProjectionType {
+  AXIS_PROJECTION
 }
 
-model PersonaAxis {
+// One stored vector in a model's activation space, with the parameters that turn an activation into
+// a reading. Sent to inference with the request, so a new axis is a row here rather than a deploy of
+// the serving pod. Distinct from `Neuron`, which addresses weights living in an SAE or a
+// transcoder; this holds the numbers themselves.
+//
+// One row is one reading: a fit with several independent components is several rows, while a probe
+// summing across layers is one row with several `layers`. Which pole is the preferable one is
+// deliberately not recorded -- that is an editorial call for whatever displays the reading.
+//
+// The AXIS_PROJECTION projection, and where each part of a row lands in it:
+//
+//   h          = mean resid_post over the assistant turn, at the one entry in `layers`
+//   x          = h - params.preNormMean
+//   x          = x / ||x||                    (only when params.normalize is "l2")
+//   raw        = dot(x - params.postNormMean, values)
+//   value      = (raw - params.center) / (raw >= center ? params.scalePos : params.scaleNeg)
+//   percentile = interpolated against params.quantilesPos/quantilesNeg, bounded to [-1, 1]
+//
+// where `params` is `projectionParams`. `value` is never clipped: a reading past 1 says the axis is
+// being read off the distribution it was fitted on, which is a signal rather than a boundary.
+model Vector {
   id      String @id @default(cuid())
   modelId String
   model   Model  @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
-  // The id a request names this axis by, conventionally `<author>_<name>`. Two groups fitting
-  // the same trait is expected rather than a collision, which is why the author is part of the
-  // name.
+  // What a request names this by, unique per model and conventionally `<author>_<name>`, so two
+  // groups can fit the same trait without colliding.
+  //
+  // A row's numbers are never edited. Every stored reading records the row that measured it and
+  // nothing re-derives it, so editing one in place silently changes what those readings meant and
+  // nothing can detect it. A recalibration is a new row under a new name -- `mit_toxic_v2` -- which
+  // callers switch to deliberately.
   name   String
   author String
 
-  // A row is never edited: a recalibration inserts the next version and retires this one, so a
-  // reading stored against this row's `id` stays interpretable against the constants that
-  // produced it. Live rows are the ones with no `retiredAt`, and there should be exactly one per
-  // name.
+  // The sites this reads, in the order `values` concatenates them. One entry under
+  // AXIS_PROJECTION, which is why the read path narrows to a scalar.
   //
-  // That last part is maintained by whoever writes an axis -- retire and insert in one
-  // transaction -- and deliberately not by the partial unique index that would enforce it.
-  // Prisma cannot express one, so it would live only inside a migration file, leaving this model
-  // no longer a description of the table it defines. The trade is cheap because two live rows is
-  // not a correctness failure: a reading records the axis `id` and `version` it was measured
-  // with, so history stays pinned whatever the live set does, and a reader takes the highest live
-  // version. All the index would buy is failing the second insert instead of ignoring it.
-  version   Int       @default(1)
-  retiredAt DateTime?
+  // An array rather than a scalar plus a params key, so "where does this read" has one home
+  // whatever the projection type.
+  layers Int[]
 
-  layer Int
-
-  // What each end of the axis means. These are fields rather than halves of one display string:
-  // the poles are structure, and a reader needs them separately to label a reading.
-  polePositive            String
-  poleNegative            String
+  // What each end means. Null for a vector with one direction and no ends -- a probe, or a plain
+  // steering vector -- which nothing can label a reading from.
+  polePositive            String?
+  poleNegative            String?
   polePositiveDescription String?
   poleNegativeDescription String?
 
-  // For an axis whose natural label is not just its two poles. Nothing parses it.
+  // For a vector whose natural label is not just its two poles. Nothing parses it.
   displayName String?
-  // A known limitation, shown beside the axis's values.
+  // A known limitation, shown beside this vector's readings. A column because the page reads it.
   caveat      String?
 
-  // Float[] rather than pgvector: these are one per model dimension (4096 for Llama-3.1-8B), and
-  // pgvector's indexes stop at 2000 dimensions. Nothing searches over axes, so the index is no
-  // loss. Fitted as float32, stored as float8, which round-trips exactly.
-  direction    Float[]
-  // Subtracted from the activation before and after normalizing. Empty in every fit so far
-  // except the 70B's, and equivalent to each other when normalize is NONE.
-  preNormMean  Float[]              @default([])
-  postNormMean Float[]              @default([])
-  normalize    PersonaAxisNormalize @default(NONE)
+  // The vector: `layers.length * model.dimension` floats, one layer's worth after another. Float[]
+  // rather than pgvector, whose indexes stop at 2000; nothing searches over these. `values` is
+  // reserved in SQL, so hand-written psql needs `"values"`.
+  values Float[]
 
-  // Where the axis reads zero, and one divisor per pole. Separate divisors because a fitted axis
-  // is rarely symmetric about its centre: under a shared divisor a tighter pole is squeezed
-  // towards zero and reads flat whatever the prompt.
-  center   Float @default(0)
-  scalePos Float @default(1)
-  scaleNeg Float @default(1)
+  // Which shape `projectionParams` holds. Also the filter that keeps a row nothing can read as an
+  // axis off a page that draws axes.
+  projectionType ProjectionType @default(AXIS_PROJECTION)
 
-  // Inverse-CDF of the fitting corpus, per pole, which is what turns a raw ratio into a bounded
-  // percentile. All three or none: two of them cannot be interpreted without the third. Levels
-  // are the grid the tables are sampled at, and may be left empty for an evenly spaced one.
-  quantileLevels Float[] @default([])
-  quantilesPos   Float[] @default([])
-  quantilesNeg   Float[] @default([])
+  // The rest of the projection. Under AXIS_PROJECTION, exactly the inference `NPAxis` payload minus
+  // what the columns above hold: `normalize`, `center`, `scalePos`, `scaleNeg`, `preNormMean`,
+  // `postNormMean`, the three quantile tables, and `render`.
+  //
+  // Absent means defaulted, so omit a key rather than storing it empty -- inference rejects a
+  // quantile table shorter than two entries, and `[]` is one. `{}` is a whole axis: the bare dot
+  // product, in its own units, with no percentile.
+  //
+  // A breaking change to a shape is a new `ProjectionType` member, not a version inside here. And
+  // because this mirrors a wire contract, an inference-side rename is a migration here.
+  projectionParams Json @default("{}")
 
-  // How a conversation has to be templated for this axis's numbers to mean anything. A
-  // projection onto a fitted direction only holds if inference renders the conversation the way
-  // the fit did, so these travel with the axis. `templateKwargs` is a flat string map; Llama 3.1
-  // injects the current date, so a fit on it pins `date_string` or drifts as the calendar moves.
-  blankSystemPrompt Boolean @default(false)
-  templateKwargs    Json?
-
-  // How the fit went, e.g. r_squared and turn_bias. Recorded for provenance; nothing reads it.
-  provenance Json?
-
-  // Where this axis is published for anyone to fetch, if it has been. The same artifact a caller
-  // can hand to inference as a path instead of sending the vectors inline. Named after
-  // `Source.hfRepoId` / `hfFolderId`, which point at SAE weights the same way.
+  // Where this is published, if it is: the artifact a caller can hand to inference as a path
+  // instead of sending the numbers inline. Named after `Source.hfRepoId` / `hfFolderId`.
+  //
+  // Also the only home for how the fit scored. An unpublished row records none, deliberately: what
+  // a reader needs in order to trust a reading goes in `caveat`, which is displayed.
   hfRepoId   String?
   hfFolderId String?
 
@@ -1629,7 +1639,7 @@ model PersonaAxis {
 
   createdAt DateTime @default(now())
 
-  @@unique([modelId, name, version])
+  @@unique([modelId, name])
   @@index([modelId, visibility])
   @@index([creatorId])
 }

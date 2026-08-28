@@ -1,7 +1,8 @@
 import { NPSteerMethod } from '@/lib/api/inference-types';
 import { prisma } from '@/lib/db';
 import { NEXT_PUBLIC_URL } from '@/lib/env';
-import { assistantAxisFromStored, storedOutputTextIncludesPrompt } from '@/lib/utils/steer-wire';
+import { axisReadoutsToLegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
+import { axisReadoutsFromStored, storedOutputTextIncludesPrompt } from '@/lib/utils/steer-wire';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputType } from '@prisma/client';
 import { NextResponse } from 'next/server';
@@ -107,27 +108,22 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     toReturnResult.id = savedSteerSteeredOutput.id;
     toReturnResult.shareUrl = `${NEXT_PUBLIC_URL}/steer/${savedSteerSteeredOutput.id}`;
 
-    // Handle assistant_axis (capMonitorOutput) for PROJECTION_CAP steer method
-    const isAssistantAxis = savedSteerSteeredOutput.steerMethod === NPSteerMethod.PROJECTION_CAP;
-    if (isAssistantAxis) {
-      toReturnResult.assistant_axis = [];
-
-      // Get capMonitorOutput for steered output (use cached data only)
-      const steeredCapMonitor = savedSteerSteeredOutput.capMonitorOutput;
-      if (steeredCapMonitor) {
-        const parsed = JSON.parse(steeredCapMonitor);
-        toReturnResult.assistant_axis.push(assistantAxisFromStored(parsed));
-      }
-
-      // Get capMonitorOutput for default output (use cached data only)
-      const defaultCapMonitor = savedSteerDefaultOutput.capMonitorOutput;
-      if (defaultCapMonitor) {
-        const parsed = JSON.parse(defaultCapMonitor);
-        toReturnResult.assistant_axis.push(assistantAxisFromStored(parsed));
-      }
-
-      if (toReturnResult.assistant_axis.length === 0) {
-        toReturnResult.assistant_axis = undefined;
+    // Axis readouts (capMonitorOutput) for the PROJECTION_CAP steer method. Cached data only:
+    // loading a shared link must not run inference.
+    if (savedSteerSteeredOutput.steerMethod === NPSteerMethod.PROJECTION_CAP) {
+      const readouts = [
+        ...axisReadoutsFromStored(
+          savedSteerSteeredOutput.capMonitorOutput ? JSON.parse(savedSteerSteeredOutput.capMonitorOutput) : null,
+          SteerOutputType.STEERED,
+        ),
+        ...axisReadoutsFromStored(
+          savedSteerDefaultOutput.capMonitorOutput ? JSON.parse(savedSteerDefaultOutput.capMonitorOutput) : null,
+          SteerOutputType.DEFAULT,
+        ),
+      ];
+      if (readouts.length > 0) {
+        toReturnResult.axes = readouts;
+        toReturnResult.assistant_axis = axisReadoutsToLegacyAssistantAxis(readouts);
       }
     }
 

@@ -100,6 +100,23 @@ QWEN_THINKING = ModelSpec(
     is_thinking=True,
 )
 
+# The one checkpoint that ships readout axis assets. The axis path can be unit-tested with
+# synthetic tensors, but whether capture, the pinned template kwargs and the projection agree
+# can only be seen on the model they were fitted for. No SAEs -- a readout needs the forward
+# pass and the capture hooks, nothing else.
+#
+# Deliberately not in MODELS: 16GB of gated weights is more than CI should pull, so its
+# model_expectations.yaml row is `tier: manual` and `test_manual_rows_are_not_in_the_ci_matrix`
+# holds it out of the matrix. Tests using this spec opt in the same way, via
+# NP_RUN_MANUAL_TESTS.
+LLAMA_8B_TRAITS = ModelSpec(
+    key="llama3.1-8b-it",
+    model_id="meta-llama/Llama-3.1-8B-Instruct",
+    dtype="bfloat16",
+    is_chat=True,
+    is_gated=True,
+)
+
 MODELS: dict[str, ModelSpec] = {m.key: m for m in (GPT2, GEMMA_IT, QWEN_THINKING)}
 
 

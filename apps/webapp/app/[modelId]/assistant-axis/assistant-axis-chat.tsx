@@ -6,9 +6,10 @@ import { Button } from '@/components/shadcn/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import SteerChatMessage from '@/components/steer/chat-message';
 import { LoadingSquare } from '@/components/svg/loading-square';
-import { NPSteerMethod, SteerAssistantAxis } from '@/lib/api/inference-types';
+import { NPSteerMethod } from '@/lib/api/inference-types';
 import { ASSET_BASE_URL, IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { ChatMessage, ERROR_STEER_MAX_PROMPT_CHARS, SteerFeature } from '@/lib/utils/steer';
+import { LegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ArrowRightIcon, InfoCircledIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import copy from 'copy-to-clipboard';
@@ -34,7 +35,9 @@ import AssistantAxisWelcomeModal from './assistant-axis-welcome-modal';
 import PersonaChart, { ChartData } from './persona-chart';
 import { CAP_BLOG_URL, CAP_CONTACT_EMAIL, CAP_GITHUB_URL, CAP_PAPER_URL, CAP_VECTOR_URL, DEMO_BUTTONS } from './shared';
 
-type PersonaCheckResult = SteerAssistantAxis;
+// Reads the deprecated `assistant_axis` view of the readouts, which /api/steer-chat still
+// returns. The `axes` field it derives that from is what a multi-axis chart wants.
+type PersonaCheckResult = LegacyAssistantAxis;
 
 export default function AssistantAxisChat({
   isSteering,

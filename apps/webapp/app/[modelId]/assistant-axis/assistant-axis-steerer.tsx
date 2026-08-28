@@ -2,7 +2,7 @@
 
 import { SteerResultChat } from '@/app/api/steer-chat/route';
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { NPSteerMethod, SteerAssistantAxis } from '@/lib/api/inference-types';
+import { NPSteerMethod } from '@/lib/api/inference-types';
 import { useIsMount } from '@/lib/hooks/use-is-mount';
 import {
   ChatMessage,
@@ -15,12 +15,15 @@ import {
   STEER_TEMPERATURE,
   SteerFeature,
 } from '@/lib/utils/steer';
+import { LegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AssistantAxisChat from './assistant-axis-chat';
 import { ChartData, buildChartData, combineChartData } from './persona-chart';
 
-type PersonaCheckResult = SteerAssistantAxis;
+// Reads the deprecated `assistant_axis` view of the readouts, which /api/steer-chat still
+// returns. The `axes` field it derives that from is what a multi-axis chart wants.
+type PersonaCheckResult = LegacyAssistantAxis;
 
 const PERSONA_MODELS = ['llama3.3-70b-it'];
 

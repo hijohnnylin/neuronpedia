@@ -81,7 +81,6 @@ from neuronpedia_inference.endpoints.util.sae_vector import router as sae_vector
 from neuronpedia_inference.endpoints.util.similarity_matrix_pred import (
     router as similarity_matrix_pred_router,
 )
-from neuronpedia_inference.inference_utils.persona import initialize_persona_data
 from neuronpedia_inference.logging import initialize_logging
 from neuronpedia_inference.operation_ids import sdk_operation_id
 from neuronpedia_inference.resilience import (
@@ -947,10 +946,6 @@ async def initialize(
     # card, so either way the measurement below sees what the lens took.
     if not await place_jacobian_lens_on_worker(config, args, model):
         place_jacobian_lens_on_device(config, args)
-
-    model_id_for_persona = config.override_model_id or config.model_id
-    logger.info(f"Initializing persona data for model: {model_id_for_persona}")
-    initialize_persona_data(model_id_for_persona)
 
     # ---- size the request working-set budget, LAST ----
     # Deliberately the final step of startup. compute_serving_limits() above runs before the
