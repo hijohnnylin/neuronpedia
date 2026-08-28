@@ -26,6 +26,11 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
     }
 
+    // An empty list is a valid request with an empty answer, and the code below assumes at least one.
+    if (featuresRequest.length === 0) {
+      return NextResponse.json([]);
+    }
+
     const features: NeuronIdentifier[] = [];
     featuresRequest.forEach((feature) => {
       features.push(new NeuronIdentifier(feature.modelId, feature.layer, feature.index.toString()));
@@ -52,6 +57,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     if (error instanceof ValidationError) {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }
+    console.error('[/api/features] failed:', error);
     return NextResponse.json({ message: 'Unknown Error' }, { status: 500 });
   }
 });

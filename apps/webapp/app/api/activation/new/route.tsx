@@ -1,3 +1,4 @@
+import { prisma } from '@/lib/db';
 import { assertUserCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
 import { getActivationForFeature } from '@/lib/utils/inference';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
@@ -141,6 +142,31 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : 'Unknown Error' }, { status: 500 });
   }
+  // The dashboard hides the test box when inference is off, but this route takes unauthenticated
+  // calls, so the guard has to exist here too rather than only in the UI.
+  const target = await prisma.neuron.findUnique({
+    where: {
+      modelId_layer_index: { modelId: neuron.modelId, layer: neuron.layer, index: neuron.index.toString() },
+    },
+    select: {
+      hasVector: true,
+      model: { select: { inferenceEnabled: true } },
+      source: { select: { inferenceEnabled: true } },
+    },
+  });
+  if (!target) {
+    return NextResponse.json({ message: 'Feature not found.' }, { status: 404 });
+  }
+  // A vector is run by the model alone, so it only needs the model to be enabled. An SAE feature
+  // needs its source loaded on a host, which is what the source flag tracks.
+  const inferenceEnabled = target.hasVector ? target.model.inferenceEnabled : target.source?.inferenceEnabled;
+  if (!inferenceEnabled) {
+    return NextResponse.json(
+      { message: `Inference is not enabled for ${neuron.modelId}/${neuron.layer}.` },
+      { status: 400 },
+    );
+  }
+
   const activation = await getActivationForFeature(neuron, body.customText, request.user, body.ignoreBos === true);
 
   return NextResponse.json(activation);
