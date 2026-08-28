@@ -239,24 +239,27 @@ export const getCosSimForFeature = async (
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(targetModelId);
 
-  return makeInferenceServerApiWithServerHost(serverHost).POST('/v1/util/sae-topk-by-decoder-cossim', {
-    body: {
-      ...(result?.hasVector
-        ? {
-            vector: result.vector,
-          }
-        : {
-            feature: {
-              model: feature.modelId,
-              source: feature.layer,
-              index: parseInt(feature.index, 10),
-            },
-          }),
-      model: transformerLensModelId,
-      source: targetSourceId,
-      numResults: 10,
-    },
-  });
+  // Callers read the payload's fields directly, so the openapi-fetch envelope comes off here.
+  return unwrapInferenceResponse(
+    makeInferenceServerApiWithServerHost(serverHost).POST('/v1/util/sae-topk-by-decoder-cossim', {
+      body: {
+        ...(result?.hasVector
+          ? {
+              vector: result.vector,
+            }
+          : {
+              feature: {
+                model: feature.modelId,
+                source: feature.layer,
+                index: parseInt(feature.index, 10),
+              },
+            }),
+        model: transformerLensModelId,
+        source: targetSourceId,
+        numResults: 10,
+      },
+    }),
+  );
 };
 
 type ActivationForFeatureResult = {
