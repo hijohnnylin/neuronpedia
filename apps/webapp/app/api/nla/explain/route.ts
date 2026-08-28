@@ -667,7 +667,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   }
 
   // 5. Forward only the missing positions to the upstream NLA server.
-  // `nlaFetch` shuffles the source's `servers[]` and fails over until
+  // `nlaFetch` shuffles the source's registered hosts and fails over until
   // one returns 2xx; if every server errors, the last response (e.g.
   // 429 from a busy backend) is returned and we forward its status.
   const nlaResponse = await nlaFetch(modelId, nlaSourceId, '/explain', {

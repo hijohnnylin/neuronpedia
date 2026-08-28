@@ -47,7 +47,6 @@ export type NlaSourceWithModel = {
   av: string;
   ar: string;
   layerNum: number;
-  servers: string[];
   norm: number;
   createdAt: Date | string;
   model: {

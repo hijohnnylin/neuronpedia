@@ -281,52 +281,6 @@ def export_config():
         conn.close()
 
 
-def export_inference_hosts(
-    model_id, source, OUTPUT_PATH_BASE, OVERRIDE_INSTANCE_HOST_URL
-):
-    path = f"{OUTPUT_PATH_BASE}/{source}/inference_hosts_on_source.jsonl"
-    inf_source_path = f"{OUTPUT_PATH_BASE}/{source}/inference_hosts.jsonl"
-    if os.path.exists(path) and os.path.exists(inf_source_path):
-        return
-    conn = create_connection()
-    try:
-        print(f"Exporting inference hosts for model {model_id}")
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-
-        cur.execute(
-            """
-            SELECT * FROM "InferenceHostSourceOnSource" WHERE "sourceModelId" = %s AND "sourceId" = %s
-            """,
-            (model_id, source),
-        )
-
-        rows = cur.fetchall()
-        with open(path, "w") as f:
-            writeRowsToJsonlFile(rows, f)
-
-        # for each row, get the inferenceHostSource
-        inference_hosts = []
-        for row in rows:
-            inference_hosts.append(row["inferenceHostId"])
-
-        # get the inference hosts
-        cur.execute(
-            """
-            SELECT * FROM "InferenceHostSource" WHERE "id" = ANY(%s)
-            """,
-            (inference_hosts,),
-        )
-
-        rows = cur.fetchall()
-        with open(inf_source_path, "w") as f:
-            for row in rows:
-                row["hostUrl"] = OVERRIDE_INSTANCE_HOST_URL
-            writeRowsToJsonlFile(rows, f)
-    finally:
-        cur.close()
-        conn.close()
-
-
 def export_features(model_id, source, OUTPUT_PATH_BASE):
     conn = create_connection()
     try:
@@ -635,7 +589,6 @@ def process_source_sync(release, sourceset, source):
         RELEASE_ID = release["name"]
         SOURCE_SET = sourceset["name"]
         MODEL_ID = source["modelId"]
-        OVERRIDE_INSTANCE_HOST_URL = ""
         source_id = source["id"]
 
         print(
@@ -650,12 +603,8 @@ def process_source_sync(release, sourceset, source):
         if RELEASE_ID is not None:
             export_release(RELEASE_ID, source_id, OUTPUT_PATH_BASE)
         export_source(MODEL_ID, SOURCE_SET, source_id, OUTPUT_PATH_BASE)
-        export_inference_hosts(
-            MODEL_ID,
-            source_id,
-            OUTPUT_PATH_BASE,
-            OVERRIDE_INSTANCE_HOST_URL,
-        )
+        # GPU hosts are not exported. They belong to the environment that runs
+        # them, and an importer registers its own with `make host-add`.
         export_features(MODEL_ID, source_id, OUTPUT_PATH_BASE)
         export_explanations(MODEL_ID, source_id, OUTPUT_PATH_BASE)
         export_activations(MODEL_ID, source_id, OUTPUT_PATH_BASE)
