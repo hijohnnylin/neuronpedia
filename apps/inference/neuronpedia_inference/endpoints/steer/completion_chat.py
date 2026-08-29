@@ -170,8 +170,13 @@ async def completion_chat(request: SteerCompletionChatRequest):
                 n_layers=int(model.n_layers),
             )
         except AxisRequestError as exc:
-            logger.warning("Axis request validation failed", exc_info=True)
-            return JSONResponse(content={"error": "Invalid axis request"}, status_code=exc.status_code)
+            # Returned verbatim, and safe to: every message this can carry is a literal written in
+            # `axis_request`, naming the axis and the field that was wrong. The upstream text that
+            # used to be interpolated into the Hub failures -- and with it this pod's cache paths --
+            # is logged there instead. Blanking the message would leave a caller who sent eight
+            # axes unable to tell which one this rejected, which is the whole point of the type.
+            logger.warning(f"Axis request rejected: {exc}", exc_info=True)
+            return JSONResponse(content={"error": str(exc)}, status_code=exc.status_code)
 
     # Every requested axis has to agree about how the conversation is rendered, because those
     # conditions are applied before generation and so change the text itself. There is no way to

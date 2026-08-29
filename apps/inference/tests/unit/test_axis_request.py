@@ -398,9 +398,13 @@ class TestPublishedArtifact:
         # A Hub that will not answer is ours to report as such: a 400 would tell the caller to fix
         # a request that was fine.
         hub.repo_error = OSError("connection reset")
-        with pytest.raises(AxisRequestError, match="connection reset") as caught:
+        with pytest.raises(AxisRequestError, match="org/axes") as caught:
             from_source()
         assert caught.value.status_code == 502
+        # The Hub's own text stays out of it. The endpoint returns these messages to the caller
+        # verbatim, and an upstream error carries request urls and this pod's cache paths; it is
+        # logged instead. What the caller can act on is which repo could not be read.
+        assert "connection reset" not in str(caught.value)
 
     def test_a_download_that_fails_for_any_other_reason(self, hub, monkeypatch):
         def explode(**_kwargs):

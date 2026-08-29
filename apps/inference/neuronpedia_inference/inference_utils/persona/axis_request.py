@@ -202,9 +202,13 @@ def _resolve_revision(source: NPAxisSource) -> str:
 
     try:
         info = HfApi().repo_info(repo_id=source.hf_repo_id, revision=source.revision, repo_type="model")
-    except Exception as exc:  # noqa: BLE001  # the Hub's exception tree is wide; the message is what matters
+    except Exception as exc:  # noqa: BLE001  # the Hub's exception tree is wide; that it failed is what matters
+        # The Hub's own text is logged rather than returned. It carries request urls and cache
+        # paths from this pod, and the caller can act on none of it -- what they need is which
+        # repo and revision this server could not read, which the message states.
+        logger.warning(f"Could not read {source.hf_repo_id} at {source.revision or 'default'}", exc_info=True)
         raise AxisRequestError(
-            f"Could not read {source.hf_repo_id} at revision {source.revision or 'default'}: {exc}",
+            f"Could not read {source.hf_repo_id} at revision {source.revision or 'default'}",
             status_code=502,
         ) from exc
     if not info.sha:
@@ -232,8 +236,9 @@ def _artifact_at(repo_id: str, folder: str, revision: str) -> AxisAsset:
             # The commit resolved, so the repo is there and this is a folder that is not an axis.
             raise AxisRequestError(f"{repo_id}/{prefix} at {revision} has no {name}") from exc
         except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Could not download {filename} from {repo_id} at {revision}", exc_info=True)
             raise AxisRequestError(
-                f"Could not download {filename} from {repo_id} at {revision}: {exc}", status_code=502
+                f"Could not download {filename} from {repo_id} at {revision}", status_code=502
             ) from exc
 
     # Both files land in the same snapshot directory, which is the shape `load_axis` reads.
@@ -241,7 +246,11 @@ def _artifact_at(repo_id: str, folder: str, revision: str) -> AxisAsset:
     try:
         asset = load_axis(prefix.rsplit("/", 1)[-1] or repo_id, directory)
     except Exception as exc:  # noqa: BLE001
-        raise AxisRequestError(f"{repo_id}/{prefix} at {revision} is not a valid axis: {exc}") from exc
+        # `load_axis` names the file it rejected, which here is this pod's Hub cache path -- so
+        # the reason goes to the log and the caller is told which artifact was bad. They own the
+        # artifact and can validate it against `load_axis` directly; the path is ours.
+        logger.warning(f"{repo_id}/{prefix} at {revision} is not a valid axis", exc_info=True)
+        raise AxisRequestError(f"{repo_id}/{prefix} at {revision} is not a valid axis") from exc
     return dataclasses.replace(asset, source_revision=revision)
 
 
