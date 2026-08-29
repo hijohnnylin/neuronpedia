@@ -5,7 +5,7 @@ import logging
 import os
 import time
 import traceback
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
 import sentry_sdk
@@ -466,11 +466,93 @@ def _format_duration(seconds: float) -> str:
     return f"{minutes}m {secs}s" if minutes else f"{secs}s"
 
 
+def _format_address_ranges(addresses: Iterable[Address]) -> str:
+    """Addresses as collapsed layer runs: ``resid_post.0-31,40 attn.0-3``.
+
+    An `auto` pod declares one address per layer, so the literal list on a 70B model is 80 entries
+    per direction and reads as noise. Collapsed, the same set is short enough to scan, and the
+    shape of it -- every layer, or just the two an SAE and an axis happen to want -- is the part
+    worth seeing. One token per point name, layers grouped inside it.
+    """
+    by_name: dict[str, set[int]] = {}
+    # A point can be addressed without a layer (`Address.layer` is optional, for the sites that
+    # are not per-block), and such an address prints as the bare name.
+    layerless: set[str] = set()
+    for address in addresses:
+        if address.layer is None:
+            layerless.add(address.name)
+            continue
+        by_name.setdefault(address.name, set()).add(address.layer)
+    tokens: list[str] = []
+    for name in sorted(set(by_name) | layerless):
+        if name in layerless:
+            tokens.append(name)
+        layers = sorted(by_name.get(name, ()))
+        if not layers:
+            continue
+        runs: list[str] = []
+        start = end = layers[0]
+        for layer in layers[1:]:
+            if layer == end + 1:
+                end = layer
+                continue
+            runs.append(f"{start}-{end}" if start != end else f"{start}")
+            start = end = layer
+        runs.append(f"{start}-{end}" if start != end else f"{start}")
+        tokens.append(f"{name}.{','.join(runs)}")
+    return " ".join(tokens) if tokens else "none"
+
+
+def _describe_requested_static_points(
+    static_mode: Any,
+    extra_points: list[Address],
+    *,
+    generation_only: bool,
+) -> str:
+    """What this pod asked to declare, for the config banner.
+
+    Printed before the SAEs load, so `sae` cannot be resolved to addresses yet and says so rather
+    than printing an empty set that would read as "nothing declared". The resolved truth is in the
+    ready banner at the end of startup, which is where the two differ.
+    """
+    if generation_only:
+        return "none (GENERATION_ONLY: completions only)"
+    extra = f" + {_format_address_ranges(extra_points)}" if extra_points else ""
+    if static_mode is None:
+        return "none (hooked backend: every point reachable)"
+    if static_mode in _SAE_RESOLVED_MODES:
+        return f"{static_mode} (resolved once the SAEs load){extra}"
+    if static_mode == "auto":
+        return f"auto (the block-output point at every layer, read and write){extra}"
+    # Whatever is left is the explicit JSON list, which is already addresses. Reached only after
+    # the named modes above: every one of them is a `str`, and a `str` is iterable, so falling
+    # through with one renders it a character at a time.
+    return f"{_format_address_ranges(to_address(point) for point in static_mode)}{extra}"
+
+
 def _log_banner(title: str, lines: list[str]) -> None:
     """One visually obvious block, so the end of a long noisy startup is findable."""
     bar = "=" * 100
     body = "\n".join(f"  {line}" for line in lines)
     logger.info("\n%s\n  %s\n%s\n%s\n%s\n", bar, title, "-" * 100, body, bar)
+
+
+def _declared_taps_line() -> str:
+    """The tap set as it actually resolved, read off the loaded model.
+
+    The config banner prints what was asked for, which for `sae` is a mode name and not a set.
+    This is the same question answered after the SAEs loaded and the extras were merged in, so a
+    pod whose axis layer is missing is visible at startup rather than on the first request that
+    needs it.
+    """
+    model = Model.get_instance()
+    reads = tuple(getattr(model, "static_points", ()) or ())
+    writes = tuple(getattr(model, "static_writes", ()) or ())
+    if not reads and not writes:
+        if getattr(model, "hooks_available", True):
+            return "none declared (hooked backend: every point reachable)"
+        return "none declared (graphs on, nothing capturable)"
+    return f"read {_format_address_ranges(reads)} | write {_format_address_ranges(writes)}"
 
 
 def _log_ready_banner(elapsed_seconds: float) -> None:
@@ -488,6 +570,7 @@ def _log_ready_banner(elapsed_seconds: float) -> None:
             f"({', '.join(sae_manager.valid_sae_sets) or 'none'})",
             f"token limits: prompt={config.token_limit} activation={config.activation_token_limit} "
             f"lens={config.lens_token_limit}",
+            f"static taps: {_declared_taps_line()}",
             f"startup took {_format_duration(elapsed_seconds)}",
         ],
     )
@@ -782,6 +865,7 @@ async def initialize(
         num_gpus = max(1, int(getattr(args, "num_gpus", 1) or 1))
         if num_gpus > 1:
             logger.info("Multi-GPU: sharding across %d GPUs (%s)", num_gpus, args.backend)
+        generation_only = _resolve_generation_only(args)
 
         config = Config(
             secret=SECRET,
@@ -802,7 +886,12 @@ async def initialize(
             num_gpus=num_gpus,
             sae_gpu_budget_gib=args.sae_gpu_budget_gib,
             sae_pinned_host_gib=args.sae_pinned_host_gib,
-            generation_only=_resolve_generation_only(args),
+            generation_only=generation_only,
+            static_points_summary=_describe_requested_static_points(
+                static_mode,
+                extra_points,
+                generation_only=generation_only,
+            ),
         )
         Config._instance = config
 
@@ -988,10 +1077,9 @@ async def initialize(
             )
             raise
 
-    # After the model is loaded: preload the vLLM engine (vLLM backend only), then
-    # initialize persona data for the assistant-axis feature. Persona data loads
-    # for whichever backend is active (vLLM or EagerModel); it's a no-op/warn
-    # when the model has no persona data files on disk.
+    # After the model is loaded, preload the vLLM engine (vLLM backend only). Nothing is loaded
+    # here for readout axes: they are database rows that travel with the request, so there is no
+    # per-model asset for startup to find.
     model = Model.get_instance()
     if isinstance(model, VLLMModel):
         # warmup() builds the engine, compiles decode kernels, and — when static taps

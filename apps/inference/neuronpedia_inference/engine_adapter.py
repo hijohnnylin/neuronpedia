@@ -189,6 +189,73 @@ def assert_residual_available(model: object, what: str = "This endpoint", point:
     )
 
 
+def declares_static_taps(model: object) -> bool:
+    """True when this pod's tap set is fixed, so a per-layer check is worth asking at all.
+
+    Guards the work of resolving which layers a request would touch, not just the answer: on a
+    hooked pod that resolution reaches into the SAE manager for each feature's hook name, and a
+    check that cannot refuse anything should not be able to raise on the way to saying so.
+    """
+    return not getattr(model, "hooks_available", True)
+
+
+def _resid_aliases(address: Address) -> tuple[Address, ...]:
+    """The other name for the same residual add: ``resid_pre[L]`` IS ``resid_post[L-1]``.
+
+    Mirrors ``resid_stream_aliases`` in the engine's vllm_backend, which is what the refusals
+    these two checks pre-empt match against. Copied rather than imported: it is three lines, and
+    the import would reach past the package root into the vLLM backend module.
+
+    Drift is the risk that trades for, so these checks lean PERMISSIVE. A site this fails to
+    recognize as declared is one the engine refuses for itself, which is the 500 they exist to
+    replace and not a new failure; a site they wrongly call missing would refuse a request the pod
+    could have served.
+    """
+    if address.layer is None:
+        return (address,)
+    layer = int(address.layer)
+    if address.name == "resid_pre" and layer > 0:
+        return (address, Address("resid_post", layer - 1))
+    if address.name == "resid_post":
+        return (address, Address("resid_pre", layer + 1))
+    return (address,)
+
+
+def _undeclared_layers(declared: set[str], layers: list[int], point: str) -> list[int]:
+    """Which of ``layers`` no alias of ``point`` covers, sorted and deduplicated."""
+    return sorted(
+        {
+            layer
+            for layer in layers
+            if not any(str(alias) in declared for alias in _resid_aliases(Address(point, layer)))
+        }
+    )
+
+
+def _static_layer_miss(
+    model: object,
+    layers: list[int],
+    point: str,
+    *,
+    private_attr: str,
+    public_attr: str,
+) -> tuple[list[int], list[str]] | None:
+    """``(missing layers, declared)`` for a static pod, or None when the question does not apply.
+
+    None covers both "hooks run, so every site is reachable" and "nothing declared at all", the
+    second because that pod is refused wholesale by :func:`assert_hooks_available` /
+    :func:`assert_steering_available` and a layer list would be the wrong reason to give.
+    """
+    if getattr(model, "hooks_available", True):
+        return None
+    declared = getattr(model, private_attr, None) or getattr(model, public_attr, ()) or ()
+    declared_keys = {str(address) for address in declared}
+    if not declared_keys:
+        return None
+    missing = _undeclared_layers(declared_keys, layers, point)
+    return (missing, sorted(declared_keys)) if missing else None
+
+
 def assert_capture_layers_declared(
     model: object,
     layers: list[int],
@@ -200,29 +267,53 @@ def assert_capture_layers_declared(
     :func:`assert_residual_available` asks whether ``point`` is declared at all, which is the
     right question for an endpoint that reads every layer or none. A readout axis reads exactly
     one, so a pod can declare ``resid_post`` and still not have the layer in hand: the 70B pod
-    declares the site its layer-50 SAE reads and is asked for layer 40 by an axis fitted there.
+    declared the site its layer-50 SAE reads and was asked for layer 40 by an axis fitted there.
 
     That distinction only started to matter when axes became database rows. A shipped asset was
     on disk before the graphs were recorded, so the mismatch was a deploy-time fact; an axis that
     arrives with the request makes it a per-request one, and the engine's own refusal comes from
-    inside the generate call -- a 500 with a traceback, after the prompt was rendered. Asked here
-    instead, it is a 400 that names the axis and the layer, which is a pod that needs
-    ``STATIC_POINTS_EXTRA`` rather than a bug.
+    inside the generate call -- a 500 with a traceback, after the prompt was rendered.
     """
-    if getattr(model, "hooks_available", True):
+    miss = _static_layer_miss(model, layers, point, private_attr="_static_reads", public_attr="static_points")
+    if miss is None:
         return
-    declared = getattr(model, "_static_reads", None) or getattr(model, "static_points", ()) or ()
-    declared_keys = {str(address) for address in declared}
-    if not declared_keys:
-        return  # Not a static pod; the hooks/native checks own this case.
-    missing = sorted({layer for layer in layers if f"{point}.{layer}" not in declared_keys})
-    if not missing:
-        return
+    missing, declared = miss
     raise BackendUnsupported(
         f"{what} reads {point} at layer(s) {missing}, which this pod did not declare. Its CUDA "
         f"graphs are recorded against a fixed tap set, so no layer can be added while it runs. "
-        f"Declared: {sorted(declared_keys)}. Relaunch it with those layers in "
-        f"STATIC_POINTS_EXTRA (e.g. STATIC_POINTS_EXTRA='[\"{point}.{missing[0]}\"]')."
+        f"Declared: {declared}. Relaunch it with those layers declared: STATIC_POINTS=auto covers "
+        f"every layer, and STATIC_POINTS_EXTRA adds a closed set beside STATIC_POINTS=sae "
+        f"(e.g. STATIC_POINTS_EXTRA='[\"{point}.{missing[0]}\"]')."
+    )
+
+
+def assert_steer_layers_declared(
+    model: object,
+    layers: list[int],
+    what: str = "Steered generation",
+    point: str = "resid_post",
+) -> None:
+    """The write-side twin of :func:`assert_capture_layers_declared`.
+
+    :func:`assert_steering_available` asks whether this pod declared ANY write site, which catches
+    a generation-only pod and misses the case that actually bit: writes declared, at other layers.
+    A projection cap writes wherever the feature or vector it caps was fitted, and an uploaded
+    vector can name any layer at all, so the set is not one a pod can enumerate at startup --
+    which is why the pod this was written for now declares every layer instead.
+
+    Kept separate from the read check because the two sets genuinely differ: an SAE set declares
+    writes under the ``resid_pre[L]`` -> ``resid_post[L-1]`` mapping, so a pod can hold a read at
+    a layer and no write there.
+    """
+    miss = _static_layer_miss(model, layers, point, private_attr="_static_writes", public_attr="static_writes")
+    if miss is None:
+        return
+    missing, declared = miss
+    raise BackendUnsupported(
+        f"{what} writes {point} at layer(s) {missing}, which this pod did not declare. Its CUDA "
+        f"graphs are recorded against a fixed tap set, so no write tap can be added while it "
+        f"runs. Declared for writing: {declared}. Relaunch it with STATIC_POINTS=auto, which "
+        f"declares every layer to read and to write."
     )
 
 

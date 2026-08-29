@@ -23,11 +23,14 @@ from neuronpedia_inference.endpoints.steer.completion import (
     _feature_to_steerspec,
     features_to_vllm_steering_spec,
     resolve_max_new_tokens,
+    steer_write_layers,
 )
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     assert_capture_layers_declared,
+    assert_steer_layers_declared,
     assert_steering_available,
+    declares_static_taps,
     get_tokenize,
 )
 from neuronpedia_inference.inference_utils.persona import (
@@ -296,6 +299,16 @@ async def completion_chat(request: SteerCompletionChatRequest):
             content={"error": "No features or vectors provided"},
             status_code=400,
         )
+
+    # The write-side twin of the axis-layer check above, and asked for the same reason: the spec
+    # that writes is built inside the SSE generator, so a refusal there is a 500 mid-stream. A
+    # projection cap writes wherever the vector it caps was fitted, which on this endpoint is not
+    # the layer the axis reads -- the 70B pod declared 40 for the readout and was asked to write 32.
+    if wants_steering and declares_static_taps(model):
+        try:
+            assert_steer_layers_declared(model, steer_write_layers(features))
+        except BackendUnsupported as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
 
     # Convert promptChatFormatted to NPSteerChatMessage for the readouts, so they analyze the
     # same conversation (including the system message, blanked or not) that generation saw.

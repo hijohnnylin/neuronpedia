@@ -23,7 +23,9 @@ from interp_engine import Address
 
 from neuronpedia_inference.server import (
     _DEFAULT_CUDAGRAPH_CAPTURE_SIZES,
+    _describe_requested_static_points,
     _engine_context_len,
+    _format_address_ranges,
     _parse_extra_static_points,
     _parse_static_points,
     _vllm_backend_kwargs,
@@ -172,6 +174,62 @@ def test_an_extra_point_is_declared_to_read_and_to_write():
     )
     assert [str(a) for a in reads] == ["resid_post.50", "resid_post.40"]
     assert [str(a) for a in writes] == ["resid_post.49", "resid_post.40"]
+
+
+def test_declared_taps_are_logged_as_ranges_rather_than_one_line_per_layer():
+    """80 addresses is what an `auto` 70B pod declares, and nobody reads 80 addresses."""
+    assert _format_address_ranges([]) == "none"
+    assert _format_address_ranges([Address("resid_post", 40)]) == "resid_post.40"
+    assert _format_address_ranges(Address("resid_post", n) for n in range(80)) == "resid_post.0-79"
+    # The gap is the point: a run and an isolated layer read differently at a glance.
+    assert (
+        _format_address_ranges([Address("resid_post", n) for n in range(4)] + [Address("resid_post", 40)])
+        == "resid_post.0-3,40"
+    )
+    # The 70B case, where the SAE site and the axis layer are both singletons.
+    assert _format_address_ranges([Address("resid_post", 50), Address("resid_post", 40)]) == "resid_post.40,50"
+
+
+def test_ranges_group_by_point_name_and_do_not_double_count_a_repeat():
+    assert (
+        _format_address_ranges(
+            [
+                Address("resid_post", 1),
+                Address("attn", 0),
+                Address("resid_post", 0),
+                Address("attn", 1),
+                Address("resid_post", 1),
+            ]
+        )
+        == "attn.0-1 resid_post.0-1"
+    )
+
+
+def test_a_point_with_no_layer_prints_as_the_bare_name():
+    """`Address.layer` is optional, for sites that are not per-block."""
+    assert _format_address_ranges([Address("embed", None)]) == "embed"
+    assert _format_address_ranges([Address("embed", None), Address("resid_post", 3)]) == "embed resid_post.3"
+
+
+def test_the_config_banner_says_a_resolved_mode_is_not_a_set_yet():
+    """It prints before the SAEs load. An empty list there would read as "nothing declared"."""
+    summary = _describe_requested_static_points("sae", [Address("resid_post", 40)], generation_only=False)
+    assert "sae" in summary
+    assert "resolved once the SAEs load" in summary
+    assert "resid_post.40" in summary
+
+    assert "GENERATION_ONLY" in _describe_requested_static_points(None, [], generation_only=True)
+    assert "every point reachable" in _describe_requested_static_points(None, [], generation_only=False)
+    # Every named mode is a `str`, and a `str` is iterable: falling through to the list branch
+    # with one renders it a character at a time ("a o t u"), which is how this read at first.
+    assert _describe_requested_static_points("auto", [], generation_only=False).startswith("auto (")
+    for mode in ("auto", "sae", "sae+auto"):
+        assert " ".join(mode) not in _describe_requested_static_points(mode, [], generation_only=False)
+    # An explicit list is already addresses, so it is shown as the set it is.
+    assert (
+        _describe_requested_static_points([["resid_post", 7], "resid_post.8"], [], generation_only=False)
+        == "resid_post.7-8"
+    )
 
 
 def test_an_extra_point_the_sae_set_already_covers_costs_nothing_twice():

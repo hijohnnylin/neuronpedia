@@ -130,6 +130,10 @@ class Config:
     sae_gpu_budget_gib: str | None = None
     # Cap on page-locked host memory for those master copies. None = measure it.
     sae_pinned_host_gib: float | None = None
+    # Human-readable summary of what STATIC_POINTS (+ STATIC_POINTS_EXTRA) asked to declare, for
+    # the startup banner. A string rather than the addresses because this banner prints before the
+    # SAEs load, so `sae` has no address list yet; the resolved set is in the ready banner.
+    static_points_summary: str | None = None
 
     # Accepted as constructor arguments but stored under the derived names below.
     include_sae: InitVar[list[str] | None] = None
@@ -169,6 +173,7 @@ class Config:
         "exclude_sae_patterns",
         "backend",
         "num_gpus",
+        "static_points_summary",
     )
 
     def __post_init__(
