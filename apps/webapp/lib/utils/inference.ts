@@ -1,9 +1,8 @@
-/* eslint-disable no-var */
-
 import type { paths } from '@/lib/api/inference';
 import type {
   ActivationAttentionResponse,
   ActivationTopkByTokenResponse,
+  NPAxis,
   NPSteerMethod,
   SteerCompletionResponse,
   UtilSaeVectorResponse,
@@ -580,17 +579,20 @@ export const steerCompletionChat = async (
   stream: boolean,
   steerMethod: NPSteerMethod = STEER_METHOD,
   n_logprobs: number = STEER_N_LOGPROBS,
-  isAssistantAxis: boolean = false,
+  /**
+   * Readout axes, sent with the request. Inference ships none of its own, so a `Vector` row is
+   * how any axis reaches it.
+   */
+  customAxes: NPAxis[] = [],
 ) => {
   // record start time
   const startTime = new Date().getTime();
 
-  // The axis is a vector and vectors need no SAE loaded, so in both of the first
-  // two cases any host serving the model will do. The pair runs the default and
-  // steered completions concurrently, and collapses to one host when only one
-  // is registered.
+  // An axis is a vector and vectors need no SAE loaded, so in every case but the last any host
+  // serving the model will do. The pair runs the default and steered completions concurrently,
+  // and collapses to one host when only one is registered.
   const [serverHostDefault, serverHostSteered] = await resolveTwoHosts(
-    isAssistantAxis || hasVector || steerFeatures.length === 0
+    customAxes.length > 0 || hasVector || steerFeatures.length === 0
       ? inferenceTarget(modelId)
       : inferenceTarget(modelId, { sourceSetName: getSourceSetNameFromSource(steerFeatures[0].layer), user }),
   );
@@ -606,9 +608,8 @@ export const steerCompletionChat = async (
     // Always send one request per steer type so default and steered generate simultaneously.
     // A combined request makes the inference server loop over the types one after the other,
     // so the second column only starts filling once the first has finished.
-    console.log(
-      `completion chat - sending separate requests (hasTwoServers: ${hasTwoServers}, isAssistantAxis: ${isAssistantAxis})`,
-    );
+    const axisLog = customAxes.map((axis) => axis.id).join(',') || 'none';
+    console.log(`completion chat - sending separate requests (hasTwoServers: ${hasTwoServers}, axes: ${axisLog})`);
     const toRunPromises = steerTypesToRun.map((type) => {
       const host = type === SteerOutputType.DEFAULT ? serverHostDefault : serverHostSteered;
       console.log(`completion chat - sending ${type} to ${host}`);
@@ -635,7 +636,7 @@ export const steerCompletionChat = async (
         normalizeSteering: false,
         stream: true,
         nLogprobs: n_logprobs,
-        isAssistantAxis,
+        customAxes,
       });
     });
     const responses = await Promise.all(toRunPromises);
@@ -676,7 +677,7 @@ export const steerCompletionChat = async (
             steerMethod,
             normalizeSteering: false,
             nLogprobs: n_logprobs,
-            isAssistantAxis,
+            customAxes,
             // This path collects whole responses; the SSE variant is lensPromptStream's job.
             stream: false,
           },
@@ -709,7 +710,7 @@ export const steerCompletionChat = async (
             steerMethod,
             normalizeSteering: false,
             nLogprobs: n_logprobs,
-            isAssistantAxis,
+            customAxes,
             // This path collects whole responses; the SSE variant is lensPromptStream's job.
             stream: false,
           },

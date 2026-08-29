@@ -1,7 +1,9 @@
-import { SteerAssistantAxis } from '@/lib/api/inference-types';
+import { LegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-type PersonaCheckResult = SteerAssistantAxis;
+// Reads the deprecated `assistant_axis` view of the readouts, which /api/steer-chat still
+// returns. The `axes` field it derives that from is what a multi-axis chart wants.
+type PersonaCheckResult = LegacyAssistantAxis;
 
 // Color palette for PC lines (Steered)
 const PC_COLORS = [

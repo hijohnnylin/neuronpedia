@@ -21,12 +21,13 @@ dependencies = [
   "huggingface-hub>=1.0",
   "huggingface>=0.0.1,<0.0.2",
   "pandas>=2.2.2,<3",
-  # The assistant-axis persona assets are pickled sklearn PCA objects, and the projection
-  # calls PCA.transform -- so this is a runtime dependency of that feature, not just an
-  # unpickling shim. Without it the asset load raises ModuleNotFoundError at startup.
-  "scikit-learn>=1.4",
-  # Read at startup for each persona asset's persona.yaml manifest. Declared explicitly
-  # rather than leaned on transitively (it arrives via several deps today).
+  # Readout axis assets are safetensors, so the load path is three tensors and no pickle.
+  # (It used to be pickled sklearn PCA objects, which made scikit-learn a runtime dependency
+  # of that feature and needed a __main__ shim to unpickle; converting the assets removed
+  # both. utils/persona-assets/convert_to_safetensors.py is what performed the conversion.)
+  "safetensors>=0.4",
+  # Read at startup for each readout axis's axis.yaml manifest. Declared explicitly rather
+  # than leaned on transitively (it arrives via several deps today).
   "pyyaml>=6.0",
   "sae-lens>=6.30.0",
   "fastapi>=0.133.0,<0.137.0",

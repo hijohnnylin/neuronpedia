@@ -198,11 +198,12 @@ def test_qwen_apply_chat_template_spans():
 
 @pytest.mark.thinking
 @pytest.mark.chat
-def test_qwen_persona_flag_does_not_crash():
-    """``is_assistant_axis`` must be accepted end-to-end even when PersonaData is unloaded.
+def test_qwen_rejects_an_axis_it_cannot_measure_and_still_generates_without_one():
+    """An axis this model cannot measure is a 400, and asking for none generates as usual.
 
-    Without per-model PCA assets PersonaData stays uninitialized and the monitor no-ops
-    (``assistant_axis`` absent/null); the chat completion itself must still succeed.
+    A readout has to fail loudly rather than come back absent: the caller named the axis, and a
+    silently missing readout is an unexplained blank chart rather than a mistake anyone can see.
+    A request that asks for no readout is untouched by any of this and must still complete.
     """
     with try_initialized_server(QWEN_THINKING) as client:
         model = Model.get_instance()
@@ -222,11 +223,20 @@ def test_qwen_persona_flag_does_not_crash():
             "freq_penalty": 0.0,
             "seed": 42,
             "steer_special_tokens": False,
-            "is_assistant_axis": True,
+            # A layer this model does not have, which only the served model can rule out.
+            "custom_axes": [{"id": "lu_assistant-axis", "layer": 999, "direction": [0.1] * d_model}],
         }
-        resp = client.post(
+        rejected = client.post(
             "/v1/steer/completion-chat",
             json=req,
+            headers={"X-SECRET-KEY": X_SECRET_KEY},
+        )
+        assert rejected.status_code == 400, rejected.text
+        assert "lu_assistant-axis" in rejected.json()["error"]
+
+        resp = client.post(
+            "/v1/steer/completion-chat",
+            json={**req, "custom_axes": []},
             headers={"X-SECRET-KEY": X_SECRET_KEY},
         )
         assert resp.status_code == 200, resp.text
@@ -234,8 +244,39 @@ def test_qwen_persona_flag_does_not_crash():
         outputs = {o["type"]: o["raw"] for o in body["outputs"]}
         assert "DEFAULT" in outputs
         assert isinstance(outputs["DEFAULT"], str) and len(outputs["DEFAULT"]) > 0
-        # No PCA assets for this model => persona monitor no-ops; key may be absent.
-        assert body.get("assistantAxis") in (None, [])
+        assert body.get("axes") in (None, [])
+
+
+@pytest.mark.thinking
+@pytest.mark.chat
+def test_qwen_readout_only_request_needs_no_features():
+    """A DEFAULT-only request carrying neither features nor vectors is legitimate.
+
+    This is the shape an unsteered readout page sends. It used to be rejected by the
+    "exactly one of features or vectors" check, which is why callers reached for a
+    zero-strength placeholder vector; steering is what needs something to steer with.
+    """
+    with try_initialized_server(QWEN_THINKING) as client:
+        resp = client.post(
+            "/v1/steer/completion-chat",
+            json={
+                "prompt": [{"content": "Say hi in one word.", "role": "user"}],
+                "model": QWEN_THINKING.model_id,
+                "steer_method": "SIMPLE_ADDITIVE",
+                "normalize_steering": False,
+                "types": ["DEFAULT"],
+                "n_completion_tokens": 8,
+                "temperature": 0,
+                "strength_multiplier": 0.0,
+                "freq_penalty": 0.0,
+                "seed": 42,
+                "steer_special_tokens": False,
+            },
+            headers={"X-SECRET-KEY": X_SECRET_KEY},
+        )
+        assert resp.status_code == 200, resp.text
+        outputs = {o["type"]: o["raw"] for o in resp.json()["outputs"]}
+        assert isinstance(outputs["DEFAULT"], str) and len(outputs["DEFAULT"]) > 0
 
 
 @pytest.mark.thinking
