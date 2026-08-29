@@ -1,7 +1,7 @@
-import { CLTGraphLink, CLTGraphNode } from './graph-types';
+import type { CLTGraphLink, CLTGraphNode } from './graph-types';
 
 export const MAX_SUPERNODE_CANDIDATES = 200;
-export const GROUPABLE_FEATURE_TYPES = new Set(['cross layer transcoder', 'lorsa']);
+export const GROUPABLE_FEATURE_TYPES: ReadonlySet<string> = new Set(['cross layer transcoder', 'lorsa']);
 
 export type SupernodeProfileMode = 'both' | 'incoming' | 'outgoing';
 
@@ -53,6 +53,7 @@ type Candidate = {
 };
 
 type PairEvidence = {
+  eligible: boolean;
   score: number;
   sharedIncomingNeighbors: number;
   sharedOutgoingNeighbors: number;
@@ -249,6 +250,7 @@ function scorePair(left: Candidate, right: Candidate, config: SupernodeSuggestio
   }
 
   return {
+    eligible: selectedScores.length > 0,
     score: selectedScores.length > 0 ? average(selectedScores) : 0,
     sharedIncomingNeighbors,
     sharedOutgoingNeighbors,
@@ -340,7 +342,11 @@ function allCrossPairsPass(
 }
 
 function pairPasses(pair: PairEvidence, config: SupernodeSuggestionConfig): boolean {
-  return pair.score >= config.similarityThreshold && pair.selectedSharedNeighbors >= config.minSharedNeighbors;
+  return (
+    pair.eligible &&
+    pair.score >= config.similarityThreshold &&
+    pair.selectedSharedNeighbors >= config.minSharedNeighbors
+  );
 }
 
 function summarizeCluster(
@@ -384,7 +390,13 @@ function getEvidence(
 }
 
 function emptyEvidence(): PairEvidence {
-  return { score: 0, sharedIncomingNeighbors: 0, sharedOutgoingNeighbors: 0, selectedSharedNeighbors: 0 };
+  return {
+    eligible: false,
+    score: 0,
+    sharedIncomingNeighbors: 0,
+    sharedOutgoingNeighbors: 0,
+    selectedSharedNeighbors: 0,
+  };
 }
 
 function average(values: readonly number[]): number {

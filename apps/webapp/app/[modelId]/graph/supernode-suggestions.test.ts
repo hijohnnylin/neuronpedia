@@ -227,6 +227,12 @@ describe('suggestSupernodes', () => {
     );
 
     expect(suggestSupernodes(input, ['mlp', 'attention'])).toEqual([]);
+    expect(
+      suggestSupernodes(input, ['mlp', 'attention'], [], {
+        similarityThreshold: -1,
+        minSharedNeighbors: 0,
+      }),
+    ).toEqual([]);
     expect(suggestSupernodes(input, ['mlp', 'attention'], [], { sameFeatureTypeOnly: false })).toHaveLength(1);
   });
 
