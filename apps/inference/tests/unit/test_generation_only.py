@@ -139,6 +139,73 @@ class TestTheRequestLevelRefusal:
         assert_capture_layers_declared(SimpleNamespace(), [40])
         assert_capture_layers_declared(SimpleNamespace(hooks_available=True), [40])
 
+    def test_a_steer_at_an_undeclared_layer_is_refused_before_the_stream_opens(self):
+        """The write-side case: a projection cap writes where its vector was fitted, which is not
+        the layer the axis reads. The 70B pod declared 40 to read and was asked to write 32."""
+        from interp_engine.address import Address
+
+        from neuronpedia_inference.engine_adapter import assert_steer_layers_declared
+
+        pod = SimpleNamespace(
+            hooks_available=False,
+            graph_replay=True,
+            static_points=(Address("resid_post", 40), Address("resid_post", 50)),
+            static_writes=(Address("resid_post", 40), Address("resid_post", 50)),
+        )
+        with pytest.raises(BackendUnsupported) as excinfo:
+            assert_steer_layers_declared(pod, [32])
+        message = str(excinfo.value)
+        assert "[32]" in message
+        assert "STATIC_POINTS=auto" in message
+
+        assert_steer_layers_declared(pod, [40, 50])
+
+    def test_the_read_and_write_sets_are_asked_separately(self):
+        """An SAE set declares writes under the resid_pre[L] -> resid_post[L-1] mapping, so a pod
+        can hold a read at a layer and no write there. One check for both would miss it."""
+        from interp_engine.address import Address
+
+        from neuronpedia_inference.engine_adapter import (
+            assert_capture_layers_declared,
+            assert_steer_layers_declared,
+        )
+
+        pod = SimpleNamespace(
+            hooks_available=False,
+            graph_replay=True,
+            static_points=(Address("resid_post", 40),),
+            static_writes=(),
+        )
+        assert_capture_layers_declared(pod, [40])
+        # No writes declared at all is assert_steering_available's refusal, not a layer list.
+        assert_steer_layers_declared(pod, [40])
+
+    def test_a_hooked_pod_is_not_asked_which_layers_a_request_would_write(self):
+        """The gate exists so resolving those layers -- which reads each feature's hook out of the
+        SAE manager -- never runs on a pod where the answer could not refuse anything."""
+        from neuronpedia_inference.engine_adapter import declares_static_taps
+
+        assert declares_static_taps(SimpleNamespace(hooks_available=False)) is True
+        assert declares_static_taps(SimpleNamespace(hooks_available=True)) is False
+        assert declares_static_taps(SimpleNamespace()) is False
+
+    def test_a_layer_declared_under_the_other_residual_name_still_counts(self):
+        """`resid_pre[L]` IS `resid_post[L-1]`, and the engine matches on that. Checking the
+        literal name would refuse a request the pod can serve."""
+        from interp_engine.address import Address
+
+        from neuronpedia_inference.engine_adapter import assert_steer_layers_declared
+
+        pod = SimpleNamespace(
+            hooks_available=False,
+            graph_replay=True,
+            static_points=(),
+            static_writes=(Address("resid_pre", 33),),
+        )
+        assert_steer_layers_declared(pod, [32])
+        with pytest.raises(BackendUnsupported):
+            assert_steer_layers_declared(pod, [33])
+
     def test_an_unknown_backend_is_assumed_capable(self):
         # Anything without the attribute predates it and hooks in-process (eager, and the test
         # doubles for it). Defaulting to "refuse" here would break every such caller.

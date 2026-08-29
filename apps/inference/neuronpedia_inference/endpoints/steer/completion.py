@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from typing import Any, cast
 
 import torch
@@ -20,7 +20,13 @@ from interp_engine import generate_stream as engine_generate_stream
 from interp_engine import steer as engine_steer
 
 from neuronpedia_inference.config import Config
-from neuronpedia_inference.engine_adapter import BackendUnsupported, assert_steering_available, tlens_hook_to_point
+from neuronpedia_inference.engine_adapter import (
+    BackendUnsupported,
+    assert_steer_layers_declared,
+    assert_steering_available,
+    declares_static_taps,
+    tlens_hook_to_point,
+)
 from neuronpedia_inference.inference_utils.steering import (
     SteeringSettings,
     format_sse_message,
@@ -136,6 +142,14 @@ async def completion(request: SteerCompletionRequest):
             content={"error": "No features or vectors provided"},
             status_code=400,
         )
+
+    # Asked here because the spec that writes is built inside the generator, where a refusal is a
+    # 500 mid-stream rather than a status this can return.
+    if NPSteerType.STEERED in request.types and declares_static_taps(model):
+        try:
+            assert_steer_layers_declared(model, steer_write_layers(features))
+        except BackendUnsupported as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
 
     max_new_tokens, no_room = resolve_max_new_tokens(len(tokens), int(request.n_completion_tokens))
     if no_room is not None:
@@ -261,6 +275,38 @@ def _feature_to_steerspec(
     )
 
 
+def steer_layer_for_hook(hook_name: str) -> int:
+    """Which layer a steer at ``hook_name`` writes: ``resid_pre[X]`` lands at ``X-1``.
+
+    Split out so the pre-flight write check and the spec that does the writing read the layer the
+    same way. Computing it twice is how a pod passes a check for one layer and fails the engine at
+    another.
+    """
+    if "resid_post" in hook_name:
+        return int(hook_name.split(".")[1])
+    if "resid_pre" in hook_name:
+        return int(hook_name.split(".")[1]) - 1
+    raise ValueError(f"Unsupported hook name for vLLM steering: {hook_name}")
+
+
+def steer_write_layers(features: Sequence[NPSteerFeature | NPSteerVector]) -> list[int]:
+    """The layers a steer over ``features`` will write to, sorted and deduplicated.
+
+    Answerable in the request handler, before a StreamingResponse has taken the reply away, where
+    :func:`features_to_vllm_steering_spec` runs inside the generator and cannot return a status.
+    Hooks it cannot map are left to that function, whose ValueError is already handled.
+    """
+    sae_manager = SAEManager.get_instance()
+    layers: set[int] = set()
+    for feature in features:
+        hook_name = sae_manager.get_sae_hook(feature.source) if isinstance(feature, NPSteerFeature) else feature.hook
+        try:
+            layers.add(steer_layer_for_hook(hook_name))
+        except ValueError:
+            continue
+    return sorted(layers)
+
+
 def features_to_vllm_steering_spec(settings: SteeringSettings) -> SteeringSpec:
     """Build an engine ``SteeringSpec`` (per-layer Add/ProjectionCap ops) for the vLLM backend.
 
@@ -271,12 +317,7 @@ def features_to_vllm_steering_spec(settings: SteeringSettings) -> SteeringSpec:
     layer_features: dict[int, list[tuple[NPSteerFeature | NPSteerVector, torch.Tensor]]] = {}
     for feature in settings.features:
         hook_name = sae_manager.get_sae_hook(feature.source) if isinstance(feature, NPSteerFeature) else feature.hook
-        if "resid_post" in hook_name:
-            layer = int(hook_name.split(".")[1])
-        elif "resid_pre" in hook_name:
-            layer = int(hook_name.split(".")[1]) - 1
-        else:
-            raise ValueError(f"Unsupported hook name for vLLM steering: {hook_name}")
+        layer = steer_layer_for_hook(hook_name)
 
         steering_vector = torch.tensor(feature.steering_vector, dtype=torch.float32)
         if not torch.isfinite(steering_vector).all():
