@@ -110,6 +110,35 @@ class TestTheRequestLevelRefusal:
             )
         )
 
+    def test_an_axis_layer_the_pod_did_not_declare_is_refused_by_layer_not_by_point_name(self):
+        """The 70B case: `resid_post` IS declared, at the layer its SAE reads and not the one the
+        axis was fitted at. Checked by address, or the pod passes here and dies inside generate."""
+        from interp_engine.address import Address
+
+        from neuronpedia_inference.engine_adapter import assert_capture_layers_declared
+
+        pod = SimpleNamespace(
+            hooks_available=False,
+            graph_replay=True,
+            static_points=(Address("resid_post", 50),),
+            static_writes=(),
+        )
+        with pytest.raises(BackendUnsupported) as excinfo:
+            assert_capture_layers_declared(pod, [40], "Readout axis ['lu_assistant-axis']")
+        message = str(excinfo.value)
+        assert "lu_assistant-axis" in message
+        assert "[40]" in message
+        # Names the way out, since this is a relaunch and not a code change.
+        assert "STATIC_POINTS_EXTRA" in message
+
+        assert_capture_layers_declared(pod, [50], "Readout axis ['x']")
+
+    def test_a_hooked_pod_declares_nothing_and_can_capture_anywhere(self):
+        from neuronpedia_inference.engine_adapter import assert_capture_layers_declared
+
+        assert_capture_layers_declared(SimpleNamespace(), [40])
+        assert_capture_layers_declared(SimpleNamespace(hooks_available=True), [40])
+
     def test_an_unknown_backend_is_assumed_capable(self):
         # Anything without the attribute predates it and hooks in-process (eager, and the test
         # doubles for it). Defaulting to "refuse" here would break every such caller.

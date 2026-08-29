@@ -19,13 +19,16 @@ the last test is for: it is a tripwire on that premise, not a test of the overri
 from __future__ import annotations
 
 import pytest
+from interp_engine import Address
 
 from neuronpedia_inference.server import (
     _DEFAULT_CUDAGRAPH_CAPTURE_SIZES,
     _engine_context_len,
+    _parse_extra_static_points,
     _parse_static_points,
     _vllm_backend_kwargs,
     _vllm_engine_backend,
+    _with_extra_points,
 )
 
 
@@ -143,6 +146,42 @@ def test_an_empty_declared_set_points_at_generation_only_instead_of_loading_a_us
 def test_a_malformed_static_points_is_refused_rather_than_ignored():
     with pytest.raises(ValueError, match="STATIC_POINTS"):
         _parse_static_points("resid_post")
+
+
+def test_extra_static_points_takes_both_address_spellings_and_means_nothing_when_unset():
+    assert _parse_extra_static_points(None) == []
+    assert _parse_extra_static_points("") == []
+    assert _parse_extra_static_points("  ") == []
+    assert [str(a) for a in _parse_extra_static_points('["resid_post.40"]')] == ["resid_post.40"]
+    assert [str(a) for a in _parse_extra_static_points('[["resid_post", 40]]')] == ["resid_post.40"]
+
+
+def test_a_malformed_extra_static_points_is_refused_rather_than_ignored():
+    with pytest.raises(ValueError, match="STATIC_POINTS_EXTRA"):
+        _parse_extra_static_points("resid_post.40")
+    with pytest.raises(ValueError, match="STATIC_POINTS_EXTRA"):
+        _parse_extra_static_points('"resid_post.40"')
+
+
+def test_an_extra_point_is_declared_to_read_and_to_write():
+    """Both, so a persona axis can be steered at the layer it was fitted at and not only read."""
+    reads, writes = _with_extra_points(
+        [Address("resid_post", 50)],
+        [Address("resid_post", 49)],
+        [Address("resid_post", 40)],
+    )
+    assert [str(a) for a in reads] == ["resid_post.50", "resid_post.40"]
+    assert [str(a) for a in writes] == ["resid_post.49", "resid_post.40"]
+
+
+def test_an_extra_point_the_sae_set_already_covers_costs_nothing_twice():
+    reads, writes = _with_extra_points(
+        [Address("resid_post", 40)],
+        [Address("resid_post", 40)],
+        [Address("resid_post", 40), Address("resid_post", 40)],
+    )
+    assert [str(a) for a in reads] == ["resid_post.40"]
+    assert [str(a) for a in writes] == ["resid_post.40"]
 
 
 def test_no_endpoint_accepts_an_image():
