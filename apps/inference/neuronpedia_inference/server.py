@@ -22,6 +22,7 @@ from interp_engine import (
     check_cuda_driver,
     load_model,
     select_backend,
+    to_address,
 )
 
 from neuronpedia_inference.args import parse_env_and_args
@@ -243,6 +244,54 @@ def _parse_static_points(raw: str | None) -> Any:
             "declare (STATIC_POINTS=auto, sae, sae+auto, or a JSON list of addresses)."
         )
     return points
+
+
+def _parse_extra_static_points(raw: str | None) -> list[Address]:
+    """``STATIC_POINTS_EXTRA``: a JSON list of addresses to declare beside a resolved set.
+
+    Same spelling as an explicit ``STATIC_POINTS`` list, so a site moves between the two by
+    cut-and-paste. Empty and unset both mean nothing extra, which is the common case.
+    """
+    if raw is None or raw.strip() == "":
+        return []
+    try:
+        points = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"STATIC_POINTS_EXTRA={raw!r} is not JSON (e.g. '[\"resid_post.40\"]' or '[[\"resid_post\", 40]]')."
+        ) from exc
+    if not isinstance(points, list):
+        raise ValueError(f"STATIC_POINTS_EXTRA={raw!r} must be a JSON list of addresses.")
+    return [to_address(point) for point in points]
+
+
+def _with_extra_points(
+    reads: list[Address],
+    writes: list[Address],
+    extra: list[Address],
+) -> tuple[list[Address], list[Address]]:
+    """Add ``STATIC_POINTS_EXTRA`` to a resolved set, as reads and as writes.
+
+    Both, for the reason ``auto`` implies its writes: a capture site that cannot be written is a
+    readout that works and then refuses every steer at the same layer, and steering on a persona
+    direction at the layer it was fitted at is a thing this server is asked to do. One layer both
+    ways costs two buffers, which is the cheap half of the trade `sae+auto` gets wrong at scale.
+
+    Deduplicated, so naming a site an SAE already covers is free rather than doubled, and appended
+    after the resolved set so the startup log reads as "the SAE set, plus what was declared on top".
+    """
+    read_keys = {str(address) for address in reads}
+    write_keys = {str(address) for address in writes}
+    merged_reads = list(reads)
+    merged_writes = list(writes)
+    for address in extra:
+        if str(address) not in read_keys:
+            merged_reads.append(address)
+            read_keys.add(str(address))
+        if str(address) not in write_keys:
+            merged_writes.append(address)
+            write_keys.add(str(address))
+    return merged_reads, merged_writes
 
 
 def _with_residual_set(
@@ -718,6 +767,18 @@ async def initialize(
                 f"STATIC_POINTS={static_mode} needs SAE_SETS so there are hook sites to declare. "
                 "Use STATIC_POINTS=auto for the residual set alone."
             )
+        extra_points = _parse_extra_static_points(getattr(args, "static_points_extra", None))
+        if extra_points and static_mode not in _SAE_RESOLVED_MODES:
+            # Refused rather than ignored. Every other value already says everything it is going
+            # to: `auto` declares each layer, an explicit list is the caller's own set, and unset
+            # is a hooked pod where nothing needs declaring. Merging into one of those would be a
+            # no-op that reads, in a deploy config, as though a site had been added.
+            raise ValueError(
+                f"STATIC_POINTS_EXTRA has nothing to add to STATIC_POINTS={static_mode!r}. It "
+                "declares sites beside a set this server resolves after the SAEs load, so it "
+                "applies to STATIC_POINTS=sae or sae+auto. Add the sites to the list itself, or "
+                "drop STATIC_POINTS_EXTRA."
+            )
         num_gpus = max(1, int(getattr(args, "num_gpus", 1) or 1))
         if num_gpus > 1:
             logger.info("Multi-GPU: sharding across %d GPUs (%s)", num_gpus, args.backend)
@@ -872,9 +933,12 @@ async def initialize(
             reads, writes = sae_static_addresses(SAEManager._instance)
             if static_mode == "sae+auto":
                 reads, writes = _with_residual_set(model, reads, writes, num_layers)
+            if extra_points:
+                reads, writes = _with_extra_points(reads, writes, extra_points)
             logger.info(
-                "STATIC_POINTS=%s: freezing %d read site(s) and %d write site(s)",
+                "STATIC_POINTS=%s%s: freezing %d read site(s) and %d write site(s)",
                 static_mode,
+                f" + {[str(a) for a in extra_points]}" if extra_points else "",
                 len(reads),
                 len(writes),
             )

@@ -92,6 +92,16 @@ attention and DFA. Because the set is fixed at load, this is a routing decision:
 a pod that did not declare a point cannot grow one, and says so in a 400 that
 lists what it did declare.
 
+`STATIC_POINTS_EXTRA` adds sites to a set the server resolves for itself —
+`sae` or `sae+auto` — as a JSON list in the same spelling, `["resid_post.40"]`.
+It is for readout axes, which are the one thing a pod cannot resolve at startup:
+an axis is a database row that arrives with the request, so the layer it reads is
+not knowable when the graphs are recorded. `sae` declares the SAE sites and
+nothing else, and the alternatives are both wrong for one extra layer — `auto`
+declares every layer, which the larger pods cannot afford, and an explicit list
+declares no writes, which trades every steer for the readout. Declared as a read
+and a write, so an axis can also be steered at the layer it was fitted at.
+
 `GENERATION_ONLY=true` is the empty case, worth up to +249% decode on a 1B model
 and ~1% at 8B — small-model completion traffic and nothing else. The server
 refuses to start if `SAE_SETS` is non-empty (an SAE read *is* a capture), if

@@ -67,6 +67,17 @@ def parse_env_and_args():
     # Declare attn at a layer to keep attention/DFA. Anything not declared 400s, so this is a
     # routing decision, not a tuning knob.
     args.static_points = os.getenv("STATIC_POINTS")
+    # Sites to declare on top of a set this server resolves for itself, as a JSON list in the same
+    # spelling STATIC_POINTS takes: '["resid_post.40"]' or '[["resid_post", 40]]'.
+    #
+    # It exists for readout axes, which are the one thing a pod cannot resolve at startup. An axis
+    # is a database row that arrives with the request, so which layers this pod will be asked to
+    # capture is not knowable when the graphs are recorded -- and a layer that was not declared
+    # then cannot be added to a running static pod at all. STATIC_POINTS=sae covers the SAE sites
+    # and nothing else, and a pod whose axes read elsewhere has no other way to say so: `auto`
+    # would declare every layer, which several pods cannot afford, and an explicit list declares
+    # no writes, which trades every steer for the readout.
+    args.static_points_extra = os.getenv("STATIC_POINTS_EXTRA")
     # Renamed in interp-engine 1.3 along with the backend it drives. Refused rather than aliased,
     # because a deploy that sets the old name is asking for a tap set and would otherwise get a
     # hooked pod: same endpoints, several times slower, and no line in the log saying why.

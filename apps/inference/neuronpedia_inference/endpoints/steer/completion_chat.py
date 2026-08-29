@@ -24,7 +24,12 @@ from neuronpedia_inference.endpoints.steer.completion import (
     features_to_vllm_steering_spec,
     resolve_max_new_tokens,
 )
-from neuronpedia_inference.engine_adapter import BackendUnsupported, assert_steering_available, get_tokenize
+from neuronpedia_inference.engine_adapter import (
+    BackendUnsupported,
+    assert_capture_layers_declared,
+    assert_steering_available,
+    get_tokenize,
+)
 from neuronpedia_inference.inference_utils.persona import (
     AxisAsset,
     AxisRequestError,
@@ -177,6 +182,18 @@ async def completion_chat(request: SteerCompletionChatRequest):
             # axes unable to tell which one this rejected, which is the whole point of the type.
             logger.warning(f"Axis request rejected: {exc}", exc_info=True)
             return JSONResponse(content={"error": str(exc)}, status_code=exc.status_code)
+
+        # Asked before anything is rendered or generated. A static pod's tap set is fixed when its
+        # graphs are recorded, and an axis names its layer at request time, so this is the one
+        # mismatch that no startup check could have caught.
+        try:
+            assert_capture_layers_declared(
+                model,
+                [axis.layer for axis in axes],
+                f"Readout axis {[axis.id for axis in axes]}",
+            )
+        except BackendUnsupported as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
 
     # Every requested axis has to agree about how the conversation is rendered, because those
     # conditions are applied before generation and so change the text itself. There is no way to
