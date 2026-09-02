@@ -1,19 +1,22 @@
-"""Readout axes - one fitted direction, and what turns an activation into a number.
+"""Vector reads - one fitted direction, and what turns an activation into a number.
 
-An axis is a named direction plus everything needed to read it: the layer it was fitted at, how
-the activation is scaled first, and the affine constants that put the result on a readable scale.
+A read is a named direction plus everything needed to apply it: the layer it was fitted at, how
+the activation is gathered and scaled first, and the affine constants that put the result on a
+readable scale. What the number *means* -- a trait, a class probability, a position on some axis
+between two poles -- is the caller's to name; nothing here knows.
 
-**This server ships none.** Every axis arrives with the request, either inline or as a reference
-to a published artifact, and :mod:`.axis_request` is what turns one into the :class:`AxisAsset`
-below. The caller owns the catalogue, so adding an axis is a row in their database rather than a
-release here, and this process holds no opinion about which axes exist for which model.
+**This server ships none.** Every vector arrives with the request, either inline or as a reference
+to a published artifact, and :mod:`.vector_request` is what turns one into the
+:class:`VectorAsset` below. The caller owns the catalogue, so adding a vector is a row in their
+database rather than a release here, and this process holds no opinion about which vectors exist
+for which model.
 
-An artifact is a folder holding ``axis.safetensors`` (three vectors) and ``axis.yaml`` (the
-scalars and the rendering conditions the fit assumed), which :func:`load_axis` reads. One axis is
-one direction: a fit with several components is several artifacts, which is what lets each of
-them name its own layer.
+An artifact is a folder holding ``vector.safetensors`` (three tensors) and ``vector.yaml`` (the
+scalars and the rendering conditions the fit assumed), which :func:`load_vector` reads. One
+artifact is one direction: a fit with several components is several artifacts, which is what lets
+each of them name its own layer.
 
-An axis is conventionally named ``<author>_<name>``, and the manifest states the author in a
+A vector is conventionally named ``<author>_<name>``, and the manifest states the author in a
 field of its own. Two groups fitting the same trait is the expected case rather than a collision:
 ``mit_empathy`` and some later ``lu_empathy`` are different measurements. Nothing here enforces
 that convention, because the id belongs to whoever sent the request.
@@ -27,27 +30,25 @@ A projection is::
 and is never clipped -- a value outside [-1, 1] is a real reading, not something to pin to the
 boundary.
 
-One divisor per pole, because a fitted axis is rarely symmetric about its centre. A single
-divisor has to be the larger of the two spreads, which squeezes the tighter pole towards zero:
+One divisor per sign, because a fitted direction is rarely symmetric about its centre. A single
+divisor has to be the larger of the two spreads, which squeezes the tighter side towards zero:
 ``mit_erudite``'s negative tail is 5.8x its positive spread, so under one divisor its
-"sophisticated" pole could not read past +0.21 and looked flat whatever the prompt. The map is
+"sophisticated" end could not read past +0.21 and looked flat whatever the prompt. The map is
 continuous at ``center``, where both branches are zero, and monotone, so it preserves rank order
-exactly. A manifest carrying a lone ``scale`` means both poles share it, which is the spelling
-that predates this and is what ``lu_assistant-axis`` still ships.
+exactly. A manifest carrying a lone ``scale`` means both signs share it.
 
 **Two readings of the same projection, and both are reported.** The value above is a ratio to
-the p99 landmark of the fitting corpus, so it exceeds 1 for roughly 2% of turns by construction
--- accurate, and unreadable on a gauge a person expects to stop at 100%. An asset may therefore
-also carry per-pole quantile tables, and :func:`percentile` turns the same projection into the
-share of the corpus it is past, which cannot leave [-1, 1]. That is what a display shows;
-the ratio is the measurement, and it stays unclipped because how far past the corpus a turn
-sits is the signal that an axis is being read off distribution. Dropping either loses something
-the other cannot say.
+the p99 landmark of the fitting corpus, so it exceeds 1 for roughly 2% of readings by
+construction -- accurate, and unreadable on a gauge a person expects to stop at 100%. An asset
+may therefore also carry per-sign quantile tables, and :func:`percentile` turns the same
+projection into the share of the corpus it is past, which cannot leave [-1, 1]. That is what a
+display shows; the ratio is the measurement, and it stays unclipped because how far past the
+corpus a reading sits is the signal that a vector is being read off distribution. Dropping
+either loses something the other cannot say.
 """
 
 import logging
 import os
-import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -58,8 +59,8 @@ from safetensors.torch import load_file
 
 logger = logging.getLogger(__name__)
 
-MANIFEST_FILENAME = "axis.yaml"
-TENSORS_FILENAME = "axis.safetensors"
+MANIFEST_FILENAME = "vector.yaml"
+TENSORS_FILENAME = "vector.safetensors"
 
 # The L2 denominator floor. Fixed here rather than per asset: the converter rejects an asset
 # fitted with a different value, so this is the only one in play.
@@ -67,31 +68,70 @@ L2_EPS = 1e-12
 
 TENSOR_NAMES = ("direction", "scaler_mean", "pca_mean")
 
-# The poles a manifest predating ``pole_positive`` / ``pole_negative`` encodes in its display
-# title, as ``- simplistic <-> + sophisticated``. Every asset shipped in this tree is written that
-# way, and a title was the only place the two names existed; parsing it is how they reach the pole
-# fields until those assets are replaced. New manifests declare the poles instead, and this goes
-# with the last old one. The arrow is spelled as escapes because a variation selector in a .py
-# file breaks GitHub's CodeQL extractor.
-TITLE_POLES = re.compile(r"^\s*-\s*(.+?)\s*\u2194\ufe0f?\s*\+\s*(.+?)\s*$")
-
 # The quantile tables a percentile is read off. Optional, and all three or none: an asset fitted
 # before them ships only the divisors, and reports no percentile rather than a made-up one.
 QUANTILE_TENSOR_NAMES = ("quantile_levels", "quantiles_pos", "quantiles_neg")
 
 Normalize = Literal["l2", "none"]
 
+# The stages of getting an activation, before any direction is projected onto it. Each is closed on
+# purpose: a value outside one of these is refused rather than defaulted, because a fit read with the
+# wrong rule returns a plausible number rather than an error. Adding a member means implementing it
+# in `capture_engine` or `build_readouts` in the same change.
+CaptureSite = Literal["resid_post"]
+TokenSelection = Literal["assistant_turns", "all_turns"]
+Pooling = Literal["mean", "last", "max"]
+
+
+@dataclass(frozen=True)
+class ReadSpec:
+    """How an activation is obtained and reduced, for one vector.
+
+    Distinct from :class:`RenderConditions`, which is about the text: render conditions change what
+    the model is shown and so every read in one request has to agree about them, while these change
+    only how the captured activations are reduced and are free to differ per read.
+
+    The defaults are what every vector fitted before this existed used, which is why an asset or a
+    payload that says nothing still reads the way it always did.
+    """
+
+    site: CaptureSite = "resid_post"
+    tokens: TokenSelection = "assistant_turns"
+    pool: Pooling = "mean"
+
+
+@dataclass(frozen=True, order=True)
+class CaptureKey:
+    """One capture-and-reduce a request needs. What every capture dict is keyed by.
+
+    Keyed by the reduction as well as the point, because pooling happens inside the capture: two
+    reads at one layer that pool differently need two results, and this used to be a bare layer
+    number, so they silently shared one.
+
+    `site` is part of the key rather than assumed, so that reading `mlp_out` needs no second
+    re-keying of every capture dict. `tokens` is deliberately absent: it picks which pooled rows get
+    reported, so it cannot change what has to be captured, and including it would capture identical
+    activations twice for two reads that differ only in what they report.
+
+    Ordered so that a set of these sorts by depth: what a capture pass logs and what it declares to
+    the backend is then the same list run to run, whatever order the reads arrived in.
+    """
+
+    site: CaptureSite
+    layer: int
+    pool: Pooling
+
 
 @dataclass(frozen=True)
 class RenderConditions:
-    """How a conversation must be templated for an axis's numbers to mean anything.
+    """How a conversation must be templated for a vector's numbers to mean anything.
 
     A projection onto a fitted direction only holds if inference renders the conversation the
     way it was rendered during fitting. These conditions are applied to the prompt *before*
-    generation, so they change the text the user sees -- which is why two axes that disagree
+    generation, so they change the text the user sees -- which is why two reads that disagree
     here cannot both be served in one request.
 
-    **What this cannot say: that a fit assumed a non-empty system turn.** The ``mit_*`` axes were
+    **What this cannot say: that a fit assumed a non-empty system turn.** The ``mit_*`` vectors were
     fitted with a persona-describing system prompt on every conversation, and the page serving
     them sends none, so they are read off distribution today. ``blank_system_prompt: false`` is
     not the same statement -- it only means "do not blank the caller's prompt". Nor is this a
@@ -113,7 +153,7 @@ class RenderConditions:
     template_kwargs: dict[str, str] = field(default_factory=dict)
 
     def key(self) -> tuple:
-        """A hashable form, for checking that a set of axes agrees."""
+        """A hashable form, for checking that a set of reads agrees."""
         return (self.blank_system_prompt, tuple(sorted(self.template_kwargs.items())))
 
     def describe(self) -> str:
@@ -123,18 +163,18 @@ class RenderConditions:
 
 
 @dataclass(frozen=True)
-class AxisAsset:
-    """One readout axis, loaded and ready to project with."""
+class VectorAsset:
+    """One vector, loaded and ready to project with."""
 
     id: str
-    # Who fitted this axis: the ``<author>_`` prefix of the id, restated as data so a caller
+    # Who fitted this vector: the ``<author>_`` prefix of the id, restated as data so a caller
     # attributing a reading does not have to split the id on an underscore.
     author: str
     title: str
     layer: int
     normalize: Normalize
     center: float
-    # One divisor per pole of the axis; see the projection formula in the module docstring.
+    # One divisor per sign of the projection; see the formula in the module docstring.
     scale_pos: float
     scale_neg: float
     render: RenderConditions
@@ -147,14 +187,24 @@ class AxisAsset:
     quantile_levels: torch.Tensor | None = None
     quantiles_pos: torch.Tensor | None = None
     quantiles_neg: torch.Tensor | None = None
-    # What each end of the axis means. Optional because an axis is a direction first: one supplied
-    # with a request may name no poles at all, and reports none rather than inventing them.
+    # What each end of the direction means, for a vector where both ends mean something. Optional
+    # because a vector is a direction first: a probe has a positive class rather than two poles, a
+    # steering vector has neither, and one supplied with a request may name nothing at all.
     pole_positive: str | None = None
     pole_negative: str | None = None
     pole_positive_description: str | None = None
     pole_negative_description: str | None = None
-    # The commit an axis fetched from a published artifact was read at. None for anything local.
+    # The commit a vector fetched from a published artifact was read at. None for anything local.
     source_revision: str | None = None
+    # How to get the activation this direction is projected onto. Defaulted, so a published artifact
+    # keeps reading the way it did: `vector.yaml` has no key for this yet, and every artifact
+    # written so far is a mean over each assistant turn.
+    read: ReadSpec = field(default_factory=ReadSpec)
+
+    @property
+    def capture_key(self) -> CaptureKey:
+        """The capture this vector reads from, which several may share."""
+        return CaptureKey(site=self.read.site, layer=self.layer, pool=self.read.pool)
 
     @property
     def hidden_size(self) -> int:
@@ -162,7 +212,7 @@ class AxisAsset:
 
     @property
     def has_percentile(self) -> bool:
-        """Whether this axis can report a bounded reading as well as the unbounded ratio."""
+        """Whether this vector can report a bounded reading as well as the unbounded ratio."""
         return self.quantile_levels is not None
 
 
@@ -234,38 +284,37 @@ def _read_quantiles(
     return levels, table_pos, table_neg
 
 
-def _read_poles(raw: dict[str, Any], title: str) -> tuple[str | None, str | None]:
-    """``(pole_positive, pole_negative)``: from their own keys, or parsed out of the title.
+def _read_poles(raw: dict[str, Any]) -> tuple[str | None, str | None]:
+    """``(pole_positive, pole_negative)``: what each end of this direction means, if it says.
 
-    Neither spelling is required. An axis is a direction first, and one that names no poles
-    reports none rather than having names invented for it.
+    Neither is required. A vector is a direction first, and one that names no poles reports none
+    rather than having names invented for it -- a probe has a positive class rather than two poles,
+    and a steering vector has neither.
     """
-    declared = {name: str(raw.get(name) or "").strip() or None for name in ("pole_positive", "pole_negative")}
-    if declared["pole_positive"] or declared["pole_negative"]:
-        return declared["pole_positive"], declared["pole_negative"]
-    match = TITLE_POLES.match(title)
-    return (match.group(2), match.group(1)) if match else (None, None)
+    positive = str(raw.get("pole_positive") or "").strip() or None
+    negative = str(raw.get("pole_negative") or "").strip() or None
+    return positive, negative
 
 
-def load_axis(axis_id: str, axis_dir: str) -> AxisAsset:
-    """Read one axis directory. Raises on anything malformed; the caller decides what that means.
+def load_vector(vector_id: str, vector_dir: str) -> VectorAsset:
+    """Read one artifact directory. Raises on anything malformed; the caller decides what that means.
 
-    ``axis_id`` is the name the reading is reported under, and is the caller's to choose. It is
+    ``vector_id`` is the name the reading is reported under, and is the caller's to choose. It is
     not checked against the manifest's ``author``: the two agree by convention in a published
     artifact, but the id belongs to the request rather than to the folder it came from.
     """
-    manifest_path = os.path.join(axis_dir, MANIFEST_FILENAME)
-    tensors_path = os.path.join(axis_dir, TENSORS_FILENAME)
+    manifest_path = os.path.join(vector_dir, MANIFEST_FILENAME)
+    tensors_path = os.path.join(vector_dir, TENSORS_FILENAME)
     raw = _read_manifest(manifest_path)
 
     author = str(raw.get("author") or "").strip()
     if not author:
         raise ValueError(f"{manifest_path}: 'author' is required and must be non-empty")
 
+    pole_positive, pole_negative = _read_poles(raw)
     title = str(raw.get("title") or "").strip()
-    pole_positive, pole_negative = _read_poles(raw, title)
     if not title:
-        # A manifest that names its poles has said everything a title says, in the two fields a
+        # A manifest that names both poles has said everything a title says, in the two fields a
         # reader wants them in. Synthesized here rather than made optional on the asset, so that
         # `title` stays a plain string for the callers that display one.
         if not (pole_positive and pole_negative):
@@ -294,8 +343,8 @@ def load_axis(axis_id: str, axis_dir: str) -> AxisAsset:
         name: str(raw.get(name) or "").strip() or None
         for name in ("pole_positive_description", "pole_negative_description")
     }
-    return AxisAsset(
-        id=axis_id,
+    return VectorAsset(
+        id=vector_id,
         author=author,
         title=title,
         layer=layer,
@@ -318,38 +367,38 @@ def load_axis(axis_id: str, axis_dir: str) -> AxisAsset:
     )
 
 
-def calibrate(raw: torch.Tensor, axis: AxisAsset) -> torch.Tensor:
-    """A raw projection -> the value that gets reported, each pole by its own divisor.
+def calibrate(raw: torch.Tensor, vector: VectorAsset) -> torch.Tensor:
+    """A raw projection -> the value that gets reported, each sign by its own divisor.
 
     Both branches are computed and one selected, which is cheaper than indexing for the handful
-    of turns in a request and keeps the two spellings of the formula in one line. Continuous at
+    of readings in a request and keeps the two spellings of the formula in one line. Continuous at
     ``center``, where the numerator is zero on both sides, and deliberately unclipped.
     """
-    d = raw - axis.center
-    return torch.where(d >= 0, d / axis.scale_pos, d / axis.scale_neg)
+    d = raw - vector.center
+    return torch.where(d >= 0, d / vector.scale_pos, d / vector.scale_neg)
 
 
-def percentile(raw: torch.Tensor, axis: AxisAsset) -> torch.Tensor | None:
+def percentile(raw: torch.Tensor, vector: VectorAsset) -> torch.Tensor | None:
     """A raw projection -> where it falls in the fitting corpus, in [-1, 1]. ``None`` without tables.
 
     Where :func:`calibrate` gives a ratio to the p99 landmark -- a real measurement that passes
-    1 for about 2% of turns by construction -- this gives the share of the fitting corpus a
-    reading is past, on its own pole. Bounded because a share cannot exceed 1: interpolation
-    holds the table's end values, so a turn beyond everything the fit saw reads exactly 1.0 and
-    can read no more. That is the number a display can show; "102%" reads as a broken gauge
-    however defensible it is.
+    1 for about 2% of readings by construction -- this gives the share of the fitting corpus a
+    reading is past, on its own side of centre. Bounded because a share cannot exceed 1:
+    interpolation holds the table's end values, so a reading beyond everything the fit saw reads
+    exactly 1.0 and can read no more. That is the number a display can show; "102%" reads as a
+    broken gauge however defensible it is.
 
     Monotone, so it preserves rank order exactly, and zero at ``center`` on both branches, so
-    the two poles meet without a step. What it gives up is resolution at the ends, where every
+    the two sides meet without a step. What it gives up is resolution at the ends, where every
     reading past the corpus collapses onto 1.0 -- which is why the ratio is reported alongside
     it rather than replaced by it.
     """
-    if axis.quantile_levels is None or axis.quantiles_pos is None or axis.quantiles_neg is None:
+    if vector.quantile_levels is None or vector.quantiles_pos is None or vector.quantiles_neg is None:
         return None
-    levels = axis.quantile_levels.to(torch.float64)
-    d = (raw - axis.center).to(torch.float64)
-    forward = _interpolate(d, axis.quantiles_pos.to(torch.float64), levels)
-    backward = -_interpolate(-d, axis.quantiles_neg.to(torch.float64), levels)
+    levels = vector.quantile_levels.to(torch.float64)
+    d = (raw - vector.center).to(torch.float64)
+    forward = _interpolate(d, vector.quantiles_pos.to(torch.float64), levels)
+    backward = -_interpolate(-d, vector.quantiles_neg.to(torch.float64), levels)
     return torch.where(d >= 0, forward, backward).to(raw.dtype)
 
 
@@ -367,35 +416,35 @@ def _interpolate(x: torch.Tensor, xp: torch.Tensor, fp: torch.Tensor) -> torch.T
     return torch.clamp(fp[index - 1] + (x - lo) * slope, fp[0], fp[-1])
 
 
-def project_axis(mean_acts_per_turn: torch.Tensor | list[torch.Tensor], axis: AxisAsset) -> np.ndarray:
-    """Project per-turn activations onto one axis -> ``[n_turns]`` calibrated values.
+def project_vector(pooled_acts: torch.Tensor | list[torch.Tensor], vector: VectorAsset) -> np.ndarray:
+    """Project pooled per-message activations onto one vector -> ``[n_rows]`` calibrated values.
 
     Mirrors the arithmetic the pickled sklearn assets performed, minus sklearn: the scaler's
     centering (and optional L2 normalization), then the PCA's own centering, then the dot
-    product, then the per-pole calibration.
+    product, then the per-sign calibration.
     """
-    return calibrate(_raw_projection(mean_acts_per_turn, axis), axis).numpy()
+    return calibrate(_raw_projection(pooled_acts, vector), vector).numpy()
 
 
-def project_axis_with_percentile(
-    mean_acts_per_turn: torch.Tensor | list[torch.Tensor], axis: AxisAsset
+def project_vector_with_percentile(
+    pooled_acts: torch.Tensor | list[torch.Tensor], vector: VectorAsset
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Both readings of one projection: ``(value, percentile)``, the latter ``None`` without tables.
 
     One function because the two share the expensive half -- the projection itself -- and
     because they are meant to travel together. Reporting the percentile alone would lose how far
-    past the corpus a turn sits, which is the signal that an axis is read off distribution.
+    past the corpus a reading sits, which is the signal that a vector is read off distribution.
     """
-    raw = _raw_projection(mean_acts_per_turn, axis)
-    ranked = percentile(raw, axis)
-    return calibrate(raw, axis).numpy(), None if ranked is None else ranked.numpy()
+    raw = _raw_projection(pooled_acts, vector)
+    ranked = percentile(raw, vector)
+    return calibrate(raw, vector).numpy(), None if ranked is None else ranked.numpy()
 
 
-def _raw_projection(mean_acts_per_turn: torch.Tensor | list[torch.Tensor], axis: AxisAsset) -> torch.Tensor:
-    """The uncalibrated projection: ``[n_turns]`` values in the axis's own units."""
-    acts = torch.stack(mean_acts_per_turn) if isinstance(mean_acts_per_turn, list) else mean_acts_per_turn
-    x = acts.float().cpu() - axis.scaler_mean
-    if axis.normalize == "l2":
+def _raw_projection(pooled_acts: torch.Tensor | list[torch.Tensor], vector: VectorAsset) -> torch.Tensor:
+    """The uncalibrated projection: ``[n_rows]`` values in the vector's own units."""
+    acts = torch.stack(pooled_acts) if isinstance(pooled_acts, list) else pooled_acts
+    x = acts.float().cpu() - vector.scaler_mean
+    if vector.normalize == "l2":
         norms = torch.linalg.vector_norm(x, ord=2, dim=-1, keepdim=True)
         x = x / torch.clamp(norms, min=L2_EPS)
-    return (x - axis.pca_mean) @ axis.direction
+    return (x - vector.pca_mean) @ vector.direction

@@ -110,9 +110,9 @@ class TestTheRequestLevelRefusal:
             )
         )
 
-    def test_an_axis_layer_the_pod_did_not_declare_is_refused_by_layer_not_by_point_name(self):
+    def test_a_vector_layer_the_pod_did_not_declare_is_refused_by_layer_not_by_point_name(self):
         """The 70B case: `resid_post` IS declared, at the layer its SAE reads and not the one the
-        axis was fitted at. Checked by address, or the pod passes here and dies inside generate."""
+        vector was fitted at. Checked by address, or the pod passes here and dies inside generate."""
         from interp_engine.address import Address
 
         from neuronpedia_inference.engine_adapter import assert_capture_layers_declared
@@ -124,14 +124,14 @@ class TestTheRequestLevelRefusal:
             static_writes=(),
         )
         with pytest.raises(BackendUnsupported) as excinfo:
-            assert_capture_layers_declared(pod, [40], "Readout axis ['lu_assistant-axis']")
+            assert_capture_layers_declared(pod, [40], "Readout vector ['lu_assistant-axis']")
         message = str(excinfo.value)
         assert "lu_assistant-axis" in message
         assert "[40]" in message
         # Names the way out, since this is a relaunch and not a code change.
         assert "STATIC_POINTS_EXTRA" in message
 
-        assert_capture_layers_declared(pod, [50], "Readout axis ['x']")
+        assert_capture_layers_declared(pod, [50], "Readout vector ['x']")
 
     def test_a_hooked_pod_declares_nothing_and_can_capture_anywhere(self):
         from neuronpedia_inference.engine_adapter import assert_capture_layers_declared
@@ -141,7 +141,7 @@ class TestTheRequestLevelRefusal:
 
     def test_a_steer_at_an_undeclared_layer_is_refused_before_the_stream_opens(self):
         """The write-side case: a projection cap writes where its vector was fitted, which is not
-        the layer the axis reads. The 70B pod declared 40 to read and was asked to write 32."""
+        the layer the vector reads. The 70B pod declared 40 to read and was asked to write 32."""
         from interp_engine.address import Address
 
         from neuronpedia_inference.engine_adapter import assert_steer_layers_declared

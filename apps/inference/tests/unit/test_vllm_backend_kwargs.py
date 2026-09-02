@@ -166,7 +166,7 @@ def test_a_malformed_extra_static_points_is_refused_rather_than_ignored():
 
 
 def test_an_extra_point_is_declared_to_read_and_to_write():
-    """Both, so a persona axis can be steered at the layer it was fitted at and not only read."""
+    """Both, so a vector can be steered at the layer it was fitted at and not only read."""
     reads, writes = _with_extra_points(
         [Address("resid_post", 50)],
         [Address("resid_post", 49)],
@@ -186,7 +186,7 @@ def test_declared_taps_are_logged_as_ranges_rather_than_one_line_per_layer():
         _format_address_ranges([Address("resid_post", n) for n in range(4)] + [Address("resid_post", 40)])
         == "resid_post.0-3,40"
     )
-    # The 70B case, where the SAE site and the axis layer are both singletons.
+    # The 70B case, where the SAE site and the vector layer are both singletons.
     assert _format_address_ranges([Address("resid_post", 50), Address("resid_post", 40)]) == "resid_post.40,50"
 
 

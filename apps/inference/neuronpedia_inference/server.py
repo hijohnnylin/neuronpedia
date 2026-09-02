@@ -273,8 +273,8 @@ def _with_extra_points(
     """Add ``STATIC_POINTS_EXTRA`` to a resolved set, as reads and as writes.
 
     Both, for the reason ``auto`` implies its writes: a capture site that cannot be written is a
-    readout that works and then refuses every steer at the same layer, and steering on a persona
-    direction at the layer it was fitted at is a thing this server is asked to do. One layer both
+    readout that works and then refuses every steer at the same layer, and steering on a fitted
+    direction at the layer it was read at is a thing this server is asked to do. One layer both
     ways costs two buffers, which is the cheap half of the trade `sae+auto` gets wrong at scale.
 
     Deduplicated, so naming a site an SAE already covers is free rather than doubled, and appended
@@ -471,7 +471,7 @@ def _format_address_ranges(addresses: Iterable[Address]) -> str:
 
     An `auto` pod declares one address per layer, so the literal list on a 70B model is 80 entries
     per direction and reads as noise. Collapsed, the same set is short enough to scan, and the
-    shape of it -- every layer, or just the two an SAE and an axis happen to want -- is the part
+    shape of it -- every layer, or just the two an SAE and a vector happen to want -- is the part
     worth seeing. One token per point name, layers grouped inside it.
     """
     by_name: dict[str, set[int]] = {}
@@ -542,7 +542,7 @@ def _declared_taps_line() -> str:
 
     The config banner prints what was asked for, which for `sae` is a mode name and not a set.
     This is the same question answered after the SAEs loaded and the extras were merged in, so a
-    pod whose axis layer is missing is visible at startup rather than on the first request that
+    pod missing the layer a vector reads is visible at startup rather than on the first request that
     needs it.
     """
     model = Model.get_instance()
@@ -1078,7 +1078,7 @@ async def initialize(
             raise
 
     # After the model is loaded, preload the vLLM engine (vLLM backend only). Nothing is loaded
-    # here for readout axes: they are database rows that travel with the request, so there is no
+    # here for vector readouts: they are database rows that travel with the request, so there is no
     # per-model asset for startup to find.
     model = Model.get_instance()
     if isinstance(model, VLLMModel):

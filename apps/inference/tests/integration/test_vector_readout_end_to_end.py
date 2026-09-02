@@ -1,17 +1,17 @@
-"""Readout axes against the model they were fitted for.
+"""Readout reads against the model they were fitted for.
 
-Everything else about axes is tested on synthetic tensors: the projection arithmetic, the
-per-axis failure isolation, which layers get captured, how readouts are shaped. None of that
+Everything else about reads is tested on synthetic tensors: the projection arithmetic, the
+per-vector failure isolation, which layers get captured, how readouts are shaped. None of that
 touches a model, and none of it would notice the failure that matters most here -- capture
 reading a different point than the projection assumes, or the prompt being rendered differently
 than the fit assumed. Both produce plausible numbers rather than an error.
 
 So this brings up ``meta-llama/Llama-3.1-8B-Instruct`` and asks for real readouts over a real
-conversation. The axes are sent with the request, which is the only way one reaches this server,
+conversation. The reads are sent with the request, which is the only way one reaches this server,
 and their directions are synthetic: what is pinned here is the wiring, not the values. A fitted
 direction's numbers depend on what the model happens to say, so asserting a particular reading
 would pin the generation rather than the readout, while a basis vector makes the plumbing legible
--- the reading is one coordinate of the residual stream at one layer, so two axes that disagree
+-- the reading is one coordinate of the residual stream at one layer, so two reads that disagree
 about which layer or which coordinate cannot come back equal by accident.
 
 Run against both backends. The two capture activations by different mechanisms -- eager reads
@@ -87,19 +87,19 @@ SHALLOW = "mit_shallow"
 SHALLOW_LAYER = 13
 
 
-def _axis(axis_id: str, layer: int, component: int) -> dict:
-    """One inline axis reading a single coordinate of the residual stream at ``layer``.
+def _read(vector_id: str, layer: int, component: int) -> dict:
+    """One inline vector reading a single coordinate of the residual stream at ``layer``.
 
     Called inside a server context, because the width of the direction has to be this model's
     and the endpoint refuses any other.
     """
     direction = [0.0] * Model.get_instance().d_model
     direction[component] = 1.0
-    return {"id": axis_id, "layer": layer, "direction": direction, "author": "mit"}
+    return {"id": vector_id, "layer": layer, "direction": direction, "author": "mit"}
 
 
-def _both_axes() -> list[dict]:
-    return [_axis(DEEP, DEEP_LAYER, 0), _axis(SHALLOW, SHALLOW_LAYER, 1)]
+def _both_reads() -> list[dict]:
+    return [_read(DEEP, DEEP_LAYER, 0), _read(SHALLOW, SHALLOW_LAYER, 1)]
 
 
 def _request(**overrides) -> dict:
@@ -134,9 +134,9 @@ def test_two_traits_at_different_layers_come_back_from_one_request(engine_env):
     the kind of error that still looks like a plausible chart.
     """
     with try_initialized_server(LLAMA_8B_TRAITS, engine=engine_env) as client:
-        body = _post(client, custom_axes=_both_axes())
+        body = _post(client, reads=_both_reads())
 
-        readouts = {readout["id"]: readout for readout in body["axes"]}
+        readouts = {readout["id"]: readout for readout in body["reads"]}
         assert sorted(readouts) == sorted([DEEP, SHALLOW])
         assert readouts[DEEP]["layer"] == DEEP_LAYER
         assert readouts[SHALLOW]["layer"] == SHALLOW_LAYER
@@ -161,41 +161,41 @@ def test_two_traits_at_different_layers_come_back_from_one_request(engine_env):
 
 @pytest.mark.parametrize("engine", ENGINES)
 def test_the_traits_are_measuring_different_things(engine_env):
-    """Two axes over one generation must not report the same number.
+    """Two reads over one generation must not report the same number.
 
     The failure this catches is a capture keyed by something other than the layer, where every
-    axis reads whichever activation was stored last. Both readouts would look reasonable; they
+    vector reads whichever activation was stored last. Both readouts would look reasonable; they
     would just be the same.
     """
     with try_initialized_server(LLAMA_8B_TRAITS, engine=engine_env) as client:
-        body = _post(client, custom_axes=_both_axes())
-        by_id = {readout["id"]: readout for readout in body["axes"]}
+        body = _post(client, reads=_both_reads())
+        by_id = {readout["id"]: readout for readout in body["reads"]}
         deep = [turn["value"] for turn in by_id[DEEP]["turns"]]
         shallow = [turn["value"] for turn in by_id[SHALLOW]["turns"]]
         assert deep != shallow
 
 
 def test_a_readout_does_not_change_what_the_model_says():
-    """Measuring is not steering: the same seed generates the same text with and without axes.
+    """Measuring is not steering: the same seed generates the same text with and without reads.
 
-    The axis pins ``date_string``, which is what makes the readout path re-render the prompt. If
+    The vector pins ``date_string``, which is what makes the readout path re-render the prompt. If
     that render reached generation, asking for a readout would quietly change the answer being
     read -- so the pinned date is the point of the test, not incidental to it.
     """
     with try_initialized_server(LLAMA_8B_TRAITS) as client:
-        dated = _axis(DEEP, DEEP_LAYER, 0) | {"render": {"template_kwargs": {"date_string": "26 Jul 2024"}}}
+        dated = _read(DEEP, DEEP_LAYER, 0) | {"render": {"template_kwargs": {"date_string": "26 Jul 2024"}}}
         without = _post(client)
-        with_axes = _post(client, custom_axes=[dated])
+        with_reads = _post(client, reads=[dated])
 
         def text(body: dict) -> str:
             return next(output["raw"] for output in body["outputs"] if output["type"] == "DEFAULT")
 
-        assert text(with_axes) == text(without)
+        assert text(with_reads) == text(without)
 
 
 @pytest.mark.parametrize("engine", ENGINES)
 def test_a_readout_only_request_carries_no_features(engine_env):
-    """The shape an unsteered readout page sends: types=[DEFAULT], axes=[...], nothing to steer with.
+    """The shape an unsteered readout page sends: types=[DEFAULT], reads=[...], nothing to steer with.
 
     Named separately from the tests above, which happen to send the same shape, because this is
     the request that used to fail. Steering used to be validated for every request and the vLLM
@@ -204,13 +204,13 @@ def test_a_readout_only_request_carries_no_features(engine_env):
     faking a zero-strength vector, which is a steer being pretended at to take a measurement.
     """
     with try_initialized_server(LLAMA_8B_TRAITS, engine=engine_env) as client:
-        request = _request(custom_axes=[_axis(DEEP, DEEP_LAYER, 0)])
+        request = _request(reads=[_read(DEEP, DEEP_LAYER, 0)])
         assert "features" not in request and "vectors" not in request
         resp = client.post(ENDPOINT, json=request, headers={"X-SECRET-KEY": X_SECRET_KEY})
         assert resp.status_code == 200, resp.text
         body = resp.json()
-        assert [readout["id"] for readout in body["axes"]] == [DEEP]
-        assert all(math.isfinite(turn["value"]) for turn in body["axes"][0]["turns"])
+        assert [readout["id"] for readout in body["reads"]] == [DEEP]
+        assert all(math.isfinite(turn["value"]) for turn in body["reads"][0]["turns"])
 
 
 @pytest.mark.parametrize("engine", ENGINES)
@@ -232,7 +232,7 @@ def test_a_steered_readout_reports_both_sides_of_the_cap(engine_env):
             ENDPOINT,
             json=_request(
                 types=["STEERED", "DEFAULT"],
-                custom_axes=[_axis(DEEP, DEEP_LAYER, 0)],
+                reads=[_read(DEEP, DEEP_LAYER, 0)],
                 strength_multiplier=1.0,
                 vectors=[
                     {
@@ -247,7 +247,7 @@ def test_a_steered_readout_reports_both_sides_of_the_cap(engine_env):
         assert resp.status_code == 200, resp.text
         body = resp.json()
 
-        by_type = {readout["type"]: readout for readout in body["axes"] if readout["id"] == DEEP}
+        by_type = {readout["type"]: readout for readout in body["reads"] if readout["id"] == DEEP}
         assert sorted(by_type) == ["DEFAULT", "STEERED"]
         steered_turns = by_type["STEERED"]["turns"]
         assert steered_turns
@@ -258,8 +258,8 @@ def test_a_steered_readout_reports_both_sides_of_the_cap(engine_env):
             assert math.isfinite(turn["valuePostCap"])
 
 
-def test_an_axis_fitted_for_other_weights_is_refused():
-    """A direction of the wrong width is a 400 naming the axis, not a 500 out of the matmul.
+def test_a_vector_fitted_for_other_weights_is_refused():
+    """A direction of the wrong width is a 400 naming the vector, not a 500 out of the matmul.
 
     The unit tests check this against a stub, which fixes the width by construction. Here it is
     the real model answering, which is the only thing that knows what its width is -- and the
@@ -269,7 +269,7 @@ def test_an_axis_fitted_for_other_weights_is_refused():
         too_wide = {"id": "lu_assistant-axis", "layer": 40, "direction": [0.1] * 8192}
         resp = client.post(
             ENDPOINT,
-            json=_request(custom_axes=[too_wide]),
+            json=_request(reads=[too_wide]),
             headers={"X-SECRET-KEY": X_SECRET_KEY},
         )
         assert resp.status_code == 400, resp.text

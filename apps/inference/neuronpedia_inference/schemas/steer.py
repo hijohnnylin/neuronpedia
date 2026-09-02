@@ -28,11 +28,62 @@ class NPSteerType(StrEnum):
     DEFAULT = "DEFAULT"
 
 
-class NPAxisNormalize(StrEnum):
-    """How an activation is scaled before it is projected onto a readout axis."""
+class NPNormalize(StrEnum):
+    """How an activation is scaled before a direction is projected onto it."""
 
     L2 = "l2"
     NONE = "none"
+
+
+class NPCaptureSite(StrEnum):
+    """Where in a layer an activation is read."""
+
+    RESID_POST = "resid_post"
+
+
+class NPTokenSelection(StrEnum):
+    """Which of a conversation's messages a reading is reported for."""
+
+    ASSISTANT_TURNS = "assistant_turns"
+    ALL_TURNS = "all_turns"
+
+
+class NPPooling(StrEnum):
+    """How one message's token activations collapse to a single vector."""
+
+    MEAN = "mean"
+    LAST = "last"
+    MAX = "max"
+
+
+class NPReadSpec(BaseSchema):
+    """How to get the activation a direction is projected onto.
+
+    A fitted direction only means anything against activations gathered the way the fit gathered
+    them, so these three travel with the vector rather than being this server's convention. Everything
+    here was hard-coded until now, and the defaults are exactly what was hard-coded.
+
+    Distinct from `render`, which is about the text: a render condition changes what the model is
+    shown, so every read in one request has to agree about it. These change only how the captured
+    activations are reduced, so two reads in one request may differ freely -- reading one layer two
+    ways costs one forward, not two.
+    """
+
+    site: NPCaptureSite = Field(default=NPCaptureSite.RESID_POST, description="Where in the layer to read")
+    tokens: NPTokenSelection = Field(
+        default=NPTokenSelection.ASSISTANT_TURNS,
+        description=(
+            "Which messages get a reading. `assistant_turns` reports the model's own turns, which is "
+            "what a persona fit is about; `all_turns` reports every message, including the user's."
+        ),
+    )
+    pool: NPPooling = Field(
+        default=NPPooling.MEAN,
+        description=(
+            "How a message's tokens collapse. `mean` is the whole turn's average, `last` its final "
+            "token, `max` the per-dimension maximum."
+        ),
+    )
 
 
 class NPSteerFeature(BaseSchema):
@@ -55,12 +106,12 @@ class NPSteerVector(BaseSchema):
     hook: StrictStr
 
 
-class NPAxisRender(BaseSchema):
-    """How a conversation has to be templated for an axis's numbers to mean anything.
+class NPRenderConditions(BaseSchema):
+    """How a conversation has to be templated for a vector's numbers to mean anything.
 
     A projection onto a fitted direction only holds if the conversation reaches the model rendered
-    the way it was during fitting, so these conditions travel with the axis. They are applied
-    before generation and so change the text itself, which is why every axis in one request has to
+    the way it was during fitting, so these conditions travel with the vector. They are applied
+    before generation and so change the text itself, which is why every read in one request has to
     agree about them.
     """
 
@@ -80,11 +131,11 @@ class NPAxisRender(BaseSchema):
     )
 
 
-class NPAxisSource(BaseSchema):
-    """A published axis to fetch, instead of sending its vectors inline.
+class NPVectorSource(BaseSchema):
+    """A published vector to fetch, instead of sending its tensors inline.
 
-    The artifact is one folder holding `axis.yaml` and `axis.safetensors`. Everything about the
-    axis comes from there, so nothing but `id` may be sent beside this.
+    The artifact is one folder holding `vector.yaml` and `vector.safetensors`. Everything about the
+    vector comes from there, so nothing but `id` may be sent beside this.
     """
 
     hf_repo_id: StrictStr = Field(description='Hugging Face model repo, e.g. "neuronpedia/persona-axes"')
@@ -100,61 +151,62 @@ class NPAxisSource(BaseSchema):
     )
 
 
-class NPAxis(BaseSchema):
-    """A readout axis supplied with the request, rather than named by id from this server's assets.
+class NPVectorRead(BaseSchema):
+    """One vector to read off the generated conversation, supplied with the request.
 
-    Either send `source` on its own, or send `direction` and `layer` with as much of the rest as
-    the axis has. With everything else defaulted the reading is the dot product of the direction
-    with the mean residual-stream activation over each assistant turn, which is the axis you can
-    build without a calibration corpus. The optional fields refine that in three steps::
+    Purely computational: a direction, where to read the activation it applies to, and the
+    arithmetic that turns the projection into a number. Nothing here says what the number *means* --
+    a trait, a class, a position between two named poles -- because that is the caller's to name,
+    and this server has no catalogue to look it up in.
 
-        h          = mean resid_post activation over the assistant turn, at `layer`
+    Either send `source` on its own, or send `direction` and `layer` with as much of the rest as the
+    fit has. With everything else defaulted the reading is the dot product of the direction with the
+    mean residual-stream activation over each assistant turn, which is what you can read without a
+    calibration corpus. The optional fields refine that in three steps::
+
+        h          = activation at `layer`, gathered as `read` says (default: the mean
+                     resid_post over each assistant turn)
         x          = h - preNormMean                    # default: no-op
         x          = x / max(||x||, 1e-12)              # only when normalize is "l2"
         raw        = dot(x - postNormMean, direction)
         value      = (raw - center) / (raw >= center ? scalePos : scaleNeg)
         percentile = interpolated against quantilesPos / quantilesNeg, bounded to [-1, 1]
 
-    So `value` is in the axis's own units until `center` and the two scales put it on a readable
+    So `value` is in the fit's own units until `center` and the two scales put it on a readable
     one, and a `percentile` is reported only once the quantile tables say what the fitting corpus
-    looked like. `value` is never clipped: a reading past 1 says the axis is being read off the
+    looked like. `value` is never clipped: a reading past 1 says the vector is being read off the
     distribution it was fitted on, which is a signal rather than something to pin to the boundary.
 
-    Nothing here says whether a pole is one you would rather see. That is an editorial call about
-    a trait rather than a property of a fit, so it belongs to whatever displays the reading.
+    **No labels.** There is no field here for an author, a title, a caveat or what either end means.
+    A caller who holds the catalogue already has those beside the row this payload came from, and
+    sending them here only to have them echoed back would make this server a courier for display
+    text it cannot check. A `source` artifact is the exception, and states them in `vector.yaml`.
     """
 
     id: StrictStr = Field(
         description=(
-            "What this axis is reported under, and unique across `axes` and `customAxes` in one "
-            "request. Conventionally `<author>_<name>`, though nothing here parses it."
+            "What this reading is reported under, and unique across `reads` in one request. "
+            "Conventionally `<author>_<name>`, though nothing here parses it."
         )
     )
-    source: NPAxisSource | None = Field(
-        default=None, description="Fetch the axis from a published artifact instead of sending it inline"
+    source: NPVectorSource | None = Field(
+        default=None, description="Fetch the vector from a published artifact instead of sending it inline"
     )
 
     direction: list[StrictFloat] | None = Field(
         default=None,
         description="The fitted direction. Required without `source`, and must be the model's hidden size",
     )
-    layer: StrictInt | None = Field(
-        default=None, description="Layer to read `resid_post` at. Required without `source`"
+    layer: StrictInt | None = Field(default=None, description="Layer to read at. Required without `source`")
+    read: NPReadSpec | None = Field(
+        default=None,
+        description=(
+            "How to gather the activation this direction is projected onto. Defaults to the mean over "
+            "each assistant turn's `resid_post`, which is how every vector fitted so far was read."
+        ),
     )
 
-    author: StrictStr | None = Field(default=None, description="Who fitted this axis. Reported as-is")
-    pole_positive: StrictStr | None = Field(default=None, description='Name of the + pole, e.g. "toxic"')
-    pole_negative: StrictStr | None = Field(default=None, description='Name of the - pole, e.g. "respectful"')
-    pole_positive_description: StrictStr | None = None
-    pole_negative_description: StrictStr | None = None
-    display_name: StrictStr | None = Field(
-        default=None, description="A label for an axis whose two poles are not one. Nothing parses it"
-    )
-    caveat: StrictStr | None = Field(
-        default=None, description="A known limitation, worth showing beside this axis's values"
-    )
-
-    normalize: NPAxisNormalize = NPAxisNormalize.NONE
+    normalize: NPNormalize = NPNormalize.NONE
     pre_norm_mean: list[StrictFloat] | None = Field(
         default=None, description="Subtracted from the activation before normalizing. Rarely needed"
     )
@@ -163,14 +215,14 @@ class NPAxis(BaseSchema):
         description="Subtracted after normalizing. Interchangeable with `preNormMean` when normalize is none",
     )
 
-    center: StrictFloat = Field(default=0.0, description="Where the axis reads zero, in raw projection units")
+    center: StrictFloat = Field(default=0.0, description="Where the reading is zero, in raw projection units")
     scale_pos: StrictFloat = Field(default=1.0, description="Divisor above `center`. May not be zero")
     scale_neg: StrictFloat = Field(default=1.0, description="Divisor below `center`. May not be zero")
 
     quantiles_pos: list[StrictFloat] | None = Field(
         default=None,
         description=(
-            "Distance from `center` at each level of this pole's half of the fitting corpus, "
+            "Distance from `center` at each level of the positive half of the fitting corpus, "
             "ascending. Sent with `quantilesNeg`, and the two are what a percentile is read off."
         ),
     )
@@ -180,20 +232,20 @@ class NPAxis(BaseSchema):
         description="Levels the two tables are sampled at. Defaults to evenly spaced 0 to 1",
     )
 
-    render: NPAxisRender = Field(default_factory=NPAxisRender)
+    render: NPRenderConditions = Field(default_factory=NPRenderConditions)
 
     @model_validator(mode="after")
-    def check_one_shape(self) -> "NPAxis":
+    def check_one_shape(self) -> "NPVectorRead":
         """Either a source or an inline definition, and never a source with fields beside it.
 
         Refused rather than merged: a caller who sends both cannot be told which one produced the
-        numbers they get back, and half of a published axis overridden by hand is not the axis
+        numbers they get back, and half of a published vector overridden by hand is not the vector
         anyone can go and look at.
         """
         if self.source is None:
             missing = [name for name in ("direction", "layer") if getattr(self, name) is None]
             if missing:
-                raise ValueError(f"axis {self.id!r}: {missing} required without a `source`")
+                raise ValueError(f"vector {self.id!r}: {missing} required without a `source`")
             return self
 
         overridden = sorted(
@@ -205,7 +257,7 @@ class NPAxis(BaseSchema):
         # The four scalars above cannot be told apart from their defaults, so they are not checked;
         # the loaded artifact overwrites them either way.
         if overridden:
-            raise ValueError(f"axis {self.id!r}: {overridden} cannot be sent with a `source`, which carries them")
+            raise ValueError(f"vector {self.id!r}: {overridden} cannot be sent with a `source`, which carries them")
         return self
 
 
@@ -282,52 +334,63 @@ class SteerCompletionResponse(BaseSchema):
     outputs: list[NPSteerCompletionOutput]
 
 
-class SteerAxisTurn(BaseSchema):
-    """One assistant turn's reading on a single axis, as a measurement and as a percentile.
+class SteerReadoutTurn(BaseSchema):
+    """One message's reading of a single vector, as a measurement and as a percentile.
 
-    `value` is calibrated against the axis's own spread, so it passes 1 for roughly 2% of turns
-    by construction and is never clipped -- how far past the calibration corpus a turn sits is
-    what says an axis is being read off distribution. `percentile` is the same reading expressed
+    `value` is calibrated against the fit's own spread, so it passes 1 for roughly 2% of readings
+    by construction and is never clipped -- how far past the calibration corpus a reading sits is
+    what says a vector is being read off distribution. `percentile` is the same reading expressed
     as the share of that corpus it is past, which cannot leave [-1, 1]. Display the percentile
     and keep the value: a gauge reading "102%" looks broken, and a clipped value would delete
-    the diagnostic. `percentile` is absent for an axis whose asset ships no quantile tables.
+    the diagnostic. `percentile` is absent for a vector that ships no quantile tables.
+
+    One entry per message the read's `tokens` selection picked, in conversation order.
     """
 
-    value: StrictFloat | None = Field(default=None, description="Axis value for this turn (pre-cap)")
+    value: StrictFloat | None = Field(default=None, description="The reading (pre-cap)")
     value_post_cap: StrictFloat | None = Field(
-        default=None, description="Axis value for this turn measured under steering (post-cap)"
+        default=None, description="The same reading measured under steering (post-cap)"
     )
     percentile: StrictFloat | None = Field(
         default=None,
         description=(
-            "Where `value` falls in the axis's calibration corpus, signed by pole and bounded "
-            "to [-1, 1]: 0.97 is further along this pole than 97% of that corpus. Absent when "
-            "the axis ships no quantile tables."
+            "Where `value` falls in the fitting corpus, signed and bounded to [-1, 1]: 0.97 is "
+            "further along than 97% of that corpus. Absent when the vector ships no quantile tables."
         ),
     )
     percentile_post_cap: StrictFloat | None = Field(
-        default=None, description="`percentile` for this turn measured under steering (post-cap)"
+        default=None, description="`percentile` for this reading measured under steering (post-cap)"
     )
-    snippet: StrictStr | None = Field(default=None, description="Truncated conversation content for this turn")
+    snippet: StrictStr | None = Field(default=None, description="Truncated conversation content for this message")
 
 
-class SteerAxisReadout(BaseSchema):
-    """One axis read across the assistant's turns, for one steer type.
+class SteerVectorReadout(BaseSchema):
+    """One vector read across a generated conversation, for one steer type.
 
     Keyed by `id` rather than by `title`: a title is a display string that may be reworded,
     and these readouts are persisted by callers.
+
+    **The label fields say what the artifact said, and nothing more.** A vector sent inline carries
+    no labels -- the request has no fields for them, because a caller who holds the catalogue can
+    label a reading without a round trip through this server -- so `author` reads `custom`, `title`
+    repeats the id, and the poles and caveat are absent. They are populated only for a vector
+    fetched with `source`, where inference is the party that read `vector.yaml`.
     """
 
-    id: StrictStr = Field(description="Axis id, as requested in `axes` or `customAxes`")
-    author: StrictStr = Field(description="Who fitted this axis; the `<author>_` prefix of `id`")
-    title: StrictStr = Field(description="Display label for the axis")
+    id: StrictStr = Field(description="Vector id, as requested in `reads`")
+    author: StrictStr = Field(description="Who fitted this vector, per its artifact. `custom` for anything sent inline")
+    title: StrictStr = Field(description="Display label from the artifact, or the id for anything sent inline")
     type: NPSteerType | None = None
-    layer: StrictInt | None = Field(default=None, description="Layer the axis was fitted and read at")
+    layer: StrictInt | None = Field(default=None, description="Layer the vector was fitted and read at")
     caveat: StrictStr | None = Field(
-        default=None, description="A known limitation of this axis, worth showing beside its values"
+        default=None, description="A known limitation stated by the artifact, worth showing beside its values"
     )
     pole_positive: StrictStr | None = Field(
-        default=None, description='What a positive reading means, e.g. "toxic". Absent when the axis names no poles'
+        default=None,
+        description=(
+            'What a positive reading means, e.g. "toxic". Absent unless the artifact names both '
+            "ends, which a probe or a steering vector need not"
+        ),
     )
     pole_negative: StrictStr | None = Field(
         default=None, description='What a negative reading means, e.g. "respectful"'
@@ -337,12 +400,12 @@ class SteerAxisReadout(BaseSchema):
     source_revision: StrictStr | None = Field(
         default=None,
         description=(
-            "The commit this axis was read from, for an axis fetched with `source`. What makes a "
-            "reading reproducible: the same revision is the same axis, whatever the branch has "
+            "The commit this vector was read from, for one fetched with `source`. What makes a "
+            "reading reproducible: the same revision is the same vector, whatever the branch has "
             "moved on to since."
         ),
     )
-    turns: list[SteerAxisTurn] | None = None
+    turns: list[SteerReadoutTurn] | None = None
 
 
 class SteerCompletionChatRequest(BaseSchema):
@@ -372,12 +435,12 @@ class SteerCompletionChatRequest(BaseSchema):
         default=0,
         description="How many candidate tokens to report for each generated position. 0 asks for none. Backends that cannot report scores omit `logprobs` whatever this is set to.",
     )
-    custom_axes: list[NPAxis] | None = Field(
+    reads: list[NPVectorRead] | None = Field(
         default=None,
         description=(
-            "Readout axes to report for the generated turns, sent inline or fetched from a "
-            "published artifact. This server ships none of its own, so every axis a request "
-            "wants measured is named and defined here. Two entries sharing an id is a 400."
+            "Vectors to read off the generated conversation, sent inline or fetched from a "
+            "published artifact. This server ships none of its own, so every vector a request "
+            "wants read is named and defined here. Two entries sharing an id is a 400."
         ),
     )
     steer_special_tokens: StrictBool
@@ -388,9 +451,9 @@ class SteerCompletionChatResponse(BaseSchema):
     The steering/default chat responses.
     """
 
-    axes: list[SteerAxisReadout] | None = Field(
+    readouts: list[SteerVectorReadout] | None = Field(
         default=None,
-        description="Axis readouts for the assistant turns, one entry per requested axis per steer type",
+        description="One entry per requested vector per steer type, in the order the vectors were sent",
     )
     outputs: list[NPSteerChatResult]
     input: NPSteerChatResult

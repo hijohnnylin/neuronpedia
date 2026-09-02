@@ -100,7 +100,7 @@ def test_stream_keeps_special_tokens():
 
 
 def test_generation_uses_the_endpoints_own_token_ids():
-    """Persona pooling indexes captured rows by prompt position.
+    """Vector readouts index captured rows by prompt position.
 
     That only holds if the backend generates from the ids the endpoint tokenized, rather
     than re-tokenizing a decode of them, so the endpoint passes ids and not a string.
@@ -169,7 +169,7 @@ def test_render_does_not_strip_user_turns():
 
 
 def test_render_blanks_a_leading_system_prompt_when_asked():
-    """The persona-asset case: the turn stays so the structure matches the fit."""
+    """The published-artifact case: the turn stays so the structure matches the fit."""
     convo = [_turn("system", "You are terse."), _turn("user", "Hi")]
     assert messages_for_render(convo, blank_system_prompt=True) == [
         {"role": "system", "content": ""},

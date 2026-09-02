@@ -1,8 +1,8 @@
-"""Persona capture pools activations over per-message token spans; these pin the spans.
+"""Vector capture pools activations over per-message token spans; these pin the spans.
 
 The spans come from the engine's ``Tokenize.message_partition`` rather than being computed
 here, so these tests drive the real engine helper through stub tokenizers. Two properties
-matter to persona: the spans partition the rendered sequence 1:1 with the conversation, and the
+matter to a readout: the spans partition the rendered sequence 1:1 with the conversation, and the
 ids are real ``int``s (transformers 5 returns a ``BatchEncoding`` from the tokenizing path, and
 iterating that yields the string key ``"input_ids"`` — the failure that showed up in pod logs).
 """
@@ -16,11 +16,16 @@ from typing import Any, cast
 import torch
 from interp_engine import Address, Tokenize, VLLMModel, to_address
 
-from neuronpedia_inference.inference_utils.persona.capture_engine import (
+from neuronpedia_inference.inference_utils.vectors.capture_engine import (
     _per_message_spans,
     capture_turn_means_vllm,
     turn_means_from_generation_capture,
 )
+from neuronpedia_inference.inference_utils.vectors.vector_data import CaptureKey, Pooling
+
+
+def _key(layer: int, pool: Pooling = "mean") -> CaptureKey:
+    return CaptureKey(site="resid_post", layer=layer, pool=pool)
 
 
 class _BatchEncoding(dict):
@@ -110,7 +115,7 @@ def test_per_message_spans_with_list():
 
 
 def test_per_message_spans_partition_the_whole_sequence():
-    """Persona indexes its projection per message, so a gap or overlap misattributes a turn."""
+    """A readout indexes its projection per message, so a gap or overlap misattributes a turn."""
     msgs = [{"role": "user", "content": f"m{i}"} for i in range(4)]
     full_ids, spans = _per_message_spans(_tok(_ListTokenizer()), msgs)
 
@@ -171,14 +176,16 @@ def test_capture_turn_means_vllm_reads_back_the_point_it_asked_for():
     are post-cap, so the pre-cap ones always come from a second capture like this one.
     """
     backend = _CapturingBackend()
-    means = asyncio.run(capture_turn_means_vllm(cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [40]))
+    means = asyncio.run(
+        capture_turn_means_vllm(cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [_key(40)])
+    )
 
     assert backend.asked == [Address("resid_post", 40)]
-    torch.testing.assert_close(means[40], torch.tensor([[2.0, 3.0]]))
+    torch.testing.assert_close(means[_key(40)], torch.tensor([[2.0, 3.0]]))
 
 
 def test_pinned_template_kwargs_reach_the_render():
-    """An axis that pins a template argument has to be measured against that rendering.
+    """A vector that pins a template argument has to be measured against that rendering.
 
     Llama 3.1's template injects the current date, and the 8B trait fits pinned it. Rendering
     the conversation here without the pin would put the fit's date in the prompt that was
@@ -210,14 +217,56 @@ def test_a_generation_capture_pooled_with_the_wrong_render_is_refused():
 def test_capture_turn_means_vllm_asks_for_every_layer_in_one_call():
     """Axes at different layers must not cost one forward each.
 
-    A model can ship six axes across five layers, so looping per axis here would turn one
+    A model can ship six reads across five layers, so looping per vector here would turn one
     extra pass into five. The layers are deduplicated and requested together.
     """
     backend = _CapturingBackend()
     means = asyncio.run(
-        capture_turn_means_vllm(cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [19, 13, 19])
+        capture_turn_means_vllm(
+            cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [_key(19), _key(13), _key(19)]
+        )
     )
 
     assert backend.calls == 1
     assert backend.asked == [Address("resid_post", 13), Address("resid_post", 19)]
-    assert sorted(means) == [13, 19]
+    assert sorted(key.layer for key in means) == [13, 19]
+
+
+def test_capture_turn_means_vllm_asks_once_for_a_layer_read_two_ways():
+    """Two poolings of one layer are one capture, not two.
+
+    What keying the captures by their reduction is for: a vector that pools differently needs its
+    own result, and getting it by capturing that layer again would double the cost of the pass.
+    """
+    backend = _CapturingBackend()
+    means = asyncio.run(
+        capture_turn_means_vllm(
+            cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [_key(19), _key(19, "last")]
+        )
+    )
+
+    assert backend.asked == [Address("resid_post", 19)]
+    assert sorted(key.pool for key in means) == ["last", "mean"]
+    # The stub's two rows are [1,2] and [3,4] over one message span, so the mean and the last
+    # token are different numbers -- which is the point of asking for both.
+    torch.testing.assert_close(means[_key(19)], torch.tensor([[2.0, 3.0]]))
+    torch.testing.assert_close(means[_key(19, "last")], torch.tensor([[3.0, 4.0]]))
+
+
+def test_pooling_a_span_the_three_implemented_ways():
+    """Each mode reduces the same span differently; a new mode raises rather than defaulting."""
+    msgs = [{"role": "user", "content": "hi"}]
+    prompt_ids = [1, 2, 9]
+    acts = torch.tensor([[0.0, 6.0], [2.0, 4.0], [1.0, 1.0], [3.0, 3.0], [5.0, 5.0]])
+    tok = _tok(_ListTokenizer())
+
+    by_pool = {
+        pool: turn_means_from_generation_capture(tok, msgs, prompt_ids, acts, None, pool)
+        for pool in cast(list[Pooling], ["mean", "last", "max"])
+    }
+    for pooled in by_pool.values():
+        assert pooled is not None
+    torch.testing.assert_close(by_pool["mean"][0], torch.tensor([1.0, 5.0]))  # type: ignore[index]
+    torch.testing.assert_close(by_pool["last"][0], torch.tensor([2.0, 4.0]))  # type: ignore[index]
+    # Per dimension, so the result need not be any one token's activation.
+    torch.testing.assert_close(by_pool["max"][0], torch.tensor([2.0, 6.0]))  # type: ignore[index]

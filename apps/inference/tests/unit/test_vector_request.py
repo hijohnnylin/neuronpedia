@@ -1,4 +1,4 @@
-"""Readout axes supplied with a request: what is accepted, what is refused, and why.
+"""Readout reads supplied with a request: what is accepted, what is refused, and why.
 
 An on-disk asset was built by a converter that checked it. One arriving in a request was not, so
 every check that protects a projection has to happen at the door -- and the two that only the
@@ -7,8 +7,8 @@ length is a 500 from a matmul otherwise, and a non-finite entry is worse than an
 a fully populated readout in which every number is NaN.
 
 The other half of these tests is that an accepted payload becomes the *same* thing an asset
-directory becomes. Everything downstream reads an ``AxisAsset``, so if the two paths agree there,
-a request-supplied axis is measured by exactly the code the shipped ones are.
+directory becomes. Everything downstream reads an ``VectorAsset``, so if the two paths agree there,
+a request-supplied vector is measured by exactly the code the shipped ones are.
 """
 
 from __future__ import annotations
@@ -23,30 +23,31 @@ import yaml
 from pydantic import ValidationError
 from safetensors.torch import save_file
 
-from neuronpedia_inference.inference_utils.persona.axis_data import (
+from neuronpedia_inference.inference_utils.vectors.vector_data import (
     MANIFEST_FILENAME,
     TENSORS_FILENAME,
-    project_axis,
-    project_axis_with_percentile,
+    CaptureKey,
+    project_vector,
+    project_vector_with_percentile,
 )
-from neuronpedia_inference.inference_utils.persona.axis_request import (
+from neuronpedia_inference.inference_utils.vectors.vector_request import (
     DEFAULT_AUTHOR,
-    MAX_CUSTOM_AXES,
-    AxisRequestError,
+    MAX_READS,
+    VectorRequestError,
     _artifact_at,
     asset_from_payload,
-    resolve_request_axes,
+    resolve_request_reads,
 )
-from neuronpedia_inference.schemas import NPAxis
+from neuronpedia_inference.schemas import NPVectorRead
 
 D_MODEL = 4
 N_LAYERS = 8
 UNIT = [1.0, 0.0, 0.0, 0.0]
 
 
-def payload(**overrides) -> NPAxis:
-    """The smallest axis a caller can send, with room to break one thing at a time."""
-    return NPAxis.model_validate({"id": "np_trait", "direction": UNIT, "layer": 3, **overrides})
+def payload(**overrides) -> NPVectorRead:
+    """The smallest vector a caller can send, with room to break one thing at a time."""
+    return NPVectorRead.model_validate({"id": "np_trait", "direction": UNIT, "layer": 3, **overrides})
 
 
 def build(**overrides):
@@ -60,135 +61,163 @@ def acts(*first_components: float) -> torch.Tensor:
     return rows
 
 
-def resolve(payloads: list[NPAxis]):
-    return asyncio.run(resolve_request_axes(payloads, hidden_size=D_MODEL, n_layers=N_LAYERS))
+def resolve(payloads: list[NPVectorRead]):
+    return asyncio.run(resolve_request_reads(payloads, hidden_size=D_MODEL, n_layers=N_LAYERS))
 
 
 class TestPayloadShape:
-    """Which combinations of fields are an axis at all. Refused by the model, before any model."""
+    """Which combinations of fields are a vector at all. Refused by the model, before any model."""
 
     def test_a_direction_and_a_layer_are_enough(self):
         assert payload().layer == 3
 
     def test_a_source_alone_is_enough(self):
-        axis = NPAxis.model_validate({"id": "np_trait", "source": {"hfRepoId": "org/axes", "hfFolder": "trait"}})
-        assert axis.source is not None
-        assert axis.direction is None
+        vector = NPVectorRead.model_validate(
+            {"id": "np_trait", "source": {"hfRepoId": "org/reads", "hfFolder": "trait"}}
+        )
+        assert vector.source is not None
+        assert vector.direction is None
 
     def test_a_direction_without_a_layer_is_refused(self):
         with pytest.raises(ValidationError, match="layer"):
-            NPAxis.model_validate({"id": "np_trait", "direction": UNIT})
+            NPVectorRead.model_validate({"id": "np_trait", "direction": UNIT})
 
     def test_neither_a_source_nor_a_direction_is_refused(self):
         with pytest.raises(ValidationError, match="direction"):
-            NPAxis.model_validate({"id": "np_trait"})
+            NPVectorRead.model_validate({"id": "np_trait"})
 
-    def test_a_source_carrying_the_axis_cannot_be_overridden(self):
+    def test_a_source_carrying_the_vector_cannot_be_overridden(self):
         # Half a published artifact with a hand-edited direction is not the artifact anyone can go
         # and look at, and the response could not say which of the two produced the numbers.
         with pytest.raises(ValidationError, match="direction"):
-            NPAxis.model_validate(
+            NPVectorRead.model_validate(
                 {
                     "id": "np_trait",
-                    "source": {"hfRepoId": "org/axes", "hfFolder": "trait"},
+                    "source": {"hfRepoId": "org/reads", "hfFolder": "trait"},
                     "direction": UNIT,
                     "layer": 3,
                 }
             )
 
-    def test_a_source_cannot_be_relabelled_either(self):
-        with pytest.raises(ValidationError, match="pole_positive"):
-            NPAxis.model_validate(
+    def test_a_source_cannot_have_its_scaling_overridden_either(self):
+        with pytest.raises(ValidationError, match="pre_norm_mean"):
+            NPVectorRead.model_validate(
                 {
                     "id": "np_trait",
-                    "source": {"hfRepoId": "org/axes", "hfFolder": "trait"},
-                    "polePositive": "toxic",
+                    "source": {"hfRepoId": "org/reads", "hfFolder": "trait"},
+                    "preNormMean": [0.5] * D_MODEL,
                 }
             )
 
+    def test_there_are_no_label_fields_to_send(self):
+        # Display text was taken off this payload: a caller holding the catalogue already has it
+        # beside the row the direction came from, and echoing it through a compute server made this
+        # the courier for strings it cannot check. Dropped rather than refused, so that a client
+        # still sending them keeps working; `extra="forbid"` lands once the stored blobs agree.
+        vector = payload(author="Some Lab", displayName="Tone", polePositive="toxic", caveat="200 turns")
+        assert not any(hasattr(vector, name) for name in ("author", "display_name", "pole_positive", "caveat"))
+
+    def test_a_source_carries_how_it_was_read_too(self):
+        # The read spec is part of the fit, like the direction: an artifact read some other way
+        # than it was fitted returns a number that looks like a measurement of it.
+        with pytest.raises(ValidationError, match="read"):
+            NPVectorRead.model_validate(
+                {
+                    "id": "np_trait",
+                    "source": {"hfRepoId": "org/reads", "hfFolder": "trait"},
+                    "read": {"pool": "last"},
+                }
+            )
+
+    def test_a_pooling_this_server_does_not_implement_is_refused(self):
+        # Closed enums rather than free strings, because every unimplemented value would otherwise
+        # fall back to the mean and be reported as the pooling that was asked for.
+        with pytest.raises(ValidationError, match="pool"):
+            payload(read={"pool": "median"})
+
     def test_the_wire_names_are_camel_case(self):
-        axis = payload(preNormMean=[0.5] * D_MODEL, polePositive="toxic", scalePos=2.0)
-        assert axis.pre_norm_mean == [0.5] * D_MODEL
-        assert axis.pole_positive == "toxic"
-        assert axis.scale_pos == 2.0
+        vector = payload(preNormMean=[0.5] * D_MODEL, postNormMean=[0.25] * D_MODEL, scalePos=2.0)
+        assert vector.pre_norm_mean == [0.5] * D_MODEL
+        assert vector.post_norm_mean == [0.25] * D_MODEL
+        assert vector.scale_pos == 2.0
 
 
 class TestDefaults:
-    """What a two-field axis means. Everything optional has to have an answer, and the answer has
+    """What a two-field vector means. Everything optional has to have an answer, and the answer has
     to be the identity: a caller who sent a direction and a layer gets the dot product, not a
     transformed version of it they did not ask for."""
 
     def test_the_reading_is_the_dot_product(self):
-        assert project_axis(acts(2.0, -3.0), build()).tolist() == [2.0, -3.0]
+        assert project_vector(acts(2.0, -3.0), build()).tolist() == [2.0, -3.0]
 
     def test_no_mean_is_subtracted(self):
-        axis = build()
-        assert axis.scaler_mean.tolist() == [0.0] * D_MODEL
-        assert axis.pca_mean.tolist() == [0.0] * D_MODEL
+        vector = build()
+        assert vector.scaler_mean.tolist() == [0.0] * D_MODEL
+        assert vector.pca_mean.tolist() == [0.0] * D_MODEL
 
     def test_nothing_is_normalized(self):
         assert build().normalize == "none"
 
+    def test_the_activation_is_the_mean_over_each_assistant_turn(self):
+        # What was hard-coded before the read spec existed, so what a vector that says nothing about
+        # it still has to get. Changing this default re-reads every vector fitted so far.
+        vector = build()
+        assert (vector.read.site, vector.read.tokens, vector.read.pool) == ("resid_post", "assistant_turns", "mean")
+        assert vector.capture_key == CaptureKey(site="resid_post", layer=3, pool="mean")
+
     def test_there_is_no_percentile_without_tables(self):
-        values, percentiles = project_axis_with_percentile(acts(2.0), build())
+        values, percentiles = project_vector_with_percentile(acts(2.0), build())
         assert values.tolist() == [2.0]
         assert percentiles is None
 
-    def test_an_unclaimed_axis_is_not_attributed_to_whoever_the_id_names(self):
-        # The `<author>_<name>` convention holds for what this server ships; a caller's id is
-        # theirs to choose, so reading an author out of it would attribute a fit to a stranger.
+    def test_an_inline_read_is_not_attributed_to_whoever_the_id_names(self):
+        # The `<author>_<name>` convention holds for a published artifact; a caller's id is theirs
+        # to choose, so reading an author out of it would attribute a fit to a stranger.
         assert build(id="mit_trait").author == DEFAULT_AUTHOR
 
-    def test_a_claimed_axis_is_attributed_as_sent(self):
-        assert build(author="Some Lab").author == "Some Lab"
-
-    def test_the_title_is_not_a_parsed_string(self):
-        # Poles are their own fields now. A title survives only for displays that read one, and
-        # nothing should be able to recover the poles from it.
-        assert build(polePositive="toxic", poleNegative="respectful").title == "np_trait"
-        assert build(displayName="Tone").title == "Tone"
+    def test_an_inline_read_carries_no_labels(self):
+        # The honest answer for a payload with no label fields: a placeholder author, the caller's
+        # own id as the title, and nothing invented for the rest.
+        vector = build()
+        assert (vector.author, vector.title) == (DEFAULT_AUTHOR, "np_trait")
+        assert (vector.pole_positive, vector.pole_negative, vector.caveat) == (None, None, None)
 
 
 class TestCarried:
-    """Everything a caller sends and expects back, or expects to take effect."""
-
-    def test_poles_and_their_descriptions(self):
-        axis = build(
-            polePositive="toxic",
-            poleNegative="respectful",
-            polePositiveDescription="insulting or demeaning",
-            poleNegativeDescription="considerate",
-        )
-        assert (axis.pole_positive, axis.pole_negative) == ("toxic", "respectful")
-        assert axis.pole_positive_description == "insulting or demeaning"
-        assert axis.pole_negative_description == "considerate"
-
-    def test_a_caveat(self):
-        assert build(caveat="fitted on 200 turns").caveat == "fitted on 200 turns"
+    """Everything a caller sends and expects to take effect."""
 
     def test_render_conditions(self):
-        axis = build(render={"blankSystemPrompt": True, "templateKwargs": {"date_string": "26 Jul 2024"}})
-        assert axis.render.blank_system_prompt is True
-        assert axis.render.template_kwargs == {"date_string": "26 Jul 2024"}
+        vector = build(render={"blankSystemPrompt": True, "templateKwargs": {"date_string": "26 Jul 2024"}})
+        assert vector.render.blank_system_prompt is True
+        assert vector.render.template_kwargs == {"date_string": "26 Jul 2024"}
+
+    def test_a_read_spec(self):
+        vector = build(read={"tokens": "all_turns", "pool": "last"})
+        assert (vector.read.tokens, vector.read.pool) == ("all_turns", "last")
+
+    def test_two_reads_at_one_layer_reading_differently_capture_separately(self):
+        # What the spec exists for, and what a bare layer number could not express: equal keys
+        # would report one of these off the other's pooling.
+        assert build().capture_key != build(read={"pool": "last"}).capture_key
 
     def test_the_two_means_are_subtracted_in_their_own_places(self):
         # Without normalizing they are interchangeable, so the test that tells them apart has to
         # normalize between them: pre-norm shifts what gets scaled, post-norm shifts the result.
         pre = build(normalize="l2", preNormMean=[1.0, 0.0, 0.0, 0.0])
         post = build(normalize="l2", postNormMean=[1.0, 0.0, 0.0, 0.0])
-        assert project_axis(acts(3.0), pre).tolist() == [1.0]
-        assert project_axis(acts(3.0), post).tolist() == [0.0]
+        assert project_vector(acts(3.0), pre).tolist() == [1.0]
+        assert project_vector(acts(3.0), post).tolist() == [0.0]
 
     def test_l2_normalizing_makes_the_reading_a_direction(self):
-        assert project_axis(acts(3.0, 60.0), build(normalize="l2")).tolist() == [1.0, 1.0]
+        assert project_vector(acts(3.0, 60.0), build(normalize="l2")).tolist() == [1.0, 1.0]
 
     def test_the_two_scales_are_per_pole(self):
-        axis = build(center=1.0, scalePos=2.0, scaleNeg=4.0)
-        assert project_axis(acts(5.0, -3.0), axis).tolist() == [2.0, -1.0]
+        vector = build(center=1.0, scalePos=2.0, scaleNeg=4.0)
+        assert project_vector(acts(5.0, -3.0), vector).tolist() == [2.0, -1.0]
 
     def test_quantile_tables_produce_a_percentile(self):
-        axis = build(quantilesPos=[0.0, 1.0, 2.0], quantilesNeg=[0.0, 1.0, 2.0])
-        values, percentiles = project_axis_with_percentile(acts(1.0, -2.0, 9.0), axis)
+        vector = build(quantilesPos=[0.0, 1.0, 2.0], quantilesNeg=[0.0, 1.0, 2.0])
+        values, percentiles = project_vector_with_percentile(acts(1.0, -2.0, 9.0), vector)
         assert values.tolist() == [1.0, -2.0, 9.0]
         assert percentiles is not None
         # Half way up the table, the end of it, and past everything the fit saw -- which holds at
@@ -196,76 +225,76 @@ class TestCarried:
         assert percentiles.tolist() == [0.5, -1.0, 1.0]
 
     def test_the_levels_can_be_uneven(self):
-        axis = build(quantilesPos=[0.0, 1.0], quantilesNeg=[0.0, 1.0], quantileLevels=[0.0, 0.5])
-        _, percentiles = project_axis_with_percentile(acts(1.0), axis)
+        vector = build(quantilesPos=[0.0, 1.0], quantilesNeg=[0.0, 1.0], quantileLevels=[0.0, 0.5])
+        _, percentiles = project_vector_with_percentile(acts(1.0), vector)
         assert percentiles is not None
         assert percentiles.tolist() == [0.5]
 
 
 class TestRefusals:
-    """A payload this model cannot measure. Each of these is a 400 naming the axis and the field,
+    """A payload this model cannot measure. Each of these is a 400 naming the vector and the field,
     because every one of them is something the caller can fix -- and every one of them, unchecked,
     produces a response that looks like an answer."""
 
     def test_a_direction_of_the_wrong_width(self):
-        with pytest.raises(AxisRequestError, match="3 entries.*4-dimensional"):
+        with pytest.raises(VectorRequestError, match="3 entries.*4-dimensional"):
             build(direction=[1.0, 0.0, 0.0])
 
     def test_a_mean_of_the_wrong_width(self):
-        with pytest.raises(AxisRequestError, match="preNormMean"):
+        with pytest.raises(VectorRequestError, match="preNormMean"):
             build(preNormMean=[0.0, 0.0])
 
     def test_a_direction_of_all_zeros(self):
         # Every turn would read exactly `center`: a model with no variation on this trait, which
         # is not what "you forgot to fill in the direction" looks like.
-        with pytest.raises(AxisRequestError, match="all zeros"):
+        with pytest.raises(VectorRequestError, match="all zeros"):
             build(direction=[0.0] * D_MODEL)
 
     def test_a_non_finite_direction(self):
-        with pytest.raises(AxisRequestError, match="non-finite"):
+        with pytest.raises(VectorRequestError, match="non-finite"):
             build(direction=[float("nan"), 0.0, 0.0, 0.0])
 
     def test_a_non_finite_quantile_table(self):
-        with pytest.raises(AxisRequestError, match="non-finite"):
+        with pytest.raises(VectorRequestError, match="non-finite"):
             build(quantilesPos=[0.0, float("inf")], quantilesNeg=[0.0, 1.0])
 
     def test_a_layer_this_model_does_not_have(self):
-        with pytest.raises(AxisRequestError, match="out of range"):
+        with pytest.raises(VectorRequestError, match="out of range"):
             build(layer=N_LAYERS)
 
     def test_a_negative_layer(self):
-        with pytest.raises(AxisRequestError, match="out of range"):
+        with pytest.raises(VectorRequestError, match="out of range"):
             build(layer=-1)
 
     @pytest.mark.parametrize("field", ["scalePos", "scaleNeg"])
     def test_a_scale_of_zero(self, field: str):
-        with pytest.raises(AxisRequestError, match="may not be zero"):
+        with pytest.raises(VectorRequestError, match="may not be zero"):
             build(**{field: 0.0})
 
     def test_one_pole_of_a_quantile_table(self):
-        with pytest.raises(AxisRequestError, match="quantilesNeg is missing"):
+        with pytest.raises(VectorRequestError, match="quantilesNeg is missing"):
             build(quantilesPos=[0.0, 1.0])
 
     def test_quantile_tables_of_different_lengths(self):
-        with pytest.raises(AxisRequestError, match="2 entries and quantilesNeg has 3"):
+        with pytest.raises(VectorRequestError, match="2 entries and quantilesNeg has 3"):
             build(quantilesPos=[0.0, 1.0], quantilesNeg=[0.0, 1.0, 2.0])
 
     def test_levels_that_do_not_match_the_tables(self):
-        with pytest.raises(AxisRequestError, match="quantileLevels has 3"):
+        with pytest.raises(VectorRequestError, match="quantileLevels has 3"):
             build(quantilesPos=[0.0, 1.0], quantilesNeg=[0.0, 1.0], quantileLevels=[0.0, 0.5, 1.0])
 
     def test_levels_without_any_table(self):
-        with pytest.raises(AxisRequestError, match="without any quantile table"):
+        with pytest.raises(VectorRequestError, match="without any quantile table"):
             build(quantileLevels=[0.0, 1.0])
 
     def test_a_single_point_table(self):
-        with pytest.raises(AxisRequestError, match="at least two entries"):
+        with pytest.raises(VectorRequestError, match="at least two entries"):
             build(quantilesPos=[1.0], quantilesNeg=[1.0])
 
     def test_an_unsorted_table(self):
         # Interpolating it is non-monotone, which reorders readings rather than merely misplacing
         # them: the one failure a bounded scale must not have.
-        with pytest.raises(AxisRequestError, match="nondecreasing"):
+        with pytest.raises(VectorRequestError, match="nondecreasing"):
             build(quantilesPos=[1.0, 0.0], quantilesNeg=[0.0, 1.0])
 
 
@@ -274,16 +303,16 @@ class TestResolvingSeveral:
         assets = resolve([payload(id="a_one"), payload(id="b_two", layer=5)])
         assert [(a.id, a.layer) for a in assets] == [("a_one", 3), ("b_two", 5)]
 
-    def test_two_axes_cannot_share_an_id(self):
-        with pytest.raises(AxisRequestError, match="Duplicate"):
+    def test_two_reads_cannot_share_an_id(self):
+        with pytest.raises(VectorRequestError, match="Duplicate"):
             resolve([payload(id="a_one"), payload(id="a_one", layer=5)])
 
-    def test_more_axes_than_a_request_may_carry(self):
-        with pytest.raises(AxisRequestError, match=f"At most {MAX_CUSTOM_AXES}"):
-            resolve([payload(id=f"np_{index}") for index in range(MAX_CUSTOM_AXES + 1)])
+    def test_more_reads_than_a_request_may_carry(self):
+        with pytest.raises(VectorRequestError, match=f"At most {MAX_READS}"):
+            resolve([payload(id=f"np_{index}") for index in range(MAX_READS + 1)])
 
     def test_the_cap_itself_is_allowed(self):
-        assert len(resolve([payload(id=f"np_{index}") for index in range(MAX_CUSTOM_AXES)])) == MAX_CUSTOM_AXES
+        assert len(resolve([payload(id=f"np_{index}") for index in range(MAX_READS)])) == MAX_READS
 
 
 def write_artifact(root, *, layer: int = 3, width: int = D_MODEL, **manifest_overrides) -> None:
@@ -300,7 +329,8 @@ def write_artifact(root, *, layer: int = 3, width: int = D_MODEL, **manifest_ove
     )
     manifest = {
         "author": "mit",
-        "title": "- respectful \u2194\ufe0f + toxic",
+        "pole_positive": "toxic",
+        "pole_negative": "respectful",
         "layer": layer,
         **manifest_overrides,
     }
@@ -346,10 +376,10 @@ def hub(tmp_path, monkeypatch):
 def from_source(folder: str = "trait", **source_overrides) -> list:
     return resolve(
         [
-            NPAxis.model_validate(
+            NPVectorRead.model_validate(
                 {
                     "id": "np_mine",
-                    "source": {"hfRepoId": "org/axes", "hfFolder": folder, **source_overrides},
+                    "source": {"hfRepoId": "org/reads", "hfFolder": folder, **source_overrides},
                 }
             )
         ]
@@ -358,47 +388,47 @@ def from_source(folder: str = "trait", **source_overrides) -> list:
 
 class TestPublishedArtifact:
     def test_the_artifact_becomes_an_asset(self, hub):
-        (axis,) = from_source()
-        assert axis.layer == 3
-        assert axis.author == "mit"
-        assert (axis.pole_positive, axis.pole_negative) == ("toxic", "respectful")
-        assert project_axis(acts(2.0), axis).tolist() == [2.0]
+        (vector,) = from_source()
+        assert vector.layer == 3
+        assert vector.author == "mit"
+        assert (vector.pole_positive, vector.pole_negative) == ("toxic", "respectful")
+        assert project_vector(acts(2.0), vector).tolist() == [2.0]
 
     def test_it_is_reported_under_the_id_the_caller_chose(self, hub):
-        # The id keys the readout, so it is the caller's. Who fitted the axis comes from the
+        # The id keys the readout, so it is the caller's. Who fitted the vector comes from the
         # artifact, which is why an unprefixed id is not a misattribution here.
-        (axis,) = from_source()
-        assert axis.id == "np_mine"
+        (vector,) = from_source()
+        assert vector.id == "np_mine"
 
     def test_the_commit_it_was_read_at_comes_back(self, hub):
-        (axis,) = from_source()
-        assert axis.source_revision == hub.sha
+        (vector,) = from_source()
+        assert vector.source_revision == hub.sha
 
     def test_the_revision_is_resolved_every_time_but_read_once(self, hub):
         from_source()
         from_source()
         # Two requests, two artifacts parsed only if the cache missed. A branch name is a moving
         # target, so what gets cached is the commit it resolved to, not the name.
-        assert len(hub.downloads) == 2  # axis.yaml + axis.safetensors, for the first call only
+        assert len(hub.downloads) == 2  # vector.yaml + vector.safetensors, for the first call only
 
     def test_a_new_commit_is_read_again(self, hub):
         from_source()
         hub.sha = "1" * 40
         write_artifact(hub.root / hub.sha / "trait", layer=5)
-        (axis,) = from_source()
-        assert axis.layer == 5
-        assert axis.source_revision == "1" * 40
+        (vector,) = from_source()
+        assert vector.layer == 5
+        assert vector.source_revision == "1" * 40
 
-    def test_a_folder_that_is_not_an_axis(self, hub):
-        with pytest.raises(AxisRequestError, match=f"has no {MANIFEST_FILENAME}") as caught:
-            from_source("not-an-axis")
+    def test_a_folder_that_is_not_a_vector(self, hub):
+        with pytest.raises(VectorRequestError, match=f"has no {MANIFEST_FILENAME}") as caught:
+            from_source("not-an-vector")
         assert caught.value.status_code == 400
 
     def test_a_repo_that_cannot_be_read_is_not_the_caller_s_fault(self, hub):
         # A Hub that will not answer is ours to report as such: a 400 would tell the caller to fix
         # a request that was fine.
         hub.repo_error = OSError("connection reset")
-        with pytest.raises(AxisRequestError, match="org/axes") as caught:
+        with pytest.raises(VectorRequestError, match="org/reads") as caught:
             from_source()
         assert caught.value.status_code == 502
         # The Hub's own text stays out of it. The endpoint returns these messages to the caller
@@ -411,31 +441,31 @@ class TestPublishedArtifact:
             raise OSError("connection reset")
 
         monkeypatch.setattr("huggingface_hub.hf_hub_download", explode)
-        with pytest.raises(AxisRequestError) as caught:
+        with pytest.raises(VectorRequestError) as caught:
             from_source()
         assert caught.value.status_code == 502
 
     def test_an_artifact_fitted_for_a_different_model(self, hub):
         write_artifact(hub.root / hub.sha / "wide", width=D_MODEL + 1)
-        with pytest.raises(AxisRequestError, match="5-dimensional.*4-dimensional"):
+        with pytest.raises(VectorRequestError, match="5-dimensional.*4-dimensional"):
             from_source("wide")
 
     def test_an_artifact_fitted_at_a_layer_this_model_does_not_have(self, hub):
         write_artifact(hub.root / hub.sha / "deep", layer=N_LAYERS + 1)
-        with pytest.raises(AxisRequestError, match="does not have"):
+        with pytest.raises(VectorRequestError, match="does not have"):
             from_source("deep")
 
     def test_a_malformed_artifact_names_what_was_wrong_with_it(self, hub):
         write_artifact(hub.root / hub.sha / "broken", scale_pos=0.0)
-        with pytest.raises(AxisRequestError, match="not a valid axis"):
+        with pytest.raises(VectorRequestError, match="not a valid vector"):
             from_source("broken")
 
     def test_a_folder_cannot_walk_out_of_the_repo(self, hub):
-        with pytest.raises(AxisRequestError, match=r"\.\."):
+        with pytest.raises(VectorRequestError, match=r"\.\."):
             from_source("../../etc")
 
     def test_a_folder_at_the_repo_root(self, hub):
         write_artifact(hub.root / hub.sha, layer=6)
-        (axis,) = from_source("")
-        assert axis.layer == 6
+        (vector,) = from_source("")
+        assert vector.layer == 6
         assert os.path.basename(hub.downloads[0]) == MANIFEST_FILENAME

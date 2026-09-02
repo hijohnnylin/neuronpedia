@@ -21,12 +21,11 @@ dependencies = [
   "huggingface-hub>=1.0",
   "huggingface>=0.0.1,<0.0.2",
   "pandas>=2.2.2,<3",
-  # Readout axis assets are safetensors, so the load path is three tensors and no pickle.
+  # Vector assets are safetensors, so the load path is three tensors and no pickle.
   # (It used to be pickled sklearn PCA objects, which made scikit-learn a runtime dependency
-  # of that feature and needed a __main__ shim to unpickle; converting the assets removed
-  # both. utils/persona-assets/convert_to_safetensors.py is what performed the conversion.)
+  # of that feature and needed a __main__ shim to unpickle; converting the assets removed both.)
   "safetensors>=0.4",
-  # Read at startup for each readout axis's axis.yaml manifest. Declared explicitly rather
+  # Read for each published artifact's vector.yaml manifest. Declared explicitly rather
   # than leaned on transitively (it arrives via several deps today).
   "pyyaml>=6.0",
   "sae-lens>=6.30.0",

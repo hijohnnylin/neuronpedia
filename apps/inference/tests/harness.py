@@ -100,7 +100,7 @@ QWEN_THINKING = ModelSpec(
     is_thinking=True,
 )
 
-# The one checkpoint that ships readout axis assets. The axis path can be unit-tested with
+# The one checkpoint that ships vector assets. The read path can be unit-tested with
 # synthetic tensors, but whether capture, the pinned template kwargs and the projection agree
 # can only be seen on the model they were fitted for. No SAEs -- a readout needs the forward
 # pass and the capture hooks, nothing else.

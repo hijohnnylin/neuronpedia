@@ -265,12 +265,12 @@ def assert_capture_layers_declared(
     """Refuse a capture at a layer a static pod did not declare, by layer and not just by name.
 
     :func:`assert_residual_available` asks whether ``point`` is declared at all, which is the
-    right question for an endpoint that reads every layer or none. A readout axis reads exactly
+    right question for an endpoint that reads every layer or none. A vector reads exactly
     one, so a pod can declare ``resid_post`` and still not have the layer in hand: the 70B pod
-    declared the site its layer-50 SAE reads and was asked for layer 40 by an axis fitted there.
+    declared the site its layer-50 SAE reads and was asked for layer 40 by a vector fitted there.
 
-    That distinction only started to matter when axes became database rows. A shipped asset was
-    on disk before the graphs were recorded, so the mismatch was a deploy-time fact; an axis that
+    That distinction only started to matter when vectors became database rows. A shipped asset was
+    on disk before the graphs were recorded, so the mismatch was a deploy-time fact; a vector that
     arrives with the request makes it a per-request one, and the engine's own refusal comes from
     inside the generate call -- a 500 with a traceback, after the prompt was rendered.
     """

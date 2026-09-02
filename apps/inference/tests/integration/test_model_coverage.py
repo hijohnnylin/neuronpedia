@@ -198,10 +198,10 @@ def test_qwen_apply_chat_template_spans():
 
 @pytest.mark.thinking
 @pytest.mark.chat
-def test_qwen_rejects_an_axis_it_cannot_measure_and_still_generates_without_one():
-    """An axis this model cannot measure is a 400, and asking for none generates as usual.
+def test_qwen_rejects_a_vector_it_cannot_measure_and_still_generates_without_one():
+    """A vector this model cannot measure is a 400, and asking for none generates as usual.
 
-    A readout has to fail loudly rather than come back absent: the caller named the axis, and a
+    A readout has to fail loudly rather than come back absent: the caller named the vector, and a
     silently missing readout is an unexplained blank chart rather than a mistake anyone can see.
     A request that asks for no readout is untouched by any of this and must still complete.
     """
@@ -224,7 +224,7 @@ def test_qwen_rejects_an_axis_it_cannot_measure_and_still_generates_without_one(
             "seed": 42,
             "steer_special_tokens": False,
             # A layer this model does not have, which only the served model can rule out.
-            "custom_axes": [{"id": "lu_assistant-axis", "layer": 999, "direction": [0.1] * d_model}],
+            "reads": [{"id": "lu_assistant-axis", "layer": 999, "direction": [0.1] * d_model}],
         }
         rejected = client.post(
             "/v1/steer/completion-chat",
@@ -236,7 +236,7 @@ def test_qwen_rejects_an_axis_it_cannot_measure_and_still_generates_without_one(
 
         resp = client.post(
             "/v1/steer/completion-chat",
-            json={**req, "custom_axes": []},
+            json={**req, "reads": []},
             headers={"X-SECRET-KEY": X_SECRET_KEY},
         )
         assert resp.status_code == 200, resp.text
@@ -244,7 +244,7 @@ def test_qwen_rejects_an_axis_it_cannot_measure_and_still_generates_without_one(
         outputs = {o["type"]: o["raw"] for o in body["outputs"]}
         assert "DEFAULT" in outputs
         assert isinstance(outputs["DEFAULT"], str) and len(outputs["DEFAULT"]) > 0
-        assert body.get("axes") in (None, [])
+        assert body.get("reads") in (None, [])
 
 
 @pytest.mark.thinking
