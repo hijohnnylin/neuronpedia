@@ -1,3 +1,4 @@
+import MdxDevReload from '@/components/mdx-dev-reload';
 import Navbar from '@/components/nav/navbar';
 import AuthProvider from '@/components/provider/auth-provider';
 import { Providers } from '@/components/provider/providers';
@@ -11,7 +12,7 @@ import {
 } from '@/lib/db/explanation-type';
 import { getGlobalSourceReleases } from '@/lib/db/source';
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
-import { ENABLE_VERCEL_ANALYTICS, NEXT_PUBLIC_URL } from '@/lib/env';
+import { ENABLE_VERCEL_ANALYTICS, NEXT_PUBLIC_URL, NODE_ENV } from '@/lib/env';
 import { formatToGlobalModels } from '@/lib/utils/general';
 import { Analytics } from '@vercel/analytics/react';
 import { Metadata } from 'next';
@@ -114,6 +115,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </main>
             {!isEmbed && <Footer />}
             {ENABLE_VERCEL_ANALYTICS && <Analytics />}
+            {NODE_ENV === 'development' && <MdxDevReload />}
           </Providers>
         </AuthProvider>
       </body>
