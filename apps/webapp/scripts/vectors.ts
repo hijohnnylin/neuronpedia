@@ -103,20 +103,39 @@ function assertLocalDatabase(args: Map<string, string>): void {
   );
 }
 
-async function dump(args: Map<string, string>) {
-  const modelId = args.get('model');
-  // No `select`, so this is every scalar column and survives a new one without an edit here. Only
-  // the tag relation has to be asked for.
-  const rows = await prisma.vector.findMany({
+/**
+ * Every row, with its tag names where there are any to have.
+ *
+ * The retry is not defensive coding. A dump is wanted most against a database the tag migration has
+ * not reached yet -- that is the snapshot the migration tells you to take -- and asking for a
+ * relation whose table does not exist is `P2021`, which would fail the one run that matters. So a
+ * missing table costs the tags and nothing else, said out loud rather than silently.
+ *
+ * No `select` either way, so a new scalar column joins the dump without an edit here.
+ */
+async function dumpedRows(modelId: string | undefined): Promise<DumpedVector[]> {
+  const query = {
     where: modelId && modelId !== 'true' ? { modelId } : undefined,
-    orderBy: [{ modelId: 'asc' }, { name: 'asc' }],
-    include: { tags: { select: { tagName: true }, orderBy: { tagName: 'asc' } } },
-  });
-
-  const payload: Dump = {
-    dumpedAt: new Date().toISOString(),
-    rows: rows.map(({ tags, ...row }) => ({ ...row, tags: tags.map((tag) => tag.tagName) })),
+    orderBy: [{ modelId: 'asc' as const }, { name: 'asc' as const }],
   };
+
+  try {
+    const rows = await prisma.vector.findMany({
+      ...query,
+      include: { tags: { select: { tagName: true }, orderBy: { tagName: 'asc' } } },
+    });
+    return rows.map(({ tags, ...row }) => ({ ...row, tags: tags.map((tag) => tag.tagName) }));
+  } catch (e) {
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== 'P2021') throw e;
+    console.error('This database has no VectorTag tables, so this dump carries no tags.');
+    return prisma.vector.findMany(query);
+  }
+}
+
+async function dump(args: Map<string, string>) {
+  const rows = await dumpedRows(args.get('model'));
+
+  const payload: Dump = { dumpedAt: new Date().toISOString(), rows };
   const serialized = JSON.stringify(payload, null, 2);
 
   const out = args.get('out');

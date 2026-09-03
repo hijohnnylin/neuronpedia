@@ -64,6 +64,10 @@ firebase-debug.log
 # temp files
 /tmp/
 
+# Vector snapshots from scripts/vectors.ts: a model's directions are megabytes of floats, and a
+# production dump is a copy of rows rather than anything to version.
+vectors*.json
+
 # nested dependencies
 node_modules/
 
