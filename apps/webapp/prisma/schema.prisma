@@ -1542,7 +1542,7 @@ model ProcessLock {
 // ── Vectors ───────────────────────────────────────────────────────────
 
 // A label a vector can carry: what it is for, what it was fitted on, whatever a reader would sort a
-// list by. `axis`, `probe`, `steering-vector` are the first three.
+// list by. `axis`, `probe`, `steer` are the first three.
 //
 // Nothing gates a read on a tag. Every vector projects the same way, so a probe reads just as well
 // as an axis, and refusing one would be a display convention withholding a number that is perfectly
@@ -1553,7 +1553,8 @@ model ProcessLock {
 // rather than a migration plus a deploy. Only an admin writes one today, by hand; letting a user
 // coin a tag is why this is a table, and is work for later.
 model VectorTag {
-  // What a query and a URL name this by: lowercase, hyphenated, `steering-vector`.
+  // What a query and a URL name this by: lowercase, hyphenated where it needs to be. Every tag sits
+  // on a vector, so it does not say so itself: `steer`, not `steering-vector`.
   name String @id
 
   // What a page shows, and what the tag means where a reader is choosing between tags. A tag
