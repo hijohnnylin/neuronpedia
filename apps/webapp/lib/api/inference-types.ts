@@ -26,16 +26,16 @@ export type ActivationTopkByTokenResponse = Schemas['ActivationTopkByTokenRespon
 export type ActivationTopkByTokenBatchResponse = Schemas['ActivationTopkByTokenBatchResponse'];
 export type ActivationAttentionResponse = Schemas['ActivationAttentionResponse'];
 
-export type NPAxis = Schemas['NPAxis'];
-export type NPAxisNormalize = Schemas['NPAxisNormalize'];
 export type NPLogprob = Schemas['NPLogprob'];
+export type NPNormalize = Schemas['NPNormalize'];
 export type NPSteerChatMessage = Schemas['NPSteerChatMessage'];
 export type NPSteerFeature = Schemas['NPSteerFeature'];
 export type NPSteerMethod = Schemas['NPSteerMethod'];
 export type NPSteerType = Schemas['NPSteerType'];
 export type NPSteerVector = Schemas['NPSteerVector'];
-export type SteerAxisReadout = Schemas['SteerAxisReadout'];
-export type SteerAxisTurn = Schemas['SteerAxisTurn'];
+export type NPVectorRead = Schemas['NPVectorRead'];
+export type SteerReadoutTurn = Schemas['SteerReadoutTurn'];
+export type SteerVectorReadout = Schemas['SteerVectorReadout'];
 export type SteerCompletionResponse = Schemas['SteerCompletionResponse'];
 export type SteerCompletionChatResponse = Schemas['SteerCompletionChatResponse'];
 

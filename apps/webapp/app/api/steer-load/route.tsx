@@ -2,6 +2,7 @@ import { NPSteerMethod } from '@/lib/api/inference-types';
 import { prisma } from '@/lib/db';
 import { NEXT_PUBLIC_URL } from '@/lib/env';
 import { axisReadoutsToLegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
+import { axisReadoutsToPublic } from '@/lib/utils/steer-axis-public';
 import { axisReadoutsFromStored, storedOutputTextIncludesPrompt } from '@/lib/utils/steer-wire';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { SteerOutputType } from '@prisma/client';
@@ -122,7 +123,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         ),
       ];
       if (readouts.length > 0) {
-        toReturnResult.axes = readouts;
+        toReturnResult.axes = axisReadoutsToPublic(readouts);
         toReturnResult.assistant_axis = axisReadoutsToLegacyAssistantAxis(readouts);
       }
     }

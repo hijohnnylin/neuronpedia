@@ -1,12 +1,12 @@
 // TODO: clean this up
 
 import {
-  NPAxis,
   NPLogprob,
   NPSteerChatMessage,
   NPSteerMethod,
-  SteerAxisReadout,
+  NPVectorRead,
   SteerCompletionChatResponse,
+  SteerVectorReadout,
 } from '@/lib/api/inference-types';
 import { prisma } from '@/lib/db';
 import { getModelById } from '@/lib/db/model';
@@ -15,7 +15,7 @@ import { getPersonaAxisDefinitions, getPersonaAxisFits } from '@/lib/db/persona-
 import { ERROR_NOT_FOUND_MESSAGE } from '@/lib/db/userCanAccess';
 import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
 import { InferenceServerError, steerCompletionChat } from '@/lib/utils/inference';
-import { personaAxisToNPAxis } from '@/lib/utils/persona-axis';
+import { labelReadouts, personaAxisToVectorRead, type PersonaAxisDefinition } from '@/lib/utils/persona-axis';
 import {
   ChatMessage,
   ERROR_STEER_MAX_PROMPT_CHARS,
@@ -36,6 +36,7 @@ import {
   SteerFeature,
 } from '@/lib/utils/steer';
 import { axisReadoutsToLegacyAssistantAxis, LegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
+import { axisReadoutsToPublic, PublicAxisReadout } from '@/lib/utils/steer-axis-public';
 import {
   AxisProvenance,
   axisReadoutsFromStored,
@@ -88,7 +89,7 @@ async function saveSteerChatOutput(
   steerTypesRan: SteerOutputType[],
   input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null,
   userId: string | undefined,
-  axisReadouts?: SteerAxisReadout[],
+  axisReadouts?: SteerVectorReadout[],
   supersededRows?: Partial<Record<SteerOutputType, { outputText: string; capMonitorOutput: string | null }>>,
   measuredWith?: AxisProvenance,
 ) {
@@ -269,8 +270,18 @@ async function* generateResponse(
   hasVector: boolean,
   supersededRows?: Partial<Record<SteerOutputType, { outputText: string; capMonitorOutput: string | null }>>,
   /** Readout axes, sent with the request: inference resolves none by name. */
-  customAxes: NPAxis[] = [],
+  reads: NPVectorRead[] = [],
   measuredWith?: AxisProvenance,
+  /**
+   * Readouts already on `toReturnResult` from a cache hit on the other steer type.
+   *
+   * Passed in rather than read back off `toReturnResult.axes`, which is now a mapped public shape.
+   * Without them a request that found DEFAULT cached and generated STEERED would store only the
+   * half it generated.
+   */
+  cachedReadouts: SteerVectorReadout[] = [],
+  /** The rows behind `reads`, for the labels inference does not send back. */
+  definitions: PersonaAxisDefinition[] = [],
 ): AsyncGenerator<SteerResultChat> {
   console.log('steerTypesToRun', steerTypesToRun);
   const steerCompletionChatResults = (await steerCompletionChat(
@@ -290,7 +301,7 @@ async function* generateResponse(
     true,
     body.steer_method,
     undefined,
-    customAxes,
+    reads,
   )) as ReadableStream<any>[];
 
   const readableStreams = steerCompletionChatResults.map((stream) =>
@@ -310,6 +321,10 @@ async function* generateResponse(
   }));
 
   let input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null = null;
+
+  // The readouts in the inference shape, which is what gets persisted and what the two public views
+  // are mapped from. Seeded with whatever a cache hit on the other steer type already produced.
+  const axisReadouts: SteerVectorReadout[] = [...cachedReadouts];
 
   // Helper to create a promise for reading from a processor
   const createReadPromise = (processor: (typeof streamProcessors)[0], processorIndex: number) =>
@@ -362,17 +377,16 @@ async function* generateResponse(
       // Axis readouts arrive on the last frame of each stream, and default and steered are
       // separate streams, so a readout is identified by (axis id, steer type): merging on the
       // type alone would let the second stream's DEFAULT frame drop the first's STEERED one.
-      if (Array.isArray(value.axes) && value.axes.length > 0) {
-        const merged = [...(toReturnResult.axes ?? [])];
-        for (const readout of value.axes as SteerAxisReadout[]) {
-          const at = merged.findIndex((item) => item.id === readout.id && item.type === readout.type);
+      if (Array.isArray(value.readouts) && value.readouts.length > 0) {
+        for (const readout of labelReadouts(value.readouts as SteerVectorReadout[], definitions)) {
+          const at = axisReadouts.findIndex((item) => item.id === readout.id && item.type === readout.type);
           if (at >= 0) {
-            merged[at] = readout;
+            axisReadouts[at] = readout;
           } else {
-            merged.push(readout);
+            axisReadouts.push(readout);
           }
         }
-        setAxesOnResult(toReturnResult, merged);
+        setAxesOnResult(toReturnResult, axisReadouts);
       }
 
       // Start reading the next chunk from this processor immediately
@@ -395,7 +409,7 @@ async function* generateResponse(
         steerTypesToRun,
         input,
         user?.id,
-        toReturnResult.axes,
+        axisReadouts,
         supersededRows,
         measuredWith,
       );
@@ -435,7 +449,7 @@ export type SteerResultChat = {
     | undefined;
   features?: SteerOutputToNeuronWithPartialRelations[];
   /** One entry per requested axis per steer type. */
-  axes?: SteerAxisReadout[];
+  axes?: PublicAxisReadout[];
   /**
    * The pre-`axes` view of the same readouts, one entry per steer type with values keyed by display
    * title. Deprecated and derived, never a separate measurement, but this endpoint has callers
@@ -444,9 +458,16 @@ export type SteerResultChat = {
   assistant_axis?: LegacyAssistantAxis[];
 };
 
-/** Set both the current and the deprecated view of a set of readouts on a result. */
-function setAxesOnResult(result: SteerResultChat, readouts: SteerAxisReadout[]) {
-  result.axes = readouts;
+/**
+ * Set both the current and the deprecated view of a set of readouts on a result.
+ *
+ * Takes the inference readouts and owns the mapping into both public shapes, so the accumulation a
+ * caller does stays in the inference type. Reading the accumulated set back off `result.axes` is no
+ * longer possible, deliberately: it is a mapped shape now, and mapping back would be a second
+ * translation to keep in step.
+ */
+function setAxesOnResult(result: SteerResultChat, readouts: SteerVectorReadout[]) {
+  result.axes = axisReadoutsToPublic(readouts);
   result.assistant_axis = readouts.length > 0 ? axisReadoutsToLegacyAssistantAxis(readouts) : undefined;
 }
 
@@ -807,6 +828,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         steer_method: body.steer_method,
       },
     };
+    // The readouts in the inference shape, accumulated across the two steer types as cache hits and
+    // fresh generations land. `toReturnResult.axes` is a mapped public shape and cannot be read back
+    // as this, so what is stored and what is displayed both derive from here.
+    const axisReadouts: SteerVectorReadout[] = [];
     // A requested axis is a `Vector` row, and is sent to inference with the request. Adding an
     // axis is then a row rather than a deploy, and which fit measured a turn is something this
     // database knows rather than something a serving pod's disk decides.
@@ -913,7 +938,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         // Only what was asked for: a row may cover more axes than this request wants, and
         // returning the extras would put lines on the chart nobody selected.
         const wanted = cached.filter((readout) => axisIds.includes(readout.id));
-        setAxesOnResult(toReturnResult, [...(toReturnResult.axes ?? []), ...wanted]);
+        axisReadouts.push(...wanted);
+        setAxesOnResult(toReturnResult, axisReadouts);
       }
       steerTypesToRun = steerTypesToRun.filter((type) => type !== SteerOutputType.DEFAULT);
     } else if (savedSteerDefaultOutput) {
@@ -989,7 +1015,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       if (savedSteered.capMonitorOutput) {
         const cached = axisReadoutsFromStored(JSON.parse(savedSteered.capMonitorOutput), SteerOutputType.STEERED);
         const wanted = cached.filter((readout) => axisIds.includes(readout.id));
-        setAxesOnResult(toReturnResult, [...(toReturnResult.axes ?? []), ...wanted]);
+        axisReadouts.push(...wanted);
+        setAxesOnResult(toReturnResult, axisReadouts);
       }
 
       steerTypesToRun = steerTypesToRun.filter((type) => type !== SteerOutputType.STEERED);
@@ -1014,7 +1041,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
 
     // Something is being generated, so the axes have to be measured: read the vectors now.
-    const customAxes = (await getPersonaAxisFits(modelId, rowAxisIds, request.user)).map(personaAxisToNPAxis);
+    const reads = (await getPersonaAxisFits(modelId, rowAxisIds, request.user)).map(personaAxisToVectorRead);
 
     if (body.stream) {
       const generator = generateResponse(
@@ -1026,8 +1053,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         request.user,
         hasVector,
         supersededRows,
-        customAxes,
+        reads,
         measuredWith,
+        axisReadouts,
+        axisDefinitions,
       );
       const stream = createStream(generator);
       return new NextResponse(stream, {
@@ -1055,7 +1084,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       body.stream,
       body.steer_method,
       undefined,
-      customAxes,
+      reads,
     );
     steerCompletionResults = steerCompletionResults as SteerCompletionChatResponse[];
     for (let i = 0; i < steerCompletionResults.length; i += 1) {
@@ -1075,8 +1104,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           };
         }
       }
-      if (result.axes && result.axes.length > 0) {
-        setAxesOnResult(toReturnResult, [...(toReturnResult.axes ?? []), ...result.axes]);
+      if (result.readouts && result.readouts.length > 0) {
+        axisReadouts.push(...labelReadouts(result.readouts, axisDefinitions));
+        setAxesOnResult(toReturnResult, axisReadouts);
       }
     }
     let input: { raw: string; chatTemplate: NPSteerChatMessage[] } | null = null;
@@ -1095,7 +1125,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       steerTypesToRun,
       input,
       request.user?.id,
-      toReturnResult.axes,
+      axisReadouts,
       supersededRows,
       measuredWith,
     );

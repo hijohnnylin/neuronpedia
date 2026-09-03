@@ -1,13 +1,13 @@
 import { prisma } from '@/lib/db';
 import type { PersonaAxisDefinition, PersonaAxisFit } from '@/lib/utils/persona-axis';
 import { AuthenticatedUser } from '@/lib/with-user';
-import { ProjectionType } from '@prisma/client';
 import { AllowUnlistedFor, userCanAccessClause } from './userCanAccess';
 
 /** Exactly the columns of `PersonaAxisDefinition`, so the row a query yields is one. */
 const DEFINITION_COLUMNS = {
   id: true,
   name: true,
+  author: true,
   layers: true,
   polePositive: true,
   poleNegative: true,
@@ -20,7 +20,6 @@ const DEFINITION_COLUMNS = {
 /** The above plus the numbers, which is `PersonaAxisFit`. */
 const FIT_COLUMNS = {
   ...DEFINITION_COLUMNS,
-  author: true,
   values: true,
   projectionParams: true,
 } as const;
@@ -28,51 +27,48 @@ const FIT_COLUMNS = {
 /**
  * The rows for these names, subject to what this user may see. One row per name, by constraint.
  *
- * Restricted to `AXIS_PROJECTION` because everything downstream of here -- `personaAxisToNPAxis`,
- * the payload it builds, the chart that reads the result -- assumes that shape. A row of another
- * type would otherwise be read with its keys defaulted rather than refused, and measure something
- * plausible and wrong.
+ * Not filtered by `uses`. Every row projects the same way -- subtract a mean, maybe normalize, dot
+ * with the direction, scale, look up a percentile -- so a probe or a plain steering vector reads
+ * just as well as an axis does, and `uses` says what a row is for rather than whether it can be
+ * read. Refusing one here would have been a display convention denying a caller a number that is
+ * perfectly well defined.
  */
 const axisClause = (modelId: string, names: string[], user?: AuthenticatedUser | null) => ({
   where: {
     modelId,
     name: { in: names },
-    projectionType: ProjectionType.AXIS_PROJECTION,
     ...userCanAccessClause(user, AllowUnlistedFor.EVERYONE),
   },
 });
 
 /**
- * The rows that can be read as an axis: both poles named, and exactly one site.
+ * The rows inference can read: those at exactly one site.
  *
  * This is where a `Vector` becomes a `PersonaAxisDefinition`, and it is deliberately the only place
- * that knows the two differ. `Vector` holds directions of every kind, so it names its poles
- * optionally -- one without them is a probe or a plain steering vector, which nothing downstream
- * can label a reading from -- and it holds `layers` as an array, because a probe reads at several.
- * An axis is the narrow case of both, so both are checked once here and everything above this line
- * sees a scalar `layer` and two poles that are certainly there.
+ * that knows the two differ. `Vector` holds `layers` as an array, because a probe that sums across
+ * layers is one row reading at several, while the wire carries a scalar `layer` -- so the narrowing
+ * happens once here and everything above this line sees one site.
  *
- * A row failing either check is dropped with its own line in the log rather than carried on and
- * re-checked at every use. Neither should happen -- the query already asks for AXIS_PROJECTION --
- * so one of these in the log means a bad write, not a case to handle.
+ * The poles are not checked. A row without them reads perfectly well; it just has nothing to label
+ * the ends with, which every shape downstream already allows for.
+ *
+ * A row reading at several sites is dropped with its own line in the log rather than carried on and
+ * re-checked at every use. It should not happen while nothing writes such a row, so one of these in
+ * the log means a fit arrived that the wire cannot express yet, not a case to handle here.
  */
-type AxisShaped<T> = Omit<T, 'layers'> & { layer: number; polePositive: string; poleNegative: string };
+type AtOneSite<T> = Omit<T, 'layers'> & { layer: number };
 
-function asAxes<T extends { name: string; layers: number[]; polePositive: string | null; poleNegative: string | null }>(
-  rows: T[],
-): AxisShaped<T>[] {
-  const axes: AxisShaped<T>[] = [];
+function asAtOneSite<T extends { name: string; layers: number[] }>(rows: T[]): AtOneSite<T>[] {
+  const readable: AtOneSite<T>[] = [];
   for (const { layers, ...rest } of rows) {
-    const row = rest as Omit<T, 'layers'> & Pick<T, 'name' | 'polePositive' | 'poleNegative'>;
-    if (row.polePositive === null || row.poleNegative === null) {
-      console.warn(`Vector ${row.name} names no poles, so it cannot be read as an axis`);
-    } else if (layers.length !== 1) {
-      console.warn(`Vector ${row.name} reads at ${layers.length} sites, but an axis reads at one`);
+    const row = rest as Omit<T, 'layers'> & Pick<T, 'name'>;
+    if (layers.length === 1) {
+      readable.push({ ...row, layer: layers[0] });
     } else {
-      axes.push({ ...row, layer: layers[0], polePositive: row.polePositive, poleNegative: row.poleNegative });
+      console.warn(`Vector ${row.name} reads at ${layers.length} sites, and the read payload takes one`);
     }
   }
-  return axes;
+  return readable;
 }
 
 /**
@@ -102,7 +98,7 @@ export async function getPersonaAxisDefinitions(
     ...axisClause(modelId, names, user),
     select: DEFINITION_COLUMNS,
   });
-  return inOrder(modelId, names, asAxes(rows));
+  return inOrder(modelId, names, asAtOneSite(rows));
 }
 
 /**
@@ -122,5 +118,5 @@ export async function getPersonaAxisFits(
     ...axisClause(modelId, names, user),
     select: FIT_COLUMNS,
   });
-  return inOrder(modelId, names, asAxes(rows));
+  return inOrder(modelId, names, asAtOneSite(rows));
 }

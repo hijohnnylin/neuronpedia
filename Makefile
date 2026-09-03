@@ -21,6 +21,7 @@ LOAD_ROOT_ENV = set -a; if [ -f .env ]; then . ./.env; fi; set +a;
 
 .PHONY: help init-env install-nodejs \
 	db-init db-check db-status db-reset \
+	vector-dump vector-load \
 	host-add host-list host-remove \
 	webapp-install webapp-dev webapp-build webapp-run webapp-openapi sdk-dry-run \
 	inference-install inference-dev inference-list-configs inference-openapi \
@@ -111,6 +112,23 @@ db-init: ## Database: create the schema, seed it, and apply pgvector tuning
 	@cd apps/webapp && npx --no-install env-cmd -f .env.localhost --use-shell \
 		'psql "$$POSTGRES_URL_NON_POOLING" -q -f prisma/pgvector-init/pgvector.sql'
 	@echo "Database ready."
+
+# Snapshotting `Vector` rows. Nothing in the webapp writes one, so a migration that rewrites that
+# table has no other way to carry its rows across. VECTOR_ENV selects the env file because the rows
+# worth saving are usually not on this machine; `load` refuses a non-local database without REMOTE=1.
+VECTOR_ENV ?= .env.localhost
+VECTOR_CLI = cd apps/webapp && npx --no-install env-cmd -f $(VECTOR_ENV) --use-shell \
+	'ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/vectors.ts'
+
+vector-dump: ## Vectors: write Vector rows to JSON. Optional: OUT, MODEL, VECTOR_ENV
+	@$(VECTOR_CLI) dump $(if $(OUT),--out $(OUT),) $(if $(MODEL),--model $(MODEL),)
+
+vector-load: ## Vectors: restore Vector rows from JSON. Required: IN. Optional: OVERWRITE=1, REMOTE=1, VECTOR_ENV
+	@if [ -z "$(IN)" ]; then \
+		echo "Error: IN is required, e.g. make vector-load IN=vectors.json"; \
+		exit 1; \
+	fi
+	@$(VECTOR_CLI) load --in $(IN) $(if $(OVERWRITE),--overwrite,) $(if $(REMOTE),--remote,)
 
 HOST_CLI = cd apps/webapp && npx --no-install env-cmd -f .env.localhost --use-shell \
 	'ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/compute-host.ts'

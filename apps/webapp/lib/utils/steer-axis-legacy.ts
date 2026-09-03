@@ -2,7 +2,7 @@
  * The `assistant_axis` shape `/api/steer-chat` has always returned, rebuilt from axis readouts.
  *
  * `/api/*` has real users and its field names are a contract of their own, so a rename inside
- * inference must not reach them. Inference now returns one `SteerAxisReadout` per axis, keyed by a
+ * inference must not reach them. Inference now returns one `SteerVectorReadout` per axis, keyed by a
  * stable id and holding a bare value per turn; the public field is one entry per steer type, whose
  * turns hold a map keyed by display title. This maps between them explicitly rather than forwarding
  * the new shape through under the old name.
@@ -18,7 +18,7 @@
  * by id everywhere else. It cannot happen for the assets shipped today and would only ever affect
  * this compatibility view.
  */
-import type { SteerAxisReadout } from '@/lib/api/inference-types';
+import type { SteerVectorReadout } from '@/lib/api/inference-types';
 
 export type LegacyAssistantAxisTurn = {
   pcValues?: Record<string, number>;
@@ -29,7 +29,7 @@ export type LegacyAssistantAxisTurn = {
 export type LegacyAssistantAxis = {
   pcTitles?: string[];
   turns?: LegacyAssistantAxisTurn[];
-  type?: SteerAxisReadout['type'];
+  type?: SteerVectorReadout['type'];
 };
 
 /**
@@ -43,15 +43,15 @@ export type LegacyAssistantAxis = {
  *
  * Falls back to `title` for an axis that names no poles, which is all this view ever had.
  */
-function legacyTitle(readout: SteerAxisReadout): string {
+function legacyTitle(readout: SteerVectorReadout): string {
   const { polePositive, poleNegative } = readout;
   if (!polePositive || !poleNegative) return readout.title;
   return `- ${poleNegative} \u2194\ufe0f + ${polePositive}`;
 }
 
 /** Group readouts by steer type and re-key their values by title, one entry per type. */
-export function axisReadoutsToLegacyAssistantAxis(readouts: SteerAxisReadout[]): LegacyAssistantAxis[] {
-  const byType = new Map<string, SteerAxisReadout[]>();
+export function axisReadoutsToLegacyAssistantAxis(readouts: SteerVectorReadout[]): LegacyAssistantAxis[] {
+  const byType = new Map<string, SteerVectorReadout[]>();
   for (const readout of readouts) {
     const key = readout.type ?? '';
     const group = byType.get(key);

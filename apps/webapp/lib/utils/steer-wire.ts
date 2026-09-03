@@ -26,7 +26,7 @@
  * against the constants that produced it, so the row and version are stored with it, and the poles
  * are stored so the reading still reads as something after that row is retired.
  */
-import type { SteerAxisReadout } from '@/lib/api/inference-types';
+import type { SteerVectorReadout } from '@/lib/api/inference-types';
 import { STEER_COMPLETION_VERSION } from '@/lib/utils/steer';
 
 /**
@@ -141,10 +141,10 @@ function isStoredAxisSet(stored: unknown): stored is StoredAxisSet {
 }
 
 /** Reshape a pre-`axes` row: one component becomes one axis, its title becomes its id's label. */
-function readoutsFromLegacy(row: LegacyRow, fallbackType?: string | null): SteerAxisReadout[] {
+function readoutsFromLegacy(row: LegacyRow, fallbackType?: string | null): SteerVectorReadout[] {
   const titles = row.pcTitles ?? row.pc_titles ?? [];
   const turns = row.turns ?? [];
-  const type = (row.type ?? fallbackType ?? undefined) as SteerAxisReadout['type'];
+  const type = (row.type ?? fallbackType ?? undefined) as SteerVectorReadout['type'];
 
   return titles.map((title) => {
     const id = legacyAxisId(title);
@@ -172,7 +172,7 @@ function readoutsFromLegacy(row: LegacyRow, fallbackType?: string | null): Steer
  * `fallbackType` is the steer type of the row being read. Rows written before the type was stored
  * carry none, and which column a readout belongs to is not recoverable from the payload.
  */
-export function axisReadoutsFromStored(stored: unknown, fallbackType?: string | null): SteerAxisReadout[] {
+export function axisReadoutsFromStored(stored: unknown, fallbackType?: string | null): SteerVectorReadout[] {
   if (stored === null || stored === undefined) return [];
 
   if (isStoredAxisSet(stored)) {
@@ -181,7 +181,7 @@ export function axisReadoutsFromStored(stored: unknown, fallbackType?: string | 
       id,
       author: authorFromAxisId(id),
       title: axis.title ?? id,
-      type: (type ?? fallbackType ?? undefined) as SteerAxisReadout['type'],
+      type: (type ?? fallbackType ?? undefined) as SteerVectorReadout['type'],
       layer: axis.layer ?? undefined,
       caveat: axis.caveat ?? undefined,
       polePositive: axis.pole_positive ?? undefined,
@@ -207,7 +207,7 @@ export function axisReadoutsFromStored(stored: unknown, fallbackType?: string | 
  * reader can do and a writer cannot undo.
  */
 export function axisReadoutsToStored(
-  readouts: SteerAxisReadout[],
+  readouts: SteerVectorReadout[],
   type?: string | null,
   measuredWith?: AxisProvenance,
 ): StoredAxisSet {
@@ -269,12 +269,12 @@ export function storedAxisRowIds(stored: unknown): Record<string, string> {
  *
  * A row already in the current shape is carried across as it stands rather than reshaped through
  * readouts, which is the only way the axes it is not being asked about keep their provenance: a
- * `SteerAxisReadout` has no field for the row that measured it, so a round trip through one would
+ * `SteerVectorReadout` has no field for the row that measured it, so a round trip through one would
  * quietly drop `axis_id` from every axis this request did not measure.
  */
 export function mergeStoredAxes(
   existing: unknown,
-  incoming: SteerAxisReadout[],
+  incoming: SteerVectorReadout[],
   type?: string | null,
   measuredWith?: AxisProvenance,
 ): StoredAxisSet {

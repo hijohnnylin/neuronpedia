@@ -5,7 +5,7 @@
  * bundle; nothing in here touches the database. The queries that fill these are
  * `lib/db/persona-axis.ts`.
  */
-import type { NPAxis } from '@/lib/api/inference-types';
+import type { NPVectorRead, SteerVectorReadout } from '@/lib/api/inference-types';
 
 /**
  * One readout axis as a page needs it to draw a wheel: what the poles are called, what they mean,
@@ -19,13 +19,17 @@ import type { NPAxis } from '@/lib/api/inference-types';
  * `id` and `name` are both identifiers and are not interchangeable. `name` is what a request calls
  * the axis (`mit_toxic`) and what a readout comes back keyed by; `id` is the row, which is what a
  * stored reading records so it stays interpretable against the constants that produced it.
+ *
+ * The poles are nullable because a row need not have any: a probe or a plain steering vector reads
+ * to the same number with no named ends, and every display of one already falls back to its title.
  */
 export type PersonaAxisDefinition = {
   id: string;
   name: string;
+  author: string;
   layer: number;
-  polePositive: string;
-  poleNegative: string;
+  polePositive: string | null;
+  poleNegative: string | null;
   polePositiveDescription: string | null;
   poleNegativeDescription: string | null;
   displayName: string | null;
@@ -37,7 +41,6 @@ export type PersonaAxisDefinition = {
  * turn, and nothing it does not. The fit report, publication and ownership stay in the table.
  */
 export type PersonaAxisFit = PersonaAxisDefinition & {
-  author: string;
   values: number[];
   projectionParams: unknown;
 };
@@ -45,18 +48,19 @@ export type PersonaAxisFit = PersonaAxisDefinition & {
 /**
  * The stored `projectionParams` blob: exactly the payload fields, minus the ones a column holds.
  *
- * Derived from `NPAxis` rather than declared, so an inference-side change to any of these fails
- * `tsc` here instead of at runtime, and a new field is one name added to the `Pick` below. Every
- * key optional because absent means defaulted, and which keys a row has depends on how it was
+ * Derived from `NPVectorRead` rather than declared, so an inference-side change to any of these
+ * fails `tsc` here instead of at runtime, and a new field is one name added to the `Pick` below.
+ * Every key optional because absent means defaulted, and which keys a row has depends on how it was
  * fitted -- the PCA axis has almost none of them.
  *
- * One type, because inference has one axis payload. A second would arrive as a union tagged by the
+ * One type, because inference has one read payload. A second would arrive as a union tagged by the
  * blob's own `v`, and `parseProjectionParams` would branch on it; nothing infers a shape from which
  * keys happen to be present, which would make a typo into a different fitting method.
  */
 type ProjectionParams = Partial<
   Pick<
-    NPAxis,
+    NPVectorRead,
+    | 'read'
     | 'normalize'
     | 'center'
     | 'scalePos'
@@ -101,7 +105,7 @@ function templateKwargs(stored: unknown): Record<string, string> {
 }
 
 /**
- * A row as the axis payload inference takes.
+ * A row as the read payload inference takes.
  *
  * Mostly the stored parameters spread verbatim, which is the point of holding them in the payload's
  * own shape: a fitting method inference already understands needs nothing added here to reach it.
@@ -109,8 +113,13 @@ function templateKwargs(stored: unknown): Record<string, string> {
  * Sends `id: name`, not the row id: `id` is what the readout comes back under and what the chart
  * matches on, and a cuid there would make every stored reading unreadable to the next request.
  * Which row was used is recorded separately, beside the reading.
+ *
+ * **No labels.** The payload has no field for the poles, the title, the author or the caveat: they
+ * are this table's, they are already in hand wherever a reading is displayed or stored, and sending
+ * them to a compute server to have them echoed back made inference the courier for display text it
+ * cannot check. `labelReadouts` is what puts them on the response instead.
  */
-export function personaAxisToNPAxis(axis: PersonaAxisFit): NPAxis {
+export function personaAxisToVectorRead(axis: PersonaAxisFit): NPVectorRead {
   const params = parseProjectionParams(axis.projectionParams);
   return {
     ...params,
@@ -131,14 +140,39 @@ export function personaAxisToNPAxis(axis: PersonaAxisFit): NPAxis {
     },
 
     id: axis.name,
-    author: axis.author,
     layer: axis.layer,
     direction: axis.values,
-    polePositive: axis.polePositive,
-    poleNegative: axis.poleNegative,
-    polePositiveDescription: axis.polePositiveDescription ?? undefined,
-    poleNegativeDescription: axis.poleNegativeDescription ?? undefined,
-    displayName: axis.displayName ?? undefined,
-    caveat: axis.caveat ?? undefined,
   };
+}
+
+/**
+ * Readouts with this table's labels put back on them, so a reading reads as something.
+ *
+ * The counterpart of `personaAxisToVectorRead` sending none. Inference answers with the id it was
+ * asked for, a placeholder author and the id as a title, and nothing else it could honestly say
+ * about a bare direction; everything a display or a stored row wants beside the numbers is here,
+ * one row lookup away, and was never worth a round trip.
+ *
+ * Matched on `name`, which is what the readout's `id` is. A readout with no row -- an axis fetched
+ * from a published artifact, where inference did read a manifest -- is left exactly as it came back.
+ */
+export function labelReadouts(
+  readouts: SteerVectorReadout[],
+  definitions: PersonaAxisDefinition[],
+): SteerVectorReadout[] {
+  const byName = new Map(definitions.map((definition) => [definition.name, definition]));
+  return readouts.map((readout) => {
+    const row = byName.get(readout.id);
+    if (!row) return readout;
+    return {
+      ...readout,
+      author: row.author,
+      title: row.displayName ?? readout.id,
+      caveat: row.caveat ?? undefined,
+      polePositive: row.polePositive ?? undefined,
+      poleNegative: row.poleNegative ?? undefined,
+      polePositiveDescription: row.polePositiveDescription ?? undefined,
+      poleNegativeDescription: row.poleNegativeDescription ?? undefined,
+    };
+  });
 }

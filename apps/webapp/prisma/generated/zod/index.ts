@@ -162,7 +162,11 @@ export const ProbeLogScalarFieldEnumSchema = z.enum(['id','action','modelId','us
 
 export const ProcessLockScalarFieldEnumSchema = z.enum(['name','startedAt','expiresAt','details']);
 
-export const VectorScalarFieldEnumSchema = z.enum(['id','modelId','name','author','layers','polePositive','poleNegative','polePositiveDescription','poleNegativeDescription','displayName','caveat','values','projectionType','projectionParams','hfRepoId','hfFolderId','visibility','creatorId','createdAt']);
+export const VectorTagScalarFieldEnumSchema = z.enum(['name','displayName','description','creatorId','createdAt']);
+
+export const VectorTagOnVectorScalarFieldEnumSchema = z.enum(['vectorId','tagName','addedAt']);
+
+export const VectorScalarFieldEnumSchema = z.enum(['id','modelId','name','author','layers','polePositive','poleNegative','polePositiveDescription','poleNegativeDescription','displayName','caveat','values','projectionParams','hfRepoId','hfFolderId','visibility','creatorId','createdAt']);
 
 export const SortOrderSchema = z.enum(['asc','desc']);
 
@@ -223,10 +227,6 @@ export type ReductionMethodType = `${z.infer<typeof ReductionMethodSchema>}`
 export const ProbeLogActionSchema = z.enum(['NEW_PROBE','NEW_SAMPLE','SAMPLE_ACCEPTED','SAMPLE_REJECTED','RANK_CHANGE']);
 
 export type ProbeLogActionType = `${z.infer<typeof ProbeLogActionSchema>}`
-
-export const ProjectionTypeSchema = z.enum(['AXIS_PROJECTION']);
-
-export type ProjectionTypeType = `${z.infer<typeof ProjectionTypeSchema>}`
 
 /////////////////////////////////////////
 // MODELS
@@ -468,6 +468,7 @@ export type UserRelations = {
   samples: SampleWithRelations[];
   probes: ProbeWithRelations[];
   vectors: VectorWithRelations[];
+  vectorTags: VectorTagWithRelations[];
   problemNodesCreated: ProblemNodeWithRelations[];
   problemNodesApproved: ProblemNodeWithRelations[];
   problemEdgesCreated: ProblemEdgeWithRelations[];
@@ -510,6 +511,7 @@ export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.
   samples: z.lazy(() => SampleWithRelationsSchema).array(),
   probes: z.lazy(() => ProbeWithRelationsSchema).array(),
   vectors: z.lazy(() => VectorWithRelationsSchema).array(),
+  vectorTags: z.lazy(() => VectorTagWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodeWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgeWithRelationsSchema).array(),
@@ -553,6 +555,7 @@ export type UserPartialRelations = {
   samples?: SamplePartialWithRelations[];
   probes?: ProbePartialWithRelations[];
   vectors?: VectorPartialWithRelations[];
+  vectorTags?: VectorTagPartialWithRelations[];
   problemNodesCreated?: ProblemNodePartialWithRelations[];
   problemNodesApproved?: ProblemNodePartialWithRelations[];
   problemEdgesCreated?: ProblemEdgePartialWithRelations[];
@@ -595,6 +598,7 @@ export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations>
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
   vectors: z.lazy(() => VectorPartialWithRelationsSchema).array(),
+  vectorTags: z.lazy(() => VectorTagPartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -637,6 +641,7 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
   samples: z.lazy(() => SamplePartialWithRelationsSchema).array(),
   probes: z.lazy(() => ProbePartialWithRelationsSchema).array(),
   vectors: z.lazy(() => VectorPartialWithRelationsSchema).array(),
+  vectorTags: z.lazy(() => VectorTagPartialWithRelationsSchema).array(),
   problemNodesCreated: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemNodesApproved: z.lazy(() => ProblemNodePartialWithRelationsSchema).array(),
   problemEdgesCreated: z.lazy(() => ProblemEdgePartialWithRelationsSchema).array(),
@@ -4242,11 +4247,126 @@ export const ProcessLockPartialSchema = ProcessLockSchema.partial()
 export type ProcessLockPartial = z.infer<typeof ProcessLockPartialSchema>
 
 /////////////////////////////////////////
+// VECTOR TAG SCHEMA
+/////////////////////////////////////////
+
+export const VectorTagSchema = z.object({
+  name: z.string(),
+  displayName: z.string(),
+  description: z.string(),
+  creatorId: z.string().nullable(),
+  createdAt: z.coerce.date(),
+})
+
+export type VectorTag = z.infer<typeof VectorTagSchema>
+
+/////////////////////////////////////////
+// VECTOR TAG PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const VectorTagPartialSchema = VectorTagSchema.partial()
+
+export type VectorTagPartial = z.infer<typeof VectorTagPartialSchema>
+
+// VECTOR TAG RELATION SCHEMA
+//------------------------------------------------------
+
+export type VectorTagRelations = {
+  creator?: UserWithRelations | null;
+  vectors: VectorTagOnVectorWithRelations[];
+};
+
+export type VectorTagWithRelations = z.infer<typeof VectorTagSchema> & VectorTagRelations
+
+export const VectorTagWithRelationsSchema: z.ZodType<VectorTagWithRelations> = VectorTagSchema.merge(z.object({
+  creator: z.lazy(() => UserWithRelationsSchema).nullable(),
+  vectors: z.lazy(() => VectorTagOnVectorWithRelationsSchema).array(),
+}))
+
+// VECTOR TAG PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type VectorTagPartialRelations = {
+  creator?: UserPartialWithRelations | null;
+  vectors?: VectorTagOnVectorPartialWithRelations[];
+};
+
+export type VectorTagPartialWithRelations = z.infer<typeof VectorTagPartialSchema> & VectorTagPartialRelations
+
+export const VectorTagPartialWithRelationsSchema: z.ZodType<VectorTagPartialWithRelations> = VectorTagPartialSchema.merge(z.object({
+  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+  vectors: z.lazy(() => VectorTagOnVectorPartialWithRelationsSchema).array(),
+})).partial()
+
+export type VectorTagWithPartialRelations = z.infer<typeof VectorTagSchema> & VectorTagPartialRelations
+
+export const VectorTagWithPartialRelationsSchema: z.ZodType<VectorTagWithPartialRelations> = VectorTagSchema.merge(z.object({
+  creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
+  vectors: z.lazy(() => VectorTagOnVectorPartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// VECTOR TAG ON VECTOR SCHEMA
+/////////////////////////////////////////
+
+export const VectorTagOnVectorSchema = z.object({
+  vectorId: z.string(),
+  tagName: z.string(),
+  addedAt: z.coerce.date(),
+})
+
+export type VectorTagOnVector = z.infer<typeof VectorTagOnVectorSchema>
+
+/////////////////////////////////////////
+// VECTOR TAG ON VECTOR PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const VectorTagOnVectorPartialSchema = VectorTagOnVectorSchema.partial()
+
+export type VectorTagOnVectorPartial = z.infer<typeof VectorTagOnVectorPartialSchema>
+
+// VECTOR TAG ON VECTOR RELATION SCHEMA
+//------------------------------------------------------
+
+export type VectorTagOnVectorRelations = {
+  vector: VectorWithRelations;
+  tag: VectorTagWithRelations;
+};
+
+export type VectorTagOnVectorWithRelations = z.infer<typeof VectorTagOnVectorSchema> & VectorTagOnVectorRelations
+
+export const VectorTagOnVectorWithRelationsSchema: z.ZodType<VectorTagOnVectorWithRelations> = VectorTagOnVectorSchema.merge(z.object({
+  vector: z.lazy(() => VectorWithRelationsSchema),
+  tag: z.lazy(() => VectorTagWithRelationsSchema),
+}))
+
+// VECTOR TAG ON VECTOR PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type VectorTagOnVectorPartialRelations = {
+  vector?: VectorPartialWithRelations;
+  tag?: VectorTagPartialWithRelations;
+};
+
+export type VectorTagOnVectorPartialWithRelations = z.infer<typeof VectorTagOnVectorPartialSchema> & VectorTagOnVectorPartialRelations
+
+export const VectorTagOnVectorPartialWithRelationsSchema: z.ZodType<VectorTagOnVectorPartialWithRelations> = VectorTagOnVectorPartialSchema.merge(z.object({
+  vector: z.lazy(() => VectorPartialWithRelationsSchema),
+  tag: z.lazy(() => VectorTagPartialWithRelationsSchema),
+})).partial()
+
+export type VectorTagOnVectorWithPartialRelations = z.infer<typeof VectorTagOnVectorSchema> & VectorTagOnVectorPartialRelations
+
+export const VectorTagOnVectorWithPartialRelationsSchema: z.ZodType<VectorTagOnVectorWithPartialRelations> = VectorTagOnVectorSchema.merge(z.object({
+  vector: z.lazy(() => VectorPartialWithRelationsSchema),
+  tag: z.lazy(() => VectorTagPartialWithRelationsSchema),
+}).partial())
+
+/////////////////////////////////////////
 // VECTOR SCHEMA
 /////////////////////////////////////////
 
 export const VectorSchema = z.object({
-  projectionType: ProjectionTypeSchema,
   visibility: VisibilitySchema,
   id: z.string().cuid(),
   modelId: z.string(),
@@ -4282,6 +4402,7 @@ export type VectorPartial = z.infer<typeof VectorPartialSchema>
 
 export type VectorRelations = {
   model: ModelWithRelations;
+  tags: VectorTagOnVectorWithRelations[];
   creator: UserWithRelations;
 };
 
@@ -4289,6 +4410,7 @@ export type VectorWithRelations = z.infer<typeof VectorSchema> & VectorRelations
 
 export const VectorWithRelationsSchema: z.ZodType<VectorWithRelations> = VectorSchema.merge(z.object({
   model: z.lazy(() => ModelWithRelationsSchema),
+  tags: z.lazy(() => VectorTagOnVectorWithRelationsSchema).array(),
   creator: z.lazy(() => UserWithRelationsSchema),
 }))
 
@@ -4297,6 +4419,7 @@ export const VectorWithRelationsSchema: z.ZodType<VectorWithRelations> = VectorS
 
 export type VectorPartialRelations = {
   model?: ModelPartialWithRelations;
+  tags?: VectorTagOnVectorPartialWithRelations[];
   creator?: UserPartialWithRelations;
 };
 
@@ -4304,6 +4427,7 @@ export type VectorPartialWithRelations = z.infer<typeof VectorPartialSchema> & V
 
 export const VectorPartialWithRelationsSchema: z.ZodType<VectorPartialWithRelations> = VectorPartialSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
+  tags: z.lazy(() => VectorTagOnVectorPartialWithRelationsSchema).array(),
   creator: z.lazy(() => UserPartialWithRelationsSchema),
 })).partial()
 
@@ -4311,5 +4435,6 @@ export type VectorWithPartialRelations = z.infer<typeof VectorSchema> & VectorPa
 
 export const VectorWithPartialRelationsSchema: z.ZodType<VectorWithPartialRelations> = VectorSchema.merge(z.object({
   model: z.lazy(() => ModelPartialWithRelationsSchema),
+  tags: z.lazy(() => VectorTagOnVectorPartialWithRelationsSchema).array(),
   creator: z.lazy(() => UserPartialWithRelationsSchema),
 }).partial())

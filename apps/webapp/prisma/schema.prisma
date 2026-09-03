@@ -121,9 +121,10 @@ model User {
   jlensShares                  JlensShare[]
   jlensSharePutRequests        JlensSharePutRequest[]
 
-  samples Sample[]
-  probes  Probe[]
-  vectors Vector[]
+  samples    Sample[]
+  probes     Probe[]
+  vectors    Vector[]
+  vectorTags VectorTag[]
 
   isProblemEditor      Boolean              @default(false)
   problemNodesCreated  ProblemNode[]        @relation(name: "problemNodeCreatedBy")
@@ -1540,36 +1541,79 @@ model ProcessLock {
 
 // ── Vectors ───────────────────────────────────────────────────────────
 
-/// Which shape `Vector.projectionParams` holds, and so which projection inference runs.
-///
-/// One member today. A probe is the next: its parameters contradict an axis's rather than extend
-/// them -- many layers instead of one, a token-selection rule instead of a fixed turn mean, a bias
-/// added before instead of a centre subtracted after -- which is what earns a member rather than
-/// more optional keys.
-enum ProjectionType {
-  AXIS_PROJECTION
+// A label a vector can carry: what it is for, what it was fitted on, whatever a reader would sort a
+// list by. `axis`, `probe`, `steering-vector` are the first three.
+//
+// Nothing gates a read on a tag. Every vector projects the same way, so a probe reads just as well
+// as an axis, and refusing one would be a display convention withholding a number that is perfectly
+// well defined. A tag says what a vector is for; it is not a permission, and the arithmetic is
+// `projectionParams` alone.
+//
+// Rows rather than enum members, so each tag carries its own description and a new one is an insert
+// rather than a migration plus a deploy. Only an admin writes one today, by hand; letting a user
+// coin a tag is why this is a table, and is work for later.
+model VectorTag {
+  // What a query and a URL name this by: lowercase, hyphenated, `steering-vector`.
+  name String @id
+
+  // What a page shows, and what the tag means where a reader is choosing between tags. A tag
+  // nobody can define is one nobody applies consistently, so the description is not optional.
+  displayName String
+  description String
+
+  // Who coined it, once a person can. Null for the tags seeded with the table, because nobody
+  // claimed those and crediting whoever applied the migration would be a fiction. Kept on the
+  // user's deletion rather than cascading: other people's vectors wear this tag, and the vectors
+  // would outlive their labelling.
+  creatorId String?
+  creator   User?   @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+
+  vectors VectorTagOnVector[]
+
+  createdAt DateTime @default(now())
+}
+
+// Which tags a vector carries.
+//
+// A join table rather than a list of strings on `Vector`, so a tag has exactly one definition and
+// renaming or describing it is one write rather than a scan.
+model VectorTagOnVector {
+  vectorId String
+  vector   Vector @relation(fields: [vectorId], references: [id], onDelete: Cascade)
+
+  tagName String
+  tag     VectorTag @relation(fields: [tagName], references: [name], onDelete: Cascade)
+
+  addedAt DateTime @default(now())
+
+  @@id([vectorId, tagName])
+  @@index([tagName])
 }
 
 // One stored vector in a model's activation space, with the parameters that turn an activation into
-// a reading. Sent to inference with the request, so a new axis is a row here rather than a deploy of
-// the serving pod. Distinct from `Neuron`, which addresses weights living in an SAE or a
+// a reading. Sent to inference with the request, so a new vector is a row here rather than a deploy
+// of the serving pod. Distinct from `Neuron`, which addresses weights living in an SAE or a
 // transcoder; this holds the numbers themselves.
 //
 // One row is one reading: a fit with several independent components is several rows, while a probe
 // summing across layers is one row with several `layers`. Which pole is the preferable one is
 // deliberately not recorded -- that is an editorial call for whatever displays the reading.
 //
-// The AXIS_PROJECTION projection, and where each part of a row lands in it:
+// The projection, and where each part of a row lands in it:
 //
-//   h          = mean resid_post over the assistant turn, at the one entry in `layers`
+//   h          = activations pooled as params.read says, at the one entry in `layers`
 //   x          = h - params.preNormMean
 //   x          = x / ||x||                    (only when params.normalize is "l2")
 //   raw        = dot(x - params.postNormMean, values)
 //   value      = (raw - params.center) / (raw >= center ? params.scalePos : params.scaleNeg)
 //   percentile = interpolated against params.quantilesPos/quantilesNeg, bounded to [-1, 1]
 //
-// where `params` is `projectionParams`. `value` is never clipped: a reading past 1 says the axis is
-// being read off the distribution it was fitted on, which is a signal rather than a boundary.
+// where `params` is `projectionParams`. `value` is never clipped: a reading past 1 says the vector
+// is being read off the distribution it was fitted on, which is a signal rather than a boundary.
+//
+// `params.read` is what makes a reading reproducible: which site is captured, which tokens are
+// selected and how they are pooled. Fitting on one rule and reading on another returns a plausible
+// number rather than an error, so the rule belongs with the numbers rather than in serving code.
 model Vector {
   id      String @id @default(cuid())
   modelId String
@@ -1585,11 +1629,11 @@ model Vector {
   name   String
   author String
 
-  // The sites this reads, in the order `values` concatenates them. One entry under
-  // AXIS_PROJECTION, which is why the read path narrows to a scalar.
+  // The sites this reads, in the order `values` concatenates them. One entry today, which is why
+  // the read path narrows to a scalar; a probe summing across layers would hold several.
   //
   // An array rather than a scalar plus a params key, so "where does this read" has one home
-  // whatever the projection type.
+  // whatever else the projection grows.
   layers Int[]
 
   // What each end means. Null for a vector with one direction and no ends -- a probe, or a plain
@@ -1609,24 +1653,24 @@ model Vector {
   // reserved in SQL, so hand-written psql needs `"values"`.
   values Float[]
 
-  // Which shape `projectionParams` holds. Also the filter that keeps a row nothing can read as an
-  // axis off a page that draws axes.
-  projectionType ProjectionType @default(AXIS_PROJECTION)
+  // What this is for, and anything else worth browsing by. Read by pages, never by the projection.
+  tags VectorTagOnVector[]
 
-  // The rest of the projection. Under AXIS_PROJECTION, exactly the inference `NPAxis` payload minus
-  // what the columns above hold: `normalize`, `center`, `scalePos`, `scaleNeg`, `preNormMean`,
+  // The rest of the projection: exactly the inference `NPVectorRead` payload minus what the columns
+  // above hold -- `read`, `normalize`, `center`, `scalePos`, `scaleNeg`, `preNormMean`,
   // `postNormMean`, the three quantile tables, and `render`.
   //
   // Absent means defaulted, so omit a key rather than storing it empty -- inference rejects a
-  // quantile table shorter than two entries, and `[]` is one. `{}` is a whole axis: the bare dot
+  // quantile table shorter than two entries, and `[]` is one. `{}` is a whole reading: the bare dot
   // product, in its own units, with no percentile.
   //
-  // A breaking change to a shape is a new `ProjectionType` member, not a version inside here. And
-  // because this mirrors a wire contract, an inference-side rename is a migration here.
+  // Nested rather than flat, because a stage is replaced whole: a row read per token declares a
+  // different `read` rather than a version number here. This mirrors a wire contract, so an
+  // inference-side rename of any of these keys is a migration here.
   projectionParams Json @default("{}")
 
   // Where this is published, if it is: the artifact a caller can hand to inference as a path
-  // instead of sending the numbers inline. Named after `Source.hfRepoId` / `hfFolderId`.
+  // instead of sending the numbers inline, spelled as `Source` spells the same pair.
   //
   // Also the only home for how the fit scored. An unpublished row records none, deliberately: what
   // a reader needs in order to trust a reading goes in `caveat`, which is displayed.
