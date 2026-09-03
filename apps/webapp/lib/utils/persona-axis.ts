@@ -46,46 +46,62 @@ export type PersonaAxisFit = PersonaAxisDefinition & {
 };
 
 /**
- * The stored `projectionParams` blob: exactly the payload fields, minus the ones a column holds.
+ * The parameters a stored blob may carry: the payload's fields, minus the ones a column holds.
  *
- * Derived from `NPVectorRead` rather than declared, so an inference-side change to any of these
- * fails `tsc` here instead of at runtime, and a new field is one name added to the `Pick` below.
- * Every key optional because absent means defaulted, and which keys a row has depends on how it was
- * fitted -- the PCA axis has almost none of them.
+ * A runtime list rather than a type, because it is both. `satisfies` ties it to `NPVectorRead`, so
+ * an inference-side rename fails `tsc` here, and `ProjectionParams` below is derived from it --
+ * naming a field once rather than in a type and again in a copy that can fall behind it.
+ *
+ * It is a list at all because what the blob holds is not checked anywhere else. `personaAxisToVectorRead`
+ * used to spread the blob whole, so a key nobody declared travelled to inference; the day the payload
+ * refuses unknown fields, such a key stops being inert and starts refusing every read of that
+ * vector. Copying only what is named here means a hand-written row cannot do that.
+ */
+const PROJECTION_PARAM_KEYS = [
+  'read',
+  'normalize',
+  'center',
+  'scalePos',
+  'scaleNeg',
+  'preNormMean',
+  'postNormMean',
+  'quantileLevels',
+  'quantilesPos',
+  'quantilesNeg',
+  'render',
+] as const satisfies readonly (keyof NPVectorRead)[];
+
+/**
+ * Every key optional, because absent means defaulted and which keys a row has depends on how it was
+ * fitted: the assistant axis stores a mean pair and nothing else, the MIT six a center and quantile
+ * tables.
  *
  * One type, because inference has one read payload. A second would arrive as a union tagged by the
  * blob's own `v`, and `parseProjectionParams` would branch on it; nothing infers a shape from which
  * keys happen to be present, which would make a typo into a different fitting method.
  */
-type ProjectionParams = Partial<
-  Pick<
-    NPVectorRead,
-    | 'read'
-    | 'normalize'
-    | 'center'
-    | 'scalePos'
-    | 'scaleNeg'
-    | 'preNormMean'
-    | 'postNormMean'
-    | 'quantileLevels'
-    | 'quantilesPos'
-    | 'quantilesNeg'
-    | 'render'
-  >
->;
+type ProjectionParams = Partial<Pick<NPVectorRead, (typeof PROJECTION_PARAM_KEYS)[number]>>;
 
 /**
  * A stored blob as projection parameters, or an empty set for a row that has no usable blob.
  *
- * Checked for being an object and not for its fields, deliberately. Inference validates every one
- * of them -- vector lengths, non-finite entries, a zero divisor, a non-monotone quantile table --
- * and has to, because a caller may send an axis inline without ever touching this table. A second
- * copy of those rules here would be one to keep in step for no new coverage, so a malformed blob
- * is a bad backfill that fails loudly upstream rather than something to repair in passing.
+ * Filtered by name, not validated. Inference checks every value -- vector lengths, non-finite
+ * entries, a zero divisor, a non-monotone quantile table -- and has to, because a caller may send a
+ * vector inline without ever touching this table. A second copy of those rules here would be one to
+ * keep in step for no new coverage, so a malformed value is still a bad backfill that fails loudly
+ * upstream. What this does stop is a key inference never agreed to.
+ *
+ * A key present and explicitly null is copied as it stands, so a row saying "no quantile table"
+ * still says it. Only absence is absence.
  */
 function parseProjectionParams(stored: unknown): ProjectionParams {
   if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) return {};
-  return stored as ProjectionParams;
+  const blob = stored as Record<string, unknown>;
+  const params: Record<string, unknown> = {};
+  for (const key of PROJECTION_PARAM_KEYS) {
+    if (key in blob) params[key] = blob[key];
+  }
+  return params as ProjectionParams;
 }
 
 /**
@@ -138,6 +154,12 @@ export function personaAxisToVectorRead(axis: PersonaAxisFit): NPVectorRead {
       blankSystemPrompt: params.render?.blankSystemPrompt ?? false,
       templateKwargs: templateKwargs(params.render?.templateKwargs),
     },
+
+    // Named field by field for the same reason the top level is, since filtering a blob's own keys
+    // says nothing about what is nested inside one of them. Absent stays absent: a row that says
+    // nothing about how to read it means inference's defaults, which is what every row meant before
+    // the spec existed.
+    read: params.read ? { site: params.read.site, tokens: params.read.tokens, pool: params.read.pool } : undefined,
 
     id: axis.name,
     layer: axis.layer,

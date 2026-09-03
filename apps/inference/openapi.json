@@ -1569,6 +1569,7 @@
         "type": "string"
       },
       "NPReadSpec": {
+        "additionalProperties": false,
         "description": "How to get the activation a direction is projected onto.\n\nA fitted direction only means anything against activations gathered the way the fit gathered\nthem, so these three travel with the vector rather than being this server's convention. Everything\nhere was hard-coded until now, and the defaults are exactly what was hard-coded.\n\nDistinct from `render`, which is about the text: a render condition changes what the model is\nshown, so every read in one request has to agree about it. These change only how the captured\nactivations are reduced, so two reads in one request may differ freely -- reading one layer two\nways costs one forward, not two.",
         "properties": {
           "pool": {
@@ -1591,6 +1592,7 @@
         "type": "object"
       },
       "NPRenderConditions": {
+        "additionalProperties": false,
         "description": "How a conversation has to be templated for a vector's numbers to mean anything.\n\nA projection onto a fitted direction only holds if the conversation reaches the model rendered\nthe way it was during fitting, so these conditions travel with the vector. They are applied\nbefore generation and so change the text itself, which is why every read in one request has to\nagree about them.",
         "properties": {
           "blankSystemPrompt": {
@@ -1811,6 +1813,7 @@
         "type": "string"
       },
       "NPVectorRead": {
+        "additionalProperties": false,
         "description": "One vector to read off the generated conversation, supplied with the request.\n\nPurely computational: a direction, where to read the activation it applies to, and the\narithmetic that turns the projection into a number. Nothing here says what the number *means* --\na trait, a class, a position between two named poles -- because that is the caller's to name,\nand this server has no catalogue to look it up in.\n\nEither send `source` on its own, or send `direction` and `layer` with as much of the rest as the\nfit has. With everything else defaulted the reading is the dot product of the direction with the\nmean residual-stream activation over each assistant turn, which is what you can read without a\ncalibration corpus. The optional fields refine that in three steps::\n\n    h          = activation at `layer`, gathered as `read` says (default: the mean\n                 resid_post over each assistant turn)\n    x          = h - preNormMean                    # default: no-op\n    x          = x / max(||x||, 1e-12)              # only when normalize is \"l2\"\n    raw        = dot(x - postNormMean, direction)\n    value      = (raw - center) / (raw >= center ? scalePos : scaleNeg)\n    percentile = interpolated against quantilesPos / quantilesNeg, bounded to [-1, 1]\n\nSo `value` is in the fit's own units until `center` and the two scales put it on a readable\none, and a `percentile` is reported only once the quantile tables say what the fitting corpus\nlooked like. `value` is never clipped: a reading past 1 says the vector is being read off the\ndistribution it was fitted on, which is a signal rather than something to pin to the boundary.\n\n**No labels.** There is no field here for an author, a title, a caveat or what either end means.\nA caller who holds the catalogue already has those beside the row this payload came from, and\nsending them here only to have them echoed back would make this server a courier for display\ntext it cannot check. A `source` artifact is the exception, and states them in `vector.yaml`.",
         "properties": {
           "center": {
@@ -1974,6 +1977,7 @@
         "type": "object"
       },
       "NPVectorSource": {
+        "additionalProperties": false,
         "description": "A published vector to fetch, instead of sending its tensors inline.\n\nThe artifact is one folder holding `vector.yaml` and `vector.safetensors`. Everything about the\nvector comes from there, so nothing but `id` may be sent beside this.",
         "properties": {
           "hfFolder": {

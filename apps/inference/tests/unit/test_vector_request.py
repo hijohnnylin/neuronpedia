@@ -112,10 +112,33 @@ class TestPayloadShape:
     def test_there_are_no_label_fields_to_send(self):
         # Display text was taken off this payload: a caller holding the catalogue already has it
         # beside the row the direction came from, and echoing it through a compute server made this
-        # the courier for strings it cannot check. Dropped rather than refused, so that a client
-        # still sending them keeps working; `extra="forbid"` lands once the stored blobs agree.
-        vector = payload(author="Some Lab", displayName="Tone", polePositive="toxic", caveat="200 turns")
-        assert not any(hasattr(vector, name) for name in ("author", "display_name", "pole_positive", "caveat"))
+        # the courier for strings it cannot check. Refused rather than ignored, because the field
+        # that carried these reads was renamed in the same change -- anyone writing `reads` at all
+        # is writing against a spec with no `author` in it, so one here is a mistake to name.
+        with pytest.raises(ValidationError, match="author"):
+            payload(author="Some Lab", displayName="Tone", polePositive="toxic", caveat="200 turns")
+
+    def test_a_parameter_this_server_does_not_know_is_refused(self):
+        # The caller's stored blob reaches this model nearly verbatim, and every field in one
+        # changes the number that comes back. So a key nobody declared is a parameter that was
+        # meant to apply and did not, and answering anyway would return a plausible reading
+        # measured some other way -- indistinguishable downstream from a correct one.
+        with pytest.raises(ValidationError, match="fitNotes"):
+            payload(fitNotes="from the 2026 sweep")
+
+    def test_an_unknown_field_inside_the_read_spec_is_refused_too(self):
+        # A closed set of parameters says nothing about what is nested in one of them unless the
+        # nested model is closed as well.
+        with pytest.raises(ValidationError, match="window"):
+            payload(read={"site": "resid_post", "tokens": "assistant_turns", "pool": "mean", "window": 4})
+
+    def test_either_spelling_of_a_known_field_still_validates(self):
+        # What is refused is a name this server does not have, not a casing. `populate_by_name`
+        # makes the snake_case attribute a valid input name beside its camelCase alias, and a
+        # caller predating the switch sends the former.
+        camel = NPVectorRead.model_validate({"id": "np_trait", "direction": UNIT, "layer": 3, "scalePos": 2.0})
+        snake = NPVectorRead.model_validate({"id": "np_trait", "direction": UNIT, "layer": 3, "scale_pos": 2.0})
+        assert camel.scale_pos == snake.scale_pos == 2.0
 
     def test_a_source_carries_how_it_was_read_too(self):
         # The read spec is part of the fit, like the direction: an artifact read some other way

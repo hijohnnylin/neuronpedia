@@ -142,6 +142,37 @@ describe('personaAxisToVectorRead', () => {
     expect(payload.render?.templateKwargs).toEqual({ tools: 'none' });
   });
 
+  it('drops a stored key inference never agreed to', () => {
+    // Nothing validates this column on the way in, and the payload is about to refuse fields it
+    // does not know -- at which point a leftover key from a hand-written row would stop being inert
+    // and start refusing every read of that vector. Named keys travel; the rest stay in the table.
+    const payload = personaAxisToVectorRead(
+      fit({ projectionParams: { center: 0.4, fitNotes: 'from the 2026 sweep', v: 3 } }),
+    );
+    expect(payload.center).toBe(0.4);
+    expect(JSON.stringify(payload)).not.toContain('fitNotes');
+    expect(JSON.stringify(payload)).not.toContain('2026 sweep');
+  });
+
+  it('drops a stray key nested inside the read spec', () => {
+    // Filtering the blob's own keys says nothing about what is inside one of them, and the spec is
+    // its own model with its own fields.
+    const payload = personaAxisToVectorRead(
+      fit({
+        projectionParams: { read: { site: 'resid_post', tokens: 'assistant_turns', pool: 'mean', window: 4 } },
+      }),
+    );
+    expect(payload.read).toEqual({ site: 'resid_post', tokens: 'assistant_turns', pool: 'mean' });
+  });
+
+  it('says nothing about the read for a row that stores no spec', () => {
+    // Absent means inference's defaults, which is what every row meant before the spec existed.
+    // Sending an empty spec instead would be this table asserting a read it does not know.
+    const payload = personaAxisToVectorRead(fit());
+    expect(payload.read).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('read');
+  });
+
   it('survives the shapes a json column actually yields', () => {
     // A row written before the column had a default, or by something that put the wrong thing
     // there. Every one of these has to come back as the uncalibrated axis rather than as a throw.

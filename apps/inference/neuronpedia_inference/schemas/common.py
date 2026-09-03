@@ -37,6 +37,30 @@ class BaseSchema(BaseModel):
         return self.model_dump_json(exclude_none=True)
 
 
+class ExactSchema(BaseSchema):
+    """Base for a payload where a field this server does not know is an error.
+
+    Tolerating unknown fields is the right default and stays the default everywhere else: it
+    is what lets an older server keep serving a newer client, and a response grow a field
+    without every reader being redeployed first.
+
+    It is the wrong default for a payload that is somebody's stored blob forwarded verbatim.
+    A vector read is exactly that -- the caller holds a table of fitting parameters and hands
+    them over -- and every field in one changes the number that comes back. So an unrecognized
+    key there is a parameter that was meant to apply and did not, and ignoring it answers with
+    a plausible reading measured some other way, which nothing downstream can tell from a
+    correct one. Refusing the request names the key instead.
+
+    Both spellings stay accepted, since ``populate_by_name`` makes the snake_case attribute a
+    valid input name beside its camelCase alias. What is refused is a name that is neither.
+
+    Only for payloads whose fields are a closed set of parameters. Not for a request envelope
+    or a response, where refusing an unknown field would make a version skew an outage.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class PublicFrameSchema(BaseSchema):
     """Base for a payload whose field names are themselves a public contract.
 

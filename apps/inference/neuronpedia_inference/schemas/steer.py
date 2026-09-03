@@ -10,7 +10,7 @@ from typing import Annotated
 
 from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr, model_validator
 
-from neuronpedia_inference.schemas.common import BaseSchema, NPLogprob
+from neuronpedia_inference.schemas.common import BaseSchema, ExactSchema, NPLogprob
 
 
 class NPSteerMethod(StrEnum):
@@ -56,7 +56,7 @@ class NPPooling(StrEnum):
     MAX = "max"
 
 
-class NPReadSpec(BaseSchema):
+class NPReadSpec(ExactSchema):
     """How to get the activation a direction is projected onto.
 
     A fitted direction only means anything against activations gathered the way the fit gathered
@@ -106,7 +106,7 @@ class NPSteerVector(BaseSchema):
     hook: StrictStr
 
 
-class NPRenderConditions(BaseSchema):
+class NPRenderConditions(ExactSchema):
     """How a conversation has to be templated for a vector's numbers to mean anything.
 
     A projection onto a fitted direction only holds if the conversation reaches the model rendered
@@ -131,7 +131,7 @@ class NPRenderConditions(BaseSchema):
     )
 
 
-class NPVectorSource(BaseSchema):
+class NPVectorSource(ExactSchema):
     """A published vector to fetch, instead of sending its tensors inline.
 
     The artifact is one folder holding `vector.yaml` and `vector.safetensors`. Everything about the
@@ -151,7 +151,7 @@ class NPVectorSource(BaseSchema):
     )
 
 
-class NPVectorRead(BaseSchema):
+class NPVectorRead(ExactSchema):
     """One vector to read off the generated conversation, supplied with the request.
 
     Purely computational: a direction, where to read the activation it applies to, and the
