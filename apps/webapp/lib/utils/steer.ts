@@ -46,6 +46,16 @@ export const STEER_N_LOGPROBS = 5;
 // have the prompt baked into outputText, because inference used to return prompt + generation.
 export const STEER_COMPLETION_VERSION = 2;
 
+/**
+ * The one vector the assistant-axis page reads.
+ *
+ * That page shows a single named direction, so its id is a constant rather than something to
+ * discover from a response. Here rather than beside any one of them because four places need the
+ * same string: the route resolving the deprecated `isAssistantAxis` flag, the chart picking its
+ * readout out of `axes`, and the legacy title table keyed by it.
+ */
+export const ASSISTANT_AXIS_ID = 'lu_assistant-axis';
+
 export const ERROR_STEER_MAX_PROMPT_CHARS =
   'Total conversation length exceeds the maximum number of characters allowed. Please click Reset to start a new conversation.';
 

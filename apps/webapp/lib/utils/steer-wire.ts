@@ -27,7 +27,7 @@
  * are stored so the reading still reads as something after that row is retired.
  */
 import type { SteerVectorReadout } from '@/lib/api/inference-types';
-import { STEER_COMPLETION_VERSION } from '@/lib/utils/steer';
+import { ASSISTANT_AXIS_ID, STEER_COMPLETION_VERSION } from '@/lib/utils/steer';
 
 /**
  * The snake_case shape persisted in `capMonitorOutput` today.
@@ -64,8 +64,8 @@ export type StoredAxis = {
   /**
    * What the axis's two ends were called when this was measured.
    *
-   * Stored rather than looked up so a reading stays legible after its axis is retired, and so the
-   * deprecated `assistant_axis` view keys a cached conversation exactly as it keys a fresh one.
+   * Stored rather than looked up so a reading stays legible after its axis is retired: the row that
+   * named them is the row that can be deleted.
    */
   pole_positive?: string | null;
   pole_negative?: string | null;
@@ -109,19 +109,25 @@ type LegacyRow = {
 };
 
 /**
- * Axis ids for the titles legacy rows were keyed by.
+ * The display title each axis was keyed by before ids, in the exact bytes that were written.
  *
  * Only one asset was ever stored in that format -- the Llama-3.3-70B assistant axis -- so this is
- * the whole of it. Without the mapping an old row would read as an axis whose id is its title,
- * which would never satisfy a request for `lu_assistant-axis` and would silently re-run inference
- * for every conversation already in the database.
+ * the whole of it. It is read in both directions and neither may drift from the other, which is why
+ * one table serves both: here, to recover an id from a stored title, and in `steer-axis-legacy.ts`,
+ * to key the deprecated `assistant_axis` view the way its callers already parse. Without the first,
+ * an old row would read as an axis whose id is its title, would never satisfy a request for
+ * `lu_assistant-axis`, and would silently re-run inference for every conversation already stored.
  */
-const LEGACY_TITLE_TO_AXIS_ID: Record<string, string> = {
-  '- Role-playing \u2194\ufe0f + Assistant-like': 'lu_assistant-axis',
+export const LEGACY_AXIS_TITLES: Record<string, string> = {
+  [ASSISTANT_AXIS_ID]: '- Role-playing \u2194\ufe0f + Assistant-like',
 };
 
+const LEGACY_AXIS_ID_BY_TITLE: Record<string, string> = Object.fromEntries(
+  Object.entries(LEGACY_AXIS_TITLES).map(([id, title]) => [title, id]),
+);
+
 function legacyAxisId(title: string): string {
-  return LEGACY_TITLE_TO_AXIS_ID[title] ?? title;
+  return LEGACY_AXIS_ID_BY_TITLE[title] ?? title;
 }
 
 /**

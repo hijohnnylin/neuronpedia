@@ -2,7 +2,7 @@
 
 import { SteerResultChat } from '@/app/api/steer-chat/route';
 import { useGlobalContext } from '@/components/provider/global-provider';
-import { NPSteerMethod } from '@/lib/api/inference-types';
+import { NPSteerMethod, NPSteerType } from '@/lib/api/inference-types';
 import { useIsMount } from '@/lib/hooks/use-is-mount';
 import {
   ChatMessage,
@@ -15,15 +15,12 @@ import {
   STEER_TEMPERATURE,
   SteerFeature,
 } from '@/lib/utils/steer';
-import { LegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
+import { PublicAxisReadout } from '@/lib/utils/steer-axis-public';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import AssistantAxisChat from './assistant-axis-chat';
 import { ChartData, buildChartData, combineChartData } from './persona-chart';
-
-// Reads the deprecated `assistant_axis` view of the readouts, which /api/steer-chat still
-// returns. The `axes` field it derives that from is what a multi-axis chart wants.
-type PersonaCheckResult = LegacyAssistantAxis;
+import { assistantAxisFor } from './shared';
 
 const PERSONA_MODELS = ['llama3.3-70b-it'];
 
@@ -61,9 +58,9 @@ export default function AssistantAxisSteerer({
   const [loadingChartData, setLoadingChartData] = useState(false);
   const skipChartAnimationRef = useRef(false);
   const [usePostCap, setUsePostCap] = useState(false);
-  // Store raw persona check results so we can rebuild chart data when toggling pre/post cap
-  const [rawSteeredAxis, setRawSteeredAxis] = useState<PersonaCheckResult | null>(null);
-  const [rawDefaultAxis, setRawDefaultAxis] = useState<PersonaCheckResult | null>(null);
+  // Store raw readouts so we can rebuild chart data when toggling pre/post cap
+  const [rawSteeredAxis, setRawSteeredAxis] = useState<PublicAxisReadout | null>(null);
+  const [rawDefaultAxis, setRawDefaultAxis] = useState<PublicAxisReadout | null>(null);
   const [scrollToTurnIndex, setScrollToTurnIndex] = useState<number | null>(null);
 
   // Callback for when a point on the persona chart is clicked
@@ -106,9 +103,9 @@ export default function AssistantAxisSteerer({
     window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
   }
 
-  // Handle assistant_axis data from the steer-chat response
+  // Handle the axis readings from the steer-chat response
   const handleAssistantAxisData = useCallback(
-    (steeredData: PersonaCheckResult | null, defaultData: PersonaCheckResult | null) => {
+    (steeredData: PublicAxisReadout | null, defaultData: PublicAxisReadout | null) => {
       setLoadingChartData(true);
       // Store raw data for later rebuilding when toggling pre/post cap
       setRawSteeredAxis(steeredData);
@@ -190,17 +187,10 @@ export default function AssistantAxisSteerer({
         }));
         setSelectedFeatures(features || []);
 
-        // Handle cached assistant_axis data for chart
-        if (resp.assistant_axis && Array.isArray(resp.assistant_axis)) {
-          let steeredAxis: PersonaCheckResult | null = null;
-          let defaultAxis: PersonaCheckResult | null = null;
-          for (const axisItem of resp.assistant_axis as PersonaCheckResult[]) {
-            if (axisItem.type === 'STEERED') {
-              steeredAxis = axisItem;
-            } else if (axisItem.type === 'DEFAULT') {
-              defaultAxis = axisItem;
-            }
-          }
+        // Plot whatever reading the saved conversation carried
+        const steeredAxis = assistantAxisFor(resp.axes, NPSteerType.STEERED);
+        const defaultAxis = assistantAxisFor(resp.axes, NPSteerType.DEFAULT);
+        if (steeredAxis || defaultAxis) {
           // Store raw data for toggle functionality
           setRawSteeredAxis(steeredAxis);
           setRawDefaultAxis(defaultAxis);

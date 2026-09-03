@@ -3,14 +3,15 @@ import { axisReadoutsToLegacyAssistantAxis } from './steer-axis-legacy';
 
 describe('axisReadoutsToLegacyAssistantAxis', () => {
   it('reproduces the shape a single-axis response has always had', () => {
-    // The exact payload `/api/steer-chat` returned before readouts were keyed by id. Users of the
-    // public API and the existing chart both read this, so it has to come out unchanged.
+    // The exact payload `/api/steer-chat` returned before readouts were keyed by id, down to the
+    // key: users of the public API split that string on its arrow, so it has to come out unchanged.
+    const title = '- Role-playing \u2194\ufe0f + Assistant-like';
     expect(
       axisReadoutsToLegacyAssistantAxis([
         {
           id: 'lu_assistant-axis',
           author: 'lu',
-          title: 'Role-playing to Assistant-like',
+          title: 'Assistant axis',
           type: 'STEERED',
           layer: 40,
           turns: [
@@ -21,16 +22,16 @@ describe('axisReadoutsToLegacyAssistantAxis', () => {
       ]),
     ).toEqual([
       {
-        pcTitles: ['Role-playing to Assistant-like'],
+        pcTitles: [title],
         turns: [
           {
-            pcValues: { 'Role-playing to Assistant-like': 0.5 },
-            pcValuesPostCap: { 'Role-playing to Assistant-like': 0.2 },
+            pcValues: { [title]: 0.5 },
+            pcValuesPostCap: { [title]: 0.2 },
             snippet: 'hello',
           },
           {
-            pcValues: { 'Role-playing to Assistant-like': -1 },
-            pcValuesPostCap: { 'Role-playing to Assistant-like': -0.5 },
+            pcValues: { [title]: -1 },
+            pcValuesPostCap: { [title]: -0.5 },
             snippet: 'bye',
           },
         ],
@@ -61,8 +62,8 @@ describe('axisReadoutsToLegacyAssistantAxis', () => {
       },
     ]);
     expect(legacy).toHaveLength(1);
-    expect(legacy[0].pcTitles).toEqual(['empathetic', 'toxicity']);
-    expect(legacy[0].turns?.[0].pcValues).toEqual({ empathetic: 0.25, toxicity: -0.75 });
+    expect(legacy[0].pcTitles).toEqual(['mit_empathy', 'mit_toxic']);
+    expect(legacy[0].turns?.[0].pcValues).toEqual({ mit_empathy: 0.25, mit_toxic: -0.75 });
   });
 
   it('keeps the steer types apart', () => {
@@ -71,8 +72,8 @@ describe('axisReadoutsToLegacyAssistantAxis', () => {
       { id: 'mit_empathy', author: 'mit', title: 'empathetic', type: 'STEERED', turns: [{ value: -1 }] },
     ]);
     expect(legacy.map((entry) => entry.type)).toEqual(['DEFAULT', 'STEERED']);
-    expect(legacy[0].turns?.[0].pcValues).toEqual({ empathetic: 1 });
-    expect(legacy[1].turns?.[0].pcValues).toEqual({ empathetic: -1 });
+    expect(legacy[0].turns?.[0].pcValues).toEqual({ mit_empathy: 1 });
+    expect(legacy[1].turns?.[0].pcValues).toEqual({ mit_empathy: -1 });
   });
 
   it('omits the post-cap map when nothing was steered', () => {
@@ -90,25 +91,23 @@ describe('axisReadoutsToLegacyAssistantAxis', () => {
       { id: 't_long', author: 't', title: 'long', type: 'DEFAULT', turns: [{ value: 1 }, { value: 2 }] },
       { id: 't_short', author: 't', title: 'short', type: 'DEFAULT', turns: [{ value: 9 }] },
     ]);
-    expect(legacy[0].turns?.[0].pcValues).toEqual({ long: 1, short: 9 });
-    expect(legacy[0].turns?.[1].pcValues).toEqual({ long: 2 });
+    expect(legacy[0].turns?.[0].pcValues).toEqual({ t_long: 1, t_short: 9 });
+    expect(legacy[0].turns?.[1].pcValues).toEqual({ t_long: 2 });
   });
 
   it('is empty for no readouts', () => {
     expect(axisReadoutsToLegacyAssistantAxis([])).toEqual([]);
   });
 
-  it('builds the title from the poles, which is what an outside caller already parses', () => {
-    // The exact bytes the 70B axis has always been keyed by. Inference reports an axis sent with
-    // the request under its id, so a payload keyed by `title` would rename every key of this view
-    // the day the demo started sending rows -- for callers whose code splits on that arrow.
+  it('keys the one axis with outside callers by the string they already parse', () => {
+    // The exact bytes the 70B axis has always been keyed by, from the table rather than from this
+    // readout: no poles, no matching title, and the key comes out right anyway. Rewording a pole or
+    // a display name is then a thing this view cannot notice, which is the point of the table.
     const legacy = axisReadoutsToLegacyAssistantAxis([
       {
         id: 'lu_assistant-axis',
         author: 'lu',
-        title: 'lu_assistant-axis',
-        polePositive: 'Assistant-like',
-        poleNegative: 'Role-playing',
+        title: 'Some later wording of the assistant axis',
         type: 'STEERED',
         turns: [{ value: 0.5 }],
       },
@@ -118,11 +117,12 @@ describe('axisReadoutsToLegacyAssistantAxis', () => {
     expect(legacy[0].turns?.[0].pcValues).toEqual({ [title]: 0.5 });
   });
 
-  it('falls back to the title for an axis that names no poles', () => {
-    // All this view ever had, and all a stranger's axis need supply.
+  it('keys every other axis by its id', () => {
+    // Nothing was parsing these keys before ids existed, so the id is what this view can say about
+    // them honestly -- and unlike a title, two axes cannot collide on it.
     const legacy = axisReadoutsToLegacyAssistantAxis([
       { id: 'me_curiosity', author: 'me', title: 'how curious', type: 'DEFAULT', turns: [{ value: 1 }] },
     ]);
-    expect(legacy[0].pcTitles).toEqual(['how curious']);
+    expect(legacy[0].pcTitles).toEqual(['me_curiosity']);
   });
 });

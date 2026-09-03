@@ -14,11 +14,12 @@
  * because it is unimportant -- this view reproduces a shape callers already parse, so growing it
  * would change what a field means for someone who never asked for the new reading.
  *
- * Two axes sharing a display title would collide in the map, which is the reason readouts are keyed
- * by id everywhere else. It cannot happen for the assets shipped today and would only ever affect
- * this compatibility view.
+ * Nothing inside the webapp reads this any more. The assistant-axis page takes its numbers from
+ * `axes`, by the id it asked for, so this exists for callers outside the repo and is written to be
+ * deletable the day they stop reading it.
  */
 import type { SteerVectorReadout } from '@/lib/api/inference-types';
+import { LEGACY_AXIS_TITLES } from '@/lib/utils/steer-wire';
 
 export type LegacyAssistantAxisTurn = {
   pcValues?: Record<string, number>;
@@ -33,20 +34,19 @@ export type LegacyAssistantAxis = {
 };
 
 /**
- * The display title of an axis, in the form this view has always used: `- <minus> \u2194 + <plus>`.
+ * The key an axis's values appear under in this view.
  *
- * Assembled from the poles rather than taken from `title`, because `title` no longer means what it
- * did. An axis was once one display string that a reader split on the arrow; it is now two named
- * poles, and a request-supplied axis reports its id there. Rebuilding the old string from the poles
- * is what keeps the keys of this payload the bytes an outside caller already parses -- for the one
- * axis that has such callers, `- Role-playing \u2194\ufe0f + Assistant-like`, exactly.
+ * A lookup in the table of what was actually written, not a string assembled from the poles. The
+ * assembly was an inference -- that a key had always been `- <minus> \u2194\ufe0f + <plus>`, so
+ * rebuilding it from two poles would reproduce it -- and it held only while every axis was worded
+ * the way that one was. One axis has callers who parse this key, the table names it, and the same
+ * table reads it back in `steer-wire.ts`, so a reworded pole cannot move it.
  *
- * Falls back to `title` for an axis that names no poles, which is all this view ever had.
+ * Anything else keys by its id, which is what this view can honestly say about an axis nobody was
+ * parsing before ids existed.
  */
 function legacyTitle(readout: SteerVectorReadout): string {
-  const { polePositive, poleNegative } = readout;
-  if (!polePositive || !poleNegative) return readout.title;
-  return `- ${poleNegative} \u2194\ufe0f + ${polePositive}`;
+  return LEGACY_AXIS_TITLES[readout.id] ?? readout.id;
 }
 
 /** Group readouts by steer type and re-key their values by title, one entry per type. */

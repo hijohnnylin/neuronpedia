@@ -6,10 +6,10 @@ import { Button } from '@/components/shadcn/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import SteerChatMessage from '@/components/steer/chat-message';
 import { LoadingSquare } from '@/components/svg/loading-square';
-import { NPSteerMethod } from '@/lib/api/inference-types';
+import { NPSteerMethod, NPSteerType } from '@/lib/api/inference-types';
 import { ASSET_BASE_URL, IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
 import { ChatMessage, ERROR_STEER_MAX_PROMPT_CHARS, SteerFeature } from '@/lib/utils/steer';
-import { LegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
+import { PublicAxisReadout } from '@/lib/utils/steer-axis-public';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ArrowRightIcon, InfoCircledIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import copy from 'copy-to-clipboard';
@@ -33,11 +33,15 @@ import { MutableRefObject, useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 import AssistantAxisWelcomeModal from './assistant-axis-welcome-modal';
 import PersonaChart, { ChartData } from './persona-chart';
-import { CAP_BLOG_URL, CAP_CONTACT_EMAIL, CAP_GITHUB_URL, CAP_PAPER_URL, CAP_VECTOR_URL, DEMO_BUTTONS } from './shared';
-
-// Reads the deprecated `assistant_axis` view of the readouts, which /api/steer-chat still
-// returns. The `axes` field it derives that from is what a multi-axis chart wants.
-type PersonaCheckResult = LegacyAssistantAxis;
+import {
+  assistantAxisFor,
+  CAP_BLOG_URL,
+  CAP_CONTACT_EMAIL,
+  CAP_GITHUB_URL,
+  CAP_PAPER_URL,
+  CAP_VECTOR_URL,
+  DEMO_BUTTONS,
+} from './shared';
 
 export default function AssistantAxisChat({
   isSteering,
@@ -96,7 +100,7 @@ export default function AssistantAxisChat({
   steerSpecialTokens: boolean;
   steerMethod: NPSteerMethod;
   scrollToTurnIndex?: number | null;
-  onAssistantAxisData?: (steeredData: PersonaCheckResult | null, defaultData: PersonaCheckResult | null) => void;
+  onAssistantAxisData?: (steeredData: PublicAxisReadout | null, defaultData: PublicAxisReadout | null) => void;
   currentSavedId: string | null;
   loadSavedSteerOutput: (steerOutputId: string) => void;
   chartData: ChartData | null;
@@ -107,8 +111,8 @@ export default function AssistantAxisChat({
   setChartData: (chartData: ChartData | null) => void;
   usePostCap: boolean;
   setUsePostCap: (usePostCap: boolean) => void;
-  rawSteeredAxis: PersonaCheckResult | null;
-  rawDefaultAxis: PersonaCheckResult | null;
+  rawSteeredAxis: PublicAxisReadout | null;
+  rawDefaultAxis: PublicAxisReadout | null;
 }) {
   const normalEndRef = useRef<HTMLDivElement | null>(null);
   const steeredEndRef = useRef<HTMLDivElement | null>(null);
@@ -347,9 +351,9 @@ export default function AssistantAxisChat({
           .getReader();
         readerRef.current = reader;
 
-        // Track the latest assistant_axis data from streaming chunks (one for each steer type)
-        let latestSteeredAxis: PersonaCheckResult | null = null;
-        let latestDefaultAxis: PersonaCheckResult | null = null;
+        // Track the latest reading from the streaming chunks (one for each steer type)
+        let latestSteeredAxis: PublicAxisReadout | null = null;
+        let latestDefaultAxis: PublicAxisReadout | null = null;
         let axisApplied = false;
 
         while (true) {
@@ -375,57 +379,32 @@ export default function AssistantAxisChat({
           if (data.id) {
             setUrl(data.id);
           }
-          // Track assistant_axis data from the response (now an array with type field)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const assistantAxisArray = (data as any).assistant_axis as PersonaCheckResult[] | undefined;
-          if (assistantAxisArray && Array.isArray(assistantAxisArray)) {
-            console.log('[DEBUG] Received assistant_axis (streaming):', JSON.stringify(assistantAxisArray, null, 2));
-            for (const axisItem of assistantAxisArray) {
-              if (axisItem.type === 'STEERED') {
-                latestSteeredAxis = axisItem;
-              } else if (axisItem.type === 'DEFAULT') {
-                latestDefaultAxis = axisItem;
-              }
-            }
-            // Both lines are plottable the moment each type has sent its axis frame. What
-            // remains on the stream is the database write and the share URL, so waiting
-            // for it to close (as this used to) held the chart still for that whole round
-            // trip even though the numbers were already here.
-            if (!axisApplied && latestSteeredAxis && latestDefaultAxis && onAssistantAxisData) {
-              axisApplied = true;
-              onAssistantAxisData(latestSteeredAxis, latestDefaultAxis);
-            }
+          // A frame carries every axis read so far, for whichever type produced it
+          const steered = assistantAxisFor(data.axes, NPSteerType.STEERED);
+          const notSteered = assistantAxisFor(data.axes, NPSteerType.DEFAULT);
+          if (steered) latestSteeredAxis = steered;
+          if (notSteered) latestDefaultAxis = notSteered;
+          // Both lines are plottable the moment each type has sent its axis frame. What
+          // remains on the stream is the database write and the share URL, so waiting
+          // for it to close (as this used to) held the chart still for that whole round
+          // trip even though the numbers were already here.
+          if (!axisApplied && latestSteeredAxis && latestDefaultAxis && onAssistantAxisData) {
+            axisApplied = true;
+            onAssistantAxisData(latestSteeredAxis, latestDefaultAxis);
           }
           setTypedInText('');
         }
       } else {
-        const data = await response.json();
+        const data = (await response.json()) as SteerResultChat;
         setDefaultChatMessages(data.DEFAULT?.chatTemplate || []);
         setSteeredChatMessages(data.STEERED?.chatTemplate || []);
-        setUrl(data.id);
+        setUrl(data.id ?? '');
         setTypedInText('');
         setIsSteering(false);
-        // Pass the assistant_axis data to the parent for non-streaming response
 
-        const assistantAxisArray = data.assistant_axis as PersonaCheckResult[] | undefined;
-        console.log('[DEBUG] Received assistant_axis (non-streaming):', JSON.stringify(assistantAxisArray, null, 2));
-        if (onAssistantAxisData && assistantAxisArray && Array.isArray(assistantAxisArray)) {
-          let steeredAxis: PersonaCheckResult | null = null;
-          let defaultAxis: PersonaCheckResult | null = null;
-          for (const axisItem of assistantAxisArray) {
-            // Debug: check if pcValuesPostCap exists in turns
-            const hasPostCap = axisItem.turns?.some((t) => t.pcValuesPostCap);
-            console.log(`[DEBUG] ${axisItem.type} axis - has pcValuesPostCap:`, hasPostCap);
-            if (axisItem.turns && axisItem.turns.length > 0) {
-              console.log(`[DEBUG] ${axisItem.type} first turn keys:`, Object.keys(axisItem.turns[0]));
-              console.log(`[DEBUG] ${axisItem.type} first turn pcValuesPostCap:`, axisItem.turns[0].pcValuesPostCap);
-            }
-            if (axisItem.type === 'STEERED') {
-              steeredAxis = axisItem;
-            } else if (axisItem.type === 'DEFAULT') {
-              defaultAxis = axisItem;
-            }
-          }
+        const steeredAxis = assistantAxisFor(data.axes, NPSteerType.STEERED);
+        const defaultAxis = assistantAxisFor(data.axes, NPSteerType.DEFAULT);
+        if (onAssistantAxisData && (steeredAxis || defaultAxis)) {
           onAssistantAxisData(steeredAxis, defaultAxis);
         }
       }
@@ -500,7 +479,7 @@ export default function AssistantAxisChat({
                     steerMethod,
                   },
                   chartData,
-                  // Include raw axis data with pcValues and pcValuesPostCap
+                  // The readings the chart was drawn from, both pre- and post-cap
                   assistantAxis: {
                     steered: rawSteeredAxis,
                     default: rawDefaultAxis,
@@ -825,8 +804,8 @@ export default function AssistantAxisChat({
                 </button>
                 {(() => {
                   const hasPostCapData =
-                    rawSteeredAxis?.turns?.some((t) => t.pcValuesPostCap) ||
-                    rawDefaultAxis?.turns?.some((t) => t.pcValuesPostCap);
+                    rawSteeredAxis?.turns?.some((t) => t.valuePostCap !== null && t.valuePostCap !== undefined) ||
+                    rawDefaultAxis?.turns?.some((t) => t.valuePostCap !== null && t.valuePostCap !== undefined);
                   return (
                     <button
                       type="button"

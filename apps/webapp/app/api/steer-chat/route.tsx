@@ -17,6 +17,7 @@ import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
 import { InferenceServerError, steerCompletionChat } from '@/lib/utils/inference';
 import { labelReadouts, personaAxisToVectorRead, type PersonaAxisDefinition } from '@/lib/utils/persona-axis';
 import {
+  ASSISTANT_AXIS_ID,
   ChatMessage,
   ERROR_STEER_MAX_PROMPT_CHARS,
   STEER_FREQUENCY_PENALTY,
@@ -61,11 +62,12 @@ const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 // store changes shape -- otherwise rows written under the old semantics keep being served as hits.
 const STEERING_VERSION = 2;
 
-// What the deprecated `isAssistantAxis: true` asks for. Readouts are named now, so the flag is one
-// particular name; it stays accepted because `/api/*` has callers outside this repo.
-const ASSISTANT_AXIS_ID = 'lu_assistant-axis';
-
-/** The axis ids a request asks for, honouring the deprecated boolean. */
+/**
+ * The axis ids a request asks for, honouring the deprecated boolean.
+ *
+ * `isAssistantAxis: true` asks for one particular name now that readouts are named. It stays
+ * accepted because `/api/*` has callers outside this repo.
+ */
 function requestedAxisIds(body: { axes?: string[] | undefined; isAssistantAxis?: boolean | undefined }): string[] {
   if (body.axes && body.axes.length > 0) return body.axes;
   return body.isAssistantAxis ? [ASSISTANT_AXIS_ID] : [];

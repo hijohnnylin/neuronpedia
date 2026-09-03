@@ -1,26 +1,8 @@
-import { LegacyAssistantAxis } from '@/lib/utils/steer-axis-legacy';
+import { PublicAxisReadout } from '@/lib/utils/steer-axis-public';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-// Reads the deprecated `assistant_axis` view of the readouts, which /api/steer-chat still
-// returns. The `axes` field it derives that from is what a multi-axis chart wants.
-type PersonaCheckResult = LegacyAssistantAxis;
-
-// Color palette for PC lines (Steered)
-const PC_COLORS = [
-  '#1f77b4',
-  '#ff7f0e',
-  '#2ca02c',
-  '#d62728',
-  '#9467bd',
-  '#8c564b',
-  '#e377c2',
-  '#7f7f7f',
-  '#bcbd22',
-  '#17becf',
-  '#aec7e8',
-  '#ffbb78',
-];
-
+// The chart draws two lines, capped and default, for one axis.
+const STEERED_COLOR = '#1f77b4';
 // Color for Default lines (slate-400)
 const DEFAULT_COLOR = '#94a3b8';
 
@@ -41,32 +23,35 @@ export interface ChartData {
   nTurns: number;
 }
 
-// Transform persona-check data into chart data
-// Turn indices are offset by +1 so turn 0 is reserved for the initial "starting" dots
+// One readout becomes one line. Turn indices are offset by +1 so turn 0 is reserved for the
+// initial "starting" dots.
 export function buildChartData(
-  result: PersonaCheckResult,
+  readout: PublicAxisReadout,
   type: 'steered' | 'default' = 'steered',
   usePostCap: boolean = false,
 ): ChartData {
   // nTurns is +1 because turn 0 is the initial state
-  const nTurns = (result.turns?.length ?? 0) + 1;
+  const nTurns = (readout.turns?.length ?? 0) + 1;
 
-  const series = (result.pcTitles ?? []).map((pcTitle, pcIdx) => {
-    const color = type === 'steered' ? PC_COLORS[pcIdx % PC_COLORS.length] : DEFAULT_COLOR;
-    // Offset turnIndex by +1 so first message is at turn 1
-    const points = (result.turns ?? []).map((turn, idx) => {
-      // Use post-cap values if requested and available, otherwise fall back to pre-cap
-      const pcValues = usePostCap && turn.pcValuesPostCap ? turn.pcValuesPostCap : turn.pcValues;
-      return {
-        turnIndex: idx + 1,
-        similarity: pcValues?.[pcTitle] ?? 0,
-        snippet: turn.snippet ?? '',
-      };
-    });
-
-    const suffix = type === 'steered' ? 'Capped Llama' : 'Default Llama';
-    return { name: suffix, color, points };
+  // Offset turnIndex by +1 so first message is at turn 1
+  const points = (readout.turns ?? []).map((turn, idx) => {
+    // Use the post-cap reading if requested and the turn has one, otherwise the pre-cap reading
+    const value =
+      usePostCap && turn.valuePostCap !== null && turn.valuePostCap !== undefined ? turn.valuePostCap : turn.value;
+    return {
+      turnIndex: idx + 1,
+      similarity: value ?? 0,
+      snippet: turn.snippet ?? '',
+    };
   });
+
+  const series = [
+    {
+      name: type === 'steered' ? 'Capped Llama' : 'Default Llama',
+      color: type === 'steered' ? STEERED_COLOR : DEFAULT_COLOR,
+      points,
+    },
+  ];
 
   return { series, nTurns };
 }
@@ -588,7 +573,7 @@ export default function PersonaChart({
                     cx={xScale(0)}
                     cy={yScale(0)}
                     r={6}
-                    fill={PC_COLORS[0]}
+                    fill={STEERED_COLOR}
                     opacity={0.75}
                     style={{ pointerEvents: 'none' }}
                   >
@@ -602,12 +587,12 @@ export default function PersonaChart({
                   cy={yScale(0)}
                   r={9}
                   fill="none"
-                  stroke={PC_COLORS[0]}
+                  stroke={STEERED_COLOR}
                   strokeWidth={2}
                   className="opacity-0 transition-opacity group-hover:opacity-100"
                   style={{ pointerEvents: 'none' }}
                 />
-                <circle cx={xScale(0)} cy={yScale(0)} r={6} fill={PC_COLORS[0]} stroke="white" strokeWidth={2} />
+                <circle cx={xScale(0)} cy={yScale(0)} r={6} fill={STEERED_COLOR} stroke="white" strokeWidth={2} />
               </g>
             </>
           )}
@@ -801,8 +786,8 @@ export default function PersonaChart({
             </text>
           </g>
           <g transform="translate(28, 5)">
-            <line x1="0" y1="0" x2="16" y2="0" stroke={PC_COLORS[0]} strokeWidth={2} />
-            <circle cx="16" cy="0" r="3" fill={PC_COLORS[0]} stroke="white" strokeWidth={1} />
+            <line x1="0" y1="0" x2="16" y2="0" stroke={STEERED_COLOR} strokeWidth={2} />
+            <circle cx="16" cy="0" r="3" fill={STEERED_COLOR} stroke="white" strokeWidth={1} />
             <text x="24" y="0" fontSize={11} fill="#64748b" alignmentBaseline="middle">
               Capped
             </text>
