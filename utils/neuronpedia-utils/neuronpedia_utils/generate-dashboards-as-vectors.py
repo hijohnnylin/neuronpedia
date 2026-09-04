@@ -136,6 +136,13 @@ def main(
             help_text="[Model] Model Name: The TransformerLens name of the model to be used for the dashboard. Eg 'gemma-2-2b-it'. See https://transformerlensorg.github.io/TransformerLens/generated/model_properties_table.html",
         ),
     ],
+    model_layers: Annotated[
+        int,
+        make_option(
+            "--model-layers",
+            help_text="[Model] Model Layers: Total number of transformer layers in the backing model. Use the full model depth, not just the exported source-set coverage.",
+        ),
+    ],
     model_dtype: Annotated[
         str,
         make_option(
@@ -398,6 +405,7 @@ def main(
                     creatorNameShort=creator_name,
                     creatorName=creator_name,
                     creatorId=DEFAULT_CREATOR_ID,
+                    defaultSourceSetName=neuronpedia_source_set_id,
                     createdAt=created_at,
                 )
                 f.write(json.dumps(release.__dict__, default=datetime_handler) + "\n")
@@ -411,6 +419,9 @@ def main(
                     displayNameShort=model_name,
                     displayName=model_name,
                     creatorId=DEFAULT_CREATOR_ID,
+                    defaultSourceSetName=neuronpedia_source_set_id,
+                    defaultGraphSourceSetName=neuronpedia_source_set_id,
+                    layers=model_layers,
                     createdAt=created_at,
                     updatedAt=created_at,
                 )

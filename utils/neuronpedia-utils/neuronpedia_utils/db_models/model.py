@@ -14,6 +14,7 @@ class Model:
     dimension: Optional[int] = None
     visibility: str = "PUBLIC"
     defaultSourceSetName: Optional[str] = None
+    defaultGraphSourceSetName: Optional[str] = None
     defaultSourceId: Optional[str] = None
     inferenceEnabled: bool = True
     layers: int = 0

@@ -254,6 +254,11 @@ TRANSCODER_SET_TO_SOURCE_URL_ARRAYS = {
         "https://huggingface.co/mwhanna/gemma-scope-2-4b-it/transcoder_all/width_262k_l0_small_affine",
         "https://huggingface.co/google/gemma-scope-2-4b-it/transcoder_all",
     ],
+    "mwhanna/gemma-scope-2-4b-it/transcoder_all/width_16k_l0_small_affine": [
+        "https://neuronpedia.org/gemma-3-4b-it/gemmascope-2-transcoder-16k",
+        "https://huggingface.co/mwhanna/gemma-scope-2-4b-it/transcoder_all/width_16k_l0_small_affine",
+        "https://huggingface.co/google/gemma-scope-2-4b-it/transcoder_all",
+    ],
 }
 
 # HuggingFace model ID to the Neuronpedia model ID a graph is labelled with. Not TransformerLens'

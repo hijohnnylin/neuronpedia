@@ -8,18 +8,27 @@ const MAX_RANDOM_FEATURE = 10000;
 
 export default function RandomReleaseFeature({
   release,
+  releases,
   callback,
 }: {
-  release: SourceReleaseWithPartialRelations;
+  release?: SourceReleaseWithPartialRelations;
+  releases?: SourceReleaseWithPartialRelations[];
   callback?: () => void;
 }) {
   const router = useRouter();
   return (
     <Button
       onClick={() => {
+        const candidateReleases = release ? [release] : releases || [];
+        if (candidateReleases.length === 0) {
+          return;
+        }
+
+        const selectedRelease = candidateReleases[Math.floor(Math.random() * candidateReleases.length)];
+
         // pick a random sourceSet
-        if (release.sourceSets && release.sourceSets.length > 0) {
-          const sourceSet = release.sourceSets[Math.floor(Math.random() * release.sourceSets.length)];
+        if (selectedRelease.sourceSets && selectedRelease.sourceSets.length > 0) {
+          const sourceSet = selectedRelease.sourceSets[Math.floor(Math.random() * selectedRelease.sourceSets.length)];
           if (sourceSet && sourceSet.sources && sourceSet.sources.length > 0) {
             // pick a random source
             const source = sourceSet.sources[Math.floor(Math.random() * sourceSet.sources.length)];

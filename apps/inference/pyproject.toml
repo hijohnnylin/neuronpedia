@@ -28,7 +28,16 @@ dependencies = [
   # Read for each published artifact's vector.yaml manifest. Declared explicitly rather
   # than leaned on transitively (it arrives via several deps today).
   "pyyaml>=6.0",
-  "sae-lens>=6.30.0",
+  # Floor raised from >=6.30.0: 6.49.0 is the first release whose SAE directory carries the
+  # gemma-scope-2 Neuronpedia aliases this service reads. Checked release by release rather than
+  # against latest: 6.46.1, 6.47.0, 6.47.1 and 6.48.0 all still differ.
+  #
+  # KNOWN GAP: 6.49.0 restricted those aliases to sources neuronpedia.org actually serves, which
+  # dropped all 44 gemma-3-1b-it *transcoder* aliases. 4b-it and the 1b-it res sets are unaffected.
+  # So the two `.env.inference.gemma-3-1b-it.gemmascope-2-transcoder-*` configs resolve to zero
+  # SAEs against a released SAELens. Deliberate: a git dependency on a personal fork is the worse
+  # trade for this repo, and local work needing those sources supplies them another way.
+  "sae-lens>=6.49.0",
   "fastapi>=0.133.0,<0.137.0",
   "uvicorn>=0.34.0",
   "sentry-sdk[fastapi]>=2.24.1,<3",

@@ -15,7 +15,8 @@ import {
   INFERENCE_ACTIVATION_USER_ID_DO_NOT_INCLUDE_IN_PUBLIC_ACTIVATIONS,
   PUBLIC_ACTIVATIONS_USER_IDS,
 } from '@/lib/env';
-import { runInferenceActivationAll } from '@/lib/utils/inference';
+import { InferenceServerError, runInferenceActivationAll } from '@/lib/utils/inference';
+import { Prisma } from '@prisma/client';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 
@@ -23,6 +24,55 @@ import { NextResponse } from 'next/server';
 // export const maxDuration = 120;
 
 const NUMBER_TOP_RESULTS = 50;
+
+/**
+ * Run the search, and retry once without the sort indexes if inference rejects them.
+ *
+ * A saved search can outlive the source set it was made against, so a bookmarked URL can
+ * carry token indexes that no longer address anything. Inference answers that with a 5xx,
+ * which would otherwise surface as a dead search page rather than as the unsorted results
+ * the caller can still use. Returns the indexes actually used so the response and the cache
+ * write agree with what was run.
+ */
+async function runInferenceActivationAllWithSortFallback(
+  modelId: string,
+  sourceSetName: string,
+  text: string | string[],
+  numResults: number,
+  selectedLayers: string[],
+  sortIndexes: number[],
+  ignoreBos: boolean,
+  user: RequestOptionalUser['user'],
+): Promise<{
+  result: ActivationAllBatchResponse | ActivationAllResponse;
+  sortIndexes: number[];
+}> {
+  const run = (indexes: number[]) =>
+    runInferenceActivationAll(
+      modelId,
+      sourceSetName,
+      text,
+      numResults,
+      selectedLayers,
+      indexes,
+      ignoreBos,
+      user,
+    ) as Promise<ActivationAllBatchResponse | ActivationAllResponse>;
+
+  try {
+    return { result: await run(sortIndexes), sortIndexes };
+  } catch (error) {
+    // Only a server-side failure with indexes to drop is worth retrying. A 4xx means the
+    // request was wrong in some other way, and re-sending it without the sort would just
+    // fail again more slowly.
+    if (!(error instanceof InferenceServerError) || sortIndexes.length === 0 || error.status < 500) {
+      throw error;
+    }
+
+    console.warn('Retrying search-all without stale sort indexes:', sortIndexes, error.message);
+    return { result: await run([]), sortIndexes: [] };
+  }
+}
 const DEFAULT_DENSITY_THRESHOLD = -1;
 
 /**
@@ -134,8 +184,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
   const { modelId } = body;
   const selectedLayers = ((body.selectedLayers || []) as string[]).sort();
-  const sortIndexes = (body.sortIndexes as number[]).sort();
+  const requestedSortIndexes = ((body.sortIndexes || []) as number[]).sort();
   const sourceSetName = body.sourceSet;
+  // What the search actually ran with, which the fallback above may narrow to [].
+  let effectiveSortIndexes = requestedSortIndexes;
 
   const numResults = body.numResults || NUMBER_TOP_RESULTS;
   if (numResults < 1) {
@@ -155,16 +207,17 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
   // if it's a batch search, we don't need to check savedSearch or fetch the feature
   if (Array.isArray(body.text)) {
-    const resultsBatch = (await runInferenceActivationAll(
+    const { result: batchResult, sortIndexes: batchSortIndexes } = await runInferenceActivationAllWithSortFallback(
       modelId,
       sourceSetName,
       body.text,
       numResults,
       selectedLayers,
-      sortIndexes,
+      requestedSortIndexes,
       body.ignoreBos,
       request.user,
-    )) as ActivationAllBatchResponse;
+    );
+    const resultsBatch = batchResult as ActivationAllBatchResponse;
 
     const batchResults: InferenceActivationAllResponse[] = [];
     resultsBatch.results.forEach((promptSearchAllResult) => {
@@ -182,7 +235,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           dfaTargetIndex: activation.dfaTargetIndex ?? undefined,
           dfaMaxValue: activation.dfaMaxValue ?? undefined,
         })),
-        sortIndexes,
+        sortIndexes: batchSortIndexes,
       };
       batchResults.push(result);
     });
@@ -196,7 +249,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         modelId,
         query: body.text,
         selectedLayers,
-        sortByIndexes: sortIndexes,
+        sortByIndexes: requestedSortIndexes,
         sourceSet: sourceSetName,
         ignoreBos: body.ignoreBos,
         numResults,
@@ -270,16 +323,19 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     });
   } else {
     console.log('no saved search found');
-    const result: ActivationAllResponse = (await runInferenceActivationAll(
-      modelId,
-      sourceSetName,
-      body.text,
-      numResults,
-      selectedLayers,
-      sortIndexes,
-      body.ignoreBos,
-      request.user,
-    )) as ActivationAllResponse;
+    const { result: inferenceResult, sortIndexes: usedSortIndexes } =
+      await runInferenceActivationAllWithSortFallback(
+        modelId,
+        sourceSetName,
+        body.text,
+        numResults,
+        selectedLayers,
+        requestedSortIndexes,
+        body.ignoreBos,
+        request.user,
+      );
+    const result = inferenceResult as ActivationAllResponse;
+    effectiveSortIndexes = usedSortIndexes;
 
     console.log('got activations: ', result.activations.length);
     console.log('got tokens: ', result.tokens.length);
@@ -323,8 +379,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         return;
       }
       if (
-        (sortIndexes.length === 0 && activation.maxValue > 0) ||
-        (sortIndexes.length > 0 && activation.sumValues != null && activation.sumValues > 0)
+        (effectiveSortIndexes.length === 0 && activation.maxValue > 0) ||
+        (effectiveSortIndexes.length > 0 && activation.sumValues != null && activation.sumValues > 0)
       ) {
         searchResults.push({
           modelId,
@@ -346,7 +402,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     tokens,
 
     result: searchResults,
-    sortIndexes,
+    sortIndexes: effectiveSortIndexes,
   };
 
   // if not a cached retrieval, make savedsearch
@@ -421,44 +477,56 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     if (DEMO_MODE) {
       console.log('skipping saved search creation in demo mode');
     } else {
-      const savedSearch = await prisma.savedSearch.create({
-        data: {
-          modelId,
-          query: body.text,
-          selectedLayers,
-          sortByIndexes: sortIndexes,
+      // The cache lookup above keyed on the REQUESTED indexes; this writes the EFFECTIVE
+      // ones. When the fallback narrows them to [], that row may already exist from an
+      // earlier unsorted search of the same text, so the unique constraint can fire on a
+      // path the lookup could not have predicted. The search itself already succeeded, and
+      // the cache is an optimization, so a duplicate is a skip rather than a failure.
+      try {
+        const savedSearch = await prisma.savedSearch.create({
+          data: {
+            modelId,
+            query: body.text,
+            selectedLayers,
+            sortByIndexes: effectiveSortIndexes,
 
-          tokens,
+            tokens,
 
-          userId: userIdForSearch,
-          sourceSet: sourceSetName,
-          ignoreBos: body.ignoreBos,
-          numResults,
-          densityThreshold,
-        },
-      });
-
-      console.log('savedSearchCreated');
-
-      // create the connections
-      const toConnectNew: {
-        savedSearchId: string;
-        activationId: string;
-        order: number;
-      }[] = [];
-
-      matchingActIds.forEach((item, i) => {
-        toConnectNew.push({
-          order: i,
-          savedSearchId: savedSearch.id,
-          activationId: item.id,
+            userId: userIdForSearch,
+            sourceSet: sourceSetName,
+            ignoreBos: body.ignoreBos,
+            numResults,
+            densityThreshold,
+          },
         });
-      });
 
-      await prisma.savedSearchActivation.createMany({
-        data: toConnectNew,
-      });
-      console.log(`connections created: ${toConnectNew.length}`);
+        console.log('savedSearchCreated');
+
+        // create the connections
+        const toConnectNew: {
+          savedSearchId: string;
+          activationId: string;
+          order: number;
+        }[] = [];
+
+        matchingActIds.forEach((item, i) => {
+          toConnectNew.push({
+            order: i,
+            savedSearchId: savedSearch.id,
+            activationId: item.id,
+          });
+        });
+
+        await prisma.savedSearchActivation.createMany({
+          data: toConnectNew,
+        });
+        console.log(`connections created: ${toConnectNew.length}`);
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+          throw error;
+        }
+        console.warn('Skipping duplicate savedSearch cache write for search-all fallback');
+      }
     }
   }
 
