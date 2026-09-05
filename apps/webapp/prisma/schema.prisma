@@ -369,6 +369,16 @@ model Model {
 
   tlensId      String?
   openRouterId String?
+  // The HuggingFace repo id this model corresponds to, when it has one. Null is a real answer, not
+  // a gap to backfill: a model supplied locally is not on the Hub, and still gets a Neuronpedia id,
+  // a URL and sources like any other row. Postgres does not collide nulls in a unique index, so any
+  // number of rows may be null while every non-null value stays distinct.
+  //
+  // Unique, so a repo id resolves to one model and the lookup by it can return a single row. Note
+  // this is a rule about what a model row *is*, not one about weights: a row names the weights it
+  // serves, so a variant that runs a different repo's weights against these SAEs is its own row
+  // with its own repo id, and never a second row pointing here.
+  hfRepoId     String? @unique
   dimension    Int?
   thinking     Boolean @default(false)
 
