@@ -34,7 +34,7 @@ through a tracing context this endpoint never enters, so steering never worked t
 """
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import torch
 from transformers import LogitsProcessor, LogitsProcessorList
@@ -74,12 +74,17 @@ class _TransformerLensSampling(LogitsProcessor):
         self.temperature = temperature
         self.freq_penalty = freq_penalty
 
-    def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.Tensor:
-        scores = scores / self.temperature
+    # Returns `FloatTensor` because `LogitsProcessor.__call__` declares it and an override cannot
+    # widen a return type. The casts are what that costs: `FloatTensor` is a legacy per-dtype alias
+    # and no torch operation is annotated as producing one, so every expression below types as
+    # plain `Tensor`. Parameters stay `Tensor`, which is allowed -- accepting more than the base
+    # promises is safe, and `input_ids` is integral rather than float anyway.
+    def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.FloatTensor:
+        scaled = scores / self.temperature
         if self.freq_penalty <= 0:
-            return scores
-        counts = torch.stack([torch.bincount(row, minlength=scores.shape[-1]) for row in input_ids])
-        return scores - self.freq_penalty * counts.to(scores.dtype)
+            return cast(torch.FloatTensor, scaled)
+        counts = torch.stack([torch.bincount(row, minlength=scaled.shape[-1]) for row in input_ids])
+        return cast(torch.FloatTensor, scaled - self.freq_penalty * counts.to(scaled.dtype))
 
 
 class _SequenceCollector(BaseStreamer):
