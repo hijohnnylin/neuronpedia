@@ -60,6 +60,25 @@ export const getModelById = async (modelId: string, user?: AuthenticatedUser | n
   return model;
 };
 
+// The reverse of the model id in the URL: given what HuggingFace calls a model, find ours.
+//
+// `findFirst` rather than `findUnique` because the access clause is an extra condition, which
+// `findUnique` does not accept. `hfRepoId` is unique in the schema, so this is still at most one
+// row -- a caller who cannot see it gets null, the same as an unknown repo.
+export const getModelByHfRepoId = async (hfRepoId: string, user?: AuthenticatedUser | null) =>
+  prisma.model.findFirst({
+    where: {
+      hfRepoId,
+      ...userCanAccessClause(user, AllowUnlistedFor.EVERYONE),
+    },
+  });
+
+// Whichever model claims this repo, visibility ignored. For deciding whether a write would collide
+// with the unique index, never for serving to a user: a PRIVATE model still occupies the repo id,
+// and `getModelByHfRepoId` would not see it.
+export const getModelByHfRepoIdIgnoringAccess = async (hfRepoId: string) =>
+  prisma.model.findUnique({ where: { hfRepoId } });
+
 // sometimes transformerlens model IDs do not match our model IDs, so we need to replace them
 export const getTransformerLensModelIdIfExists = async (modelId: string) => {
   const model = await getModelById(modelId);
@@ -112,6 +131,7 @@ export const createModelAdmin = async (
   layers: number,
   owner: string,
   user: AuthenticatedUser,
+  hfRepoId?: string | null,
 ) =>
   prisma.model.create({
     data: {
@@ -123,5 +143,6 @@ export const createModelAdmin = async (
       layers,
       neuronsPerLayer: 0,
       owner,
+      hfRepoId: hfRepoId ?? null,
     },
   });

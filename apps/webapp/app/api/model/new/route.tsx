@@ -1,4 +1,5 @@
-import { createModel, getModelById } from '@/lib/db/model';
+import { createModel, getModelByHfRepoIdIgnoringAccess, getModelById } from '@/lib/db/model';
+import { HF_REPO_ID_ERROR_MESSAGE, MAX_HF_REPO_ID_CHARS, isValidHfRepoId } from '@/lib/utils/model';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { Visibility } from '@prisma/client';
 import { NextResponse } from 'next/server';
@@ -50,6 +51,12 @@ import * as yup from 'yup';
  *                 nullable: true
  *                 description: Optional URL for the model's website or documentation
  *                 example: "https://huggingface.co/gpt2"
+ *               hfRepoId:
+ *                 type: string
+ *                 nullable: true
+ *                 pattern: '^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$'
+ *                 description: The HuggingFace repo this model corresponds to, as `namespace/name`. Case-sensitive, and unique across models. Omit it for a model that is not on the Hub.
+ *                 example: "openai-community/gpt2"
  *     responses:
  *       200:
  *         description: Model created successfully
@@ -79,6 +86,8 @@ import * as yup from 'yup';
  *                   description: Field path that caused the validation error (if applicable)
  *       401:
  *         description: Unauthorized - authentication required
+ *       409:
+ *         description: Conflict - the given hfRepoId is already mapped to another model
  *       500:
  *         description: Internal server error
  */
@@ -98,6 +107,13 @@ const NewModelRequestSchema = yup.object({
   layers: yup.number().required().integer().min(1).max(127, 'Layers must be an integer less than 128'),
   displayName: yup.string().optional().min(1).max(64, 'Display name must be less than 64 characters'),
   url: yup.string().optional().nullable().url('Must be a valid URL'),
+  // Not lowercased, unlike `id`: repo ids are case-sensitive on the Hub (`google/gemma-4-E2B`).
+  hfRepoId: yup
+    .string()
+    .optional()
+    .nullable()
+    .max(MAX_HF_REPO_ID_CHARS)
+    .test('hf-repo-id', HF_REPO_ID_ERROR_MESSAGE, (value) => !value || isValidHfRepoId(value)),
 });
 
 export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
@@ -119,6 +135,19 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     return NextResponse.json({ error: 'Model already exists' }, { status: 400 });
   }
 
+  const hfRepoId = validatedRequest.hfRepoId?.trim() || null;
+  if (hfRepoId) {
+    // Checked here so a duplicate reads as a conflict rather than surfacing as a 500 from the
+    // unique index. Racy by nature, which is why the index exists as well.
+    const modelWithRepo = await getModelByHfRepoIdIgnoringAccess(hfRepoId);
+    if (modelWithRepo) {
+      return NextResponse.json(
+        { error: `HuggingFace repo ${hfRepoId} is already mapped to model ${modelWithRepo.id}` },
+        { status: 409 },
+      );
+    }
+  }
+
   const model = {
     id: validatedRequest.id,
     creatorId: request.user.id,
@@ -130,6 +159,7 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     instruct: false,
     tlensId: null,
     openRouterId: null,
+    hfRepoId,
     inferenceEnabled: false,
     dimension: null,
     defaultSourceId: null,

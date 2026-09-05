@@ -80,7 +80,7 @@ export const ListsOnActivationsScalarFieldEnumSchema = z.enum(['activationId','l
 
 export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier','token','expires']);
 
-export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','openRouterId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','defaultGraphSourceSetName','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
+export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','openRouterId','hfRepoId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','defaultGraphSourceSetName','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
 
 export const ModelHeadMetricsScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','selfAttentionScore','prevTokenScore','patternEntropy','qkDistance','qkDistanceVariance','inductionScore','qkDistanceHistogram','topQueryTokens','topKeyTokens','activationHistogram','headStatistics','createdAt','updatedAt']);
 
@@ -1264,6 +1264,7 @@ export const ModelSchema = z.object({
   creatorId: z.string(),
   tlensId: z.string().nullable(),
   openRouterId: z.string().nullable(),
+  hfRepoId: z.string().nullable(),
   dimension: z.number().int().nullable(),
   thinking: z.boolean(),
   defaultSourceSetName: z.string().nullable(),

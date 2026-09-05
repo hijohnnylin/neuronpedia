@@ -30,6 +30,7 @@ from neuronpedia_graph.chat_prompt import (
     strip_leading_bos,
     unsteerable_token_positions,
 )
+from neuronpedia_graph.model_ids import hf_model_id_to_np_model_id
 from neuronpedia_graph.runtime_env import get_device, get_model_dtype, get_model_engine
 from neuronpedia_graph.schemas import (
     CheckBusyResponse,
@@ -256,15 +257,10 @@ TRANSCODER_SET_TO_SOURCE_URL_ARRAYS = {
     ],
 }
 
-# HuggingFace model ID to the Neuronpedia model ID a graph is labelled with. Not TransformerLens'
-# list, despite the name it used to carry -- every engine loads these. `build_model` raises a
-# KeyError on an unlisted one, which is why the startup error below quotes the list.
-HF_MODEL_ID_TO_NP_MODEL_ID = {
-    "google/gemma-2-2b": "gemma-2-2b",
-    "google/gemma-3-4b-it": "gemma-3-4b-it",
-    "meta-llama/Llama-3.2-1B": "llama3.1-8b",
-    "Qwen/Qwen3-4B": "qwen3-4b",
-}
+
+# HuggingFace repo id -> the Neuronpedia model id a graph is labelled with. See model_ids.py; it
+# is reversed from np_model_to_hf.json rather than hand-kept here, which is what the dict this
+# replaced got wrong.
 
 
 def _circuit_tracer_version() -> str:
@@ -397,9 +393,19 @@ async def lifespan(_app: FastAPI):
     if not model_id_env:
         raise ValueError(
             "MODEL_ID is required. Pass --model_id, or set MODEL_ID. Models a graph can be labelled "
-            "with: " + ", ".join(HF_MODEL_ID_TO_NP_MODEL_ID.keys())
+            "with: " + ", ".join(sorted(hf_model_id_to_np_model_id()))
         )
     loaded_model_arg = model_id_env
+
+    # Refuse here rather than at build_model. The circuit-tracer path labels a graph with this, and
+    # an unlisted model used to raise a KeyError only once attribution had finished -- minutes of
+    # GPU work spent on a pod that was never going to be able to return a graph. The lm-saes-crm
+    # path is exempt because it labels from NP_MODEL_ID and never reads this map.
+    if ATTRIBUTION_ENGINE != "lm-saes-crm" and loaded_model_arg not in hf_model_id_to_np_model_id():
+        raise ValueError(
+            f"No Neuronpedia model id for MODEL_ID '{loaded_model_arg}'. Add it to "
+            "np_model_to_hf.json at the repo root. Known: " + ", ".join(sorted(hf_model_id_to_np_model_id()))
+        )
 
     device = get_device()
     model_dtype = get_model_dtype()
@@ -956,7 +962,7 @@ async def generate_graph(req_data: GraphGenerationRequest):
                 _used_nodes,
                 _used_edges,
                 slug_identifier,
-                HF_MODEL_ID_TO_NP_MODEL_ID[requested_model_id],
+                hf_model_id_to_np_model_id()[requested_model_id],
                 node_threshold,
                 tokenizer,
             )

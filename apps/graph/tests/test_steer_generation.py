@@ -36,6 +36,7 @@ def hf_model() -> GPT2LMHeadModel:
     model = GPT2LMHeadModel(config).eval()
     # An untrained model emits token ids uniformly, so it would hit EOS partway through and every
     # length below would depend on the seed. No EOS means every run reaches `max_new_tokens`.
+    assert model.generation_config is not None, "GPT2LMHeadModel should build a generation config"
     model.generation_config.eos_token_id = None
     return model
 
@@ -78,6 +79,11 @@ class FakeInterpEngineModel:
             output_logits=True,
             **kwargs,
         )
+        # `generate` returns bare ids unless `return_dict_in_generate` is set, which it is above.
+        # Asserting it rather than casting keeps the test honest: if that keyword ever stops being
+        # forwarded, this fails here instead of reading attributes off a tensor.
+        assert not isinstance(output, torch.Tensor), "expected a GenerateOutput, not bare token ids"
+        assert output.logits is not None, "output_logits=True should populate logits"
         self.sequences = output.sequences
         return "the continuation, as text", torch.cat(output.logits, dim=0), None
 
