@@ -737,7 +737,7 @@ wheels = [
 
 [[package]]
 name = "interp-engine"
-version = "1.3.3"
+version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "einops" },
@@ -745,9 +745,9 @@ dependencies = [
     { name = "torch" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/18/f82b334ef3c81de79eab7423ad273ecd7a1e110f0117b74a96c92b5e9601/interp_engine-1.3.3.tar.gz", hash = "sha256:948fdc71db9119efc484619487d8224c9309e71d05687d3696612d5cc65f3b26", size = 777436, upload-time = "2026-08-21T00:02:39.338Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/1e/d8077a96701c53e62c7818c1bc011f6ac490050acbc3db11c07b8fb0a272/interp_engine-1.6.0.tar.gz", hash = "sha256:08952ed57cdc8756c61cee777cd6a1ad51c86db75e561fae42d01f76ab7f97d5", size = 874118, upload-time = "2026-09-04T18:37:33.168Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cf/21/1b9ecf9485042acf50914323bf3e19a94bdac2496fc2ae21b8f3970a8a5b/interp_engine-1.3.3-py3-none-any.whl", hash = "sha256:8f61b28844ec559a1eae8d3bb41951de4c27e002484163515be7bdb3976830f9", size = 377787, upload-time = "2026-08-21T00:02:37.609Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/ce/59a0615d7cbb2f35060f234372326a6d2b8d26a0065762b2d173f12da946/interp_engine-1.6.0-py3-none-any.whl", hash = "sha256:75e16251b04d44f27e1165edad4b00e32d1e0a838f55476febca2134cd8f7237", size = 439787, upload-time = "2026-09-04T18:37:31.441Z" },
 ]
 
 [[package]]
@@ -1183,7 +1183,7 @@ requires-dist = [
     { name = "circuit-tracer", extras = ["interp-engine"], marker = "extra == 'circuit-tracer'", git = "https://github.com/decoderesearch/circuit-tracer.git?rev=3f0965b6701f96ca498128c7226cb3e13d3c0d5e" },
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "hf-transfer", specifier = ">=0.1.9,<0.2" },
-    { name = "interp-engine", specifier = "==1.3.3" },
+    { name = "interp-engine", specifier = "==1.6.0" },
     { name = "llamascopium", marker = "extra == 'crm'", git = "https://github.com/OpenMOSS/Language-Model-SAEs.git?rev=cfd202b18b22007f3a293670b7bbac972bd62093" },
     { name = "psutil", specifier = ">=7.0,<8" },
     { name = "pydantic", specifier = ">=2.11.4" },
