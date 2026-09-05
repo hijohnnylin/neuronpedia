@@ -46,7 +46,10 @@ dependencies = [
   # 1.3.0 renamed the vllm-freeze backend to vllm-static and split generation-only out as
   # vllm-generate; freeze_points/frozen_points became static_points. See AGENT_INTEGRATION.md
   # in the engine repo. This service's call sites moved with it in the same commit.
-  "interp-engine[vllm,quant]==1.3.3",
+  # 1.6.0 is additive on the surface this service calls: speed and memory work (half the
+  # static-buffer VRAM on vllm-static), per-model point fixes for Gemma 4, and a new
+  # `interp_engine.memory` sizer nothing here imports yet.
+  "interp-engine[vllm,quant]==1.6.0",
 ]
 
 [dependency-groups]

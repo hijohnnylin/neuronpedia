@@ -23,7 +23,7 @@ dependencies = [
     # the vendored sglang stack. The vLLM version pin lives in the engine.
     # Pinned exactly, not floored: the engine is first-party and moves in lockstep with this
     # service, so a relock for an unrelated dependency must not swap it. Bump deliberately.
-    "interp-engine[vllm]==1.3.3",
+    "interp-engine[vllm]==1.6.0",
     # Weight-only quantization for the source model and reconstructor backbone
     # (--fp8-source / --fp8-reconstructor / --int4-reconstructor). Used to arrive
     # transitively through `sglang[all]` (which pinned torchao==0.9.0); with sglang

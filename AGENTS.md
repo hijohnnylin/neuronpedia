@@ -107,7 +107,7 @@ live here at `interp-engine/`; it is now its own repository,
 with its own tests, docs, lint gates and release process. Its comparison harness against
 TransformerLens, nnsight, vLLM and SGLang went with it.
 
-Each of the three apps pins an **exact version** (`interp-engine[...]==1.3.3`) in its
+Each of the three apps pins an **exact version** (`interp-engine[...]==1.6.0`) in its
 `pyproject.toml`. Exact rather than floored because the engine is first-party and moves in lockstep
 with these services: a relock for some unrelated dependency must not silently swap the code that
 serves every activation.
