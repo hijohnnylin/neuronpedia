@@ -107,7 +107,7 @@
     "mdast-util-toc": "^7.1.0",
     "mjml": "^5.0.0-alpha.6",
     "ms": "^2.1.3",
-    "next": "15.5.23",
+    "next": "15.5.25",
     "next-auth": "^4.22.1",
     "next-mdx-remote": "^6.0.0",
     "next-swagger-doc": "^0.4.0",
