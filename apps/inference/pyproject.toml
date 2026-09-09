@@ -49,7 +49,10 @@ dependencies = [
   # 1.6.0 is additive on the surface this service calls: speed and memory work (half the
   # static-buffer VRAM on vllm-static), per-model point fixes for Gemma 4, and a new
   # `interp_engine.memory` sizer nothing here imports yet.
-  "interp-engine[vllm,quant]==1.6.0",
+  # 1.7.0 adds GLM-4 to the fused gate/up table, which is what lets mlp_pre and
+  # mlp_pre_linear serve on that family. Nothing else in the package changed, and no
+  # model served here is affected.
+  "interp-engine[vllm,quant]==1.7.0",
 ]
 
 [dependency-groups]
