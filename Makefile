@@ -264,8 +264,13 @@ autointerp-openapi: ## Autointerp: rewrite apps/autointerp/openapi.json from the
 
 # -------------------------------------------------------------------- graph --
 
-graph-install: ## Graph: install dependencies
-	cd apps/graph && uv sync $(call engine_relink,graph)
+# One extra per attribution backend, sharing no code, so a bare `uv sync` installs neither and
+# `graph-dev` dies importing the one `start.py` defaults to. Install that one; pick the other
+# with `make graph-install GRAPH_BACKEND=crm`.
+GRAPH_BACKEND ?= circuit-tracer
+
+graph-install: ## Graph: install dependencies. Options: GRAPH_BACKEND=circuit-tracer|crm
+	cd apps/graph && uv sync --extra $(GRAPH_BACKEND) $(call engine_relink,graph)
 
 graph-dev: ## Graph: run on port 5004. Options: AUTORELOAD=1
 	$(call engine_banner,graph)
