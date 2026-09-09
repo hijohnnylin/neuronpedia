@@ -1134,7 +1134,7 @@ wheels = [
 
 [[package]]
 name = "interp-engine"
-version = "1.6.0"
+version = "1.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "einops" },
@@ -1144,9 +1144,9 @@ dependencies = [
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'darwin'" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/42/1e/d8077a96701c53e62c7818c1bc011f6ac490050acbc3db11c07b8fb0a272/interp_engine-1.6.0.tar.gz", hash = "sha256:08952ed57cdc8756c61cee777cd6a1ad51c86db75e561fae42d01f76ab7f97d5", size = 874118, upload-time = "2026-09-04T18:37:33.168Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/84/6ca029d7321fb7e6c9cfce25add6178ad5e4a4fb5f18728bca45ef0814f1/interp_engine-1.7.0.tar.gz", hash = "sha256:41a05c5eb8be5af186687e4d713cc9348699e691d6f01abc93acf5a7ab1d7218", size = 874573, upload-time = "2026-09-09T03:10:54.674Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/ce/59a0615d7cbb2f35060f234372326a6d2b8d26a0065762b2d173f12da946/interp_engine-1.6.0-py3-none-any.whl", hash = "sha256:75e16251b04d44f27e1165edad4b00e32d1e0a838f55476febca2134cd8f7237", size = 439787, upload-time = "2026-09-04T18:37:31.441Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/77/759ed44fa0630346b3e019d31ce1d87324e024529ccb5b15f338076cb036/interp_engine-1.7.0-py3-none-any.whl", hash = "sha256:0a4150e3483b8a686aca2250a3a8c2e8e30c8a167c2088e5854a6232e1fce375", size = 439821, upload-time = "2026-09-09T03:10:53.24Z" },
 ]
 
 [package.optional-dependencies]
@@ -1634,7 +1634,7 @@ requires-dist = [
     { name = "accelerate", specifier = ">=1.13.0" },
     { name = "fastapi" },
     { name = "huggingface-hub" },
-    { name = "interp-engine", extras = ["vllm"], specifier = "==1.6.0" },
+    { name = "interp-engine", extras = ["vllm"], specifier = "==1.7.0" },
     { name = "numpy" },
     { name = "orjson" },
     { name = "python-dotenv" },
