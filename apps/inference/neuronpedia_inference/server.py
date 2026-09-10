@@ -97,6 +97,7 @@ from neuronpedia_inference.shared import (  # noqa: F401
     STR_TO_DTYPE,
     Model,
     RecoverableOutOfMemory,
+    RequestBusy,
     RequestTooLarge,
     configure_budget,
     configure_limiter,
@@ -1337,6 +1338,21 @@ def _replay_receive(receive: Any, body: bytes, first: Any = None) -> Any:
 app.add_middleware(SecretKeyMiddleware)
 app.add_middleware(CheckModelMiddleware)
 app.add_middleware(CudaHealthMiddleware)
+
+
+@app.exception_handler(RequestBusy)
+async def request_busy_handler(request: Request, exc: RequestBusy):  # noqa: ARG001
+    """The client asked to be refused rather than queued, and there was no room.
+
+    Handled here rather than per endpoint because ``with_request_lock`` raises it from outside
+    the handler, so the handler's own ``except`` cannot see it. The lens endpoint takes its own
+    slot inline and answers this shape itself; keep the two the same, since one client reads
+    both.
+    """
+    return JSONResponse(
+        status_code=429,
+        content={"error": "Server is busy with another request", "busy": True},
+    )
 
 
 @app.exception_handler(RequestTooLarge)

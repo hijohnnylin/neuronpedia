@@ -219,22 +219,57 @@ describe('steerCompletion host selection', () => {
     expect(attempts).toHaveLength(2);
   });
 
-  it('waits on a host that is merely slow, rather than hopping off it', async () => {
-    // Steer has no fail-fast, so silence means "queued behind a generation" far more often
-    // than "wedged". Hopping would abandon a pod that was about to answer.
-    let respond: (() => void) | undefined;
+  it('asks the first pass to refuse rather than queue', async () => {
+    respondWith([async () => new Response('data: {}\n\n', { status: 200 })]);
+
+    await runSteer();
+
+    expect(attempts[0].body.failIfBusy).toBe(true);
+  });
+
+  it('gives up on a silent host at the deadline and tries the next', async () => {
     respondWith([
-      async () =>
-        new Promise<Response>((resolve) => {
-          respond = () => resolve(new Response('data: {}\n\n', { status: 200 }));
-        }),
+      async (_attempt, signal) => silent(signal),
+      async () => new Response('data: {}\n\n', { status: 200 }),
     ]);
 
     const pending = runSteer();
+    await vi.advanceTimersByTimeAsync(HEADERS_TIMEOUT_MS + 1);
+    await pending;
+
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1].url).toBe('https://b/v1/steer/completion');
+  });
+
+  it('queues on a busy host rather than failing when every host declined', async () => {
+    // Every pod refusing means the fleet is occupied, not broken. Steer generations are long
+    // enough that queueing is normal, so this pass is what keeps a busy fleet working.
+    respondWith([
+      async () => new Response('{"busy": true}', { status: 429 }),
+      async () => new Response('{"busy": true}', { status: 429 }),
+      async () => new Response('data: {}\n\n', { status: 200 }),
+    ]);
+
+    await runSteer();
+
+    expect(attempts).toHaveLength(3);
+    expect(attempts[2].url).toBe('https://a/v1/steer/completion');
+    expect(attempts[2].body.failIfBusy).toBe(false);
+  });
+
+  it('does not bound the queueing attempt, which is meant to wait', async () => {
+    respondWith([
+      async () => new Response('{"busy": true}', { status: 429 }),
+      async () => new Response('{"busy": true}', { status: 429 }),
+      async (_attempt, signal) => silent(signal),
+    ]);
+
+    const pending = runSteer();
+    pending.catch(() => {}); // nothing should reject; asserted below
     await vi.advanceTimersByTimeAsync(HEADERS_TIMEOUT_MS * 20);
 
-    expect(attempts).toHaveLength(1);
-    respond?.();
-    await expect(pending).resolves.toBeDefined();
+    expect(attempts).toHaveLength(3);
+    // No signal at all, with no caller signal to combine: nothing can cut this attempt short.
+    expect(attempts[2].signal ?? null).toBeNull();
   });
 });

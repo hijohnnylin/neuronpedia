@@ -227,21 +227,6 @@ async function postInferenceStreaming<P extends keyof paths>(
 }
 
 /**
- * The steer endpoints carry no headers deadline, deliberately.
- *
- * They have no `failIfBusy`, so a pod holding its headers is almost always queueing behind a
- * healthy generation rather than wedged — the two are indistinguishable from here. Hopping off
- * at a deadline would therefore fire mostly on pods that were about to serve us, spending the
- * route's budget probing and, on a pod that cannot yet notice we left, orphaning a full
- * generation each time. Waiting is the better guess, and `maxDuration` is the backstop.
- *
- * So steer fails over on hard failures only, which is unambiguous and is what it was missing.
- * Give the steer endpoints a fail-fast flag and this can become the jlens arrangement: a short
- * deadline in pass 1, and a queueing pass behind it.
- */
-const STEER_HEADERS_TIMEOUT_MS = 0;
-
-/**
  * Whether a failed response says anything about the host, or would fail the same everywhere.
  *
  * 404 counts, unlike in `computeFetch`: inference itself never returns one, so a 404 here is a
@@ -261,50 +246,77 @@ const rotate = (hosts: string[], offset: number) => hosts.map((_, i) => hosts[(i
 /**
  * Send to each candidate in turn until one answers, and return that response.
  *
- * A 2xx or a deterministic 4xx comes back immediately. Anything that describes the host's own
- * condition, and anything thrown — a refused connection, or no headers before the caller's
- * deadline if it set one — moves to the next. The last failure is returned (or thrown) once the
- * candidates run out, so the caller still sees a real upstream status rather than a synthetic
- * one.
+ * Two passes. Pass 1 asks every host to refuse rather than queue (`failIfBusy`), so an occupied
+ * or memory-starved pod costs milliseconds and the next one gets a turn. A 2xx or a deterministic
+ * 4xx comes back straight away; a 429, a 5xx, a 404 from a dead pod's gateway, or anything thrown
+ * moves on.
  *
- * There is no queueing pass behind this, unlike `lensPromptStream`. Every reason to move on here
- * is a host that answered wrongly or not at all, and going back to wait on one of those would
- * only fail again more slowly.
+ * Pass 2 exists because pass 1 refuses far more readily than it fails. Once every host has
+ * declined, the fleet is busy rather than broken, so we go back and queue on the most promising
+ * one — which is what the request would have done all along. Without it a short deadline turns a
+ * request that used to wait and succeed into an outright failure.
+ *
+ * `send` therefore takes the flag rather than closing over it, since the same host is asked twice
+ * with different answers wanted. Anything the caller wants bounded in pass 1 must be unbounded in
+ * pass 2: that attempt is meant to wait.
  */
 const streamWithFailover = async (
   hosts: string[],
-  send: (host: string) => Promise<Response>,
+  send: (host: string, failIfBusy: boolean) => Promise<Response>,
   callerSignal?: AbortSignal,
+  label = 'request',
 ): Promise<Response> => {
   let lastResponse: Response | null = null;
   let lastError: unknown = null;
+  let firstBusyHost: string | null = null;
+  // A host that went quiet is still a better bet than one that refused the connection:
+  // something is listening there.
+  let firstSilentHost: string | null = null;
 
   for (let i = 0; i < hosts.length; i += 1) {
+    const remaining = hosts.length - i - 1;
     try {
       // eslint-disable-next-line no-await-in-loop
-      const response = await send(hosts[i]);
+      const response = await send(hosts[i], true);
+      if (response.status === 429) {
+        firstBusyHost ??= hosts[i];
+        // Free the connection, since we are moving on.
+        void response.body?.cancel();
+        continue;
+      }
       if (!shouldTryAnotherHost(response.status)) {
         void lastResponse?.body?.cancel();
         return response;
       }
       void lastResponse?.body?.cancel();
       lastResponse = response;
-      console.warn(`[inference] ${hosts[i]} -> ${response.status}; ${hosts.length - i - 1} host(s) remaining`);
+      console.warn(`[inference] ${hosts[i]} -> ${response.status}; ${remaining} host(s) remaining`);
     } catch (error) {
       // The client has gone, so no other host would have anyone to answer.
       if (callerSignal?.aborted) {
         throw error;
       }
+      if (isTimeoutAbort(error)) {
+        firstSilentHost ??= hosts[i];
+      }
       lastError = error;
       const why = isTimeoutAbort(error) ? 'sent no headers in time' : `threw: ${error}`;
-      console.warn(`[inference] ${hosts[i]} ${why}; ${hosts.length - i - 1} host(s) remaining`);
+      console.warn(`[inference] ${hosts[i]} ${why}; ${remaining} host(s) remaining`);
     }
+  }
+
+  // Prefer a host that answered 429: it is demonstrably healthy and merely occupied. Neither it
+  // nor a quiet host is worth less than one that hard-failed, which would only fail again.
+  const queueHost = firstBusyHost ?? firstSilentHost;
+  if (queueHost !== null) {
+    void lastResponse?.body?.cancel();
+    return send(queueHost, false);
   }
 
   if (lastResponse) {
     return lastResponse;
   }
-  throw lastError instanceof Error ? lastError : new Error('All inference servers failed');
+  throw lastError instanceof Error ? lastError : new Error(`All inference servers failed for the ${label}`);
 };
 
 export type InferenceActivationResultMultiple = {
@@ -663,37 +675,43 @@ export const steerCompletion = async (
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
-  const response = await streamWithFailover(hosts, (host) =>
-    postInferenceStreaming(
-      host,
-      '/v1/steer/completion',
-      {
-        types: steerTypesToRun.map((type) =>
-          type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED,
-        ),
-        prompt,
-        model: transformerLensModelId,
-        features: hasVector
-          ? undefined
-          : steerFeatures.map((feature) => ({
-              model: feature.modelId,
-              source: feature.layer,
-              index: feature.index,
-              strength: feature.strength,
-            })),
-        vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
-        strengthMultiplier,
-        nCompletionTokens: n_tokens,
-        temperature,
-        freqPenalty: freq_penalty,
-        seed,
-        steerMethod,
-        normalizeSteering: false,
-        stream,
-        nLogprobs: n_logprobs,
-      },
-      { headersTimeoutMs: STEER_HEADERS_TIMEOUT_MS },
-    ),
+  const response = await streamWithFailover(
+    hosts,
+    (host, failIfBusy) =>
+      postInferenceStreaming(
+        host,
+        '/v1/steer/completion',
+        {
+          types: steerTypesToRun.map((type) =>
+            type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED,
+          ),
+          prompt,
+          model: transformerLensModelId,
+          features: hasVector
+            ? undefined
+            : steerFeatures.map((feature) => ({
+                model: feature.modelId,
+                source: feature.layer,
+                index: feature.index,
+                strength: feature.strength,
+              })),
+          vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
+          strengthMultiplier,
+          nCompletionTokens: n_tokens,
+          temperature,
+          freqPenalty: freq_penalty,
+          seed,
+          steerMethod,
+          normalizeSteering: false,
+          stream,
+          nLogprobs: n_logprobs,
+          failIfBusy,
+        },
+        // Pass 2 asks to queue, so it must be allowed to wait for its turn.
+        { headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
+      ),
+    undefined,
+    'steer completion',
   );
   await throwIfInferenceError(response);
   if (!response.body) {
@@ -763,37 +781,43 @@ export const steerCompletionChat = async (
       // costs a retry rather than the whole completion.
       const candidates = rotate(hosts, type === SteerOutputType.DEFAULT ? 0 : 1);
       console.log(`completion chat - sending ${type} to ${candidates[0]}`);
-      return streamWithFailover(candidates, (host) =>
-        postInferenceStreaming(
-          host,
-          '/v1/steer/completion-chat',
-          {
-            types: [type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED],
-            prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
-            model: transformerLensModelId,
-            features: hasVector
-              ? undefined
-              : steerFeatures.map((feature) => ({
-                  model: feature.modelId,
-                  source: feature.layer,
-                  index: feature.index,
-                  strength: feature.strength,
-                })),
-            vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
-            strengthMultiplier,
-            nCompletionTokens: nTokens,
-            temperature,
-            freqPenalty,
-            seed,
-            steerSpecialTokens,
-            steerMethod,
-            normalizeSteering: false,
-            stream: true,
-            nLogprobs: n_logprobs,
-            reads,
-          },
-          { headersTimeoutMs: STEER_HEADERS_TIMEOUT_MS },
-        ),
+      return streamWithFailover(
+        candidates,
+        (host, failIfBusy) =>
+          postInferenceStreaming(
+            host,
+            '/v1/steer/completion-chat',
+            {
+              types: [type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED],
+              prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
+              model: transformerLensModelId,
+              features: hasVector
+                ? undefined
+                : steerFeatures.map((feature) => ({
+                    model: feature.modelId,
+                    source: feature.layer,
+                    index: feature.index,
+                    strength: feature.strength,
+                  })),
+              vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
+              strengthMultiplier,
+              nCompletionTokens: nTokens,
+              temperature,
+              freqPenalty,
+              seed,
+              steerSpecialTokens,
+              steerMethod,
+              normalizeSteering: false,
+              stream: true,
+              nLogprobs: n_logprobs,
+              reads,
+              failIfBusy,
+            },
+            // Pass 2 asks to queue, so it must be allowed to wait for its turn.
+            { headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
+          ),
+        undefined,
+        'steer chat completion',
       );
     });
     const responses = await Promise.all(toRunPromises);
@@ -837,6 +861,8 @@ export const steerCompletionChat = async (
             reads,
             // This path collects whole responses; the SSE variant is lensPromptStream's job.
             stream: false,
+            // No failover on this path, so queueing is the only way to be served.
+            failIfBusy: false,
           },
         }),
       );
@@ -870,6 +896,8 @@ export const steerCompletionChat = async (
             reads,
             // This path collects whole responses; the SSE variant is lensPromptStream's job.
             stream: false,
+            // No failover on this path, so queueing is the only way to be served.
+            failIfBusy: false,
           },
         }),
       );
@@ -1035,83 +1063,17 @@ export const lensPromptStream = async (
     throw new Error('No server host found');
   }
 
-  const sendRequest = (host: string, failIfBusy: boolean) =>
-    postInferenceStreaming(
-      host,
-      '/v1/lens/prompt',
-      { ...request, model: transformerLensModelId, stream: true, failIfBusy },
-      // Pass 2 asks to queue, so it must be allowed to wait for its turn.
-      { signal, headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
-    );
-
-  let lastErrorResponse: Response | null = null;
-  let lastError: unknown = null;
-  let firstBusyHost: string | null = null;
-  // A host that went quiet is still a better bet for pass 2 than one that refused the
-  // connection: something is listening there. Without this, an 8s deadline that catches every
-  // host turns a request that used to queue and succeed into an outright failure.
-  let firstSilentHost: string | null = null;
-
-  // Pass 1: try each host, skipping any that report busy (429) or hard-fail
-  // (connection error / 5xx / 404). Return on the first success or deterministic
-  // client error (other 4xx).
-  for (let i = 0; i < hosts.length; i += 1) {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      const response = await sendRequest(hosts[i], true);
-      if (response.status === 429) {
-        if (firstBusyHost === null) {
-          firstBusyHost = hosts[i];
-        }
-        // Free the connection since we're moving on to the next host.
-        void response.body?.cancel();
-
-        continue;
-      }
-      // A 404 means this host is unavailable (e.g. the instance went down and
-      // its proxy/gateway returns "Not Found"), not a deterministic client
-      // error — so fall through and try the next host, like a 5xx.
-      if (response.status === 404) {
-        void lastErrorResponse?.body?.cancel();
-        lastErrorResponse = response;
-
-        continue;
-      }
-      // Success, or a deterministic client error (other 4xx) that won't differ
-      // across hosts — return either way. 5xx (and 404 above) fall through to
-      // try another host.
-      if (response.ok || (response.status >= 400 && response.status < 500)) {
-        return response;
-      }
-      void lastErrorResponse?.body?.cancel();
-      lastErrorResponse = response;
-    } catch (error) {
-      // A caller who has gone away is not a host fault, and there is nobody left to serve.
-      if (signal?.aborted) {
-        throw error;
-      }
-      // Network/connection error, or no headers in time; try the next one.
-      if (isTimeoutAbort(error) && firstSilentHost === null) {
-        firstSilentHost = hosts[i];
-      }
-      lastError = error;
-    }
-  }
-
-  // Pass 2: every host was busy, silent, or hard-failed. If any of them was reachable, fall
-  // back to queueing on it (fail_if_busy=false) so the request is still served rather than
-  // rejected. Prefer a host that answered 429 — it is demonstrably healthy and merely occupied
-  // — over one that went quiet, and neither over a host that hard-failed (e.g. 404 because it
-  // is down), which would only fail again.
-  const queueHost = firstBusyHost ?? firstSilentHost;
-  if (queueHost !== null) {
-    void lastErrorResponse?.body?.cancel();
-    return sendRequest(queueHost, false);
-  }
-
-  // Every host hard-failed (no busy responses): surface the last failure.
-  if (lastErrorResponse) {
-    return lastErrorResponse;
-  }
-  throw lastError instanceof Error ? lastError : new Error('All inference servers failed for the lens request');
+  return streamWithFailover(
+    hosts,
+    (host, failIfBusy) =>
+      postInferenceStreaming(
+        host,
+        '/v1/lens/prompt',
+        { ...request, model: transformerLensModelId, stream: true, failIfBusy },
+        // Pass 2 asks to queue, so it must be allowed to wait for its turn.
+        { signal, headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
+      ),
+    signal,
+    'lens request',
+  );
 };
