@@ -20,14 +20,19 @@ import { userCanAccessModelAndSourceSet } from './userCanAccess';
  * Sized to the work, not to taste: building an attribution graph is minutes of
  * GPU time, an NLA pass is seconds. A caller with a tighter or looser bound
  * should pass `timeoutMs` rather than moving these.
+ *
+ * Only the services that actually reach `computeFetch` are listed. Inference does not — it
+ * streams, so it resolves a URL and fetches directly — and an entry for it here read as though
+ * jlens and steering were covered by a 60s cap when nothing bounded them at all. Their
+ * deadlines live beside those calls, in `lib/utils/inference.ts`.
  */
-const ATTEMPT_TIMEOUT_MS: Record<ComputeService, number> = {
+const ATTEMPT_TIMEOUT_MS: Partial<Record<ComputeService, number>> = {
   [ComputeService.GRAPH]: 300_000,
-  [ComputeService.AUTOINTERP]: 120_000,
   [ComputeService.NLA]: 90_000,
-  [ComputeService.INFERENCE]: 60_000,
-  [ComputeService.SPARSITY]: 60_000,
 };
+
+/** For a service with no entry above, i.e. one that has just acquired its first caller. */
+const DEFAULT_ATTEMPT_TIMEOUT_MS = 60_000;
 
 // Resolution is a join across three or four tables and the answer rarely
 // changes, so hold it briefly per serverless instance.
@@ -205,19 +210,6 @@ export async function resolveHost(target: ResolveTarget): Promise<string> {
 }
 
 /**
- * Two distinct hosts, for callers that run a pair of requests concurrently
- * (steering runs a default and a steered completion side by side). Falls back
- * to the same host twice when only one is registered.
- */
-export async function resolveTwoHosts(target: ResolveTarget): Promise<[string, string]> {
-  const hosts = await resolveHosts(target);
-  if (hosts.length === 0) {
-    throw new NoComputeHostError(target);
-  }
-  return hosts.length === 1 ? [hosts[0], hosts[0]] : [hosts[0], hosts[1]];
-}
-
-/**
  * Whether a failed request says anything about the host.
  *
  * A 422 for a malformed body means the same on every host, so retrying is both
@@ -255,7 +247,11 @@ export async function computeFetch(
     throw new NoComputeHostError(target);
   }
 
-  const { timeoutMs = ATTEMPT_TIMEOUT_MS[target.service], signal: callerSignal, ...rest } = init;
+  const {
+    timeoutMs = ATTEMPT_TIMEOUT_MS[target.service] ?? DEFAULT_ATTEMPT_TIMEOUT_MS,
+    signal: callerSignal,
+    ...rest
+  } = init;
   const fetchInit: RequestInit = { ...rest, headers: computeHeaders(target.service, init.headers) };
 
   let lastResponse: Response | null = null;

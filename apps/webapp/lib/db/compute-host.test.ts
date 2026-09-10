@@ -19,8 +19,7 @@ vi.mock('../env', () => ({
   SPARSITY_SERVER_SECRET: '',
 }));
 
-// eslint-disable-next-line import/first
-import { computeFetch, resolveHosts, resolveTwoHosts } from './compute-host';
+import { computeFetch, resolveHosts } from './compute-host';
 
 const host = (hostUrl: string) => ({ hostUrl });
 
@@ -137,32 +136,6 @@ describe('resolveHosts', () => {
     await resolveHosts({ service: ComputeService.INFERENCE, modelId });
 
     expect(findMany).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('resolveTwoHosts', () => {
-  it('returns two distinct hosts when they exist', async () => {
-    findMany.mockResolvedValue([host('https://a'), host('https://b')]);
-
-    const [first, second] = await resolveTwoHosts({ service: ComputeService.INFERENCE, modelId: freshModel() });
-    expect(first).not.toEqual(second);
-  });
-
-  it('repeats the only host rather than failing', async () => {
-    findMany.mockResolvedValue([host('https://a')]);
-
-    expect(await resolveTwoHosts({ service: ComputeService.INFERENCE, modelId: freshModel() })).toEqual([
-      'https://a',
-      'https://a',
-    ]);
-  });
-
-  it('throws when nothing is registered', async () => {
-    findMany.mockResolvedValue([]);
-
-    await expect(resolveTwoHosts({ service: ComputeService.INFERENCE, modelId: freshModel() })).rejects.toThrow(
-      /No INFERENCE host available/,
-    );
   });
 });
 

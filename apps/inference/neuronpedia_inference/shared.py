@@ -23,7 +23,7 @@ REQUEST_LOCK_TIMEOUT = float(os.environ.get("REQUEST_LOCK_TIMEOUT", "300"))  # 5
 
 
 class RequestBusy(Exception):
-    """Raised when ``fail_if_busy`` is set and no slot is immediately available."""
+    """Raised when ``fail_if_busy`` is set and no slot, or no memory, is free right now."""
 
 
 class RequestTooLarge(Exception):
@@ -90,13 +90,24 @@ class VramBudget:
     def enabled(self) -> bool:
         return self._total > 0
 
-    async def acquire(self, nbytes: int, *, timeout: float = REQUEST_LOCK_TIMEOUT) -> int:
+    async def acquire(
+        self,
+        nbytes: int,
+        *,
+        timeout: float = REQUEST_LOCK_TIMEOUT,
+        fail_if_busy: bool = False,
+    ) -> int:
         """Claim ``nbytes``, waiting for room. Returns the amount actually claimed.
 
         Callers MUST pass the return value to :meth:`release` when done -- it is 0 when the
         budget is disabled, so releasing it is harmless either way. Prefer :meth:`reserve`
         unless the reservation has to outlive the calling frame (the streaming lens response
         holds one for the lifetime of its generator).
+
+        ``fail_if_busy`` raises :class:`RequestBusy` instead of waiting when there is no room
+        right now. A caller that can try another pod wants this: a free slot on a pod with no
+        memory to go with it still means "come back later", and the wait for room is the one
+        remaining place a fail-fast request can block for minutes.
 
         Raises :class:`RequestTooLarge` if it can never fit, or ``TimeoutError`` if it did
         not fit in time.
@@ -108,6 +119,8 @@ class VramBudget:
             raise RequestTooLarge(nbytes, self._total)
 
         async with self._condition:
+            if fail_if_busy and self._available < nbytes:
+                raise RequestBusy()
             has_room = self._condition.wait_for(lambda: self._available >= nbytes)
             if timeout and timeout > 0:
                 await asyncio.wait_for(has_room, timeout=timeout)

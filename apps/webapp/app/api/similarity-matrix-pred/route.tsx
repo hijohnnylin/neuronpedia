@@ -2,6 +2,7 @@ import { INFERENCE_BASE_PATH } from '@/lib/api/inference-types';
 import { resolveHost } from '@/lib/db/compute-host';
 import { getTransformerLensModelIdIfExists } from '@/lib/db/model';
 import { INFERENCE_SERVER_SECRET } from '@/lib/env';
+import { INFERENCE_REQUEST_TIMEOUT_MS } from '@/lib/utils/inference';
 import { withOptionalUser } from '@/lib/with-user';
 import { ComputeService } from '@prisma/client';
 import { NextResponse } from 'next/server';
@@ -62,6 +63,7 @@ export const POST = withOptionalUser(async (request) => {
         text,
       }),
       cache: 'no-cache',
+      signal: AbortSignal.timeout(INFERENCE_REQUEST_TIMEOUT_MS),
     });
 
     if (!resp.ok) {

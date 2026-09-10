@@ -52,6 +52,7 @@ from neuronpedia_inference.shared import (
     REQUEST_LOCK_TIMEOUT,
     STR_TO_DTYPE,
     Model,
+    RequestBusy,
     RequestTooLarge,
     budget,
     limiter,
@@ -2443,12 +2444,23 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
         n_capture_points=len({layer for layers in layers_by_type.values() for layer in layers}),
         n_streams=int(getattr(getattr(model, "residual_basis", None), "n_streams", 1) or 1),
     )
+    #
+    # `fail_if_busy` covers this wait too, and has to. The slot check above is instant, so
+    # without it a fail-fast request could still sit here for the full budget timeout -- and
+    # a client that asked to fail fast did so in order to try a different pod, which it can
+    # only do while it is still connected.
     try:
-        budget_claim = await budget.acquire(lens_bytes)
+        budget_claim = await budget.acquire(lens_bytes, fail_if_busy=request.fail_if_busy)
     except RequestTooLarge as exc:
         acquired.release()
         logger.error("[BUDGET] lens request rejected: %s", exc)
         return JSONResponse(content={"error": str(exc)}, status_code=400)
+    except RequestBusy:
+        acquired.release()
+        return JSONResponse(
+            content={"error": "Server has no free memory for another request", "busy": True},
+            status_code=429,
+        )
     except TimeoutError:
         acquired.release()
         logger.error("[BUDGET] Timeout waiting for VRAM on lens request")
@@ -2477,9 +2489,12 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
                 residual=residual_spec,
             ):
                 # Stop generating as soon as the client (or the proxy in front of
-                # it) goes away — e.g. the user pressed "Stop". Checked once per
-                # token; the `finally` below then releases the model lock so the
-                # next request isn't blocked behind an abandoned generation.
+                # it) goes away — e.g. the user pressed "Stop", or it timed out and
+                # moved to another pod. The `finally` below then releases the slot and
+                # the VRAM so the next request isn't blocked behind a dead one.
+                #
+                # This only answers truthfully while every middleware is pure ASGI; see
+                # the middleware section of server.py before adding one.
                 if await http_request.is_disconnected():
                     logger.info("[LENS] Client disconnected; aborting generation.")
                     break
