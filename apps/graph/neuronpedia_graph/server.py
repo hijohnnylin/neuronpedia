@@ -939,7 +939,7 @@ async def generate_graph(req_data: GraphGenerationRequest):
             attribution_time_ms = (time.time() - attribution_start) * 1000
             print(f"Thread {threading.get_ident()} (worker): Attribution Time: {attribution_time_ms:.2f}ms")
 
-            _graph.to("cuda")
+            _graph.to(get_device())
 
             _node_mask, _edge_mask, _cumulative_scores = (
                 el.cpu() for el in prune_graph(_graph, node_threshold, edge_threshold)
