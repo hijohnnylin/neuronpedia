@@ -5,15 +5,14 @@ import logging
 import os
 import time
 import traceback
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any
 
 import sentry_sdk
 import torch
 from dotenv import load_dotenv
-from fastapi import APIRouter, FastAPI, Request, Response
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from interp_engine import (
@@ -24,6 +23,8 @@ from interp_engine import (
     select_backend,
     to_address,
 )
+from starlette.datastructures import Headers
+from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 
 from neuronpedia_inference.args import parse_env_and_args
 from neuronpedia_inference.config import Config
@@ -96,6 +97,7 @@ from neuronpedia_inference.shared import (  # noqa: F401
     STR_TO_DTYPE,
     Model,
     RecoverableOutOfMemory,
+    RequestBusy,
     RequestTooLarge,
     configure_budget,
     configure_limiter,
@@ -609,8 +611,57 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add GZip compression middleware (only compresses if client sends Accept-Encoding: gzip)
-app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
+
+class _FlushingGZipResponder(GZipResponder):
+    """Push each streamed chunk out, instead of leaving it inside the compressor.
+
+    zlib buffers by design: writing a few KiB usually produces no output at all until its window
+    fills. Starlette never flushes, so the lens NDJSON stream reached the client in bursts of
+    roughly a dozen frames -- the tokens were computed one at a time and then arrived in clumps.
+
+    ``Z_SYNC_FLUSH`` ends the current deflate block and byte-aligns the output, which emits
+    everything written so far. The LZ77 history survives it, so later frames still compress
+    against earlier ones and only the block framing is paid twice.
+
+    Measured over 200 real-sized lens frames (11 KiB each): 1.6% more bytes and 2% more CPU,
+    against 182 of those 200 frames previously producing nothing at the moment they were written.
+    """
+
+    def apply_compression(self, body: bytes, *, more_body: bool) -> bytes:
+        self.gzip_file.write(body)
+        if more_body:
+            self.gzip_file.flush()
+        else:
+            self.gzip_file.close()
+
+        body = self.gzip_buffer.getvalue()
+        self.gzip_buffer.seek(0)
+        self.gzip_buffer.truncate()
+        return body
+
+
+class StreamingGZipMiddleware(GZipMiddleware):
+    """GZip that does not hold a streamed chunk back waiting for the next one.
+
+    Identical to Starlette's for a buffered response, including the ``minimum_size`` floor and
+    the excluded content types (SSE is never compressed).
+    """
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        responder: Any
+        if "gzip" in Headers(scope=scope).get("Accept-Encoding", ""):
+            responder = _FlushingGZipResponder(self.app, self.minimum_size, compresslevel=self.compresslevel)
+        else:
+            responder = IdentityResponder(self.app, self.minimum_size)
+        await responder(scope, receive, send)
+
+
+# Only compresses if the client sends Accept-Encoding: gzip.
+app.add_middleware(StreamingGZipMiddleware, minimum_size=1000, compresslevel=6)
 
 args = parse_env_and_args()
 
@@ -1142,61 +1193,166 @@ async def initialize(
     _log_ready_banner(time.monotonic() - startup_started_at)
 
 
-@app.middleware("http")
-async def check_secret_key(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-    if request.url.path in ("/health",):
-        return await call_next(request)
+# ---------------------------------------------------------------------------
+# Middleware
+#
+# Pure ASGI, and that is load-bearing rather than a matter of taste.
+#
+# These were `@app.middleware("http")`, which FastAPI implements as Starlette's
+# `BaseHTTPMiddleware`. That class hands the app below it a `receive` wrapped in an anyio task
+# group, and a task group inside an already-cancelled scope aborts before it can assign a
+# message. `Request.is_disconnected()` reads a message exactly that way -- one non-blocking
+# probe inside a cancelled scope -- so a single BaseHTTPMiddleware layer makes it answer False
+# forever. There were three, and the lens stream's per-batch disconnect check sat underneath
+# them: a client that hung up still got its whole generation computed, holding a request slot
+# and a VRAM reservation, written into a socket nobody was reading.
+#
+# Anything added here must stay pure ASGI for that check to keep working.
+# ---------------------------------------------------------------------------
 
-    config = Config.get_instance()
-    if config.secret is None:
-        return await call_next(request)
-    secret_key = request.headers.get("X-SECRET-KEY")
-    if not secret_key or secret_key != config.secret:
-        return JSONResponse(
-            status_code=401,
-            content={"error": "Invalid or missing X-SECRET-KEY header"},
-        )
-    return await call_next(request)
+
+class SecretKeyMiddleware:
+    """Reject a request without the shared secret, once the pod is configured with one."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http" or scope["path"] in ("/health",):
+            await self.app(scope, receive, send)
+            return
+
+        config = Config.get_instance()
+        if config.secret is not None:
+            secret_key = Headers(scope=scope).get("x-secret-key")
+            if not secret_key or secret_key != config.secret:
+                response = JSONResponse(
+                    status_code=401,
+                    content={"error": "Invalid or missing X-SECRET-KEY header"},
+                )
+                await response(scope, receive, send)
+                return
+
+        await self.app(scope, receive, send)
 
 
-@app.middleware("http")
-async def check_model(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+class CheckModelMiddleware:
     """Note, without rejecting, a request that names a model this pod did not load.
 
     A pod holds exactly one model, so the ``model`` field selects nothing and can only ever
     be a client-side assertion. It used to be enforced here, which meant a caller had to
     spell the id the way the alias expansion happened to produce it -- and pods are started
     for reasons that have nothing to do with the SAE directory those aliases come from.
+
+    The body is read here and replayed downstream, since a POST body can only be consumed
+    once. Replay delegates to the real ``receive`` after the body, which is what leaves
+    ``http.disconnect`` reachable by the endpoints.
     """
-    if request.method == "POST":
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http" or scope["method"] != "POST":
+            await self.app(scope, receive, send)
+            return
+
+        chunks: list[bytes] = []
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                # The client hung up before finishing the body; hand it straight down.
+                await self.app(scope, _replay_receive(receive, b"", first=message), send)
+                return
+            chunks.append(message.get("body", b""))
+            if not message.get("more_body", False):
+                break
+        body = b"".join(chunks)
+
         try:
-            body = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return await call_next(request)
-        if isinstance(body, dict) and body.get("model"):
-            Config.get_instance().check_requested_model(body["model"])
+            parsed = json.loads(body)
+        except (json.JSONDecodeError, ValueError, UnicodeDecodeError):
+            parsed = None
+        if isinstance(parsed, dict) and parsed.get("model"):
+            Config.get_instance().check_requested_model(parsed["model"])
 
-    return await call_next(request)
+        await self.app(scope, _replay_receive(receive, body), send)
 
 
-@app.middleware("http")
-async def log_and_check_cuda_error(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-    if not initialized:
-        error_details = f" Initialization error: {initialization_error}" if initialization_error else ""
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Server not initialized.{error_details}"},
-        )
-    logger.info("=== Request Info ===")
-    logger.info(f"URL: {request.url}")
+class CudaHealthMiddleware:
+    """Refuse traffic until startup finishes, and probe the CUDA context once a request ends.
 
-    response = await call_next(request)
+    The probe runs after the response body is complete, so for the streaming endpoints it now
+    covers the generation itself rather than only the work done before the first frame.
+    """
 
-    # Post-request CUDA health probe: if this request poisoned the CUDA context
-    # (device-side assert / illegal access / wedged post-OOM), terminate so the
-    # supervisor restarts us -- even if the endpoint swallowed the error into a 500.
-    probe_cuda_or_die(Config.get_instance().device)
-    return response
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if not initialized:
+            error_details = f" Initialization error: {initialization_error}" if initialization_error else ""
+            response = JSONResponse(
+                status_code=500,
+                content={"error": f"Server not initialized.{error_details}"},
+            )
+            await response(scope, receive, send)
+            return
+
+        logger.info("=== Request Info ===")
+        logger.info(f"URL: {scope['path']}")
+
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            # If this request poisoned the CUDA context (device-side assert / illegal access /
+            # wedged post-OOM), terminate so the supervisor restarts us -- even if the endpoint
+            # swallowed the error into a 500.
+            probe_cuda_or_die(Config.get_instance().device)
+
+
+def _replay_receive(receive: Any, body: bytes, first: Any = None) -> Any:
+    """A ``receive`` that yields ``body`` once, then defers to the real one.
+
+    Deferring rather than returning ``http.disconnect`` forever is the point: it is how
+    ``Request.is_disconnected()`` downstream still reaches uvicorn, which answers immediately
+    once the connection is gone.
+    """
+    replayed = False
+
+    async def wrapped() -> Any:
+        nonlocal replayed
+        if not replayed:
+            replayed = True
+            return first if first is not None else {"type": "http.request", "body": body, "more_body": False}
+        return await receive()
+
+    return wrapped
+
+
+# Registration order is nesting order: the last one added is the outermost. Kept as it was.
+app.add_middleware(SecretKeyMiddleware)
+app.add_middleware(CheckModelMiddleware)
+app.add_middleware(CudaHealthMiddleware)
+
+
+@app.exception_handler(RequestBusy)
+async def request_busy_handler(request: Request, exc: RequestBusy):  # noqa: ARG001
+    """The client asked to be refused rather than queued, and there was no room.
+
+    Handled here rather than per endpoint because ``with_request_lock`` raises it from outside
+    the handler, so the handler's own ``except`` cannot see it. The lens endpoint takes its own
+    slot inline and answers this shape itself; keep the two the same, since one client reads
+    both.
+    """
+    return JSONResponse(
+        status_code=429,
+        content={"error": "Server is busy with another request", "busy": True},
+    )
 
 
 @app.exception_handler(RequestTooLarge)

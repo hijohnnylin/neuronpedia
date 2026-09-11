@@ -14,7 +14,7 @@ from functools import wraps
 
 import pytest
 
-from neuronpedia_inference.shared import RequestTooLarge, VramBudget
+from neuronpedia_inference.shared import RequestBusy, RequestTooLarge, VramBudget
 
 GIB = 1024**3
 
@@ -167,6 +167,40 @@ async def test_waiting_for_memory_times_out_rather_than_hanging(
                 pass
 
     assert one_gib_budget.available_bytes == GIB
+
+
+@async_test
+async def test_failing_fast_refuses_instead_of_waiting_for_room(
+    one_gib_budget: VramBudget,
+):
+    """A client that asked to fail fast is going to try another pod, so it must not queue here.
+
+    The slot check ahead of this one is instant, so before ``fail_if_busy`` reached the budget
+    a fail-fast request could still sit for the full timeout -- long enough for the caller to
+    give up on every pod it knows.
+    """
+    async with one_gib_budget.reserve(GIB):
+        with pytest.raises(RequestBusy):
+            await one_gib_budget.acquire(GIB // 2, fail_if_busy=True)
+
+    assert one_gib_budget.available_bytes == GIB
+
+
+@async_test
+async def test_failing_fast_still_admits_a_request_that_fits(one_gib_budget: VramBudget):
+    async with one_gib_budget.reserve(GIB // 4):
+        claimed = await one_gib_budget.acquire(GIB // 4, fail_if_busy=True)
+        assert claimed == GIB // 4
+        await one_gib_budget.release(claimed)
+
+
+@async_test
+async def test_failing_fast_on_an_impossible_request_still_says_why(
+    one_gib_budget: VramBudget,
+):
+    """RequestTooLarge is a 400 and RequestBusy a 429, so the never/not-now split must hold."""
+    with pytest.raises(RequestTooLarge):
+        await one_gib_budget.acquire(4 * GIB, fail_if_busy=True)
 
 
 @async_test

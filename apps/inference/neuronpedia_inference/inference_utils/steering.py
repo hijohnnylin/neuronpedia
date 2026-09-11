@@ -1,11 +1,16 @@
+import logging
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 import torch
+from fastapi import Request
 
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.schemas import NPSteerFeature, NPSteerMethod, NPSteerVector
 from neuronpedia_inference.shared import limiter
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,27 @@ async def stream_lock(is_stream: bool):
             pass
 
     return DummyLock()
+
+
+async def stop_when_client_leaves(
+    frames: AsyncIterator[str],
+    http_request: Request,
+    label: str,
+) -> AsyncIterator[str]:
+    """Pass frames through, and stop generating once nobody is listening.
+
+    The webapp now abandons a pod that has not answered in time and tries another, so without
+    this a slow pod would finish the whole completion for a client that left -- holding a
+    request slot the retry then queues behind. Checked per frame, which is per token.
+
+    ``is_disconnected()`` only answers truthfully while every middleware is pure ASGI; see the
+    middleware section of ``server.py``.
+    """
+    async for frame in frames:
+        if await http_request.is_disconnected():
+            logger.info("[%s] Client disconnected; aborting generation.", label)
+            return
+        yield frame
 
 
 def format_sse_message(data: str) -> str:

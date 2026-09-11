@@ -324,6 +324,10 @@ class SteerCompletionRequest(BaseSchema):
         default=0,
         description="How many candidate tokens to report for each generated position. 0 asks for none. Backends that cannot report scores omit `logprobs` whatever this is set to.",
     )
+    fail_if_busy: bool = Field(
+        default=False,
+        description="Return HTTP 429 at once when no slot, or no memory, is free, instead of queueing for one. For a client with more than one server for this model, which would rather try the next one than wait. Defaults to false, which queues.",
+    )
 
 
 class SteerCompletionResponse(BaseSchema):
@@ -444,6 +448,10 @@ class SteerCompletionChatRequest(BaseSchema):
         ),
     )
     steer_special_tokens: StrictBool
+    fail_if_busy: bool = Field(
+        default=False,
+        description="Return HTTP 429 at once when no slot, or no memory, is free, instead of queueing for one. For a client with more than one server for this model, which would rather try the next one than wait. Defaults to false, which queues.",
+    )
 
 
 class SteerCompletionChatResponse(BaseSchema):

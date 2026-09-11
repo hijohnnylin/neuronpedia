@@ -23,7 +23,7 @@ REQUEST_LOCK_TIMEOUT = float(os.environ.get("REQUEST_LOCK_TIMEOUT", "300"))  # 5
 
 
 class RequestBusy(Exception):
-    """Raised when ``fail_if_busy`` is set and no slot is immediately available."""
+    """Raised when ``fail_if_busy`` is set and no slot, or no memory, is free right now."""
 
 
 class RequestTooLarge(Exception):
@@ -90,13 +90,24 @@ class VramBudget:
     def enabled(self) -> bool:
         return self._total > 0
 
-    async def acquire(self, nbytes: int, *, timeout: float = REQUEST_LOCK_TIMEOUT) -> int:
+    async def acquire(
+        self,
+        nbytes: int,
+        *,
+        timeout: float = REQUEST_LOCK_TIMEOUT,
+        fail_if_busy: bool = False,
+    ) -> int:
         """Claim ``nbytes``, waiting for room. Returns the amount actually claimed.
 
         Callers MUST pass the return value to :meth:`release` when done -- it is 0 when the
         budget is disabled, so releasing it is harmless either way. Prefer :meth:`reserve`
         unless the reservation has to outlive the calling frame (the streaming lens response
         holds one for the lifetime of its generator).
+
+        ``fail_if_busy`` raises :class:`RequestBusy` instead of waiting when there is no room
+        right now. A caller that can try another pod wants this: a free slot on a pod with no
+        memory to go with it still means "come back later", and the wait for room is the one
+        remaining place a fail-fast request can block for minutes.
 
         Raises :class:`RequestTooLarge` if it can never fit, or ``TimeoutError`` if it did
         not fit in time.
@@ -108,6 +119,8 @@ class VramBudget:
             raise RequestTooLarge(nbytes, self._total)
 
         async with self._condition:
+            if fail_if_busy and self._available < nbytes:
+                raise RequestBusy()
             has_room = self._condition.wait_for(lambda: self._available >= nbytes)
             if timeout and timeout > 0:
                 await asyncio.wait_for(has_room, timeout=timeout)
@@ -131,9 +144,9 @@ class VramBudget:
             self._condition.notify_all()
 
     @asynccontextmanager
-    async def reserve(self, nbytes: int, *, timeout: float = REQUEST_LOCK_TIMEOUT):
+    async def reserve(self, nbytes: int, *, timeout: float = REQUEST_LOCK_TIMEOUT, fail_if_busy: bool = False):
         """Hold ``nbytes`` of the budget for the duration of the block."""
-        claimed = await self.acquire(nbytes, timeout=timeout)
+        claimed = await self.acquire(nbytes, timeout=timeout, fail_if_busy=fail_if_busy)
         try:
             yield
         finally:
@@ -273,6 +286,16 @@ def _estimate_cost(cost, args, kwargs) -> int:  # type: ignore[no-untyped-def]
         return 0
 
 
+def _wants_fail_fast(args, kwargs) -> bool:  # type: ignore[no-untyped-def]
+    """Whether the handler's own request asked to be refused rather than queued.
+
+    Read off the request model like ``cost`` is, so an endpoint opts in by declaring the field
+    and nothing has to be passed at the decorator.
+    """
+    request = _handler_request(args, kwargs)
+    return bool(getattr(request, "fail_if_busy", False))
+
+
 def _estimate_sae_residency(args, kwargs) -> int:  # type: ignore[no-untyped-def]
     """Bytes of SAE weights the handler will need GPU-resident, when paging is on.
 
@@ -306,6 +329,11 @@ def with_request_lock(exclusive: bool = True, cost=None):  # type: ignore[no-unt
     measured budget (:class:`VramBudget`), so N concurrent requests can only be in flight
     when N of them actually fit. Omitting it keeps the old count-only admission.
 
+    A request carrying ``fail_if_busy`` is refused with :class:`RequestBusy` rather than
+    queued, at each of the three gates below. All three, because a client that fails over on
+    a refusal needs the refusal to be immediate: one gate left blocking is enough to hold the
+    connection for the full timeout and hide the other two.
+
     When SAE paging is on, every endpoint additionally reserves room for the SAE weights it
     will page in (:mod:`neuronpedia_inference.sae_cache`). That reservation is what makes
     eviction safe: it bounds the weights in use at any moment to the residency budget, so
@@ -315,14 +343,16 @@ def with_request_lock(exclusive: bool = True, cost=None):  # type: ignore[no-unt
     def decorator(func):  # type: ignore
         @wraps(func)
         async def wrapper(*args, **kwargs):  # type: ignore
+            fail_if_busy = _wants_fail_fast(args, kwargs)
             try:
                 async with (
-                    limiter.slot(exclusive=exclusive),
+                    limiter.slot(exclusive=exclusive, fail_if_busy=fail_if_busy),
                     sae_cache.reserve(
                         _estimate_sae_residency(args, kwargs),
                         timeout=REQUEST_LOCK_TIMEOUT,
+                        fail_if_busy=fail_if_busy,
                     ),
-                    budget.reserve(_estimate_cost(cost, args, kwargs)),
+                    budget.reserve(_estimate_cost(cost, args, kwargs), fail_if_busy=fail_if_busy),
                 ):
                     return await func(*args, **kwargs)
             except TimeoutError as exc:

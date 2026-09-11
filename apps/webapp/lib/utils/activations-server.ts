@@ -1,7 +1,7 @@
 import { resolveHost } from '@/lib/db/compute-host';
 import { getTransformerLensModelIdIfExists } from '@/lib/db/model';
 import { INFERENCE_SERVER_SECRET } from '@/lib/env';
-import { throwIfInferenceError } from '@/lib/utils/inference';
+import { INFERENCE_REQUEST_TIMEOUT_MS, throwIfInferenceError } from '@/lib/utils/inference';
 import { ComputeService } from '@prisma/client';
 
 export const ACTIVATION_RAW_MAX_PROMPT_CHAR_LENGTH = 8000;
@@ -64,6 +64,7 @@ export async function getRawActivations(request: ActivationRawRequest): Promise<
       type: request.type ?? 'final_output_token',
     }),
     cache: 'no-store',
+    signal: AbortSignal.timeout(INFERENCE_REQUEST_TIMEOUT_MS),
   });
   await throwIfInferenceError(response);
 

@@ -17,6 +17,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from fastapi import Request
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.steer.completion_chat import completion_chat
@@ -114,9 +115,14 @@ def _body(response: Any) -> dict[str, Any]:
     return json.loads(response.body)
 
 
+def _http_request() -> Request:
+    """The handler takes one so it can notice a client leaving mid-stream; these never stream."""
+    return Request({"type": "http", "method": "POST", "path": "/steer/completion-chat", "headers": []})
+
+
 def test_chat_over_the_token_limit_is_refused():
     over = "word " * (TOKEN_LIMIT * 2)
-    response = asyncio.run(completion_chat(_chat_request(over)))
+    response = asyncio.run(completion_chat(_chat_request(over), _http_request()))
 
     assert response.status_code == 400
     error = _body(response)["error"]
@@ -131,4 +137,4 @@ def test_chat_within_the_token_limit_clears_the_guard():
     happens to reject everything".
     """
     with pytest.raises(ValueError, match="only supports"):
-        asyncio.run(completion_chat(_chat_request("hello there")))
+        asyncio.run(completion_chat(_chat_request("hello there"), _http_request()))

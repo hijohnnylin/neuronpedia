@@ -23,7 +23,7 @@ import { NeuronPartial, NeuronPartialWithRelations } from '@/prisma/generated/zo
 import { ComputeService, SteerOutputType } from '@prisma/client';
 import * as Sentry from '@sentry/nextjs';
 import createClient from 'openapi-fetch';
-import { resolveHost, resolveHosts, resolveTwoHosts } from '../db/compute-host';
+import { NoComputeHostError, resolveHost, resolveHosts } from '../db/compute-host';
 import { INFERENCE_SERVER_SECRET } from '../env';
 import { LensPromptRequest } from './lens';
 import { NeuronIdentifier } from './neuron-identifier';
@@ -99,6 +99,38 @@ export const rethrowAsInferenceError = async (error: unknown): Promise<never> =>
   throw error;
 };
 
+/**
+ * How long a pod has to answer with response HEADERS before we give up on it.
+ *
+ * Not a limit on the work: a lens run is minutes of streaming, and this stops counting the
+ * moment the headers land. It bounds only the wait to find out whether a pod is going to serve
+ * us at all, which is what makes failover reachable — undici's default is 300s, longer than the
+ * route's own `maxDuration`, so before this a wedged pod took the whole request down with it
+ * and the remaining pods were never tried.
+ *
+ * 8s is short because every fast-fail path on the inference server is now genuinely fast:
+ * `failIfBusy` answers 429 without waiting for either a request slot or VRAM. So a pod that has
+ * sent nothing in 8s is not busy, it is wedged.
+ */
+const HEADERS_TIMEOUT_MS = 8_000;
+
+/**
+ * Whole-request ceiling for the calls that do not stream.
+ *
+ * These buffer the entire response, so there is no headers/body split to exploit and no
+ * partial result worth waiting for. Exported for the two hand-written fetches that have not
+ * moved to the typed client yet.
+ */
+export const INFERENCE_REQUEST_TIMEOUT_MS = 60_000;
+
+/** True when `error` is this module's own deadline rather than an abort from the caller. */
+const isTimeoutAbort = (error: unknown) => (error as { name?: string } | null)?.name === 'TimeoutError';
+
+const withDeadline = (timeoutMs: number, callerSignal?: AbortSignal | null): AbortSignal => {
+  const deadline = AbortSignal.timeout(timeoutMs);
+  return callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
+};
+
 // The /v1 prefix is part of the paths in the spec, so it is not in the base URL.
 export const makeInferenceServerApiWithServerHost = (serverHost: string) =>
   createClient<paths>({
@@ -107,6 +139,9 @@ export const makeInferenceServerApiWithServerHost = (serverHost: string) =>
       'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
       'Accept-Encoding': 'gzip',
     },
+    // openapi-fetch has no timeout of its own, so without this every non-streaming call
+    // inherits undici's 300s and hangs past whatever `maxDuration` the route declared.
+    fetch: (request: Request) => fetch(request, { signal: withDeadline(INFERENCE_REQUEST_TIMEOUT_MS, request.signal) }),
   });
 
 type InferenceResult<T> = { data?: T; error?: unknown; response: Response };
@@ -153,24 +188,156 @@ type InferenceRequestBody<P extends keyof paths> = paths[P] extends {
  * accepts either. Typing the body against `paths` closes that hole without touching how the
  * response is consumed.
  */
-function postInferenceStreaming<P extends keyof paths>(
+async function postInferenceStreaming<P extends keyof paths>(
   host: string,
   path: P,
   body: InferenceRequestBody<P>,
-  init?: { signal?: AbortSignal },
+  // `headersTimeoutMs` defaults to 0, meaning wait as long as it takes. Opt in only when the
+  // reply really does stream: a caller whose whole body lands at once gets its headers when the
+  // work is finished, so a deadline there measures how long the answer took and aborts every
+  // request slower than it. Not every caller of this helper streams — the attention endpoint
+  // uses it only because it is missing from the typed client.
+  init?: { signal?: AbortSignal; headersTimeoutMs?: number },
 ): Promise<Response> {
-  // `paths` keys already carry the /v1 prefix.
-  return fetch(`${host}${String(path)}`, {
-    method: 'POST',
-    cache: 'no-cache',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
-    },
-    body: JSON.stringify(body),
-    signal: init?.signal,
-  });
+  // The deadline covers only the wait for headers: `fetch` resolves as soon as they arrive, and
+  // the timer is cleared there, so the stream that follows runs for as long as it needs. Built
+  // from a controller rather than `AbortSignal.timeout` for exactly that reason — a timeout
+  // signal stays armed and would cut the body mid-generation.
+  const headersTimeoutMs = init?.headersTimeoutMs ?? 0;
+  const deadline = headersTimeoutMs > 0 ? new AbortController() : null;
+  const timer = deadline
+    ? setTimeout(
+        () => deadline.abort(new DOMException(`No response headers after ${headersTimeoutMs}ms`, 'TimeoutError')),
+        headersTimeoutMs,
+      )
+    : undefined;
+  const signals = [init?.signal, deadline?.signal].filter((signal) => signal !== undefined);
+
+  try {
+    // `paths` keys already carry the /v1 prefix.
+    return await fetch(`${host}${String(path)}`, {
+      method: 'POST',
+      cache: 'no-cache',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-SECRET-KEY': INFERENCE_SERVER_SECRET,
+      },
+      body: JSON.stringify(body),
+      signal: signals.length > 0 ? AbortSignal.any(signals) : undefined,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }
+
+/**
+ * Headers deadline for the streaming steer endpoints in pass 1. Off until the pods are rolled.
+ *
+ * A pod that predates `fail_if_busy` on steer ignores the field, so a saturated one queues
+ * silently instead of refusing. The deadline cannot tell that apart from a wedged pod, so it
+ * fires, pass 1 walks every host, and each abandoned attempt leaves a generation running on a
+ * server that cannot yet notice the client left — N+1 generations for one request, exactly when
+ * the fleet is already busy.
+ *
+ * Little is given up by waiting. Against an upgraded pod the 429 does the real work: busy is
+ * answered in milliseconds and pass 1 moves on. The deadline only adds the wedged-pod case, where
+ * a host accepts the connection and then never speaks, and the route's `maxDuration` still bounds
+ * that. So set this to HEADERS_TIMEOUT_MS once every pod serving steer honours the flag.
+ */
+const STEER_HEADERS_TIMEOUT_MS = 0;
+
+/**
+ * Whether a failed response says anything about the host, or would fail the same everywhere.
+ *
+ * 404 counts, unlike in `computeFetch`: inference itself never returns one, so a 404 here is a
+ * dead pod's gateway answering in its place.
+ */
+const shouldTryAnotherHost = (status: number) => status >= 500 || status === 408 || status === 429 || status === 404;
+
+/**
+ * Candidate hosts starting at `offset`, wrapping around.
+ *
+ * Steering runs a default and a steered completion at once, and wants them on different pods so
+ * they generate side by side rather than queueing behind each other. Giving each a rotation of
+ * the same list keeps that while leaving both a full set of fallbacks.
+ */
+const rotate = (hosts: string[], offset: number) => hosts.map((_, i) => hosts[(i + offset) % hosts.length]);
+
+/**
+ * Send to each candidate in turn until one answers, and return that response.
+ *
+ * Two passes. Pass 1 asks every host to refuse rather than queue (`failIfBusy`), so an occupied
+ * or memory-starved pod costs milliseconds and the next one gets a turn. A 2xx or a deterministic
+ * 4xx comes back straight away; a 429, a 5xx, a 404 from a dead pod's gateway, or anything thrown
+ * moves on.
+ *
+ * Pass 2 exists because pass 1 refuses far more readily than it fails. Once every host has
+ * declined, the fleet is busy rather than broken, so we go back and queue on the most promising
+ * one — which is what the request would have done all along. Without it a short deadline turns a
+ * request that used to wait and succeed into an outright failure.
+ *
+ * `send` therefore takes the flag rather than closing over it, since the same host is asked twice
+ * with different answers wanted. Anything the caller wants bounded in pass 1 must be unbounded in
+ * pass 2: that attempt is meant to wait.
+ */
+const streamWithFailover = async (
+  hosts: string[],
+  send: (host: string, failIfBusy: boolean) => Promise<Response>,
+  callerSignal?: AbortSignal,
+  label = 'request',
+): Promise<Response> => {
+  let lastResponse: Response | null = null;
+  let lastError: unknown = null;
+  let firstBusyHost: string | null = null;
+  // A host that went quiet is still a better bet than one that refused the connection:
+  // something is listening there.
+  let firstSilentHost: string | null = null;
+
+  for (let i = 0; i < hosts.length; i += 1) {
+    const remaining = hosts.length - i - 1;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const response = await send(hosts[i], true);
+      if (response.status === 429) {
+        firstBusyHost ??= hosts[i];
+        // Free the connection, since we are moving on.
+        void response.body?.cancel();
+        continue;
+      }
+      if (!shouldTryAnotherHost(response.status)) {
+        void lastResponse?.body?.cancel();
+        return response;
+      }
+      void lastResponse?.body?.cancel();
+      lastResponse = response;
+      console.warn(`[inference] ${hosts[i]} -> ${response.status}; ${remaining} host(s) remaining`);
+    } catch (error) {
+      // The client has gone, so no other host would have anyone to answer.
+      if (callerSignal?.aborted) {
+        throw error;
+      }
+      if (isTimeoutAbort(error)) {
+        firstSilentHost ??= hosts[i];
+      }
+      lastError = error;
+      const why = isTimeoutAbort(error) ? 'sent no headers in time' : `threw: ${error}`;
+      console.warn(`[inference] ${hosts[i]} ${why}; ${remaining} host(s) remaining`);
+    }
+  }
+
+  // Prefer a host that answered 429: it is demonstrably healthy and merely occupied. Neither it
+  // nor a quiet host is worth less than one that hard-failed, which would only fail again.
+  const queueHost = firstBusyHost ?? firstSilentHost;
+  if (queueHost !== null) {
+    void lastResponse?.body?.cancel();
+    return send(queueHost, false);
+  }
+
+  if (lastResponse) {
+    return lastResponse;
+  }
+  throw lastError instanceof Error ? lastError : new Error(`All inference servers failed for the ${label}`);
+};
 
 export type InferenceActivationResultMultiple = {
   tokens: string[];
@@ -496,7 +663,8 @@ export const runInferenceActivationAll = async (
   );
 };
 
-// TODO: steerCompletion should also support parallel inference with two servers
+// TODO: steerCompletion should also run its two completions on two servers, the way
+// steerCompletionChat does. It already fails over across every host it knows.
 export const steerCompletion = async (
   modelId: string,
   steerTypesToRun: SteerOutputType[],
@@ -517,39 +685,64 @@ export const steerCompletion = async (
   const firstFeatureLayer = steerFeatures[0].layer;
 
   // Vectors need no SAE loaded, so any host serving the model will do.
-  const serverHost = await resolveHost(
-    hasVector
-      ? inferenceTarget(modelId)
-      : inferenceTarget(modelId, { sourceSetName: getSourceSetNameFromSource(firstFeatureLayer), user }),
-  );
+  const target = hasVector
+    ? inferenceTarget(modelId)
+    : inferenceTarget(modelId, { sourceSetName: getSourceSetNameFromSource(firstFeatureLayer), user });
+  const hosts = await resolveHosts(target);
+  if (hosts.length === 0) {
+    throw new NoComputeHostError(target);
+  }
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
-  const response = await postInferenceStreaming(serverHost, '/v1/steer/completion', {
-    types: steerTypesToRun.map((type) =>
-      type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED,
-    ),
-    prompt,
-    model: transformerLensModelId,
-    features: hasVector
-      ? undefined
-      : steerFeatures.map((feature) => ({
-          model: feature.modelId,
-          source: feature.layer,
-          index: feature.index,
-          strength: feature.strength,
-        })),
-    vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
-    strengthMultiplier,
-    nCompletionTokens: n_tokens,
-    temperature,
-    freqPenalty: freq_penalty,
-    seed,
-    steerMethod,
-    normalizeSteering: false,
-    stream,
-    nLogprobs: n_logprobs,
-  });
+  // A non-streamed completion sends no headers until the whole generation is done, so "no
+  // headers yet" says nothing about the host and a headers deadline would fire on every
+  // completion longer than the deadline. Bound the call as a whole instead, like the other
+  // non-streaming inference calls. `failIfBusy` still gives pass 1 its fast refusal, which is
+  // what the deadline was standing in for.
+  const wholeCallDeadline = stream ? undefined : AbortSignal.timeout(INFERENCE_REQUEST_TIMEOUT_MS);
+
+  const response = await streamWithFailover(
+    hosts,
+    (host, failIfBusy) =>
+      postInferenceStreaming(
+        host,
+        '/v1/steer/completion',
+        {
+          types: steerTypesToRun.map((type) =>
+            type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED,
+          ),
+          prompt,
+          model: transformerLensModelId,
+          features: hasVector
+            ? undefined
+            : steerFeatures.map((feature) => ({
+                model: feature.modelId,
+                source: feature.layer,
+                index: feature.index,
+                strength: feature.strength,
+              })),
+          vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
+          strengthMultiplier,
+          nCompletionTokens: n_tokens,
+          temperature,
+          freqPenalty: freq_penalty,
+          seed,
+          steerMethod,
+          normalizeSteering: false,
+          stream,
+          nLogprobs: n_logprobs,
+          failIfBusy,
+        },
+        // Pass 2 asks to queue, so it must be allowed to wait for its turn.
+        {
+          signal: wholeCallDeadline,
+          headersTimeoutMs: stream && failIfBusy ? STEER_HEADERS_TIMEOUT_MS : 0,
+        },
+      ),
+    wholeCallDeadline,
+    'steer completion',
+  );
   await throwIfInferenceError(response);
   if (!response.body) {
     throw new Error('No response body');
@@ -589,13 +782,16 @@ export const steerCompletionChat = async (
   const startTime = new Date().getTime();
 
   // A read projects a vector, and vectors need no SAE loaded, so in every case but the last any host
-  // serving the model will do. The pair runs the default and steered completions concurrently,
-  // and collapses to one host when only one is registered.
-  const [serverHostDefault, serverHostSteered] = await resolveTwoHosts(
+  // serving the model will do.
+  const target =
     reads.length > 0 || hasVector || steerFeatures.length === 0
       ? inferenceTarget(modelId)
-      : inferenceTarget(modelId, { sourceSetName: getSourceSetNameFromSource(steerFeatures[0].layer), user }),
-  );
+      : inferenceTarget(modelId, { sourceSetName: getSourceSetNameFromSource(steerFeatures[0].layer), user });
+  const hosts = await resolveHosts(target);
+  if (hosts.length === 0) {
+    throw new NoComputeHostError(target);
+  }
+  const [serverHostDefault, serverHostSteered] = [hosts[0], hosts[hosts.length > 1 ? 1 : 0]];
 
   // make the promises to run
   // check if we need to replace "gemma-2-2b-it" with "gemma-2-2b", since we don't have SAEs for "-it"
@@ -611,33 +807,48 @@ export const steerCompletionChat = async (
     const readLog = reads.map((read) => read.id).join(',') || 'none';
     console.log(`completion chat - sending separate requests (hasTwoServers: ${hasTwoServers}, reads: ${readLog})`);
     const toRunPromises = steerTypesToRun.map((type) => {
-      const host = type === SteerOutputType.DEFAULT ? serverHostDefault : serverHostSteered;
-      console.log(`completion chat - sending ${type} to ${host}`);
-      return postInferenceStreaming(host, '/v1/steer/completion-chat', {
-        types: [type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED],
-        prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
-        model: transformerLensModelId,
-        features: hasVector
-          ? undefined
-          : steerFeatures.map((feature) => ({
-              model: feature.modelId,
-              source: feature.layer,
-              index: feature.index,
-              strength: feature.strength,
-            })),
-        vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
-        strengthMultiplier,
-        nCompletionTokens: nTokens,
-        temperature,
-        freqPenalty,
-        seed,
-        steerSpecialTokens,
-        steerMethod,
-        normalizeSteering: false,
-        stream: true,
-        nLogprobs: n_logprobs,
-        reads,
-      });
+      // Each type starts on its own host and falls back through the rest, so one dead pod
+      // costs a retry rather than the whole completion.
+      const candidates = rotate(hosts, type === SteerOutputType.DEFAULT ? 0 : 1);
+      console.log(`completion chat - sending ${type} to ${candidates[0]}`);
+      return streamWithFailover(
+        candidates,
+        (host, failIfBusy) =>
+          postInferenceStreaming(
+            host,
+            '/v1/steer/completion-chat',
+            {
+              types: [type === SteerOutputType.DEFAULT ? NPSteerType.DEFAULT : NPSteerType.STEERED],
+              prompt: type === SteerOutputType.DEFAULT ? defaultChatMessages : steeredChatMessages,
+              model: transformerLensModelId,
+              features: hasVector
+                ? undefined
+                : steerFeatures.map((feature) => ({
+                    model: feature.modelId,
+                    source: feature.layer,
+                    index: feature.index,
+                    strength: feature.strength,
+                  })),
+              vectors: hasVector ? convertSteerFeatureVectorsToInferenceVectors(steerFeatures) : undefined,
+              strengthMultiplier,
+              nCompletionTokens: nTokens,
+              temperature,
+              freqPenalty,
+              seed,
+              steerSpecialTokens,
+              steerMethod,
+              normalizeSteering: false,
+              stream: true,
+              nLogprobs: n_logprobs,
+              reads,
+              failIfBusy,
+            },
+            // Pass 2 asks to queue, so it must be allowed to wait for its turn.
+            { headersTimeoutMs: failIfBusy ? STEER_HEADERS_TIMEOUT_MS : 0 },
+          ),
+        undefined,
+        'steer chat completion',
+      );
     });
     const responses = await Promise.all(toRunPromises);
     // Checked before any stream is handed back: once the route starts piping bodies to
@@ -680,6 +891,8 @@ export const steerCompletionChat = async (
             reads,
             // This path collects whole responses; the SSE variant is lensPromptStream's job.
             stream: false,
+            // No failover on this path, so queueing is the only way to be served.
+            failIfBusy: false,
           },
         }),
       );
@@ -713,6 +926,8 @@ export const steerCompletionChat = async (
             reads,
             // This path collects whole responses; the SSE variant is lensPromptStream's job.
             stream: false,
+            // No failover on this path, so queueing is the only way to be served.
+            failIfBusy: false,
           },
         }),
       );
@@ -789,12 +1004,19 @@ export const getAttentionForHead = async (
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
-  const response = await postInferenceStreaming(host, '/v1/activation/attention', {
-    model: transformerLensModelId,
-    prompt,
-    layer,
-    head: headIndex,
-  });
+  const response = await postInferenceStreaming(
+    host,
+    '/v1/activation/attention',
+    {
+      model: transformerLensModelId,
+      prompt,
+      layer,
+      head: headIndex,
+    },
+    // Not a stream despite the helper: the whole reply lands at once, so headers arrive only
+    // when the work is finished. Bound the call, not the wait for its first byte.
+    { signal: AbortSignal.timeout(INFERENCE_REQUEST_TIMEOUT_MS), headersTimeoutMs: 0 },
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
@@ -856,6 +1078,10 @@ export const getVectorFromInstance = async (
 // errors (4xx other than 429) are returned immediately, since retrying another
 // host wouldn't change the outcome.
 //
+// Pass 1 carries HEADERS_TIMEOUT_MS, which is what makes any of this reachable on a pod that
+// accepts the connection and then goes quiet. Pass 2 does not: queueing is the whole point
+// there, so waiting is the answer rather than the failure.
+//
 // The caller is responsible for handling a non-ok response (`response.ok`).
 export const lensPromptStream = async (
   modelId: string,
@@ -874,71 +1100,17 @@ export const lensPromptStream = async (
     throw new Error('No server host found');
   }
 
-  const sendRequest = (host: string, failIfBusy: boolean) =>
-    postInferenceStreaming(
-      host,
-      '/v1/lens/prompt',
-      { ...request, model: transformerLensModelId, stream: true, failIfBusy },
-      { signal },
-    );
-
-  let lastErrorResponse: Response | null = null;
-  let lastError: unknown = null;
-  let firstBusyHost: string | null = null;
-
-  // Pass 1: try each host, skipping any that report busy (429) or hard-fail
-  // (connection error / 5xx / 404). Return on the first success or deterministic
-  // client error (other 4xx).
-  for (let i = 0; i < hosts.length; i += 1) {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      const response = await sendRequest(hosts[i], true);
-      if (response.status === 429) {
-        if (firstBusyHost === null) {
-          firstBusyHost = hosts[i];
-        }
-        // Free the connection since we're moving on to the next host.
-        void response.body?.cancel();
-
-        continue;
-      }
-      // A 404 means this host is unavailable (e.g. the instance went down and
-      // its proxy/gateway returns "Not Found"), not a deterministic client
-      // error — so fall through and try the next host, like a 5xx.
-      if (response.status === 404) {
-        void lastErrorResponse?.body?.cancel();
-        lastErrorResponse = response;
-
-        continue;
-      }
-      // Success, or a deterministic client error (other 4xx) that won't differ
-      // across hosts — return either way. 5xx (and 404 above) fall through to
-      // try another host.
-      if (response.ok || (response.status >= 400 && response.status < 500)) {
-        return response;
-      }
-      void lastErrorResponse?.body?.cancel();
-      lastErrorResponse = response;
-    } catch (error) {
-      // Network/connection error to this host; try the next one.
-      lastError = error;
-    }
-  }
-
-  // Pass 2: every host was busy and/or hard-failed. If at least one was merely
-  // busy, fall back to queueing on that busy host (fail_if_busy=false) so the
-  // request is still served (matching the previous single-server behavior of
-  // waiting for the lock) rather than rejected. We queue on a host we know was
-  // reachable-but-busy rather than one that hard-failed (e.g. 404 because it's
-  // down), which would just fail again.
-  if (firstBusyHost !== null) {
-    void lastErrorResponse?.body?.cancel();
-    return sendRequest(firstBusyHost, false);
-  }
-
-  // Every host hard-failed (no busy responses): surface the last failure.
-  if (lastErrorResponse) {
-    return lastErrorResponse;
-  }
-  throw lastError instanceof Error ? lastError : new Error('All inference servers failed for the lens request');
+  return streamWithFailover(
+    hosts,
+    (host, failIfBusy) =>
+      postInferenceStreaming(
+        host,
+        '/v1/lens/prompt',
+        { ...request, model: transformerLensModelId, stream: true, failIfBusy },
+        // Pass 2 asks to queue, so it must be allowed to wait for its turn.
+        { signal, headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
+      ),
+    signal,
+    'lens request',
+  );
 };

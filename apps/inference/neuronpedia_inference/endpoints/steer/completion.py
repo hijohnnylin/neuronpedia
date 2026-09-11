@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator, Sequence
 from typing import Any, cast
 
 import torch
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from interp_engine import (
     AddSpec,
@@ -32,6 +32,7 @@ from neuronpedia_inference.inference_utils.steering import (
     format_sse_message,
     process_features_vectorized,
     remove_sse_formatting,
+    stop_when_client_leaves,
     stream_lock,
 )
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
@@ -91,7 +92,7 @@ def resolve_max_new_tokens(prompt_len: int, requested: int) -> tuple[int, JSONRe
 
 @router.post("/steer/completion", responses={200: {"model": SteerCompletionResponse}})
 @with_request_lock(exclusive=False, cost=steer_cost)
-async def completion(request: SteerCompletionRequest):
+async def completion(request: SteerCompletionRequest, http_request: Request):
     config = Config.get_instance()
     model = Model.get_instance()
     steer_method = request.steer_method
@@ -173,7 +174,10 @@ async def completion(request: SteerCompletionRequest):
 
     if request.stream:
         logger.info("Streaming response")
-        return StreamingResponse(generator, media_type="text/event-stream")
+        return StreamingResponse(
+            stop_when_client_leaves(generator, http_request, "STEER"),
+            media_type="text/event-stream",
+        )
 
     logger.info("Non-streaming response")
     # Each frame carries the whole completion so far, so the last one is the answer.

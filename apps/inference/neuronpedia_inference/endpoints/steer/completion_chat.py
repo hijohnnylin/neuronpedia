@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import numpy as np
 import torch
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from interp_engine import (
     Address,
@@ -38,6 +38,7 @@ from neuronpedia_inference.inference_utils.steering import (
     format_sse_message,
     process_features_vectorized,
     remove_sse_formatting,
+    stop_when_client_leaves,
     stream_lock,
 )
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
@@ -146,7 +147,7 @@ def messages_for_render(promptChat: list[NPSteerChatMessage], *, blank_system_pr
 
 @router.post("/steer/completion-chat", responses={200: {"model": SteerCompletionChatResponse}})
 @with_request_lock(exclusive=False, cost=steer_cost)
-async def completion_chat(request: SteerCompletionChatRequest):
+async def completion_chat(request: SteerCompletionChatRequest, http_request: Request):
     request_start = time.time()
     model = Model.get_instance()
     config = Config.get_instance()
@@ -359,7 +360,10 @@ async def completion_chat(request: SteerCompletionChatRequest):
                 logger.exception(f"[REQUEST ERROR] Error during generation after {time.time() - request_start:.2f}s")
                 raise
 
-        return StreamingResponse(timed_generator(), media_type="text/event-stream")
+        return StreamingResponse(
+            stop_when_client_leaves(timed_generator(), http_request, "STEER-CHAT"),
+            media_type="text/event-stream",
+        )
 
     # for non-streaming request, get last item from generator
     last_item = None

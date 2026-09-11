@@ -427,18 +427,26 @@ class SAEGpuCache:
     # -- admission ---------------------------------------------------------------------
 
     @asynccontextmanager
-    async def reserve(self, nbytes: int, *, timeout: float = 0.0):
+    async def reserve(self, nbytes: int, *, timeout: float = 0.0, fail_if_busy: bool = False):
         """Reserve room for the largest single SAE this request will stage in.
 
         Held for the whole request, alongside the transient VRAM reservation, so the number
         of requests admitted is bounded by SAE residency as well as by working set.
+
+        ``fail_if_busy`` raises :class:`RequestBusy` instead of waiting for room, for a client
+        that would rather try a different server than queue here.
         """
         if not self.enabled or nbytes <= 0:
             yield None
             return
         nbytes = min(int(nbytes), self._budget_bytes)
 
+        # Imported here because shared.py imports this module: at module scope this would cycle.
+        from neuronpedia_inference.shared import RequestBusy
+
         async with self._condition:
+            if fail_if_busy and self._reserved_bytes + nbytes > self._budget_bytes:
+                raise RequestBusy()
             has_room = self._condition.wait_for(lambda: self._reserved_bytes + nbytes <= self._budget_bytes)
             if timeout and timeout > 0:
                 await asyncio.wait_for(has_room, timeout=timeout)

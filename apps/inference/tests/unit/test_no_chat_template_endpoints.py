@@ -104,7 +104,7 @@ def _lens_request(**overrides) -> LensPromptRequest:
 
 def test_steer_completion_chat_refuses_and_names_the_completion_route():
     """A 200 here means the ChatML fallback is back."""
-    response = asyncio.run(completion_chat(_steer_chat_request()))
+    response = asyncio.run(completion_chat(_steer_chat_request(), _http_request()))
 
     assert response.status_code == 400
     # The remedy is a different route on the same model, so the message has to name it
