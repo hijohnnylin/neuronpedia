@@ -19,12 +19,12 @@ import { JSONSchema } from 'json-schema-to-typescript';
 import dynamic from 'next/dynamic';
 import createPlotlyComponent from 'react-plotly.js/factory';
 import SaeEvalAccordionTrigger from './accordion-trigger';
+import SaeEvalMetricsAccordion from './metrics-accordion';
 
 const Plot = dynamic(
   () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
   { ssr: false },
 );
-import SaeEvalMetricsAccordion from './metrics-accordion';
 
 /*
 converting plotly express to plotly graph objects: 
