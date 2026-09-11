@@ -17,7 +17,7 @@ vi.mock('@/lib/db/neuron', () => ({ getNeuronOnly: vi.fn() }));
 vi.mock('../env', () => ({ INFERENCE_SERVER_SECRET: 'test-secret' }));
 
 import { SteerOutputType } from '@prisma/client';
-import { lensPromptStream, steerCompletion } from './inference';
+import { INFERENCE_REQUEST_TIMEOUT_MS, lensPromptStream, steerCompletion } from './inference';
 
 const HEADERS_TIMEOUT_MS = 8_000;
 
@@ -271,5 +271,83 @@ describe('steerCompletion host selection', () => {
     expect(attempts).toHaveLength(3);
     // No signal at all, with no caller signal to combine: nothing can cut this attempt short.
     expect(attempts[2].signal ?? null).toBeNull();
+  });
+});
+
+describe('steerCompletion without streaming', () => {
+  const feature = {
+    modelId: 'gpt2-small',
+    layer: '0-res-jb',
+    index: 1,
+    strength: 1,
+    neuron: { vector: [0.1, 0.2], hookName: 'blocks.0.hook_resid_post' },
+  };
+
+  /** `/api/steer` collects a whole completion, so nothing arrives until generation ends. */
+  const runNonStreaming = () =>
+    steerCompletion(
+      'gpt2-small',
+      [SteerOutputType.DEFAULT],
+      'hello',
+      1,
+      4,
+      0,
+      0,
+      1,
+      [feature] as never,
+      true,
+      null,
+      undefined,
+      false,
+    );
+
+  it('does not abandon a completion that takes longer than the headers deadline', async () => {
+    // The reply is one JSON body, so its headers arrive only when the work is finished. A
+    // headers deadline here would abort every completion slower than 8s.
+    let respond: ((response: Response) => void) | undefined;
+    respondWith([
+      async (_attempt, signal) =>
+        new Promise<Response>((resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(signal.reason));
+          respond = resolve;
+        }),
+    ]);
+
+    const pending = runNonStreaming();
+    await vi.advanceTimersByTimeAsync(HEADERS_TIMEOUT_MS * 3);
+
+    expect(attempts).toHaveLength(1);
+    respond?.(new Response(JSON.stringify({ outputs: [] }), { status: 200 }));
+    await expect(pending).resolves.toBeDefined();
+  });
+
+  it('still asks the first pass to refuse rather than queue', async () => {
+    respondWith([async () => new Response(JSON.stringify({ outputs: [] }), { status: 200 })]);
+
+    await runNonStreaming();
+
+    expect(attempts[0].body.failIfBusy).toBe(true);
+    expect(attempts[0].body.stream).toBe(false);
+  });
+
+  it('bounds the call as a whole, so a wedged host cannot hang it forever', async () => {
+    // `AbortSignal.timeout` runs on a native timer that fake timers do not reach, so stand in
+    // a controller driven by `setTimeout`, which they do. That also pins the duration asked for.
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(new DOMException(`timed out after ${ms}ms`, 'TimeoutError')), Number(ms));
+      return controller.signal;
+    });
+    respondWith([async (_attempt, signal) => silent(signal)]);
+
+    const pending = runNonStreaming();
+    pending.catch(() => {}); // asserted below
+    await vi.advanceTimersByTimeAsync(INFERENCE_REQUEST_TIMEOUT_MS + 1);
+
+    await expect(pending).rejects.toThrow(/timed out/);
+    expect(timeoutSpy).toHaveBeenCalledWith(INFERENCE_REQUEST_TIMEOUT_MS);
+    // The deadline is the caller's own, so it stops the call rather than moving to the next host.
+    expect(attempts).toHaveLength(1);
+    timeoutSpy.mockRestore();
   });
 });

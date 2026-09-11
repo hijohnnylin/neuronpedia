@@ -192,14 +192,18 @@ async function postInferenceStreaming<P extends keyof paths>(
   host: string,
   path: P,
   body: InferenceRequestBody<P>,
-  // `headersTimeoutMs: 0` waits as long as it takes, for a caller that asked to be queued.
+  // `headersTimeoutMs` defaults to 0, meaning wait as long as it takes. Opt in only when the
+  // reply really does stream: a caller whose whole body lands at once gets its headers when the
+  // work is finished, so a deadline there measures how long the answer took and aborts every
+  // request slower than it. Not every caller of this helper streams — the attention endpoint
+  // uses it only because it is missing from the typed client.
   init?: { signal?: AbortSignal; headersTimeoutMs?: number },
 ): Promise<Response> {
   // The deadline covers only the wait for headers: `fetch` resolves as soon as they arrive, and
   // the timer is cleared there, so the stream that follows runs for as long as it needs. Built
   // from a controller rather than `AbortSignal.timeout` for exactly that reason — a timeout
   // signal stays armed and would cut the body mid-generation.
-  const headersTimeoutMs = init?.headersTimeoutMs ?? HEADERS_TIMEOUT_MS;
+  const headersTimeoutMs = init?.headersTimeoutMs ?? 0;
   const deadline = headersTimeoutMs > 0 ? new AbortController() : null;
   const timer = deadline
     ? setTimeout(
@@ -675,6 +679,13 @@ export const steerCompletion = async (
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
+  // A non-streamed completion sends no headers until the whole generation is done, so "no
+  // headers yet" says nothing about the host and a headers deadline would fire on every
+  // completion longer than the deadline. Bound the call as a whole instead, like the other
+  // non-streaming inference calls. `failIfBusy` still gives pass 1 its fast refusal, which is
+  // what the deadline was standing in for.
+  const wholeCallDeadline = stream ? undefined : AbortSignal.timeout(INFERENCE_REQUEST_TIMEOUT_MS);
+
   const response = await streamWithFailover(
     hosts,
     (host, failIfBusy) =>
@@ -708,9 +719,12 @@ export const steerCompletion = async (
           failIfBusy,
         },
         // Pass 2 asks to queue, so it must be allowed to wait for its turn.
-        { headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
+        {
+          signal: wholeCallDeadline,
+          headersTimeoutMs: stream && failIfBusy ? HEADERS_TIMEOUT_MS : 0,
+        },
       ),
-    undefined,
+    wholeCallDeadline,
     'steer completion',
   );
   await throwIfInferenceError(response);
@@ -974,12 +988,19 @@ export const getAttentionForHead = async (
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
 
-  const response = await postInferenceStreaming(host, '/v1/activation/attention', {
-    model: transformerLensModelId,
-    prompt,
-    layer,
-    head: headIndex,
-  });
+  const response = await postInferenceStreaming(
+    host,
+    '/v1/activation/attention',
+    {
+      model: transformerLensModelId,
+      prompt,
+      layer,
+      head: headIndex,
+    },
+    // Not a stream despite the helper: the whole reply lands at once, so headers arrive only
+    // when the work is finished. Bound the call, not the wait for its first byte.
+    { signal: AbortSignal.timeout(INFERENCE_REQUEST_TIMEOUT_MS), headersTimeoutMs: 0 },
+  );
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
