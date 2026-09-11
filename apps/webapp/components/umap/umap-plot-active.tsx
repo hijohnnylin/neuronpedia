@@ -1,4 +1,3 @@
-import Plotly from 'plotly.js-dist-min';
 // import { Data } from "plotly.js";
 import {
   SPARSITY_COLOR_MAX,
@@ -9,9 +8,13 @@ import {
   useUmapContext,
 } from '@/components/provider/umap-provider';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
+import dynamic from 'next/dynamic';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
-const Plot = createPlotlyComponent(Plotly);
+const Plot = dynamic(
+  () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
+  { ssr: false },
+);
 
 export const SEARCH_NOT_MATCHED_COLOR = '#e3e3e3';
 const SEARCH_NOT_MATCHED_SIZE = 3.5;
