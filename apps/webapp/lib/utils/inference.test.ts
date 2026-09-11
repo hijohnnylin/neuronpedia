@@ -227,18 +227,41 @@ describe('steerCompletion host selection', () => {
     expect(attempts[0].body.failIfBusy).toBe(true);
   });
 
-  it('gives up on a silent host at the deadline and tries the next', async () => {
+  it('waits on a silent host instead of hopping, until every pod honours the flag', async () => {
+    // A pod predating `fail_if_busy` on steer queues silently rather than refusing, and that
+    // looks identical to wedged from here. Hopping would abandon a generation on each host it
+    // passed. Flip STEER_HEADERS_TIMEOUT_MS on once the pods are rolled, and change this test.
+    let respond: ((response: Response) => void) | undefined;
     respondWith([
-      async (_attempt, signal) => silent(signal),
-      async () => new Response('data: {}\n\n', { status: 200 }),
+      async (_attempt, signal) =>
+        new Promise<Response>((resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(signal.reason));
+          respond = resolve;
+        }),
     ]);
 
     const pending = runSteer();
-    await vi.advanceTimersByTimeAsync(HEADERS_TIMEOUT_MS + 1);
-    await pending;
+    await vi.advanceTimersByTimeAsync(HEADERS_TIMEOUT_MS * 5);
 
-    expect(attempts).toHaveLength(2);
-    expect(attempts[1].url).toBe('https://b/v1/steer/completion');
+    expect(attempts).toHaveLength(1);
+    respond?.(new Response('data: {}\n\n', { status: 200 }));
+    await expect(pending).resolves.toBeDefined();
+  });
+
+  it('still leaves a busy pod immediately, which is what the flag is for', async () => {
+    // The 429 does the real work: an upgraded pod refuses in milliseconds, so failover does not
+    // depend on the headers deadline at all.
+    respondWith([
+      async () => new Response('{"busy": true}', { status: 429 }),
+      async () => new Response('data: {}\n\n', { status: 200 }),
+    ]);
+
+    await runSteer();
+
+    expect(attempts.map((attempt) => attempt.url)).toEqual([
+      'https://a/v1/steer/completion',
+      'https://b/v1/steer/completion',
+    ]);
   });
 
   it('queues on a busy host rather than failing when every host declined', async () => {

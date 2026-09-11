@@ -231,6 +231,22 @@ async function postInferenceStreaming<P extends keyof paths>(
 }
 
 /**
+ * Headers deadline for the streaming steer endpoints in pass 1. Off until the pods are rolled.
+ *
+ * A pod that predates `fail_if_busy` on steer ignores the field, so a saturated one queues
+ * silently instead of refusing. The deadline cannot tell that apart from a wedged pod, so it
+ * fires, pass 1 walks every host, and each abandoned attempt leaves a generation running on a
+ * server that cannot yet notice the client left — N+1 generations for one request, exactly when
+ * the fleet is already busy.
+ *
+ * Little is given up by waiting. Against an upgraded pod the 429 does the real work: busy is
+ * answered in milliseconds and pass 1 moves on. The deadline only adds the wedged-pod case, where
+ * a host accepts the connection and then never speaks, and the route's `maxDuration` still bounds
+ * that. So set this to HEADERS_TIMEOUT_MS once every pod serving steer honours the flag.
+ */
+const STEER_HEADERS_TIMEOUT_MS = 0;
+
+/**
  * Whether a failed response says anything about the host, or would fail the same everywhere.
  *
  * 404 counts, unlike in `computeFetch`: inference itself never returns one, so a 404 here is a
@@ -721,7 +737,7 @@ export const steerCompletion = async (
         // Pass 2 asks to queue, so it must be allowed to wait for its turn.
         {
           signal: wholeCallDeadline,
-          headersTimeoutMs: stream && failIfBusy ? HEADERS_TIMEOUT_MS : 0,
+          headersTimeoutMs: stream && failIfBusy ? STEER_HEADERS_TIMEOUT_MS : 0,
         },
       ),
     wholeCallDeadline,
@@ -828,7 +844,7 @@ export const steerCompletionChat = async (
               failIfBusy,
             },
             // Pass 2 asks to queue, so it must be allowed to wait for its turn.
-            { headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
+            { headersTimeoutMs: failIfBusy ? STEER_HEADERS_TIMEOUT_MS : 0 },
           ),
         undefined,
         'steer chat completion',
