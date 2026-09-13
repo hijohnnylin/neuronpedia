@@ -28,13 +28,15 @@ import {
   NLA_TOUR_LLAMA_LIE_QUESTION_ELEMENT_ID,
   NLA_TOUR_LLAMA_LIE_QUESTION_POSITION,
 } from './nla-tour-constants';
-import { ChatMessage, TokenInfo } from './nla-types';
+import { ChatMessage, TokenInfo, TokenMessageGroup } from './nla-types';
 import {
   chatMessagesKey,
   cleanPartialText,
   computeRelativeMse,
   groupTokensIntoMessages,
+  isInjectedSystemGroup,
   MAX_TOKENS_TO_EXPLAIN,
+  messageGroups,
 } from './nla-utils';
 
 export default function NLAInputChat() {
@@ -860,15 +862,7 @@ export default function NLAInputChat() {
     // );
   }
 
-  function renderTokenGroup(
-    group: {
-      role: 'user' | 'assistant';
-      headerTokens: TokenInfo[];
-      contentTokens: TokenInfo[];
-      footerTokens: TokenInfo[];
-    },
-    opts?: { preview?: boolean },
-  ) {
+  function renderTokenGroup(group: TokenMessageGroup, opts?: { preview?: boolean }) {
     const preview = opts?.preview ?? false;
     // Render tokens as a sequence of per-line rows (one `flex flex-row
     // flex-wrap` per visual line). Splitting newline-delimited runs into
@@ -1217,11 +1211,15 @@ export default function NLAInputChat() {
   // alternate, so a role mismatch identifies a group that belongs to some
   // other bubble; treat it as "no group yet" rather than rendering the wrong
   // tokens.
+  const pairedGroups = tokenGroups ? messageGroups(tokenGroups.messages) : [];
   const groupForIndex = (idx: number) => {
-    const group = tokenGroups?.messages?.[idx];
+    const group = pairedGroups[idx];
     if (!group || group.role !== visibleMessages[idx]?.msg.role) return undefined;
     return group;
   };
+  // A system turn the chat template injected itself. It has no chat message,
+  // so it gets its own bubble ahead of the first message.
+  const injectedSystemGroups = tokenGroups ? tokenGroups.messages.filter(isInjectedSystemGroup) : [];
 
   // Live count of selected tokens that haven't finished being explained
   // yet. A token counts as explained the moment either (a) the streaming
@@ -1751,6 +1749,18 @@ export default function NLAInputChat() {
             onMouseDown={() => setLockedPosition(null)}
             className="flex h-full max-h-full min-h-0 flex-1 flex-col gap-y-0 overflow-y-auto pt-1 sm:pb-3 sm:pr-1 sm:pt-4"
           >
+            {injectedSystemGroups.map((group, i) => (
+              <div key={`system-${i}`} className="flex w-full justify-end">
+                <div className="flex max-w-[95%] flex-col items-end gap-y-0 px-0.5 sm:max-w-[85%]">
+                  <div className="select-none rounded-xl bg-white py-1 shadow sm:px-3.5">
+                    <div className="px-1 pt-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                      system
+                    </div>
+                    {renderTokenGroup(group)}
+                  </div>
+                </div>
+              </div>
+            ))}
             {visibleMessages.map(({ msg, originalIdx }, idx) => {
               const group = groupForIndex(idx);
               const showChips =

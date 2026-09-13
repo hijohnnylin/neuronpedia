@@ -129,11 +129,26 @@ export function groupTokensIntoMessages(tokens: TokenInfo[]): {
     else if (bucket === 'footer') group.footerTokens.push(t);
     else group.contentTokens.push(t);
     if (t.role != null) {
-      group.role = t.role === 'user' ? 'user' : 'assistant';
+      group.role = t.role === 'user' || t.role === 'system' ? t.role : 'assistant';
+    }
+    if (t.message_index != null && group.messageIndex === undefined) {
+      group.messageIndex = t.message_index;
     }
   }
 
   return { messages, hasChatFormat: messages.length > 0 };
+}
+
+// A system turn the chat template injected on its own: it has no chat message
+// behind it, so it never pairs with one.
+export function isInjectedSystemGroup(group: TokenMessageGroup): boolean {
+  return group.role === 'system' && group.messageIndex === undefined;
+}
+
+// The groups that stand for chat messages, in order, so callers can pair them
+// 1:1 with the with-content messages the tokenizer was fed.
+export function messageGroups(groups: TokenMessageGroup[]): TokenMessageGroup[] {
+  return groups.filter((g) => !isInjectedSystemGroup(g));
 }
 
 export function messageAllTokens(msg: TokenMessageGroup): TokenInfo[] {

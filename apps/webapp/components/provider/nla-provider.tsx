@@ -12,8 +12,10 @@ import {
   chatMessagesKey,
   computeAutoSelection,
   groupTokensIntoMessages,
+  isInjectedSystemGroup,
   MAX_TOKENS_TO_EXPLAIN,
   messageAllTokens,
+  messageGroups,
 } from '@/app/[modelId]/nla/nla-utils';
 import {
   DEFAULT_COMPLETION_TOKENS,
@@ -870,20 +872,18 @@ export function NLAProvider({
       const truncated = chatMessages.slice(0, clamped);
 
       // Map the kept chat messages back to their token positions. The
-      // tokenizer is fed only the with-content messages, so the
-      // grouped-messages array lines up 1:1 with that filtered list.
+      // tokenizer is fed only the with-content messages, so the message
+      // groups line up 1:1 with that filtered list. A system turn the
+      // template injects has no message; it stays whenever anything stays.
       const grouped = groupTokensIntoMessages(tokenList);
       const keptMessagesWithContent = truncated.filter((m) => m.content.length > 0).length;
       let keptPositions: Set<number> | null = null;
       if (grouped.hasChatFormat && keptMessagesWithContent > 0) {
         const positions = new Set<number>();
-        const limit = Math.min(keptMessagesWithContent, grouped.messages.length);
-        for (let i = 0; i < limit; i += 1) {
-          const m = grouped.messages[i];
-          m.headerTokens.forEach((t) => positions.add(t.position));
-          m.contentTokens.forEach((t) => positions.add(t.position));
-          m.footerTokens.forEach((t) => positions.add(t.position));
-        }
+        const paired = messageGroups(grouped.messages);
+        const limit = Math.min(keptMessagesWithContent, paired.length);
+        const kept = [...grouped.messages.filter(isInjectedSystemGroup), ...paired.slice(0, limit)];
+        kept.forEach((m) => messageAllTokens(m).forEach((t) => positions.add(t.position)));
         keptPositions = positions;
       }
 

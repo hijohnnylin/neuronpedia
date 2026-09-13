@@ -1,6 +1,6 @@
 import { LensTokenMessage } from '@/lib/utils/lens';
 import { describe, expect, it } from 'vitest';
-import { extractAssistantText, tokensToText } from './jlens-chat-format';
+import { extractAssistantText, groupTokensBySpans, messageIndicesForGroups, tokensToText } from './jlens-chat-format';
 
 // The generated half of an assistant turn, as the stream delivers it: one token
 // per position, spanned by the server as message content.
@@ -90,5 +90,82 @@ describe('tokensToText', () => {
     // Runs stored before the flag existed carry no `is_char_continuation`; they keep their
     // old (joined) reading rather than losing characters.
     expect(tokensToText([{ token: '😀' }, { token: '😀' }])).toBe('😀😀');
+  });
+});
+
+// A prompt token with the server's span fields, positioned after `start`.
+function spanned(tokens: [string, Partial<LensTokenMessage>][], start = 0): LensTokenMessage[] {
+  return tokens.map(([token, span], i) => ({
+    kind: 'token' as const,
+    position: start + i,
+    token,
+    id: start + i,
+    is_generated: false,
+    results: [],
+    ...span,
+  }));
+}
+
+describe('groupTokensBySpans', () => {
+  const sys = { role: 'system', message_index: 0 };
+  const usr = { role: 'user', message_index: 1 };
+  const explicitSystemChat = spanned([
+    ['<|begin_of_text|>', { ...sys, section: 'header' }],
+    ['system', { ...sys, section: 'header' }],
+    ['Be', { ...sys, section: 'content' }],
+    [' terse', { ...sys, section: 'content' }],
+    ['<|eot_id|>', { ...sys, section: 'footer' }],
+    ['user', { ...usr, section: 'header' }],
+    ['Hi', { ...usr, section: 'content' }],
+    ['<|eot_id|>', { ...usr, section: 'footer' }],
+    ['assistant', { role: 'assistant', section: 'header' }],
+    ['Hello', { role: 'assistant', section: 'content', is_generated: true }],
+  ]);
+
+  it('gives an explicit system message its own bubble with header and footer', () => {
+    const { messages: groups } = groupTokensBySpans(explicitSystemChat);
+    expect(groups.map((g) => g.role)).toEqual(['system', 'user', 'assistant']);
+    expect(groups[0].headerTokens).toHaveLength(2);
+    expect(tokensToText(groups[0].contentTokens)).toBe('Be terse');
+    expect(groups[0].footerTokens).toHaveLength(1);
+    expect(groups[0].messageIndex).toBe(0);
+  });
+
+  it('maps a system bubble to its message like any other input turn', () => {
+    const { messages: groups } = groupTokensBySpans(explicitSystemChat);
+    const idxs = messageIndicesForGroups(groups, [{ role: 'system' }, { role: 'user' }, { role: 'assistant' }]);
+    expect(idxs).toEqual([0, 1, 2]);
+  });
+
+  it('keeps a template-injected system turn (no message index) as a separate unmapped bubble', () => {
+    // What the engine sends once it labels the preamble it injects itself.
+    const injected = { role: 'system', message_index: null };
+    const tokens = spanned([
+      ['<|begin_of_text|>', { ...injected, section: 'header' }],
+      ['Cutting Knowledge', { ...injected, section: 'content' }],
+      ['<|eot_id|>', { ...injected, section: 'footer' }],
+      ['user', { role: 'user', message_index: 0, section: 'header' }],
+      ['Hi', { role: 'user', message_index: 0, section: 'content' }],
+    ]);
+    const { messages: groups } = groupTokensBySpans(tokens);
+    expect(groups.map((g) => g.role)).toEqual(['system', 'user']);
+    expect(groups[0].messageIndex).toBeUndefined();
+    expect(messageIndicesForGroups(groups, [{ role: 'user' }])).toEqual([null, 0]);
+  });
+
+  it('still folds the preamble into the first user header when the engine labels it that way', () => {
+    // What every deployed engine sends today; the bubble must not split.
+    const usr0 = { role: 'user', message_index: 0 };
+    const tokens = spanned([
+      ['<|begin_of_text|>', { ...usr0, section: 'header' }],
+      ['system', { ...usr0, section: 'header' }],
+      ['Cutting Knowledge', { ...usr0, section: 'header' }],
+      ['user', { ...usr0, section: 'header' }],
+      ['Hi', { ...usr0, section: 'content' }],
+    ]);
+    const { messages: groups } = groupTokensBySpans(tokens);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].role).toBe('user');
+    expect(groups[0].headerTokens).toHaveLength(4);
   });
 });

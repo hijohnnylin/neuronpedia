@@ -57,8 +57,12 @@ export type NlaSourceWithModel = {
 };
 
 export type TokenMessageGroup = {
-  role: 'user' | 'assistant';
+  // Display side: system and user on the right, the model's turns on the left.
+  role: 'system' | 'user' | 'assistant';
   headerTokens: TokenInfo[];
   contentTokens: TokenInfo[];
   footerTokens: TokenInfo[];
+  // The source chat-message index from the server spans. Undefined for the
+  // generated turn and for a system turn the chat template injects itself.
+  messageIndex?: number;
 };

@@ -19,6 +19,28 @@ export default function SteerChatMessage({
   return (
     <div className="flex flex-col gap-y-2 sm:gap-y-3">
       {chatMessages.map((s, i) => {
+        if (s.role === 'system') {
+          return (
+            <div
+              className="flex w-full justify-end"
+              key={i}
+              ref={(el) => {
+                if (messageRefs?.current) {
+                  messageRefs.current[i] = el;
+                }
+              }}
+            >
+              <div
+                className={`max-w-[85%] whitespace-pre-wrap rounded-lg bg-white px-3 py-2 ${overrideTextSize || 'text-[12.5px]'} text-slate-700 shadow sm:max-w-[90%] sm:rounded-xl sm:px-3 sm:py-2 sm:text-[12.5px]`}
+              >
+                <div className="pb-0.5 text-[8px] font-bold uppercase leading-none tracking-wide text-slate-400">
+                  system
+                </div>
+                {s.content}
+              </div>
+            </div>
+          );
+        }
         if (s.role === 'user') {
           return (
             <div

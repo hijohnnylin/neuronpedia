@@ -490,19 +490,30 @@ export default function JlensChat({
     [tokens, meta, messages, modelId, topN, temperature, hideNonWordTokens, setSelectedPositions],
   );
 
+  // Which chat message each bubble belongs to. Bubbles are not 1:1 with messages
+  // (a reasoning turn splits into two, a template-injected system turn has none).
+  const groupMessageIdxs = useMemo(
+    () => (groupedMessages ? messageIndicesForGroups(groupedMessages, messages) : []),
+    [groupedMessages, messages],
+  );
+
   // The position of the first token belonging to message `idx` (its turn-start),
   // used to slice the token stream so surviving turns keep their results when a
   // message is edited. Returns null if the grouping isn't available.
   const tokenCutoffForMessage = useCallback(
     (idx: number): number | null => {
-      if (!groupedMessages || idx < 0 || idx >= groupedMessages.length) {
+      if (!groupedMessages) {
         return null;
       }
-      const g = groupedMessages[idx];
+      const groupIdx = groupMessageIdxs.indexOf(idx);
+      if (groupIdx === -1) {
+        return null;
+      }
+      const g = groupedMessages[groupIdx];
       const first = g.headerTokens[0] ?? g.contentTokens[0] ?? g.footerTokens[0];
       return first ? first.position : null;
     },
-    [groupedMessages],
+    [groupedMessages, groupMessageIdxs],
   );
 
   const handleCopyMessage = useCallback(async (idx: number, content: string) => {
@@ -1173,8 +1184,6 @@ export default function JlensChat({
   // Bubble -> `messages` index. Editing truncates the conversation at that
   // index, so it must never be the bubble's own position: a reasoning turn is
   // two bubbles for one message. `null` leaves a bubble copy-only.
-  const groupMessageIdxs = groupedMessages ? messageIndicesForGroups(groupedMessages, messages) : [];
-
   const defaultMessages = (
     <>
       {groupedMessages &&
@@ -1216,8 +1225,9 @@ export default function JlensChat({
                       canCopy: !isEditing,
                       canEdit: !streaming && !steering && !isEditing,
                       onCopy: () => handleCopyMessage(idx, copyContent),
+                      // System turns are copy-only: there is no system-prompt editor.
                       onEdit:
-                        msgIdx == null
+                        msgIdx == null || group.role === 'system'
                           ? undefined
                           : () =>
                               group.role === 'user'
@@ -1597,7 +1607,8 @@ function GroupBubble({
   highlightedPosition: number | null;
   editControls?: MessageEditControls;
 }) {
-  const isUser = group.role === 'user';
+  // System and user turns sit on the right, the model's turns on the left.
+  const isUser = group.role !== 'assistant';
   const showContentLoading = !isUser && isLast && (showLoading || (streaming && group.contentTokens.length === 0));
   // Where generation begins within this bubble's content. Only > 0 when the
   // non-generated prefix is a real user assistant prefill, so the boundary
@@ -1614,6 +1625,9 @@ function GroupBubble({
     <div className={`group flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`relative flex max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`flex flex-col rounded-xl bg-white px-3 py-2 sm:gap-y-0.5`}>
+          {group.role === 'system' && (
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">system</div>
+          )}
           {group.headerTokens.length > 0 && (
             <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">
               {group.headerTokens.map((t, i) => (

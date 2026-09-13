@@ -17,15 +17,18 @@ import { LensCharContinuation, LensChatMessage, LensTokenMessage } from '@/lib/u
 
 export type ChatRole = 'user' | 'assistant';
 
+// Which side and style a bubble gets. `system` and `user` render on the right,
+// the model's turns on the left.
+export type BubbleRole = ChatRole | 'system';
+
 export interface JlensTokenGroup {
-  role: ChatRole;
+  role: BubbleRole;
   headerTokens: LensTokenMessage[];
   contentTokens: LensTokenMessage[];
   footerTokens: LensTokenMessage[];
-  // The true role label (e.g. `system`, `developer`) for formats that surface
-  // more roles than the `user`/`assistant` display split. `role` above is the
-  // display side (user = right, everything else = left); `roleLabel` preserves
-  // the real role so callers can map bubbles back to chat messages.
+  // The true role label (e.g. `developer`) for formats that surface more roles
+  // than the display split above; `roleLabel` preserves the real role so
+  // callers can map bubbles back to chat messages.
   roleLabel?: string;
   // The channel (`analysis` / `final` / `commentary`) for assistant turns split
   // into channels — harmony's named channels (gpt-oss) and reasoning-tag models'
@@ -171,7 +174,7 @@ export function groupTokensBySpans(tokens: LensTokenMessage[]): {
     else group.contentTokens.push(t);
     if (t.role != null && group.roleLabel === undefined) {
       group.roleLabel = t.role;
-      group.role = t.role === 'user' ? 'user' : 'assistant';
+      group.role = t.role === 'user' || t.role === 'system' ? t.role : 'assistant';
     }
     if (t.channel && group.channel === undefined) {
       group.channel = t.channel;
