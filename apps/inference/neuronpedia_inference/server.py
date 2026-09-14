@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import inspect
 import json
 import logging
 import os
@@ -391,6 +392,39 @@ def _vllm_backend_kwargs(
     return kwargs
 
 
+def _load_precision_kwargs(quantization: str, kv_cache_dtype: str) -> dict[str, Any]:
+    """The ``load_model`` arguments for on-load quantization and the KV cache dtype, when set.
+
+    Only set values are passed, so a pod that asks for neither reaches ``load_model`` with the same
+    call as before. Both names arrived in interp-engine 1.8: on an older engine (a venv synced before
+    the pin moved) they would fall into ``**backend_kwargs`` and die in a constructor as an opaque
+    ``TypeError``, so the signature is checked here and the refusal says what to do.
+    """
+    kwargs: dict[str, Any] = {}
+    if quantization:
+        kwargs["quantization"] = quantization
+    if kv_cache_dtype not in ("auto", ""):
+        kwargs["kv_cache_dtype"] = kv_cache_dtype
+    if not kwargs:
+        return kwargs
+    accepted = inspect.signature(load_model).parameters
+    missing = [name for name in kwargs if name not in accepted]
+    if missing:
+        raise ValueError(
+            f"{', '.join(missing)} needs interp-engine >= 1.8, and this venv's load_model does not take "
+            f"it. Sync the venv to the pin in pyproject.toml (`uv sync`), or drop the flag."
+        )
+    return kwargs
+
+
+def _kv_cache_dtype_for_sizing(model_dtype: str, kv_cache_dtype: str) -> str:
+    """The dtype the KV cache is really held in, for the per-token cost the serving limits use."""
+    if kv_cache_dtype in ("auto", ""):
+        return model_dtype
+    # vLLM spells its 8-bit caches fp8 / fp8_e4m3 / fp8_e5m2; startup_memory prices "float8".
+    return "float8" if kv_cache_dtype.startswith("fp8") else kv_cache_dtype
+
+
 def _resolve_generation_only(args: Any) -> bool:
     """Validate ``GENERATION_ONLY`` against the rest of the startup config, and refuse early.
 
@@ -567,7 +601,10 @@ def _log_ready_banner(elapsed_seconds: float) -> None:
         [
             f"model: {model_desc}",
             f"backend: {config.backend} | device: {config.device} | gpus: {config.num_gpus} | "
-            f"model dtype: {config.model_dtype} | sae dtype: {config.sae_dtype}",
+            f"model dtype: {config.model_dtype}"
+            + (f" | quantization: {config.quantization}" if config.quantization else "")
+            + (f" | kv cache dtype: {config.kv_cache_dtype}" if config.kv_cache_dtype != "auto" else "")
+            + f" | sae dtype: {config.sae_dtype}",
             f"saes: {len(sae_manager.loaded_saes)} resident of {configured_saes} configured "
             f"({', '.join(sae_manager.valid_sae_sets) or 'none'})",
             f"token limits: prompt={config.token_limit} activation={config.activation_token_limit} "
@@ -924,6 +961,8 @@ async def initialize(
             custom_hf_model_id=custom_hf_model_id,
             sae_sets=args_sae_sets,
             model_dtype=args.model_dtype,
+            quantization=args.quantization,
+            kv_cache_dtype=args.kv_cache_dtype,
             sae_dtype=args.sae_dtype,
             token_limit=args.token_limit,
             lens_token_limit=args.lens_token_limit,
@@ -991,12 +1030,19 @@ async def initialize(
                 "default_prepend_bos": True,
                 "model_kwargs": config.model_kwargs,
             }
+        # On-load quantization and the KV cache dtype, by the names load_model takes. The engine
+        # narrows the linear layers (embeddings stay at dtype) and refuses a scheme this backend
+        # cannot apply, so a wrong flag fails here rather than as an OOM later.
+        precision_kwargs = _load_precision_kwargs(config.quantization, config.kv_cache_dtype)
+        if precision_kwargs:
+            logger.info("Load precision: %s", precision_kwargs)
         model = load_model(
             hf_model_id,
             backend=engine_backend,
             device=args.device,
             dtype=config.model_dtype,
             num_gpus=num_gpus,
+            **precision_kwargs,
             **backend_kwargs,
         )
 
@@ -1008,20 +1054,21 @@ async def initialize(
         # the per-request token budget. On vLLM we admit up to max_concurrent (vLLM
         # batches); off vLLM (eager) we serve one at a time. See startup_memory.py.
         is_vllm = isinstance(model, VLLMModel)
+        kv_dtype = _kv_cache_dtype_for_sizing(config.model_dtype, config.kv_cache_dtype)
         if is_vllm:
             attn = model._attn_dims  # type: ignore[attr-defined]
             model_info = ModelMemoryInfo(
                 n_layers=num_layers,
                 n_kv_heads=attn["n_kv_heads"],
                 head_dim=attn["head_dim"],
-                dtype=config.model_dtype,
+                dtype=kv_dtype,
             )
         else:
             model_info = ModelMemoryInfo(
                 n_layers=num_layers,
                 n_kv_heads=model.n_kv_heads,  # type: ignore[attr-defined]
                 head_dim=model.head_dim,  # type: ignore[attr-defined]
-                dtype=config.model_dtype,
+                dtype=kv_dtype,
             )
         serving_limits = compute_serving_limits(device=args.device, is_vllm=is_vllm, model_info=model_info)
         config.set_max_tokens(serving_limits.max_tokens)

@@ -86,6 +86,20 @@ def parse_args():
         "pass e.g. float32/bfloat16 to force one.",
     )
     parser.add_argument(
+        "--quantization",
+        default=None,
+        help="Quantize a wider checkpoint at load, with no calibration step: 'fp8' (vLLM backends), "
+        "'bnb-4bit' (vLLM or eager) or 'bnb-8bit' (eager). Embeddings stay at --model_dtype; the linear "
+        "layers narrow. A checkpoint that already ships quantized needs no flag. Needs interp-engine "
+        ">= 1.8. Env MODEL_QUANTIZATION overrides this flag.",
+    )
+    parser.add_argument(
+        "--kv_cache_dtype",
+        default=None,
+        help="Dtype of vLLM's paged KV cache: 'auto' (the model dtype) or 'fp8', which halves the cache "
+        "and about doubles the context that fits. vLLM backends only. Env KV_CACHE_DTYPE overrides this flag.",
+    )
+    parser.add_argument(
         "--sae_dtype",
         default="bfloat16",
         help="Data type for SAE computations",
@@ -271,6 +285,10 @@ def main():
         os.environ["SAE_SETS"] = json.dumps([] if args.no_saes else args.sae_sets)
     if "MODEL_DTYPE" not in os.environ:
         os.environ["MODEL_DTYPE"] = args.model_dtype
+    if "MODEL_QUANTIZATION" not in os.environ and args.quantization is not None:
+        os.environ["MODEL_QUANTIZATION"] = args.quantization
+    if "KV_CACHE_DTYPE" not in os.environ and args.kv_cache_dtype is not None:
+        os.environ["KV_CACHE_DTYPE"] = args.kv_cache_dtype
     if "SAE_DTYPE" not in os.environ:
         os.environ["SAE_DTYPE"] = args.sae_dtype
     if "TOKEN_LIMIT" not in os.environ:

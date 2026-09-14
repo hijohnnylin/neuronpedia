@@ -52,7 +52,10 @@ dependencies = [
   # 1.7.3 tags a system turn the chat template injects on its own (Llama's date
   # preamble) as `role=system` with no message index, so the lens and NLA chats can
   # show it as its own bubble. 1.7.1-1.7.2 are capture-side fixes.
-  "interp-engine[vllm,quant]==1.7.3",
+  # 1.8.0 adds `quantization=` and `kv_cache_dtype=` to load_model, which start.py's
+  # --quantization / --kv_cache_dtype pass through: FP8 on load is what fits Llama-3.3-70B
+  # on one 96 GB card. Nothing else on the surface this service calls changed.
+  "interp-engine[vllm,quant]==1.8.0",
 ]
 
 [dependency-groups]

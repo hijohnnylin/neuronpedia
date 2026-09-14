@@ -21,6 +21,11 @@ def parse_env_and_args():
     # "auto" loads each checkpoint in its native dtype (e.g. gemma-2/3, qwen3 = bf16; gpt2 = fp32)
     # rather than forcing fp32. Override with MODEL_DTYPE=float32 for tight fp32 numerics if needed.
     args.model_dtype = os.getenv("MODEL_DTYPE", "auto")
+    # On-load quantization of a wider checkpoint ("fp8", "bnb-4bit", "bnb-8bit"), and the dtype of
+    # vLLM's paged KV cache ("auto" or "fp8"). Both go to load_model by the same names; the engine
+    # refuses a scheme the resolved backend cannot apply. Unset = load the checkpoint as stored.
+    args.quantization = os.getenv("MODEL_QUANTIZATION", "") or ""
+    args.kv_cache_dtype = os.getenv("KV_CACHE_DTYPE", "auto") or "auto"
     args.sae_dtype = os.getenv("SAE_DTYPE", "float32")
     args.token_limit = int(os.getenv("TOKEN_LIMIT", "200"))
     # Separate cap for the lens endpoints only (logit/jacobian lens). Defaults to

@@ -98,6 +98,11 @@ class Config:
     custom_hf_model_id: str | None = None
     sae_sets: list[str] = field(default_factory=lambda: ["res-jb"])
     model_dtype: str = "auto"
+    # On-load quantization scheme ("" = the checkpoint as stored) and the vLLM KV cache dtype
+    # ("auto" = model_dtype). Passed to load_model by the same names; the KV dtype also sizes
+    # the serving limits, since an fp8 cache holds twice the tokens.
+    quantization: str = ""
+    kv_cache_dtype: str = "auto"
     sae_dtype: str = "float32"
     secret: str | None = None
     port: int = 5000
@@ -160,6 +165,8 @@ class Config:
         "custom_hf_model_id",
         "override_model_id",
         "model_dtype",
+        "quantization",
+        "kv_cache_dtype",
         "sae_dtype",
         "port",
         "token_limit",
