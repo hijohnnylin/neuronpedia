@@ -72,6 +72,18 @@ error, after the KV cache size already looked fine.
 `VLLM_GPU_MEMORY_UTILIZATION` env var overrides the flag (as env vars do for
 every `start.py` argument).
 
+**Load precision:** `--quantization fp8` quantizes a bf16 checkpoint at load, with
+no calibration step: every linear layer narrows to one byte and the embeddings
+stay at `--model_dtype`, so Llama-3.3-70B goes from ~131 GiB to ~68 GiB and fits
+one 96 GB card. `fp8` is vLLM-only; `bnb-4bit` works on both backends and
+`bnb-8bit` on eager. `--kv_cache_dtype fp8` halves vLLM's KV cache instead, which
+about doubles the context that fits. Both reach `interp_engine.load_model` by the
+same names (interp-engine >= 1.8) and a scheme the resolved backend cannot apply is
+refused at startup. A checkpoint that already ships quantized needs neither flag.
+Env `MODEL_QUANTIZATION` / `KV_CACHE_DTYPE` override the flags. Size the result
+with the engine's `gpu-sizer` before launching:
+`python gpu-sizer/fit.py meta-llama/Llama-3.3-70B-Instruct --quantization fp8`.
+
 **Which vLLM backend a pod runs:** interp-engine splits vLLM into three, and two
 env vars pick between them. They differ only in what the pod declares up front,
 which is what decides whether it can keep CUDA graphs.
