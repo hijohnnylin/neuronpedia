@@ -5,23 +5,21 @@ import * as Select from '@radix-ui/react-select';
 import { JSONSchema } from 'json-schema-to-typescript';
 import { ChevronDownIcon, ExternalLinkIcon } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import Plotly from 'plotly.js-dist-min';
 import { DataTableFilterMeta } from 'primereact/datatable';
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import createPlotlyComponent from 'react-plotly.js/factory';
 import CustomTooltip from '../../components/custom-tooltip';
 import { PCA_BASELINES } from './pca-baselines-data';
 
+import dynamic from 'next/dynamic';
 import { convertEvalTypeToHash, convertNumToAbbr, MetricColumn } from './evals-table';
 
-// const Plot = dynamic(
-//   () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
-//   {
-//     ssr: false,
-//   },
-// );
-
-const Plot = createPlotlyComponent(Plotly);
+const Plot = dynamic(
+  () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
+  {
+    ssr: false,
+  },
+);
 
 export function getSaeBenchDisplayString(v: string) {
   return v === 'sae_bench'
