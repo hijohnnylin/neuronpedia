@@ -178,10 +178,9 @@ Inference, graph and NLA hosts are not configured with environment variables. Th
 Do not add a new `USE_LOCALHOST_*` flag or read a host out of `lib/env.ts`; only the shared secrets
 live there.
 
-Registration goes through `POST /api/compute-host/register`. `new_pod.py` calls it once the pod
-answers, and `make host-register` does it by hand; both need an admin API key. Locally, register a
-server you started yourself with `make host-add` (and see it with `make host-list`), which writes to
-Postgres directly and needs no key.
+Registration goes through `POST /api/compute-host/register`, which needs an admin API key.
+Locally, register a server you started yourself with `make host-add` (and see it with
+`make host-list`), which writes to Postgres directly and needs no key.
 
 Inference pods are launched with whole SAE sets, but the resolver matches a request's individual
 `sourceId`, so the route expands each set name into its member sources and links both. This is why

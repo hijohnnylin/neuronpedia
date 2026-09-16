@@ -137,36 +137,6 @@ host-remove: ## Hosts: deregister a GPU server. Required: SERVICE, URL
 	fi
 	@$(HOST_CLI) remove --service $(SERVICE) --url $(URL)
 
-# host-add writes to the local database directly, which a deployed environment
-# will not accept from a laptop. These two go through the admin API instead.
-REGISTER_CLI = python3 apps/inference/scripts/register_host.py
-
-host-register: ## Hosts: register a GPU server with a deployed webapp over the API. Required: SERVICE, MODEL, URL. Optional: SOURCES, SOURCE_SETS, NLA_SOURCE, NAME, PROVIDER, PROVIDER_REF, WEBAPP, ENVIRONMENT
-	@if [ -z "$(SERVICE)" ] || [ -z "$(MODEL)" ] || [ -z "$(URL)" ]; then \
-		echo "Error: SERVICE, MODEL and URL are all required."; \
-		echo "  e.g. make host-register SERVICE=INFERENCE MODEL=gemma-2-2b \\"; \
-		echo "         URL=https://abc123-5002.proxy.runpod.net SOURCE_SETS=gemmascope-res-16k"; \
-		echo "  Needs NEURONPEDIA_ADMIN_API_KEY (an admin key, from Settings)."; \
-		exit 1; \
-	fi
-	@$(REGISTER_CLI) register --service $(SERVICE) --model $(MODEL) --url $(URL) \
-		$(if $(NAME),--name $(NAME),) \
-		$(if $(SOURCES),--sources $(SOURCES),) \
-		$(if $(SOURCE_SETS),--source-sets $(SOURCE_SETS),) \
-		$(if $(NLA_SOURCE),--nla-source $(NLA_SOURCE),) \
-		$(if $(PROVIDER),--provider $(PROVIDER),) \
-		$(if $(PROVIDER_REF),--provider-ref $(PROVIDER_REF),) \
-		$(if $(WEBAPP),--webapp $(WEBAPP),) \
-		$(if $(ENVIRONMENT),--environment $(ENVIRONMENT),)
-
-host-deregister: ## Hosts: remove a GPU server from a deployed webapp over the API. Required: SERVICE, URL. Optional: WEBAPP
-	@if [ -z "$(SERVICE)" ] || [ -z "$(URL)" ]; then \
-		echo "Error: SERVICE and URL are both required."; \
-		exit 1; \
-	fi
-	@$(REGISTER_CLI) deregister --service $(SERVICE) --url $(URL) \
-		$(if $(WEBAPP),--webapp $(WEBAPP),)
-
 db-reset: ## Database: DROP the schema and rebuild it - this deletes your local data!
 	@echo "WARNING: This will delete all data in your local Neuronpedia database!"
 	@read -p "Are you sure you want to continue? (y/N) " confirm; \
