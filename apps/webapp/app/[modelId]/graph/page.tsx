@@ -265,7 +265,20 @@ export default async function Page(props: {
     }
   } else {
     // No slug specified - pick a default graph
-    if (modelId === 'gemma-2-2b' && modelIdToGraphMetadatasMap['gemma-2-2b']) {
+    if (modelId === 'gemma-2-2b' && initialSourceSet === 'clt-hp') {
+      const cltSlug = 'factthecapitalof-1789506352829';
+      metadataGraph = modelIdToGraphMetadatasMap['gemma-2-2b']?.find((graph) => graph.slug === cltSlug);
+      if (!metadataGraph) {
+        metadataGraph =
+          (await prisma.graphMetadata.findUnique({
+            where: { modelId_slug: { modelId, slug: cltSlug } },
+            include: { user: { select: { name: true } } },
+          })) || undefined;
+        if (metadataGraph) {
+          addGraphMetadataToMap(modelIdToGraphMetadatasMap, modelId, metadataGraph);
+        }
+      }
+    } else if (modelId === 'gemma-2-2b' && modelIdToGraphMetadatasMap['gemma-2-2b']) {
       metadataGraph = modelIdToGraphMetadatasMap['gemma-2-2b'].find(
         (graph) => graph.slug === 'gemma-fact-dallas-austin',
       );
