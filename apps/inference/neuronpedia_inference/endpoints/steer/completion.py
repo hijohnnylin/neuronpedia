@@ -180,12 +180,13 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
         )
 
     logger.info("Non-streaming response")
-    # Each frame carries the whole completion so far, so the last one is the answer.
+    # Each frame carries the whole completion so far, so the last one is the answer. The
+    # generators emit at least one frame per steer type, empty completion included.
     last_frame = None
     async for frame in generator:
         last_frame = frame
     if last_frame is None:
-        raise ValueError("Generator yielded no items")
+        raise ValueError("Steer generator emitted no frame for any steer type")
 
     response = SteerCompletionResponse.model_validate_json(remove_sse_formatting(last_frame))
     # Drop unset fields rather than serializing them as null: callers predating
@@ -417,6 +418,11 @@ async def _vllm_run_batched_generate(
             output_by_type[flag] = text
             yield _completion_frame(steer_types, output_by_type)
         output_by_type[flag] = text
+        if not text:
+            # No delta arrives when the model samples EOS first, or emits only special tokens
+            # (vLLM's detokenizer drops them). Close the type with a frame so the completion
+            # reads as empty rather than missing: a stream with no frame is a 500 downstream.
+            yield _completion_frame(steer_types, output_by_type)
 
 
 def _engine_generate_text(
@@ -480,6 +486,9 @@ def _engine_run_batched_generate(
             output_by_type[flag] = text
             yield _completion_frame(steer_types, output_by_type)
         output_by_type[flag] = text
+        if not text:
+            # Same guard as the vLLM path: one frame per type, even for an empty completion.
+            yield _completion_frame(steer_types, output_by_type)
 
 
 def make_steer_completion_response(

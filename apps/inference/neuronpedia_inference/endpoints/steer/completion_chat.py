@@ -365,7 +365,8 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
             media_type="text/event-stream",
         )
 
-    # for non-streaming request, get last item from generator
+    # For a non-streaming request, the last frame is the answer. The generators emit at least
+    # one frame per steer type, empty completion included.
     last_item = None
     chunk_count = 0
     async for item in generator:
@@ -862,6 +863,18 @@ async def _vllm_chat_generate(
                 inputPrompt,
             )
         output_by_type[flag] = text
+        if not text:
+            # No delta arrives when the model samples EOS first. Close the type with a frame
+            # so the completion reads as empty rather than missing: a stream with no frame is
+            # a 500 downstream.
+            yield _chat_stream_frame(
+                steer_types,
+                output_by_type,
+                prompt_string,
+                model,
+                promptTokenized,
+                inputPrompt,
+            )
         if read_points:
             gen_means_by_type[flag] = _pool_generation_capture(
                 model, inputPrompt, prompt_token_ids, captures, read_points, read_render.template_kwargs
@@ -935,6 +948,16 @@ async def _engine_chat_generate(
                 inputPrompt,
             )
         output_by_type[flag] = text
+        if not text:
+            # Same guard as the vLLM path: one frame per type, even for an empty completion.
+            yield _chat_stream_frame(
+                steer_types,
+                output_by_type,
+                prompt_string,
+                model,
+                promptTokenized,
+                inputPrompt,
+            )
 
     if reads:
         yield await _chat_readout_frame(

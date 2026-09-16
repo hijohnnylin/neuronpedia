@@ -45,23 +45,24 @@ class StubTokenizer:
 class StubBackend:
     """Captures what the endpoint asks for and replays canned harmony deltas."""
 
-    def __init__(self):
+    def __init__(self, deltas: list[str] = DELTAS):
         self.tokenizer = StubTokenizer()
         self.sampling_params = None
         self.prompt_token_ids = None
+        self.deltas = deltas
 
     async def generate_steered(self, prompt_token_ids, sampling_params, **_kwargs):
         self.sampling_params = sampling_params
         self.prompt_token_ids = prompt_token_ids
 
         async def stream():
-            for delta in DELTAS:
+            for delta in self.deltas:
                 yield delta
 
         return stream()
 
 
-async def _frames(model: StubBackend) -> list[dict]:
+async def _frames(model: StubBackend, steer_types: list[NPSteerType] | None = None) -> list[dict]:
     return [
         json.loads(remove_sse_formatting(sse))
         async for sse in _vllm_chat_generate(
@@ -78,12 +79,25 @@ async def _frames(model: StubBackend) -> list[dict]:
                 ],
                 strength_multiplier=1.0,
             ),
-            steer_types=[NPSteerType.DEFAULT],
+            steer_types=steer_types or [NPSteerType.DEFAULT],
             seed=1,
             temperature=0.0,
             max_new_tokens=32,
         )
     ]
+
+
+def test_empty_generation_still_emits_one_frame_per_type():
+    """A model that samples EOS first streams no delta.
+
+    The non-streaming handler reads the last frame as the answer, so a stream with no frame
+    was a 500 ("No response generated"). An empty completion is a valid result and has to
+    arrive as one.
+    """
+    frames = asyncio.run(_frames(StubBackend(deltas=[]), [NPSteerType.STEERED, NPSteerType.DEFAULT]))
+    assert len(frames) == 2
+    final = frames[-1]
+    assert [(o["type"], o["raw"]) for o in final["outputs"]] == [("STEERED", PROMPT), ("DEFAULT", PROMPT)]
 
 
 def _messages(frame: dict) -> list[dict]:
