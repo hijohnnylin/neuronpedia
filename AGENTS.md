@@ -179,8 +179,9 @@ Do not add a new `USE_LOCALHOST_*` flag or read a host out of `lib/env.ts`; only
 live there.
 
 Registration goes through `POST /api/compute-host/register`, which needs an admin API key.
-Locally, register a server you started yourself with `make host-add` (and see it with
-`make host-list`), which writes to Postgres directly and needs no key.
+`GET /api/compute-host` lists every row for the same key; the status page reads it to learn which
+pods should be up. Locally, register a server you started yourself with `make host-add` (and see it
+with `make host-list`), which writes to Postgres directly and needs no key.
 
 Inference pods are launched with whole SAE sets, but the resolver matches a request's individual
 `sourceId`, so the route expands each set name into its member sources and links both. This is why
