@@ -54,14 +54,31 @@ class ChannelNeuron(SparsitySchema):
     weight: float
 
 
+class HealthGpu(SparsitySchema):
+    """One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it."""
+
+    index: int
+    name: str
+    free_bytes: int
+    total_bytes: int
+
+
 class HealthResponse(SparsitySchema):
-    """Liveness plus the dimensions needed to bounds-check a request."""
+    """The dimensions needed to bounds-check a request, plus the ``/health`` verdict.
+
+    ``GET /`` reports the dimensions only. ``GET /health`` also reads a weight off the device,
+    and ``status`` is ``ok`` (200) or ``unhealthy`` (503, with ``error``) by that result.
+    """
 
     status: str
     model: str
     num_layers: int
     mlp_size: int
     d_model: int
+    # Wall time of the /health device read. Null when it did not run.
+    probe_ms: float | None = None
+    error: str | None = None
+    gpus: list[HealthGpu] = Field(default_factory=list)
 
 
 class NeuronConnectionsResponse(SparsitySchema):

@@ -441,4 +441,18 @@ FastAPI has a built-in docs + endpoint tester. After running the server, to see 
 
 Notes/Caveats:
 
-- If you set a SECRET (not set by default) in your `.env` file, you'll need to add a `x-secret-key` header.
+- The `x-secret-key` header is required on every path, `/docs` and `/health` included.
+
+## Health check
+
+`GET /health` is for monitors. It runs one token through the loaded model under the same lock the GPU handlers take, so a 200 means a request would work right now.
+
+- 200 `"status": "ok"`: the forward pass ran; `probe_ms` is its wall time.
+- 200 `"status": "busy"`: a graph is being generated, so the probe stood aside; `busy_seconds` says for how long.
+- 503 `"status": "unhealthy"`: the probe failed (`error` says how), it did not finish in `HEALTH_PROBE_TIMEOUT` seconds (default 20), or one request has held the server longer than `HEALTH_BUSY_LIMIT` seconds (default 1200).
+
+The body also lists per-GPU free and total memory.
+
+```bash
+curl -H "x-secret-key: $SECRET" http://localhost:5004/health
+```

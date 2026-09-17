@@ -1,3 +1,4 @@
+import asyncio
 import gc
 import gzip
 import json
@@ -21,6 +22,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import Headers
 from transformers import AutoTokenizer
 
 from neuronpedia_graph.chat_prompt import (
@@ -39,6 +41,8 @@ from neuronpedia_graph.schemas import (
     GraphChatMessage,
     GraphGenerationRequest,
     GraphGenerationResponse,
+    HealthGpu,
+    HealthResponse,
     LogitsByToken,
     ParseChatPromptRequest,
     ParseChatPromptResponse,
@@ -235,7 +239,49 @@ if not HF_TOKEN:
 
 transcoders: Any = None
 model: Any = None
-request_lock = threading.Lock()
+
+
+class BusyLock:
+    """A ``threading.Lock`` that also knows when it was taken.
+
+    The GPU handlers hold it for the whole request and ``/health`` reads how long, so a
+    request that never finishes reads as unhealthy rather than as forever busy.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._acquired_at: float | None = None
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        taken = self._lock.acquire(blocking, timeout)
+        if taken:
+            self._acquired_at = time.monotonic()
+        return taken
+
+    def release(self) -> None:
+        self._acquired_at = None
+        self._lock.release()
+
+    def locked(self) -> bool:
+        return self._lock.locked()
+
+    def held_for(self) -> float | None:
+        """Seconds the current holder has had it. None when free."""
+        since = self._acquired_at
+        if since is None or not self._lock.locked():
+            return None
+        return time.monotonic() - since
+
+
+request_lock = BusyLock()
+
+# A request that holds the server longer than this is stuck, and /health says so. Graph
+# generation on a large model is minutes, not tens of minutes.
+HEALTH_BUSY_LIMIT_SECONDS = float(os.getenv("HEALTH_BUSY_LIMIT", "1200"))
+# How long the /health forward pass may take before the pod reports unhealthy. Below a
+# monitor's own timeout on purpose, so the answer is a 503 with a reason, not a dropped
+# connection.
+HEALTH_PROBE_TIMEOUT_SECONDS = float(os.getenv("HEALTH_PROBE_TIMEOUT", "20"))
 
 TRANSCODER_SET_TO_SOURCE_URL_ARRAYS = {
     "gemma": [
@@ -449,6 +495,27 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
+class SecretKeyMiddleware:
+    """Reject a request without the shared secret.
+
+    The route dependency ``verify_secret_key`` below cannot reach ``/docs`` or
+    ``/openapi.json``, which FastAPI mounts as plain routes; middleware covers every path.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] == "http" and Headers(scope=scope).get("x-secret-key") != SECRET_KEY:
+            response = JSONResponse(status_code=401, content={"error": "Invalid or missing x-secret-key header"})
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(SecretKeyMiddleware)
+
+
 def resolve_prompt(prompt: str, messages: list[GraphChatMessage] | None) -> str:
     """Prefer structured ``messages`` (rendered server-side); else the raw string.
 
@@ -511,6 +578,101 @@ async def verify_secret_key(x_secret_key: str = Header(None)):
 async def check_busy():
     """Check if the server is currently busy processing a request."""
     return CheckBusyResponse(busy=request_lock.locked())
+
+
+def _gpu_report() -> list[HealthGpu]:
+    """Free and total memory per visible CUDA card. Raises on a poisoned context."""
+    if not torch.cuda.is_available():
+        return []
+    report: list[HealthGpu] = []
+    for index in range(torch.cuda.device_count()):
+        device = torch.device(f"cuda:{index}")
+        free, total = torch.cuda.mem_get_info(device)
+        report.append(
+            HealthGpu(
+                index=index, name=torch.cuda.get_device_name(device), free_bytes=int(free), total_bytes=int(total)
+            )
+        )
+    return report
+
+
+def _health_forward_pass() -> None:
+    """One token through the model, the way ``/forward-pass`` runs it. Releases the lock."""
+    try:
+        tokenizer = model.tokenizer
+        bos = getattr(tokenizer, "bos_token_id", None)
+        token_ids = [int(bos)] if bos is not None else tokenizer.encode("The", add_special_tokens=False)[:1]
+        input_ids = torch.tensor([token_ids or [0]]).to(get_device())
+        with torch.no_grad():
+            output = model(input_ids)
+            logits = getattr(output, "logits", output)
+            # ``.all()`` in a bool context syncs the device, so a kernel that failed
+            # asynchronously surfaces here rather than in the next request.
+            if not bool(torch.isfinite(logits[0, -1]).all()):
+                raise RuntimeError("forward pass produced non-finite logits")
+    finally:
+        request_lock.release()
+
+
+@app.get(
+    "/health",
+    dependencies=[Depends(verify_secret_key)],
+    responses={200: {"model": HealthResponse}, 503: {"model": HealthResponse}},
+)
+async def health_check():
+    """Run one token through the loaded model; 200 only when that works or a request is running.
+
+    A ping cannot tell a serving pod from one whose CUDA context is poisoned or whose model
+    OOMed at load. The forward pass can. It takes the same lock as the GPU handlers, so it
+    never overlaps a graph generation; when one is running the probe stands aside and reports
+    ``busy``, which becomes ``unhealthy`` once the holder has exceeded HEALTH_BUSY_LIMIT.
+    """
+    body = HealthResponse(
+        status="ok",
+        attribution_engine=ATTRIBUTION_ENGINE,
+        model_engine=MODEL_ENGINE,
+        busy=False,
+    )
+    if model is None:
+        body.status = "starting"
+        return JSONResponse(status_code=503, content=body.model_dump())
+    body.model = loaded_model_arg
+
+    try:
+        body.gpus = _gpu_report()
+    # The point of the endpoint is to report whatever the device says, including a poisoned context.
+    except Exception as e:  # noqa: BLE001
+        body.status = "unhealthy"
+        body.error = f"{type(e).__name__}: {e}"[:500]
+        return JSONResponse(status_code=503, content=body.model_dump())
+
+    if not request_lock.acquire(blocking=False):
+        held = request_lock.held_for()
+        body.busy = True
+        body.busy_seconds = round(held, 1) if held is not None else None
+        if held is not None and held > HEALTH_BUSY_LIMIT_SECONDS:
+            body.status = "unhealthy"
+            body.error = f"a request has held the server for {held:.0f}s (limit {HEALTH_BUSY_LIMIT_SECONDS:g}s)"
+            return JSONResponse(status_code=503, content=body.model_dump())
+        body.status = "busy"
+        return JSONResponse(status_code=200, content=body.model_dump())
+
+    started = time.monotonic()
+    try:
+        # In a worker thread so a wedged forward pass answers 503 on time; the thread releases
+        # the lock when it eventually returns. Not run_in_threadpool: anyio defers the
+        # cancellation until the thread ends, which is exactly the wait this avoids.
+        loop = asyncio.get_running_loop()
+        await asyncio.wait_for(loop.run_in_executor(None, _health_forward_pass), HEALTH_PROBE_TIMEOUT_SECONDS)
+        body.probe_ms = round((time.monotonic() - started) * 1000, 1)
+    except TimeoutError:
+        body.status = "unhealthy"
+        body.error = f"probe forward pass did not finish in {HEALTH_PROBE_TIMEOUT_SECONDS:g}s"
+    except Exception as e:  # noqa: BLE001 - see above
+        body.status = "unhealthy"
+        body.error = f"{type(e).__name__}: {e}"[:500]
+
+    return JSONResponse(status_code=200 if body.status == "ok" else 503, content=body.model_dump())
 
 
 @app.post(

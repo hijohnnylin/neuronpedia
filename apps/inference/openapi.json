@@ -1238,9 +1238,100 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "HealthResponse": {
-        "description": "Liveness only -- says the process is up, not that a model finished loading.",
+      "HealthGpu": {
+        "description": "One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it.",
         "properties": {
+          "freeBytes": {
+            "title": "Freebytes",
+            "type": "integer"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "totalBytes": {
+            "title": "Totalbytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "name",
+          "freeBytes",
+          "totalBytes"
+        ],
+        "title": "HealthGpu",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "What ``GET /health`` reports.\n\n``status`` is ``ok`` only when a real one-token forward pass just ran on the loaded\nmodel; the endpoint answers 200 then and 503 otherwise, so a monitor needs only the\nstatus code. ``starting`` means the model is still loading, ``unhealthy`` means the\nprobe failed and ``error`` says how.",
+        "properties": {
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/HealthGpu"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "probeMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probems"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -2959,6 +3050,7 @@
   "paths": {
     "/health": {
       "get": {
+        "description": "Run one token through the loaded model. 200 only when that works; see ``health.py``.\n\nWhile the model loads this answers 503 with ``status: starting``, so a monitor sees the\nsame shape throughout and needs only the status code.",
         "operationId": "healthGet",
         "responses": {
           "200": {
@@ -2970,9 +3062,18 @@
               }
             },
             "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           }
         },
-        "security": [],
         "summary": "Health Check"
       }
     },

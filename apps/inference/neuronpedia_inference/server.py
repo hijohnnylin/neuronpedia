@@ -27,6 +27,7 @@ from interp_engine import (
 from starlette.datastructures import Headers
 from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 
+from neuronpedia_inference import health
 from neuronpedia_inference.args import parse_env_and_args
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.activation.all import (
@@ -842,12 +843,11 @@ app.include_router(v1_router)
 
 
 def _openapi_with_secret_key_auth() -> dict[str, Any]:
-    """Document the ``X-SECRET-KEY`` header that ``check_secret_key`` below enforces.
+    """Document the ``X-SECRET-KEY`` header that ``SecretKeyMiddleware`` below enforces.
 
     That check is middleware rather than a route dependency, so FastAPI cannot see it and
     would otherwise emit a spec claiming every endpoint is open -- which the clients
-    generated from that spec would then believe. ``/health`` is the one exemption, matching
-    the middleware.
+    generated from that spec would then believe. Every path is covered, ``/health`` too.
     """
     if app.openapi_schema:
         return app.openapi_schema
@@ -862,7 +862,6 @@ def _openapi_with_secret_key_auth() -> dict[str, Any]:
         "SimpleSecretAuth": {"type": "apiKey", "in": "header", "name": "X-SECRET-KEY"}
     }
     schema["security"] = [{"SimpleSecretAuth": []}]
-    schema["paths"]["/health"]["get"]["security"] = []
     app.openapi_schema = schema
     return schema
 
@@ -870,9 +869,22 @@ def _openapi_with_secret_key_auth() -> dict[str, Any]:
 app.openapi = _openapi_with_secret_key_auth
 
 
-@app.get("/health", responses={200: {"model": HealthResponse}})
+@app.get("/health", responses={200: {"model": HealthResponse}, 503: {"model": HealthResponse}})
 async def health_check():
-    return {"status": "healthy"}
+    """Run one token through the loaded model. 200 only when that works; see ``health.py``.
+
+    While the model loads this answers 503 with ``status: starting``, so a monitor sees the
+    same shape throughout and needs only the status code.
+    """
+    if not initialized:
+        body = HealthResponse(
+            status="unhealthy" if initialization_error else "starting",
+            error=initialization_error,
+        )
+        return JSONResponse(status_code=503, content=body.model_dump())
+
+    body = await health.probe(Model.get_instance(), Config.get_instance())
+    return JSONResponse(status_code=200 if body.status == "ok" else 503, content=body.model_dump())
 
 
 @app.post("/initialize")
@@ -1259,20 +1271,27 @@ async def initialize(
 
 
 class SecretKeyMiddleware:
-    """Reject a request without the shared secret, once the pod is configured with one."""
+    """Reject a request without the shared secret, once the pod is configured with one.
+
+    Every path is covered, ``/health`` and ``/docs`` included: the health body reports what
+    is loaded and how much VRAM is free, which is not for the open internet.
+    """
 
     def __init__(self, app: Any) -> None:
         self.app = app
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
-        if scope["type"] != "http" or scope["path"] in ("/health",):
+        if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        config = Config.get_instance()
-        if config.secret is not None:
+        # ``initialize()`` copies SECRET onto the config; until then the environment is the
+        # only copy, and ``/health`` is already answering.
+        config = Config._instance  # not get_instance(), which would create a default
+        secret = (config.secret if config is not None else None) or os.getenv("SECRET")
+        if secret is not None:
             secret_key = Headers(scope=scope).get("x-secret-key")
-            if not secret_key or secret_key != config.secret:
+            if not secret_key or secret_key != secret:
                 response = JSONResponse(
                     status_code=401,
                     content={"error": "Invalid or missing X-SECRET-KEY header"},
@@ -1331,6 +1350,9 @@ class CudaHealthMiddleware:
 
     The probe runs after the response body is complete, so for the streaming endpoints it now
     covers the generation itself rather than only the work done before the first frame.
+
+    ``/health`` is let through during startup: it reports ``starting`` itself, with a 503, so
+    a monitor sees one response shape from first boot to serving.
     """
 
     def __init__(self, app: Any) -> None:
@@ -1341,7 +1363,7 @@ class CudaHealthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if not initialized:
+        if not initialized and scope["path"] != "/health":
             error_details = f" Initialization error: {initialization_error}" if initialization_error else ""
             response = JSONResponse(
                 status_code=500,

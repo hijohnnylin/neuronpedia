@@ -260,7 +260,7 @@ def _server_healthy(srv: _RunningServer) -> bool:
         if engine is None or getattr(engine, "errored", False):
             return False
     try:
-        return srv.client.get("/health").status_code == 200
+        return srv.client.get("/health", headers={"X-SECRET-KEY": X_SECRET_KEY}).status_code == 200
     except Exception:  # noqa: BLE001
         return False
 

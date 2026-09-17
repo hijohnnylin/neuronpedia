@@ -51,6 +51,7 @@ from neuronpedia_inference.schemas.chat_template import (
 from neuronpedia_inference.schemas.common import (
     BaseSchema,
     ExactSchema,
+    HealthGpu,
     HealthResponse,
     NPFeature,
     NPLogprob,
@@ -131,6 +132,7 @@ __all__ = [
     "BaseSchema",
     "ExactSchema",
     "ChatMessage",
+    "HealthGpu",
     "HealthResponse",
     "LensChatMessage",
     "LensPromptRequest",

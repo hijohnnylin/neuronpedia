@@ -118,6 +118,38 @@ class CheckBusyResponse(GraphSchema):
     busy: bool
 
 
+class HealthGpu(GraphSchema):
+    """One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it."""
+
+    index: int
+    name: str
+    free_bytes: int
+    total_bytes: int
+
+
+class HealthResponse(GraphSchema):
+    """What ``GET /health`` reports.
+
+    ``status`` is ``ok`` when a one-token forward pass just ran, ``busy`` when a graph is being
+    generated and the probe stood aside, ``starting`` while the model loads and ``unhealthy``
+    when the probe failed or a request has held the server for longer than
+    ``HEALTH_BUSY_LIMIT`` seconds. The endpoint answers 200 for the first two and 503 for the
+    rest, so a monitor needs only the status code.
+    """
+
+    status: str
+    model: str | None = None
+    attribution_engine: str
+    model_engine: str
+    busy: bool
+    # How long the current request has held the server. Null when idle.
+    busy_seconds: float | None = None
+    # Wall time of the probe forward pass. Null when it did not run.
+    probe_ms: float | None = None
+    error: str | None = None
+    gpus: list[HealthGpu] = Field(default_factory=list)
+
+
 class ParseChatPromptResponse(GraphSchema):
     # None when the model has no chat template, or the prompt is plain text with no
     # recognizable turn headers. Callers should then treat it as a raw prompt.

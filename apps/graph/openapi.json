@@ -259,6 +259,115 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HealthGpu": {
+        "description": "One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it.",
+        "properties": {
+          "free_bytes": {
+            "title": "Free Bytes",
+            "type": "integer"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "name",
+          "free_bytes",
+          "total_bytes"
+        ],
+        "title": "HealthGpu",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "What ``GET /health`` reports.\n\n``status`` is ``ok`` when a one-token forward pass just ran, ``busy`` when a graph is being\ngenerated and the probe stood aside, ``starting`` while the model loads and ``unhealthy``\nwhen the probe failed or a request has held the server for longer than\n``HEALTH_BUSY_LIMIT`` seconds. The endpoint answers 200 for the first two and 503 for the\nrest, so a monitor needs only the status code.",
+        "properties": {
+          "attribution_engine": {
+            "title": "Attribution Engine",
+            "type": "string"
+          },
+          "busy": {
+            "title": "Busy",
+            "type": "boolean"
+          },
+          "busy_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Busy Seconds"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/HealthGpu"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_engine": {
+            "title": "Model Engine",
+            "type": "string"
+          },
+          "probe_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Ms"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "attribution_engine",
+          "model_engine",
+          "busy"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
       "LogitsByToken": {
         "properties": {
           "token": {
@@ -706,6 +815,56 @@
           }
         },
         "summary": "Generate Graph"
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Run one token through the loaded model; 200 only when that works or a request is running.\n\nA ping cannot tell a serving pod from one whose CUDA context is poisoned or whose model\nOOMed at load. The forward pass can. It takes the same lock as the GPU handlers, so it\nnever overlaps a graph generation; when one is running the probe stands aside and reports\n``busy``, which becomes ``unhealthy`` once the holder has exceeded HEALTH_BUSY_LIMIT.",
+        "operationId": "health_check_health_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "title": "X-Secret-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Health Check"
       }
     },
     "/parse-chat-prompt": {

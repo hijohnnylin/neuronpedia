@@ -26,6 +26,19 @@ class BaseSchema(BaseModel):
     )
 
 
+class HealthResponse(BaseSchema):
+    """What ``GET /health`` reports.
+
+    ``status`` is ``ok`` only when the embedding model just encoded a string; the endpoint
+    answers 200 then and 503 otherwise, with ``error`` saying why.
+    """
+
+    status: StrictStr
+    #: Wall time of the probe encode. Null when it did not run.
+    probe_ms: StrictFloat | None = None
+    error: StrictStr | None = None
+
+
 class NPActivation(BaseSchema):
     """
     An activation record containing tokens and their corresponding activation values

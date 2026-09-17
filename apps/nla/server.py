@@ -5,6 +5,7 @@ Loads verbalizer model via sgl.Engine in-process (no separate SGLang server need
 Uses async_generate() to avoid event-loop conflicts with uvicorn's uvloop.
 
 Endpoints:
+  GET  /health   — one token through the verbalizer; 200 only when it works
   POST /describe — activation vector(s) -> natural language descriptions + MSE scores
   POST /score   — text + original vector -> MSE/cosine
   POST /compare — two vectors -> description of the difference vector
@@ -12,7 +13,8 @@ Endpoints:
   POST /extract — text -> per-token activation vectors from source model
 
 Config via env vars:
-  SECRET                          — shared auth secret (X-SECRET-KEY header)
+  SECRET                          — shared auth secret (X-SECRET-KEY header), covers /docs too
+  HEALTH_PROBE_TIMEOUT            — seconds the /health generation may take (default: 20)
   NLA_VERBALIZER_MODEL            — HF hub ID or local path (e.g. kitft/nla-qwen2.5-7b-actor-step4200)
   NLA_RECONSTRUCTOR_MODEL         — HF hub ID or local path (optional, enables /score)
   NLA_SOURCE_MODEL                — HF hub ID for the base model (default: Qwen/Qwen2.5-7B-Instruct)
@@ -270,9 +272,10 @@ import sentry_sdk
 import torch
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from interp_engine import check_cuda_driver
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.datastructures import Headers
 from transformers.generation.streamers import BaseStreamer
 
 # Configure the "nla" logger explicitly with its own handler and disable
@@ -969,6 +972,32 @@ app = FastAPI(
 )
 
 
+class SecretKeyMiddleware:
+    """Reject a request without the shared secret, when SECRET is configured.
+
+    The app-level ``verify_secret`` dependency cannot reach ``/docs`` or ``/openapi.json``,
+    which FastAPI mounts as plain routes; middleware covers every path.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if SECRET is not None and scope["type"] == "http" and Headers(scope=scope).get("x-secret-key") != SECRET:
+            response = JSONResponse(status_code=401, content={"error": "Invalid or missing X-SECRET-KEY header"})
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(SecretKeyMiddleware)
+
+# How long the /health forward pass may take before the pod reports unhealthy. Below a
+# monitor's own timeout on purpose, so the answer is a 503 with a reason, not a dropped
+# connection.
+HEALTH_PROBE_TIMEOUT_SECONDS = float(os.getenv("HEALTH_PROBE_TIMEOUT", "20"))
+
+
 # ─── Request-shape limits (bound worst-case memory per request) ─────────────
 #
 # These complement the global concurrency gates (NLA_MAX_CONCURRENT_EXPLAINS,
@@ -1376,14 +1405,29 @@ class HealthLimits(NlaSchema):
     max_completion_tokens: int
 
 
+class HealthGpu(NlaSchema):
+    """One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it."""
+
+    index: int
+    name: str
+    free_bytes: int
+    total_bytes: int
+
+
 class HealthResponse(NlaSchema):
-    """Liveness plus which components loaded and how they were configured.
+    """Which components loaded and how they were configured, plus the ``/health`` verdict.
 
     Most fields are null until the lifespan finishes, and stay null for whichever of the
-    verbalizer / reconstructor / source model this process did not load.
+    verbalizer / reconstructor / source model this process did not load. ``GET /`` reports
+    configuration only; ``GET /health`` also runs one token through the verbalizer, and
+    ``status`` is ``ok`` (200) or ``unhealthy`` (503, with ``error``) by that result.
     """
 
     status: str
+    # Wall time of the /health forward pass. Null when it did not run.
+    probe_ms: float | None = None
+    error: str | None = None
+    gpus: list[HealthGpu] = Field(default_factory=list)
     verbalizer_model: str
     d_model: int | None = None
     verbalizer_quantization: str | None = None
@@ -1900,9 +1944,70 @@ async def completion(req: CompletionRequest):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+def _gpu_report() -> list[HealthGpu]:
+    """Free and total memory per visible CUDA card. Raises on a poisoned context."""
+    if not torch.cuda.is_available():
+        return []
+    report: list[HealthGpu] = []
+    for index in range(torch.cuda.device_count()):
+        device = torch.device(f"cuda:{index}")
+        free, total = torch.cuda.mem_get_info(device)
+        report.append(
+            HealthGpu(
+                index=index, name=torch.cuda.get_device_name(device), free_bytes=int(free), total_bytes=int(total)
+            )
+        )
+    return report
+
+
 @app.get("/", responses={200: {"model": HealthResponse}})
 async def root():
-    """Health check."""
+    """Configuration report. Does not touch the GPU; see ``/health`` for that."""
+    return _health_body()
+
+
+@app.get("/health", responses={200: {"model": HealthResponse}, 503: {"model": HealthResponse}})
+async def health_check():
+    """Run one token through the verbalizer; 200 only when that works.
+
+    A ping cannot tell a serving pod from one whose vLLM engine child died or whose CUDA
+    context is poisoned. A real generation can, and it takes the same path ``/describe``
+    does. The reconstructor and source model are reported but not exercised.
+    """
+    body = _health_body()
+    if nla_client is None:
+        body.status = "starting"
+        return JSONResponse(status_code=503, content=body.model_dump())
+
+    started = time.monotonic()
+    try:
+        body.gpus = _gpu_report()
+        engine = getattr(getattr(nla_client, "backend", None), "engine", None)
+        if engine is not None and getattr(engine, "errored", False):
+            raise RuntimeError("vLLM engine is dead")
+        # A zero activation is safe: normalize_activation clamps the norm.
+        await asyncio.wait_for(
+            nla_client.async_generate(
+                np.zeros(nla_client.cfg.d_model, dtype=np.float32),
+                extract_explanation=False,
+                temperature=0.0,
+                max_new_tokens=1,
+            ),
+            HEALTH_PROBE_TIMEOUT_SECONDS,
+        )
+        body.probe_ms = round((time.monotonic() - started) * 1000, 1)
+    except TimeoutError:
+        body.status = "unhealthy"
+        body.error = f"probe generation did not finish in {HEALTH_PROBE_TIMEOUT_SECONDS:g}s"
+    # The point of the endpoint is to report whatever failed, including a poisoned context.
+    except Exception as e:  # noqa: BLE001
+        body.status = "unhealthy"
+        body.error = f"{type(e).__name__}: {e}"[:500]
+
+    return JSONResponse(status_code=200 if body.status == "ok" else 503, content=body.model_dump())
+
+
+def _health_body() -> HealthResponse:
     return HealthResponse(
         status="ok",
         verbalizer_model=VERBALIZER_MODEL,

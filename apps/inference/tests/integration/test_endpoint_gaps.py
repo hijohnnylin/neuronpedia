@@ -22,9 +22,19 @@ SOURCE = SAE_SELECTED_SOURCES[0]
 
 
 def test_health(client: TestClient):
+    resp = client.get("/health", headers=HEADERS)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["backend"] == "eager"
+    # A real forward pass ran, so its wall time is reported.
+    assert body["probeMs"] > 0
+    assert body["error"] is None
+
+
+def test_health_requires_the_secret(client: TestClient):
     resp = client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json() == {"status": "healthy"}
+    assert resp.status_code == 401
 
 
 def test_capabilities(client: TestClient):

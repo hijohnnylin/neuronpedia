@@ -49,7 +49,7 @@ def test_operation_ids_are_sdk_shaped():
     ids = [operation["operationId"] for path in schema["paths"].values() for operation in path.values()]
 
     assert len(ids) == len(set(ids)), f"duplicate operation ids: {sorted({i for i in ids if ids.count(i) > 1})}"
-    assert set(ids) == {"explainDefaultPost", "scoreEmbeddingPost", "scoreFuzzDetectionPost"}, (
+    assert set(ids) == {"explainDefaultPost", "healthGet", "scoreEmbeddingPost", "scoreFuzzDetectionPost"}, (
         f"operation ids changed, which renames every method in the published SDK: {sorted(ids)}"
     )
     assert all(re.fullmatch(r"[a-z][A-Za-z0-9]*", i) for i in ids)

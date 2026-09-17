@@ -157,7 +157,19 @@ FastAPI has a built-in docs + endpoint tester. After running the server, to see 
 Notes/Caveats:
 
 - Simple usage: Expand `/v1/activation/single`, click Try It Out, then click "Execute".
-- If you set a SECRET (not set by default) in your `.env` file, you'll need to add a `x-secret-key` header.
+- If you set a SECRET (not set by default) in your `.env` file, you'll need to add a `x-secret-key` header. This covers `/docs` and `/health` too.
+
+### Health check
+
+`GET /health` is for monitors. It runs one token through the loaded model on the path requests take, so a 200 means a request would work right now; a ping cannot tell that from a dead vLLM engine or a poisoned CUDA context. The body carries `status`, the model and backend, `probeMs`, per-GPU free and total memory, and `error` when something failed.
+
+- 200 `"status": "ok"`: the forward pass ran.
+- 503 `"status": "starting"`: the model or the vLLM engine is still loading.
+- 503 `"status": "unhealthy"`: the probe failed; `error` says how. A probe that does not finish in `HEALTH_PROBE_TIMEOUT` seconds (default 20) counts as a failure.
+
+```bash
+curl -H "x-secret-key: $SECRET" http://localhost:5002/health
+```
 
 ### Loading Specific SAEs From SAELens
 

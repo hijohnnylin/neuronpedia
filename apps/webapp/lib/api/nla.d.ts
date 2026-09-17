@@ -13,7 +13,7 @@ export interface paths {
     };
     /**
      * Root
-     * @description Health check.
+     * @description Configuration report. Does not touch the GPU; see ``/health`` for that.
      */
     get: operations['root__get'];
     put?: never;
@@ -135,6 +135,30 @@ export interface paths {
      * @description Extract per-token activation vectors from the source model.
      */
     post: operations['extract_extract_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health Check
+     * @description Run one token through the verbalizer; 200 only when that works.
+     *
+     *     A ping cannot tell a serving pod from one whose vLLM engine child died or whose CUDA
+     *     context is poisoned. A real generation can, and it takes the same path ``/describe``
+     *     does. The reconstructor and source model are reported but not exercised.
+     */
+    get: operations['health_check_health_get'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -478,6 +502,20 @@ export interface components {
       detail?: components['schemas']['ValidationError'][];
     };
     /**
+     * HealthGpu
+     * @description One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it.
+     */
+    HealthGpu: {
+      /** Free Bytes */
+      free_bytes: number;
+      /** Index */
+      index: number;
+      /** Name */
+      name: string;
+      /** Total Bytes */
+      total_bytes: number;
+    };
+    /**
      * HealthLimits
      * @description The request caps this process was configured with, so a client can pre-validate.
      */
@@ -497,18 +535,24 @@ export interface components {
     };
     /**
      * HealthResponse
-     * @description Liveness plus which components loaded and how they were configured.
+     * @description Which components loaded and how they were configured, plus the ``/health`` verdict.
      *
      *     Most fields are null until the lifespan finishes, and stay null for whichever of the
-     *     verbalizer / reconstructor / source model this process did not load.
+     *     verbalizer / reconstructor / source model this process did not load. ``GET /`` reports
+     *     configuration only; ``GET /health`` also runs one token through the verbalizer, and
+     *     ``status`` is ``ok`` (200) or ``unhealthy`` (503, with ``error``) by that result.
      */
     HealthResponse: {
       /** Completion Available */
       completion_available: boolean;
       /** D Model */
       d_model?: number | null;
+      /** Error */
+      error?: string | null;
       /** Extraction Layer */
       extraction_layer?: number | null;
+      /** Gpus */
+      gpus?: components['schemas']['HealthGpu'][];
       limits: components['schemas']['HealthLimits'];
       /** Max Concurrent */
       max_concurrent: number;
@@ -518,6 +562,8 @@ export interface components {
       max_describe_requests: number;
       /** Num Cuda Devices */
       num_cuda_devices: number;
+      /** Probe Ms */
+      probe_ms?: number | null;
       /** Reconstructor Available */
       reconstructor_available: boolean;
       /** Reconstructor Device */
@@ -885,6 +931,46 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  health_check_health_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'x-secret-key'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
         };
       };
     };

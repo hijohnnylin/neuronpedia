@@ -2,8 +2,10 @@
 FastAPI server for analyzing MLP neuron connections in sparse circuit models.
 """
 
+import math
 import os
 import sys
+import time
 import types
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
@@ -12,12 +14,15 @@ import sentry_sdk
 import torch
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.responses import JSONResponse
+from starlette.datastructures import Headers
 from transformers import AutoModelForCausalLM
 from transformers.dynamic_module_utils import get_class_from_dynamic_module
 
 from schemas import (
     ChannelConnectionsResponse,
     ChannelNeuron,
+    HealthGpu,
     HealthResponse,
     NeuronConnectionsResponse,
     TraceNode,
@@ -213,6 +218,27 @@ app = FastAPI(
 )
 
 
+class SecretKeyMiddleware:
+    """Reject a request without the shared secret, when SECRET is configured.
+
+    The app-level ``verify_secret`` dependency cannot reach ``/docs`` or ``/openapi.json``,
+    which FastAPI mounts as plain routes; middleware covers every path.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if SECRET is not None and scope["type"] == "http" and Headers(scope=scope).get("x-secret-key") != SECRET:
+            response = JSONResponse(status_code=401, content={"error": "Invalid or missing X-SECRET-KEY header"})
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(SecretKeyMiddleware)
+
+
 def get_layers() -> Any:
     """Get transformer layers from model."""
     if model is None:
@@ -324,9 +350,7 @@ def trace_circuit_backward(start_layer: int, start_neuron: int, depth: int = 3, 
     return trace_from_neuron(start_layer, start_neuron, depth) or []
 
 
-@app.get("/", responses={200: {"model": HealthResponse}})
-async def root():
-    """Health check and model info."""
+def _model_info() -> HealthResponse:
     layers = get_layers()
     return HealthResponse(
         status="ok",
@@ -335,6 +359,51 @@ async def root():
         mlp_size=layers[0].mlp.c_fc.weight.shape[0],
         d_model=layers[0].mlp.c_proj.weight.shape[0],
     )
+
+
+def _gpu_report() -> list[HealthGpu]:
+    """Free and total memory per visible CUDA card. Raises on a poisoned context."""
+    if not torch.cuda.is_available():
+        return []
+    report: list[HealthGpu] = []
+    for index in range(torch.cuda.device_count()):
+        device = torch.device(f"cuda:{index}")
+        free, total = torch.cuda.mem_get_info(device)
+        report.append(
+            HealthGpu(
+                index=index, name=torch.cuda.get_device_name(device), free_bytes=int(free), total_bytes=int(total)
+            )
+        )
+    return report
+
+
+@app.get("/", responses={200: {"model": HealthResponse}})
+async def root():
+    """Model info. Does not touch the device; see ``/health`` for that."""
+    return _model_info()
+
+
+@app.get("/health", responses={200: {"model": HealthResponse}, 503: {"model": HealthResponse}})
+async def health_check():
+    """Read one weight off the device; 200 only when that works.
+
+    The routes here read weights and run no forward pass, so a weight read is the probe. It
+    syncs the device, so a poisoned CUDA context fails here rather than on the next request.
+    """
+    if model is None:
+        return JSONResponse(status_code=503, content={"status": "starting", "error": "model is not loaded yet"})
+    body = _model_info()
+    started = time.monotonic()
+    try:
+        body.gpus = _gpu_report()
+        if math.isnan(get_layers()[0].mlp.c_fc.weight[0, 0].item()):
+            raise RuntimeError("weights hold NaN")
+        body.probe_ms = round((time.monotonic() - started) * 1000, 1)
+    # The point of the endpoint is to report whatever failed, including a poisoned context.
+    except Exception as e:  # noqa: BLE001
+        body.status = "unhealthy"
+        body.error = f"{type(e).__name__}: {e}"[:500]
+    return JSONResponse(status_code=200 if body.status == "ok" else 503, content=body.model_dump())
 
 
 @app.get("/neuron/{layer}/{neuron}", responses={200: {"model": NeuronConnectionsResponse}})

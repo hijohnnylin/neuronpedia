@@ -11,7 +11,7 @@ carries ``ScoreFuzzDetectionRequest`` and ``ScoreFuzzDetectionResponse``. Renami
 a breaking change for SDK consumers.
 """
 
-from neuronpedia_autointerp.schemas.common import BaseSchema, NPActivation
+from neuronpedia_autointerp.schemas.common import BaseSchema, HealthResponse, NPActivation
 from neuronpedia_autointerp.schemas.explain import (
     ExplainDefaultRequest,
     ExplainDefaultResponse,
@@ -30,6 +30,7 @@ __all__ = [
     "BaseSchema",
     "ExplainDefaultRequest",
     "ExplainDefaultResponse",
+    "HealthResponse",
     "NPActivation",
     "ScoreEmbeddingBreakdownItem",
     "ScoreEmbeddingRequest",

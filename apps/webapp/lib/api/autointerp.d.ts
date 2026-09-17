@@ -4,6 +4,30 @@
  */
 
 export interface paths {
+  '/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health Check
+     * @description Encode one string with the embedding model; 200 only when that works.
+     *
+     *     The explainers call remote LLM APIs and are not exercised. The embedding scorer is the
+     *     one local model, and a ping cannot tell a serving pod from one whose CUDA context is
+     *     poisoned; an encode can.
+     */
+    get: operations['healthGet'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/v1/explain/default': {
     parameters: {
       query?: never;
@@ -95,6 +119,21 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components['schemas']['ValidationError'][];
+    };
+    /**
+     * HealthResponse
+     * @description What ``GET /health`` reports.
+     *
+     *     ``status`` is ``ok`` only when the embedding model just encoded a string; the endpoint
+     *     answers 200 then and 503 otherwise, with ``error`` saying why.
+     */
+    HealthResponse: {
+      /** Error */
+      error?: string | null;
+      /** Probems */
+      probeMs?: number | null;
+      /** Status */
+      status: string;
     };
     /**
      * NPActivation
@@ -279,6 +318,35 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  healthGet: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
+        };
+      };
+    };
+  };
   explainDefaultPost: {
     parameters: {
       query?: never;

@@ -11,7 +11,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Health Check */
+    /**
+     * Health Check
+     * @description Run one token through the loaded model. 200 only when that works; see ``health.py``.
+     *
+     *     While the model loads this answers 503 with ``status: starting``, so a monitor sees the
+     *     same shape throughout and needs only the status code.
+     */
     get: operations['healthGet'];
     put?: never;
     post?: never;
@@ -967,10 +973,41 @@ export interface components {
       detail?: components['schemas']['ValidationError'][];
     };
     /**
+     * HealthGpu
+     * @description One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it.
+     */
+    HealthGpu: {
+      /** Freebytes */
+      freeBytes: number;
+      /** Index */
+      index: number;
+      /** Name */
+      name: string;
+      /** Totalbytes */
+      totalBytes: number;
+    };
+    /**
      * HealthResponse
-     * @description Liveness only -- says the process is up, not that a model finished loading.
+     * @description What ``GET /health`` reports.
+     *
+     *     ``status`` is ``ok`` only when a real one-token forward pass just ran on the loaded
+     *     model; the endpoint answers 200 then and 503 otherwise, so a monitor needs only the
+     *     status code. ``starting`` means the model is still loading, ``unhealthy`` means the
+     *     probe failed and ``error`` says how.
      */
     HealthResponse: {
+      /** Backend */
+      backend?: string | null;
+      /** Device */
+      device?: string | null;
+      /** Error */
+      error?: string | null;
+      /** Gpus */
+      gpus?: components['schemas']['HealthGpu'][];
+      /** Model */
+      model?: string | null;
+      /** Probems */
+      probeMs?: number | null;
       /** Status */
       status: string;
     };
@@ -1889,6 +1926,15 @@ export interface operations {
     responses: {
       /** @description Successful Response */
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
         headers: {
           [name: string]: unknown;
         };

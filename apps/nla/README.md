@@ -91,11 +91,19 @@ uv run server.py --port 8080 --max-concurrent 32 --mem-fraction 0.45 \
 
 ## Endpoints
 
-All endpoints require an `X-SECRET-KEY` header if `SECRET` is set.
+All endpoints require an `X-SECRET-KEY` header if `SECRET` is set, `/docs` and `/health` included.
+
+### `GET /health`
+
+Health check for monitors. Runs one token through the verbalizer on the same path `/describe` uses, and answers 200 with `"status": "ok"` only when that works. Otherwise it answers 503: `"status": "starting"` while the models load, or `"status": "unhealthy"` with an `error` (dead vLLM engine, poisoned CUDA context, or a probe that did not finish in `HEALTH_PROBE_TIMEOUT` seconds, default 20). The body is the `GET /` report plus `probe_ms`, `error` and per-GPU `gpus` memory.
+
+```bash
+curl -H "X-SECRET-KEY: $SECRET" http://localhost:5009/health
+```
 
 ### `GET /`
 
-Health check. The response reports the active configuration so callers can detect quantization / truncation state without scraping logs.
+Configuration report. Does not touch the GPU. The response reports the active configuration so callers can detect quantization / truncation state without scraping logs.
 
 ```bash
 curl http://localhost:5009/

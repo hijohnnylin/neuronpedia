@@ -59,6 +59,42 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HealthResponse": {
+        "description": "What ``GET /health`` reports.\n\n``status`` is ``ok`` only when the embedding model just encoded a string; the endpoint\nanswers 200 then and 503 otherwise, with ``error`` saying why.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "probeMs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probems"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
       "NPActivation": {
         "description": "An activation record containing tokens and their corresponding activation values",
         "properties": {
@@ -401,6 +437,35 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/health": {
+      "get": {
+        "description": "Encode one string with the embedding model; 200 only when that works.\n\nThe explainers call remote LLM APIs and are not exercised. The embedding scorer is the\none local model, and a ping cannot tell a serving pod from one whose CUDA context is\npoisoned; an encode can.",
+        "operationId": "healthGet",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Health Check"
+      }
+    },
     "/v1/explain/default": {
       "post": {
         "operationId": "explainDefaultPost",

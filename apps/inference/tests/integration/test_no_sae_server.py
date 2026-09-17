@@ -63,7 +63,9 @@ def no_sae_client():
 
 
 def test_starts_with_no_saes_loaded(no_sae_client: TestClient):
-    assert no_sae_client.get("/health").json() == {"status": "healthy"}
+    health = no_sae_client.get("/health", headers={"X-SECRET-KEY": X_SECRET_KEY})
+    assert health.status_code == 200, health.text
+    assert health.json()["status"] == "ok"
     assert SAEManager.get_instance().get_valid_sae_sets() == []
     assert SAEManager.get_instance().loaded_saes == {}
 

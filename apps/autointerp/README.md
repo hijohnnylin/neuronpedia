@@ -41,7 +41,8 @@ FastAPI has a built-in docs + endpoint tester. After running the server, to see 
 Notes/Caveats:
 
 - You will need to set the YOUR_OPENROUTER_KEY in your test requests.
-- If you set a SECRET (not set by default) in your `.env` file, you'll need to add a `x-secret-key` header.
+- If you set a SECRET (not set by default) in your `.env` file, you'll need to add a `x-secret-key` header. This covers `/docs` and `/health` too.
+- `GET /health` is for monitors: it encodes one string with the embedding model and answers 200 only when that works, else 503 with an `error`.
 
 ## Testing, Linting, and Formatting
 

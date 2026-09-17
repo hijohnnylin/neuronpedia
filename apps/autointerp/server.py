@@ -1,6 +1,7 @@
 # ruff: noqa: T201
 
 import os
+import time
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
@@ -22,6 +23,7 @@ from neuronpedia_autointerp.routes.score.fuzz_detection import (
 from neuronpedia_autointerp.schemas import (
     ExplainDefaultRequest,
     ExplainDefaultResponse,
+    HealthResponse,
     ScoreEmbeddingRequest,
     ScoreEmbeddingResponse,
     ScoreFuzzDetectionRequest,
@@ -192,6 +194,29 @@ app = FastAPI(
     generate_unique_id_function=sdk_operation_id,
 )
 app.include_router(router)
+
+
+@app.get("/health", responses={200: {"model": HealthResponse}, 503: {"model": HealthResponse}})
+async def health_check():
+    """Encode one string with the embedding model; 200 only when that works.
+
+    The explainers call remote LLM APIs and are not exercised. The embedding scorer is the
+    one local model, and a ping cannot tell a serving pod from one whose CUDA context is
+    poisoned; an encode can.
+    """
+    if model is None:
+        body = HealthResponse(status="starting", error="embedding model is not loaded yet")
+        return JSONResponse(status_code=503, content=body.model_dump())
+    body = HealthResponse(status="ok")
+    started = time.monotonic()
+    try:
+        model.encode("health")
+        body.probe_ms = round((time.monotonic() - started) * 1000, 1)
+    # The point of the endpoint is to report whatever failed, including a poisoned context.
+    except Exception as e:  # noqa: BLE001
+        body.status = "unhealthy"
+        body.error = f"{type(e).__name__}: {e}"[:500]
+    return JSONResponse(status_code=200 if body.status == "ok" else 503, content=body.model_dump())
 
 
 def _openapi_with_secret_key_auth() -> dict[str, Any]:

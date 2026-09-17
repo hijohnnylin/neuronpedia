@@ -608,6 +608,35 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HealthGpu": {
+        "description": "One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it.",
+        "properties": {
+          "free_bytes": {
+            "title": "Free Bytes",
+            "type": "integer"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "name",
+          "free_bytes",
+          "total_bytes"
+        ],
+        "title": "HealthGpu",
+        "type": "object"
+      },
       "HealthLimits": {
         "description": "The request caps this process was configured with, so a client can pre-validate.",
         "properties": {
@@ -648,7 +677,7 @@
         "type": "object"
       },
       "HealthResponse": {
-        "description": "Liveness plus which components loaded and how they were configured.\n\nMost fields are null until the lifespan finishes, and stay null for whichever of the\nverbalizer / reconstructor / source model this process did not load.",
+        "description": "Which components loaded and how they were configured, plus the ``/health`` verdict.\n\nMost fields are null until the lifespan finishes, and stay null for whichever of the\nverbalizer / reconstructor / source model this process did not load. ``GET /`` reports\nconfiguration only; ``GET /health`` also runs one token through the verbalizer, and\n``status`` is ``ok`` (200) or ``unhealthy`` (503, with ``error``) by that result.",
         "properties": {
           "completion_available": {
             "title": "Completion Available",
@@ -665,6 +694,17 @@
             ],
             "title": "D Model"
           },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
           "extraction_layer": {
             "anyOf": [
               {
@@ -675,6 +715,13 @@
               }
             ],
             "title": "Extraction Layer"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/HealthGpu"
+            },
+            "title": "Gpus",
+            "type": "array"
           },
           "limits": {
             "$ref": "#/components/schemas/HealthLimits"
@@ -694,6 +741,17 @@
           "num_cuda_devices": {
             "title": "Num Cuda Devices",
             "type": "integer"
+          },
+          "probe_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probe Ms"
           },
           "reconstructor_available": {
             "title": "Reconstructor Available",
@@ -1157,7 +1215,7 @@
   "paths": {
     "/": {
       "get": {
-        "description": "Health check.",
+        "description": "Configuration report. Does not touch the GPU; see ``/health`` for that.",
         "operationId": "root__get",
         "parameters": [
           {
@@ -1485,6 +1543,63 @@
           }
         },
         "summary": "Extract"
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Run one token through the verbalizer; 200 only when that works.\n\nA ping cannot tell a serving pod from one whose vLLM engine child died or whose CUDA\ncontext is poisoned. A real generation can, and it takes the same path ``/describe``\ndoes. The reconstructor and source model are reported but not exercised.",
+        "operationId": "health_check_health_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-secret-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Secret-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Health Check"
       }
     },
     "/score": {

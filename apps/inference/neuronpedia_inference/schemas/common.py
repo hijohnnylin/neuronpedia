@@ -82,10 +82,32 @@ class PublicFrameSchema(BaseSchema):
     model_config = ConfigDict(alias_generator=None)
 
 
+class HealthGpu(BaseSchema):
+    """One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it."""
+
+    index: StrictInt
+    name: StrictStr
+    free_bytes: StrictInt
+    total_bytes: StrictInt
+
+
 class HealthResponse(BaseSchema):
-    """Liveness only -- says the process is up, not that a model finished loading."""
+    """What ``GET /health`` reports.
+
+    ``status`` is ``ok`` only when a real one-token forward pass just ran on the loaded
+    model; the endpoint answers 200 then and 503 otherwise, so a monitor needs only the
+    status code. ``starting`` means the model is still loading, ``unhealthy`` means the
+    probe failed and ``error`` says how.
+    """
 
     status: StrictStr
+    model: StrictStr | None = None
+    backend: StrictStr | None = None
+    device: StrictStr | None = None
+    #: Wall time of the probe forward pass. Null when it did not run.
+    probe_ms: StrictFloat | None = None
+    error: StrictStr | None = None
+    gpus: list[HealthGpu] = Field(default_factory=list)
 
 
 class NPFeature(BaseSchema):

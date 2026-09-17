@@ -122,5 +122,5 @@ def test_secret_key_auth_is_documented():
     schema = json.loads(render())
     assert schema["components"]["securitySchemes"]["SimpleSecretAuth"]["name"] == "X-SECRET-KEY"
     assert schema["security"] == [{"SimpleSecretAuth": []}]
-    # /health is exempt in the middleware, so it must be exempt in the spec too.
-    assert schema["paths"]["/health"]["get"]["security"] == []
+    # The middleware covers /health too, so the spec must not exempt it.
+    assert "security" not in schema["paths"]["/health"]["get"]

@@ -61,6 +61,31 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health Check
+     * @description Run one token through the loaded model; 200 only when that works or a request is running.
+     *
+     *     A ping cannot tell a serving pod from one whose CUDA context is poisoned or whose model
+     *     OOMed at load. The forward pass can. It takes the same lock as the GPU handlers, so it
+     *     never overlaps a graph generation; when one is running the probe stands aside and reports
+     *     ``busy``, which becomes ``unhealthy`` once the holder has exceeded HEALTH_BUSY_LIMIT.
+     */
+    get: operations['health_check_health_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/parse-chat-prompt': {
     parameters: {
       query?: never;
@@ -264,6 +289,50 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components['schemas']['ValidationError'][];
+    };
+    /**
+     * HealthGpu
+     * @description One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it.
+     */
+    HealthGpu: {
+      /** Free Bytes */
+      free_bytes: number;
+      /** Index */
+      index: number;
+      /** Name */
+      name: string;
+      /** Total Bytes */
+      total_bytes: number;
+    };
+    /**
+     * HealthResponse
+     * @description What ``GET /health`` reports.
+     *
+     *     ``status`` is ``ok`` when a one-token forward pass just ran, ``busy`` when a graph is being
+     *     generated and the probe stood aside, ``starting`` while the model loads and ``unhealthy``
+     *     when the probe failed or a request has held the server for longer than
+     *     ``HEALTH_BUSY_LIMIT`` seconds. The endpoint answers 200 for the first two and 503 for the
+     *     rest, so a monitor needs only the status code.
+     */
+    HealthResponse: {
+      /** Attribution Engine */
+      attribution_engine: string;
+      /** Busy */
+      busy: boolean;
+      /** Busy Seconds */
+      busy_seconds?: number | null;
+      /** Error */
+      error?: string | null;
+      /** Gpus */
+      gpus?: components['schemas']['HealthGpu'][];
+      /** Model */
+      model?: string | null;
+      /** Model Engine */
+      model_engine: string;
+      /** Probe Ms */
+      probe_ms?: number | null;
+      /** Status */
+      status: string;
     };
     /** LogitsByToken */
     LogitsByToken: {
@@ -500,6 +569,46 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  health_check_health_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'x-secret-key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
         };
       };
     };

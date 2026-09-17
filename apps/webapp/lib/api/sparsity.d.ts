@@ -13,7 +13,7 @@ export interface paths {
     };
     /**
      * Root
-     * @description Health check and model info.
+     * @description Model info. Does not touch the device; see ``/health`` for that.
      */
     get: operations['root__get'];
     put?: never;
@@ -36,6 +36,29 @@ export interface paths {
      * @description Get all neurons that read from or write to a specific residual channel.
      */
     get: operations['get_channel_connections_channel__channel_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health Check
+     * @description Read one weight off the device; 200 only when that works.
+     *
+     *     The routes here read weights and run no forward pass, so a weight read is the probe. It
+     *     syncs the device, so a poisoned CUDA context fails here rather than on the next request.
+     */
+    get: operations['health_check_health_get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -105,18 +128,41 @@ export interface components {
       detail?: components['schemas']['ValidationError'][];
     };
     /**
+     * HealthGpu
+     * @description One visible CUDA device, as ``torch.cuda.mem_get_info`` reports it.
+     */
+    HealthGpu: {
+      /** Free Bytes */
+      free_bytes: number;
+      /** Index */
+      index: number;
+      /** Name */
+      name: string;
+      /** Total Bytes */
+      total_bytes: number;
+    };
+    /**
      * HealthResponse
-     * @description Liveness plus the dimensions needed to bounds-check a request.
+     * @description The dimensions needed to bounds-check a request, plus the ``/health`` verdict.
+     *
+     *     ``GET /`` reports the dimensions only. ``GET /health`` also reads a weight off the device,
+     *     and ``status`` is ``ok`` (200) or ``unhealthy`` (503, with ``error``) by that result.
      */
     HealthResponse: {
       /** D Model */
       d_model: number;
+      /** Error */
+      error?: string | null;
+      /** Gpus */
+      gpus?: components['schemas']['HealthGpu'][];
       /** Mlp Size */
       mlp_size: number;
       /** Model */
       model: string;
       /** Num Layers */
       num_layers: number;
+      /** Probe Ms */
+      probe_ms?: number | null;
       /** Status */
       status: string;
     };
@@ -253,6 +299,46 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  health_check_health_get: {
+    parameters: {
+      query?: never;
+      header?: {
+        'x-secret-key'?: string | null;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HealthResponse'];
         };
       };
     };

@@ -14,11 +14,12 @@ uv sync
 uv run uvicorn server:app --port 5005 --host 0.0.0.0 --reload
 ```
 
-Optional: set `SECRET` in `.env` to require `X-SECRET-KEY` header.
+Optional: set `SECRET` in `.env` to require the `X-SECRET-KEY` header on every path, `/docs` included.
 
 ## Endpoints
 
-- `GET /` — health check, model info
+- `GET /health` — for monitors: reads a weight off the device; 200 only when that works, else 503 with `error`
+- `GET /` — model info
 - `GET /neuron/{layer}/{neuron}` — circuit traces for a neuron
   - `?trace_depth=2` — trace depth
   - `?trace_k=3` — top K channels/neurons per step
