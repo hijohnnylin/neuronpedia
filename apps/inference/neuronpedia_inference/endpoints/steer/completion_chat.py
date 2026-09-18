@@ -491,7 +491,7 @@ async def capture_read_means(
 
 def _describe_key(key: CaptureKey) -> str:
     """One capture as ``resid_post:12/mean``, for a log line that says what was actually read."""
-    return f"{key.site}:{key.layer}/{key.pool}"
+    return f"{key.point}:{key.layer}/{key.pool}"
 
 
 def _describe_keys(captures: dict[CaptureKey, torch.Tensor]) -> str:
@@ -680,7 +680,7 @@ def _read_capture_points(reads: list[VectorAsset]) -> dict[CaptureKey, Address]:
     to a generation has to deduplicate the values, which `_declared_points` does. Empty when
     nothing was requested, in which case generation captures nothing at all.
     """
-    return {key: Address(key.site, key.layer) for key in sorted({vector.capture_key for vector in reads})}
+    return {key: Address(key.point, key.layer) for key in sorted({vector.capture_key for vector in reads})}
 
 
 def _declared_points(points: dict[CaptureKey, Address]) -> list[Address]:

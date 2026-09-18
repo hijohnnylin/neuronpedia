@@ -159,7 +159,7 @@ export function personaAxisToVectorRead(axis: PersonaAxisFit): NPVectorRead {
     // says nothing about what is nested inside one of them. Absent stays absent: a row that says
     // nothing about how to read it means inference's defaults, which is what every row meant before
     // the spec existed.
-    read: params.read ? { site: params.read.site, tokens: params.read.tokens, pool: params.read.pool } : undefined,
+    read: params.read ? { point: params.read.point, tokens: params.read.tokens, pool: params.read.pool } : undefined,
 
     id: axis.name,
     layer: axis.layer,

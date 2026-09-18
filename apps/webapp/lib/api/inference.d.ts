@@ -1147,11 +1147,11 @@ export interface components {
      */
     LensType: 'LOGIT_LENS' | 'JACOBIAN_LENS';
     /**
-     * NPCaptureSite
-     * @description Where in a layer an activation is read.
+     * NPCapturePoint
+     * @description Where in a layer an activation is read: an interp-engine point name, spelled as the engine spells it.
      * @enum {string}
      */
-    NPCaptureSite: 'resid_post';
+    NPCapturePoint: 'resid_post';
     /**
      * NPFeature
      * @description A feature in Neuronpedia, identified by model, source, and index.
@@ -1228,15 +1228,15 @@ export interface components {
      */
     NPReadSpec: {
       /**
+       * @description Where in the layer to read
+       * @default resid_post
+       */
+      point: components['schemas']['NPCapturePoint'];
+      /**
        * @description How a message's tokens collapse. `mean` is the whole turn's average, `last` its final token, `max` the per-dimension maximum.
        * @default mean
        */
       pool: components['schemas']['NPPooling'];
-      /**
-       * @description Where in the layer to read
-       * @default resid_post
-       */
-      site: components['schemas']['NPCaptureSite'];
       /**
        * @description Which messages get a reading. `assistant_turns` reports the model's own turns, which is what a persona fit is about; `all_turns` reports every message, including the user's.
        * @default assistant_turns

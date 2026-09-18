@@ -78,7 +78,7 @@ Normalize = Literal["l2", "none"]
 # purpose: a value outside one of these is refused rather than defaulted, because a fit read with the
 # wrong rule returns a plausible number rather than an error. Adding a member means implementing it
 # in `capture_engine` or `build_readouts` in the same change.
-CaptureSite = Literal["resid_post"]
+CapturePoint = Literal["resid_post"]
 TokenSelection = Literal["assistant_turns", "all_turns"]
 Pooling = Literal["mean", "last", "max"]
 
@@ -95,7 +95,7 @@ class ReadSpec:
     payload that says nothing still reads the way it always did.
     """
 
-    site: CaptureSite = "resid_post"
+    point: CapturePoint = "resid_post"
     tokens: TokenSelection = "assistant_turns"
     pool: Pooling = "mean"
 
@@ -108,7 +108,7 @@ class CaptureKey:
     reads at one layer that pool differently need two results, and this used to be a bare layer
     number, so they silently shared one.
 
-    `site` is part of the key rather than assumed, so that reading `mlp_out` needs no second
+    `point` is part of the key rather than assumed, so that reading `mlp_out` needs no second
     re-keying of every capture dict. `tokens` is deliberately absent: it picks which pooled rows get
     reported, so it cannot change what has to be captured, and including it would capture identical
     activations twice for two reads that differ only in what they report.
@@ -117,7 +117,7 @@ class CaptureKey:
     the backend is then the same list run to run, whatever order the reads arrived in.
     """
 
-    site: CaptureSite
+    point: CapturePoint
     layer: int
     pool: Pooling
 
@@ -204,7 +204,7 @@ class VectorAsset:
     @property
     def capture_key(self) -> CaptureKey:
         """The capture this vector reads from, which several may share."""
-        return CaptureKey(site=self.read.site, layer=self.layer, pool=self.read.pool)
+        return CaptureKey(point=self.read.point, layer=self.layer, pool=self.read.pool)
 
     @property
     def hidden_size(self) -> int:

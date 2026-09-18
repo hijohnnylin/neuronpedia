@@ -1622,7 +1622,7 @@ model VectorTagOnVector {
 // where `params` is `projectionParams`. `value` is never clipped: a reading past 1 says the vector
 // is being read off the distribution it was fitted on, which is a signal rather than a boundary.
 //
-// `params.read` is what makes a reading reproducible: which site is captured, which tokens are
+// `params.read` is what makes a reading reproducible: which point is captured, which tokens are
 // selected and how they are pooled. Fitting on one rule and reading on another returns a plausible
 // number rather than an error, so the rule belongs with the numbers rather than in serving code.
 model Vector {

@@ -25,7 +25,7 @@ from neuronpedia_inference.inference_utils.vectors.vector_data import CaptureKey
 
 
 def _key(layer: int, pool: Pooling = "mean") -> CaptureKey:
-    return CaptureKey(site="resid_post", layer=layer, pool=pool)
+    return CaptureKey(point="resid_post", layer=layer, pool=pool)
 
 
 class _BatchEncoding(dict):

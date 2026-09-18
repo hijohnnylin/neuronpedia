@@ -87,7 +87,7 @@ def _read(
 
 def _cap(layer: int, pool: Pooling = "mean") -> CaptureKey:
     """The key a vector with default-ish read conditions captures under."""
-    return CaptureKey(site="resid_post", layer=layer, pool=pool)
+    return CaptureKey(point="resid_post", layer=layer, pool=pool)
 
 
 def _acts(*first_components: float) -> torch.Tensor:

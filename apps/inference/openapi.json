@@ -1557,12 +1557,12 @@
         "title": "LensType",
         "type": "string"
       },
-      "NPCaptureSite": {
-        "description": "Where in a layer an activation is read.",
+      "NPCapturePoint": {
+        "description": "Where in a layer an activation is read: an interp-engine point name, spelled as the engine spells it.",
         "enum": [
           "resid_post"
         ],
-        "title": "NPCaptureSite",
+        "title": "NPCapturePoint",
         "type": "string"
       },
       "NPFeature": {
@@ -1663,15 +1663,15 @@
         "additionalProperties": false,
         "description": "How to get the activation a direction is projected onto.\n\nA fitted direction only means anything against activations gathered the way the fit gathered\nthem, so these three travel with the vector rather than being this server's convention. Everything\nhere was hard-coded until now, and the defaults are exactly what was hard-coded.\n\nDistinct from `render`, which is about the text: a render condition changes what the model is\nshown, so every read in one request has to agree about it. These change only how the captured\nactivations are reduced, so two reads in one request may differ freely -- reading one layer two\nways costs one forward, not two.",
         "properties": {
+          "point": {
+            "$ref": "#/components/schemas/NPCapturePoint",
+            "default": "resid_post",
+            "description": "Where in the layer to read"
+          },
           "pool": {
             "$ref": "#/components/schemas/NPPooling",
             "default": "mean",
             "description": "How a message's tokens collapse. `mean` is the whole turn's average, `last` its final token, `max` the per-dimension maximum."
-          },
-          "site": {
-            "$ref": "#/components/schemas/NPCaptureSite",
-            "default": "resid_post",
-            "description": "Where in the layer to read"
           },
           "tokens": {
             "$ref": "#/components/schemas/NPTokenSelection",
