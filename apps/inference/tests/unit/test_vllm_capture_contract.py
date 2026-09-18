@@ -142,8 +142,19 @@ class TestCaptureWidth:
 
 
 class TestAttentionRecomputeSharding:
-    def test_refuses_under_tensor_parallelism(self):
-        # q/k/v are head-sharded, and `dims` describes the whole model, so the reshape
-        # downstream would fail on the element count. Say why instead.
-        with pytest.raises(RuntimeError, match="tensor_parallel_size=4"):
-            vllm_backend.recompute_attn_from_payloads({}, [0], {}, 4)
+    def test_tensor_parallelism_is_accepted(self):
+        # The worker all-gathers q/k/v across ranks at collect, so rank 0's payload holds every
+        # head at any TP size and the recompute no longer refuses on the argument alone. The pod-level
+        # gate for sharded attention is inference's own (`vllm_attention_unsupported_reason`).
+        assert vllm_backend.recompute_attn_from_payloads({}, [], {}, 4) == {}
+
+    def test_a_shard_that_gets_through_is_named(self):
+        # `dims` describes the whole model, so a head-sharded capture is not a whole number of heads
+        # wide. The reshape would fail on the element count; the engine says what it saw instead.
+        with pytest.raises(ValueError, match="tensor-parallel shard"):
+            vllm_backend._heads_in(torch.zeros(19, 96), head_dim=64, which="q", layer=0)
+
+    def test_a_shard_that_divides_is_caught_against_the_config(self):
+        # Half the heads at the same head dim divides cleanly, so only the config's count exposes it.
+        with pytest.raises(ValueError, match="the config says 32"):
+            vllm_backend._heads_in(torch.zeros(19, 16 * 64), head_dim=64, which="q", layer=0, expected=32)

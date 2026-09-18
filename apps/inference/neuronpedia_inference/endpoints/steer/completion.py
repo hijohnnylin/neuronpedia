@@ -13,6 +13,7 @@ from interp_engine import (
     ProjectionCapSpec,
     SteeringOp,
     SteeringSpec,
+    SteerMethod,
     SteerSpec,
     VLLMModel,
 )
@@ -255,7 +256,9 @@ def _feature_to_steerspec(
     layer = address.layer
     vector = torch.tensor(feature.steering_vector, dtype=torch.float32)
     coeff = settings.strength_multiplier * feature.strength
-    method = "orthogonal" if settings.steer_method == NPSteerMethod.ORTHOGONAL_DECOMP else "additive"
+    method = (
+        SteerMethod.ORTHOGONAL if settings.steer_method == NPSteerMethod.ORTHOGONAL_DECOMP else SteerMethod.ADDITIVE
+    )
 
     if name == "resid_post":
         point, spec_layer = "resid_post", layer
