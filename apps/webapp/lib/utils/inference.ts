@@ -14,6 +14,7 @@ import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import {
   ChatMessage,
   replaceSteerModelIdIfNeeded,
+  STEER_FREQUENCY_PENALTY,
   STEER_METHOD,
   STEER_N_LOGPROBS,
   SteerFeature,
@@ -727,6 +728,8 @@ export const steerCompletion = async (
           nCompletionTokens: n_tokens,
           temperature,
           presencePenalty: presence_penalty,
+          // Inference servers before 1.11.1 require this field; no version applies it.
+          freqPenalty: STEER_FREQUENCY_PENALTY,
           seed,
           steerMethod,
           normalizeSteering: false,
@@ -834,6 +837,8 @@ export const steerCompletionChat = async (
               nCompletionTokens: nTokens,
               temperature,
               presencePenalty,
+              // Inference servers before 1.11.1 require this field; no version applies it.
+              freqPenalty: STEER_FREQUENCY_PENALTY,
               seed,
               steerSpecialTokens,
               steerMethod,
@@ -883,6 +888,8 @@ export const steerCompletionChat = async (
             nCompletionTokens: nTokens,
             temperature,
             presencePenalty,
+            // Inference servers before 1.11.1 require this field; no version applies it.
+            freqPenalty: STEER_FREQUENCY_PENALTY,
             seed,
             steerSpecialTokens,
             steerMethod,
@@ -918,6 +925,8 @@ export const steerCompletionChat = async (
             nCompletionTokens: nTokens,
             temperature,
             presencePenalty,
+            // Inference servers before 1.11.1 require this field; no version applies it.
+            freqPenalty: STEER_FREQUENCY_PENALTY,
             seed,
             steerSpecialTokens,
             steerMethod,
