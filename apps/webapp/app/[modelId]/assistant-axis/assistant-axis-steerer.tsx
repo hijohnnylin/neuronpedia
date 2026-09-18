@@ -6,9 +6,9 @@ import { NPSteerMethod, NPSteerType } from '@/lib/api/inference-types';
 import { useIsMount } from '@/lib/hooks/use-is-mount';
 import {
   ChatMessage,
-  STEER_FREQUENCY_PENALTY,
   STEER_METHOD_ASSISTANT_CAP,
   STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS,
+  STEER_PRESENCE_PENALTY,
   STEER_SEED,
   STEER_SPECIAL_TOKENS,
   STEER_STRENGTH_MULTIPLIER,
@@ -42,7 +42,7 @@ export default function AssistantAxisSteerer({
   // Default Steering Settings
   const [steerTokens, setSteerTokens] = useState(STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS);
   const [temperature, setTemperature] = useState(STEER_TEMPERATURE);
-  const [freqPenalty, setFreqPenalty] = useState(STEER_FREQUENCY_PENALTY);
+  const [presencePenalty, setPresencePenalty] = useState(STEER_PRESENCE_PENALTY);
   const [strMultiple, setStrMultiple] = useState(STEER_STRENGTH_MULTIPLIER);
   const [steerSpecialTokens, setSteerSpecialTokens] = useState(STEER_SPECIAL_TOKENS);
   const [seed, setSeed] = useState(STEER_SEED);
@@ -166,7 +166,7 @@ export default function AssistantAxisSteerer({
         if (resp.settings) {
           setTemperature(resp.settings.temperature);
           setSteerTokens(resp.settings.n_tokens);
-          setFreqPenalty(resp.settings.freq_penalty);
+          setPresencePenalty(resp.settings.presence_penalty);
           setSeed(resp.settings.seed);
           setStrMultiple(resp.settings.strength_multiplier);
           setSteerSpecialTokens(resp.settings.steer_special_tokens);
@@ -236,7 +236,7 @@ export default function AssistantAxisSteerer({
         setUrl={setUrl}
         temperature={temperature}
         steerTokens={steerTokens}
-        freqPenalty={freqPenalty}
+        presencePenalty={presencePenalty}
         randomSeed={randomSeed}
         seed={seed}
         strMultiple={strMultiple}

@@ -14,9 +14,9 @@ import { LoadingSpinner } from '@/components/svg/loading-spinner';
 import {
   ChatMessage,
   FeaturePreset,
-  STEER_FREQUENCY_PENALTY,
   STEER_MAX_PROMPT_CHARS,
   STEER_N_COMPLETION_TOKENS_MAX,
+  STEER_PRESENCE_PENALTY,
   STEER_SEED,
   STEER_SPECIAL_TOKENS,
   STEER_STRENGTH_MULTIPLIER,
@@ -82,7 +82,7 @@ export default function SteererSimple({
   const [typedInText, setTypedInText] = useState('');
   const [steerTokens, setSteerTokens] = useState(48);
   const [temperature, setTemperature] = useState(STEER_TEMPERATURE);
-  const [freqPenalty, setFreqPenalty] = useState(STEER_FREQUENCY_PENALTY);
+  const [presencePenalty, setPresencePenalty] = useState(STEER_PRESENCE_PENALTY);
   const [strMultiple, setStrMultiple] = useState(STEER_STRENGTH_MULTIPLIER);
   const [seed, setSeed] = useState(STEER_SEED);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -135,7 +135,7 @@ export default function SteererSimple({
         if (resp.settings) {
           setTemperature(resp.settings.temperature);
           setSteerTokens(resp.settings.n_tokens);
-          setFreqPenalty(resp.settings.freq_penalty);
+          setPresencePenalty(resp.settings.presence_penalty);
           setSeed(resp.settings.seed);
           setStrMultiple(resp.settings.strength_multiplier);
           setSteerSpecialTokens(resp.settings.steer_special_tokens);
@@ -211,7 +211,7 @@ export default function SteererSimple({
         features: selectedFeaturesStrengthOverridden,
         temperature,
         n_tokens: steerTokens,
-        freq_penalty: freqPenalty,
+        presence_penalty: presencePenalty,
         seed: randomSeed ? Math.floor(Math.random() * 200000000 - 100000000) : seed,
         strength_multiplier: strMultiple,
         steer_special_tokens: steerSpecialTokens,

@@ -1169,7 +1169,9 @@ model SteerOutput {
   toNeurons                SteerOutputToNeuron[] // features used in this steer output
   temperature              Float
   numTokens                Int
+  // No backend applies this; kept for the rows that were keyed on it.
   freqPenalty              Float
+  presencePenalty          Float                 @default(0)
   seed                     Float
   strengthMultiplier       Float
   steerMethod              String                @default("SIMPLE_ADDITIVE")
@@ -1193,11 +1195,11 @@ model SteerOutput {
   capMonitorOutput String?
 
   // to do lookups, we should also check Neurons to ensure they match
-  @@index([modelId, type, inputTextMd5, temperature, numTokens, freqPenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndex")
-  @@index([modelId, type, inputTextChatTemplateMd5, temperature, numTokens, freqPenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndex2")
+  @@index([modelId, type, inputTextMd5, temperature, numTokens, presencePenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndex")
+  @@index([modelId, type, inputTextChatTemplateMd5, temperature, numTokens, presencePenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndex2")
   // quicker lookup without the type
-  @@index([modelId, inputTextMd5, temperature, numTokens, freqPenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndexWithoutType")
-  @@index([modelId, inputTextChatTemplateMd5, temperature, numTokens, freqPenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndexWithoutType2")
+  @@index([modelId, inputTextMd5, temperature, numTokens, presencePenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndexWithoutType")
+  @@index([modelId, inputTextChatTemplateMd5, temperature, numTokens, presencePenalty, seed, strengthMultiplier, version, steerSpecialTokens, steerMethod], name: "steerIndexWithoutType2")
 }
 
 enum SteerOutputType {

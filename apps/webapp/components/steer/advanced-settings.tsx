@@ -5,6 +5,9 @@ import {
   STEER_N_COMPLETION_TOKENS_MAX,
   STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
+  STEER_PRESENCE_PENALTY,
+  STEER_PRESENCE_PENALTY_MAX,
+  STEER_PRESENCE_PENALTY_MIN,
   STEER_SEED,
   STEER_SPECIAL_TOKENS,
   STEER_STRENGTH_MULTIPLIER,
@@ -30,6 +33,8 @@ export default function SteerAdvancedSettings({
   setSteerTokens,
   temperature,
   setTemperature,
+  presencePenalty,
+  setPresencePenalty,
   strMultiple,
   setStrMultiple,
   seed,
@@ -48,6 +53,8 @@ export default function SteerAdvancedSettings({
   setSteerTokens: (tokens: number) => void;
   temperature: number;
   setTemperature: (temperature: number) => void;
+  presencePenalty: number;
+  setPresencePenalty: (presencePenalty: number) => void;
   strMultiple: number;
   setStrMultiple: (strMultiple: number) => void;
   seed: number;
@@ -108,6 +115,27 @@ export default function SteerAdvancedSettings({
             }}
             className="max-w-[80px] flex-1 rounded-md border-slate-300 py-1 text-center text-xs text-slate-700"
             value={temperature}
+          />
+        </div>
+        <div className="flex w-full flex-row items-center justify-start gap-x-3">
+          <div className="w-[70px] text-right text-[10px] font-medium uppercase leading-tight text-slate-400">
+            Presence Penalty
+          </div>
+          <input
+            type="number"
+            step={0.1}
+            onChange={(e) => {
+              if (
+                parseFloat(e.target.value) > STEER_PRESENCE_PENALTY_MAX ||
+                parseFloat(e.target.value) < STEER_PRESENCE_PENALTY_MIN
+              ) {
+                alert(`Presence penalty must be >= ${STEER_PRESENCE_PENALTY_MIN} and <= ${STEER_PRESENCE_PENALTY_MAX}`);
+              } else {
+                setPresencePenalty(parseFloat(e.target.value));
+              }
+            }}
+            className="max-w-[80px] flex-1 rounded-md border-slate-300 py-1 text-center text-xs text-slate-700"
+            value={presencePenalty}
           />
         </div>
         <div className="flex w-full flex-row items-center justify-start gap-x-3">
@@ -236,6 +264,7 @@ export default function SteerAdvancedSettings({
             onClick={() => {
               setSteerTokens(STEER_N_COMPLETION_TOKENS);
               setTemperature(STEER_TEMPERATURE);
+              setPresencePenalty(STEER_PRESENCE_PENALTY);
               setStrMultiple(STEER_STRENGTH_MULTIPLIER);
               setSeed(STEER_SEED);
               setRandomSeed(false);

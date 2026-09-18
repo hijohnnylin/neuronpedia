@@ -134,7 +134,7 @@ export const SavedSearchActivationScalarFieldEnumSchema = z.enum(['savedSearchId
 
 export const SteerOutputToNeuronScalarFieldEnumSchema = z.enum(['modelId','layer','index','strength','steerOutputId']);
 
-export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextMd5','inputTextChatTemplate','inputTextChatTemplateMd5','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds','capMonitorOutput']);
+export const SteerOutputScalarFieldEnumSchema = z.enum(['id','type','modelId','steerSpecialTokens','inputText','inputTextMd5','inputTextChatTemplate','inputTextChatTemplateMd5','outputText','outputTextChatTemplate','temperature','numTokens','freqPenalty','presencePenalty','seed','strengthMultiplier','steerMethod','createdAt','creatorId','version','logprobs','connectedDefaultOutputId','connectedSteerOutputIds','capMonitorOutput']);
 
 export const ProblemNodeScalarFieldEnumSchema = z.enum(['id','nodeTypes','parentId','title','description','author','mainUrl','additionalUrls','applicationTags','approvalState','approverId','createdById','createdAt','updatedAt']);
 
@@ -3355,6 +3355,7 @@ export const SteerOutputSchema = z.object({
   temperature: z.number(),
   numTokens: z.number().int(),
   freqPenalty: z.number(),
+  presencePenalty: z.number(),
   seed: z.number(),
   strengthMultiplier: z.number(),
   steerMethod: z.string(),

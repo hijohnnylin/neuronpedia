@@ -37,7 +37,7 @@ export default function SteerCompletion({
   setUrl,
   temperature,
   steerTokens,
-  freqPenalty,
+  presencePenalty,
   randomSeed,
   seed,
   strMultiple,
@@ -66,7 +66,7 @@ export default function SteerCompletion({
   setUrl: (url: string) => void;
   temperature: number;
   steerTokens: number;
-  freqPenalty: number;
+  presencePenalty: number;
   randomSeed: boolean;
   seed: number;
   strMultiple: number;
@@ -123,7 +123,7 @@ export default function SteerCompletion({
           features: selectedFeatures,
           temperature,
           n_tokens: steerTokens,
-          freq_penalty: freqPenalty,
+          presence_penalty: presencePenalty,
           seed: randomSeed ? Math.floor(Math.random() * 200000000 - 100000000) : seed,
           strength_multiplier: strMultiple,
           steer_method: steerMethod,

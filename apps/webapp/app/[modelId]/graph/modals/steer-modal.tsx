@@ -20,12 +20,12 @@ import { SteeredPositionIdentifier, SteerLogitFeature, SteerLogitsRequest, Steer
 import { getLayerNumFromSource } from '@/lib/utils/source';
 import {
   STEER_FREEZE_ATTENTION,
-  STEER_FREQUENCY_PENALTY_GRAPH,
-  STEER_FREQUENCY_PENALTY_MAX,
-  STEER_FREQUENCY_PENALTY_MIN,
   STEER_MULTIPLIER_STEP,
   STEER_N_COMPLETION_TOKENS_GRAPH,
   STEER_N_COMPLETION_TOKENS_GRAPH_MAX,
+  STEER_PRESENCE_PENALTY_GRAPH,
+  STEER_PRESENCE_PENALTY_MAX,
+  STEER_PRESENCE_PENALTY_MIN,
   STEER_SEED,
   STEER_STRENGTH_ADDED_MULTIPLIER_CUSTOM_GRAPH,
   STEER_STRENGTH_ADDED_MULTIPLIER_GRAPH,
@@ -72,7 +72,7 @@ export default function SteerModal() {
   const [steeredPositions, setSteeredPositions] = useState<SteerLogitFeature[]>([]);
   const [steerTokens, setSteerTokens] = useState(STEER_N_COMPLETION_TOKENS_GRAPH);
   const [temperature, setTemperature] = useState(STEER_TEMPERATURE_GRAPH);
-  const [freqPenalty, setFreqPenalty] = useState(STEER_FREQUENCY_PENALTY_GRAPH);
+  const [presencePenalty, setPresencePenalty] = useState(STEER_PRESENCE_PENALTY_GRAPH);
   const [seed, setSeed] = useState(STEER_SEED);
   const [randomSeed, setRandomSeed] = useState(true);
   const [freezeAttention, setFreezeAttention] = useState(STEER_FREEZE_ATTENTION);
@@ -517,7 +517,7 @@ export default function SteerModal() {
     setCustomSteerNodes(() => []);
     setSteerTokens(STEER_N_COMPLETION_TOKENS_GRAPH);
     setTemperature(STEER_TEMPERATURE_GRAPH);
-    setFreqPenalty(STEER_FREQUENCY_PENALTY_GRAPH);
+    setPresencePenalty(STEER_PRESENCE_PENALTY_GRAPH);
     setSeed(STEER_SEED);
     setModelId(selectedGraph?.metadata.scan || '');
     setRandomSeed(true);
@@ -550,7 +550,7 @@ export default function SteerModal() {
       topK: 5,
       freezeAttention,
       temperature,
-      freqPenalty,
+      presencePenalty,
       seed,
     };
 
@@ -569,7 +569,7 @@ export default function SteerModal() {
         lastRequestBody.topK === thisRequestBody.topK &&
         lastRequestBody.freezeAttention === thisRequestBody.freezeAttention &&
         lastRequestBody.temperature === thisRequestBody.temperature &&
-        lastRequestBody.freqPenalty === thisRequestBody.freqPenalty &&
+        lastRequestBody.presencePenalty === thisRequestBody.presencePenalty &&
         lastRequestBody.seed === thisRequestBody.seed
       ) {
         steeredOutputOnly = true;
@@ -1642,24 +1642,25 @@ export default function SteerModal() {
                       </div>
                       <div className="flex w-full flex-row items-center justify-start gap-x-3">
                         <div className="w-[70px] text-right text-[10px] font-medium uppercase leading-tight text-slate-400">
-                          Freq Penalty
+                          Presence Penalty
                         </div>
                         <input
                           type="number"
+                          step={0.1}
                           onChange={(e) => {
                             if (
-                              parseFloat(e.target.value) > STEER_FREQUENCY_PENALTY_MAX ||
-                              parseFloat(e.target.value) < STEER_FREQUENCY_PENALTY_MIN
+                              parseFloat(e.target.value) > STEER_PRESENCE_PENALTY_MAX ||
+                              parseFloat(e.target.value) < STEER_PRESENCE_PENALTY_MIN
                             ) {
                               alert(
-                                `Freq penalty must be >= ${STEER_FREQUENCY_PENALTY_MIN} and <= ${STEER_FREQUENCY_PENALTY_MAX}`,
+                                `Presence penalty must be >= ${STEER_PRESENCE_PENALTY_MIN} and <= ${STEER_PRESENCE_PENALTY_MAX}`,
                               );
                             } else {
-                              setFreqPenalty(parseFloat(e.target.value));
+                              setPresencePenalty(parseFloat(e.target.value));
                             }
                           }}
                           className="max-w-[80px] flex-1 rounded-md border-slate-300 py-1 text-center text-xs text-slate-700"
-                          value={freqPenalty}
+                          value={presencePenalty}
                         />
                       </div>
                       <div className="col-span-1 flex w-full flex-row items-center justify-start gap-x-3">

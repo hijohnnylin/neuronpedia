@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STEER_COMPLETION_VERSION } from './steer';
+import { STEER_COMPLETION_VERSION_WITHOUT_PROMPT } from './steer';
 import {
   authorFromAxisId,
   axisReadoutsFromStored,
@@ -352,21 +352,30 @@ describe('storedAxisIds', () => {
 describe('storedOutputTextIncludesPrompt', () => {
   it('flags a completion saved before inference stopped returning the prompt', () => {
     expect(
-      storedOutputTextIncludesPrompt({ version: STEER_COMPLETION_VERSION - 1, outputTextChatTemplate: null }),
+      storedOutputTextIncludesPrompt({
+        version: STEER_COMPLETION_VERSION_WITHOUT_PROMPT - 1,
+        outputTextChatTemplate: null,
+      }),
     ).toBe(true);
   });
 
   it('does not flag a completion saved at the current version', () => {
-    expect(storedOutputTextIncludesPrompt({ version: STEER_COMPLETION_VERSION, outputTextChatTemplate: null })).toBe(
-      false,
-    );
+    expect(
+      storedOutputTextIncludesPrompt({
+        version: STEER_COMPLETION_VERSION_WITHOUT_PROMPT,
+        outputTextChatTemplate: null,
+      }),
+    ).toBe(false);
   });
 
   it('never flags a chat row, whose outputText is not rendered on its own', () => {
     // Chat rows share this table and are still at older versions, but they render from
     // outputTextChatTemplate, so treating one as prompt-prefixed would strip a real message.
     expect(
-      storedOutputTextIncludesPrompt({ version: STEER_COMPLETION_VERSION - 1, outputTextChatTemplate: '[]' }),
+      storedOutputTextIncludesPrompt({
+        version: STEER_COMPLETION_VERSION_WITHOUT_PROMPT - 1,
+        outputTextChatTemplate: '[]',
+      }),
     ).toBe(false);
   });
 });

@@ -110,12 +110,12 @@ import { NextResponse } from 'next/server';
  *                 maximum: 2
  *                 default: 0.5
  *                 example: 0
- *               freqPenalty:
+ *               presencePenalty:
  *                 type: number
- *                 description: Frequency penalty.
+ *                 description: Flat subtraction from the logit of every token already generated. 0 is off.
  *                 minimum: -2
  *                 maximum: 2
- *                 default: 1
+ *                 default: 0
  *                 example: 0
  *               seed:
  *                 type: integer
@@ -138,7 +138,7 @@ import { NextResponse } from 'next/server';
  *             topK: 1
  *             freezeAttention: true
  *             temperature: 0
- *             freqPenalty: 0
+ *             presencePenalty: 0
  *             seed: 16
  *     responses:
  *       200:
@@ -216,8 +216,18 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
   }
 
-  const { modelId, sourceSetName, prompt, features, nTokens, topK, freezeAttention, temperature, freqPenalty, seed } =
-    validatedBody;
+  const {
+    modelId,
+    sourceSetName,
+    prompt,
+    features,
+    nTokens,
+    topK,
+    freezeAttention,
+    temperature,
+    presencePenalty,
+    seed,
+  } = validatedBody;
 
   const response = await steerLogits(
     modelId,
@@ -228,7 +238,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     topK,
     freezeAttention,
     temperature,
-    freqPenalty,
+    presencePenalty,
     seed,
   );
 

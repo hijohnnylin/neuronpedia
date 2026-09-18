@@ -15,11 +15,11 @@ import {
   ChatMessage,
   FeaturePreset,
   replaceSteerModelIdIfNeeded,
-  STEER_FREQUENCY_PENALTY,
   STEER_METHOD,
   STEER_N_COMPLETION_TOKENS,
   STEER_N_COMPLETION_TOKENS_LARGE_LLM,
   STEER_N_COMPLETION_TOKENS_THINKING,
+  STEER_PRESENCE_PENALTY,
   STEER_SEED,
   STEER_SPECIAL_TOKENS,
   STEER_STRENGTH_MULTIPLIER,
@@ -97,7 +97,7 @@ export default function Steerer({
       : STEER_N_COMPLETION_TOKENS,
   );
   const [temperature, setTemperature] = useState(STEER_TEMPERATURE);
-  const [freqPenalty, setFreqPenalty] = useState(STEER_FREQUENCY_PENALTY);
+  const [presencePenalty, setPresencePenalty] = useState(STEER_PRESENCE_PENALTY);
   const [strMultiple, setStrMultiple] = useState(STEER_STRENGTH_MULTIPLIER);
   const [steerSpecialTokens, setSteerSpecialTokens] = useState(STEER_SPECIAL_TOKENS);
   const [seed, setSeed] = useState(STEER_SEED);
@@ -231,7 +231,7 @@ export default function Steerer({
         if (resp.settings) {
           setTemperature(resp.settings.temperature);
           setSteerTokens(resp.settings.n_tokens);
-          setFreqPenalty(resp.settings.freq_penalty);
+          setPresencePenalty(resp.settings.presence_penalty);
           setSeed(resp.settings.seed);
           setStrMultiple(resp.settings.strength_multiplier);
           setSteerSpecialTokens(resp.settings.steer_special_tokens);
@@ -323,7 +323,7 @@ export default function Steerer({
       }
       setTemperature(STEER_TEMPERATURE);
       setStrMultiple(STEER_STRENGTH_MULTIPLIER);
-      setFreqPenalty(STEER_FREQUENCY_PENALTY);
+      setPresencePenalty(STEER_PRESENCE_PENALTY);
       setRandomSeed(false);
       setSteerMethod(STEER_METHOD);
       reset();
@@ -683,6 +683,8 @@ export default function Steerer({
             setSteerTokens={setSteerTokens}
             temperature={temperature}
             setTemperature={setTemperature}
+            presencePenalty={presencePenalty}
+            setPresencePenalty={setPresencePenalty}
             strMultiple={strMultiple}
             setStrMultiple={setStrMultiple}
             seed={seed}
@@ -736,7 +738,7 @@ export default function Steerer({
           setUrl={setUrl}
           temperature={temperature}
           steerTokens={steerTokens}
-          freqPenalty={freqPenalty}
+          presencePenalty={presencePenalty}
           randomSeed={randomSeed}
           seed={seed}
           strMultiple={strMultiple}
@@ -764,7 +766,7 @@ export default function Steerer({
           setUrl={setUrl}
           temperature={temperature}
           steerTokens={steerTokens}
-          freqPenalty={freqPenalty}
+          presencePenalty={presencePenalty}
           randomSeed={randomSeed}
           seed={seed}
           strMultiple={strMultiple}

@@ -64,7 +64,7 @@ export default function TabSteer({
                 <br />
                 Temperature = 0.5
                 <br />
-                Frequency Penalty = 2.0
+                Presence Penalty = 0
                 <br />
                 Max Response Tokens = 48
                 <br />

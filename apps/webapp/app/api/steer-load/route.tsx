@@ -68,7 +68,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           inputText: savedSteerSteeredOutput.inputText,
           temperature: savedSteerSteeredOutput.temperature,
           numTokens: savedSteerSteeredOutput.numTokens,
-          freqPenalty: savedSteerSteeredOutput.freqPenalty,
+          presencePenalty: savedSteerSteeredOutput.presencePenalty,
           seed: savedSteerSteeredOutput.seed,
           strengthMultiplier: savedSteerSteeredOutput.strengthMultiplier,
           version: savedSteerSteeredOutput.version,
@@ -99,6 +99,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     toReturnResult.settings = {
       temperature: savedSteerSteeredOutput.temperature,
       n_tokens: savedSteerSteeredOutput.numTokens,
+      presence_penalty: savedSteerSteeredOutput.presencePenalty,
       freq_penalty: savedSteerSteeredOutput.freqPenalty,
       seed: savedSteerSteeredOutput.seed,
       strength_multiplier: savedSteerSteeredOutput.strengthMultiplier,

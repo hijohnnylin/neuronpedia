@@ -12,11 +12,11 @@ import * as yup from 'yup';
 import { computeFetch } from '../db/compute-host';
 import {
   STEER_FREEZE_ATTENTION,
-  STEER_FREQUENCY_PENALTY,
-  STEER_FREQUENCY_PENALTY_MAX,
-  STEER_FREQUENCY_PENALTY_MIN,
   STEER_N_COMPLETION_TOKENS,
   STEER_N_COMPLETION_TOKENS_MAX,
+  STEER_PRESENCE_PENALTY,
+  STEER_PRESENCE_PENALTY_MAX,
+  STEER_PRESENCE_PENALTY_MIN,
   STEER_SEED,
   STEER_TEMPERATURE,
   STEER_TEMPERATURE_MAX,
@@ -354,11 +354,12 @@ export const SteerLogitsRequestSchema = yup.object({
   topK: yup.number().default(STEER_TOPK_LOGITS).min(0).max(STEER_TOPK_LOGITS_MAX),
   freezeAttention: yup.boolean().default(STEER_FREEZE_ATTENTION),
   temperature: yup.number().default(STEER_TEMPERATURE).min(0.0).max(STEER_TEMPERATURE_MAX),
-  freqPenalty: yup
+  // Flat subtraction from the logit of every token already generated; 0 is off.
+  presencePenalty: yup
     .number()
-    .default(STEER_FREQUENCY_PENALTY)
-    .min(STEER_FREQUENCY_PENALTY_MIN)
-    .max(STEER_FREQUENCY_PENALTY_MAX),
+    .default(STEER_PRESENCE_PENALTY)
+    .min(STEER_PRESENCE_PENALTY_MIN)
+    .max(STEER_PRESENCE_PENALTY_MAX),
   seed: yup.number().default(STEER_SEED).nullable(),
 });
 
@@ -426,7 +427,7 @@ export const steerLogits = async (
   topK: number,
   freezeAttention: boolean,
   temperature: number,
-  freqPenalty: number,
+  presencePenalty: number,
   seed: number | null,
 ) => {
   const action = 'steer';
@@ -442,7 +443,7 @@ export const steerLogits = async (
     top_k: topK,
     freeze_attention: freezeAttention,
     temperature,
-    freq_penalty: freqPenalty,
+    presence_penalty: presencePenalty,
     seed,
     request_type: action,
   };

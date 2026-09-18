@@ -14,6 +14,9 @@ import {
   STEER_METHOD,
   STEER_N_COMPLETION_TOKENS_MAX,
   STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
+  STEER_PRESENCE_PENALTY,
+  STEER_PRESENCE_PENALTY_MAX,
+  STEER_PRESENCE_PENALTY_MIN,
   STEER_STRENGTH_MULTIPLIER_MAX,
   STEER_TEMPERATURE_MAX,
   SteerFeature,
@@ -102,7 +105,7 @@ async function* generateResponse(
         body.strength_multiplier,
         body.n_tokens,
         body.temperature,
-        body.freq_penalty,
+        body.presence_penalty,
         body.seed,
         features,
         hasVector,
@@ -211,9 +214,13 @@ const steerSchema = object({
     .required(),
   temperature: number().min(0).max(STEER_TEMPERATURE_MAX).required(),
   n_tokens: number().integer().min(1).max(STEER_N_COMPLETION_TOKENS_MAX).required(),
-  // No backend applies this any more, so it is undocumented and optional. It stays part of the
-  // saved-output lookup key, so it keeps a default rather than being dropped: changing what we
-  // store for it would miss every existing row.
+  // Flat subtraction from the logit of every token already generated; 0 is off. Part of the
+  // saved-output lookup key.
+  presence_penalty: number()
+    .min(STEER_PRESENCE_PENALTY_MIN)
+    .max(STEER_PRESENCE_PENALTY_MAX)
+    .default(STEER_PRESENCE_PENALTY),
+  // Deprecated: no backend applies it. Accepted so older callers keep working; stored, not keyed on.
   freq_penalty: number()
     .min(STEER_FREQUENCY_PENALTY_MIN)
     .max(STEER_FREQUENCY_PENALTY_MAX)
@@ -250,6 +257,7 @@ async function saveSteerOutput(
         temperature: body.temperature,
         numTokens: body.n_tokens,
         freqPenalty: body.freq_penalty,
+        presencePenalty: body.presence_penalty,
         seed: body.seed,
         strengthMultiplier: body.strength_multiplier,
         steerMethod: body.steer_method,
@@ -329,6 +337,7 @@ async function saveSteerOutput(
                 ],
                 "temperature": 0.5,
                 "n_tokens": 48,
+                "presence_penalty": 0,
                 "seed": 16,
                 "strength_multiplier": 4,
                 "steer_method": "SIMPLE_ADDITIVE"
@@ -371,6 +380,10 @@ async function saveSteerOutput(
                 },
                 "n_tokens": {
                   "type": "number"
+                },
+                "presence_penalty": {
+                  "type": "number",
+                  "description": "Flat subtraction from the logit of every token already generated. 0 is off. Range -2 to 2."
                 },
                 "seed": {
                   "type": "number"
@@ -465,7 +478,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         inputTextMd5: createHash('md5').update(body.prompt).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
-        freqPenalty: body.freq_penalty,
+        presencePenalty: body.presence_penalty,
         seed: body.seed,
         strengthMultiplier: body.strength_multiplier,
         steerMethod: body.steer_method,
@@ -547,7 +560,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       body.strength_multiplier,
       body.n_tokens,
       body.temperature,
-      body.freq_penalty,
+      body.presence_penalty,
       body.seed,
       featuresWithVectors,
       hasVector,

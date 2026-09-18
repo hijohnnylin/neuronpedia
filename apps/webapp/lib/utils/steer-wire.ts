@@ -27,7 +27,7 @@
  * are stored so the reading still reads as something after that row is retired.
  */
 import type { SteerVectorReadout } from '@/lib/api/inference-types';
-import { ASSISTANT_AXIS_ID, STEER_COMPLETION_VERSION } from '@/lib/utils/steer';
+import { ASSISTANT_AXIS_ID, STEER_COMPLETION_VERSION_WITHOUT_PROMPT } from '@/lib/utils/steer';
 
 /**
  * The snake_case shape persisted in `capMonitorOutput` today.
@@ -295,7 +295,7 @@ export function mergeStoredAxes(
  * Whether a stored row's `outputText` already begins with the prompt.
  *
  * Inference used to return prompt + generation for completions, so rows saved below
- * `STEER_COMPLETION_VERSION` have the prompt baked in. The UI now renders the prompt as its own
+ * `STEER_COMPLETION_VERSION_WITHOUT_PROMPT` have the prompt baked in. The UI now renders the prompt as its own
  * node, so prepending it to one of those rows shows it twice. Chat rows are exempt: they render
  * from `outputTextChatTemplate` and their `outputText` is never displayed on its own.
  */
@@ -303,5 +303,5 @@ export function storedOutputTextIncludesPrompt(stored: {
   version: number;
   outputTextChatTemplate: string | null;
 }): boolean {
-  return !stored.outputTextChatTemplate && stored.version < STEER_COMPLETION_VERSION;
+  return !stored.outputTextChatTemplate && stored.version < STEER_COMPLETION_VERSION_WITHOUT_PROMPT;
 }

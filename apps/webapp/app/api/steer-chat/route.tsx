@@ -31,6 +31,9 @@ import {
   STEER_N_COMPLETION_TOKENS_MAX_ASSISTANT_AXIS,
   STEER_N_COMPLETION_TOKENS_MAX_LARGE_LLM,
   STEER_N_COMPLETION_TOKENS_MAX_THINKING,
+  STEER_PRESENCE_PENALTY,
+  STEER_PRESENCE_PENALTY_MAX,
+  STEER_PRESENCE_PENALTY_MIN,
   STEER_STRENGTH_MIN,
   STEER_STRENGTH_MULTIPLIER_MAX,
   STEER_TEMPERATURE_MAX,
@@ -59,8 +62,10 @@ export const maxDuration = 180;
 
 const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 // Part of the saved-output lookup key below, so bump this whenever the text or chatTemplate we
-// store changes shape -- otherwise rows written under the old semantics keep being served as hits.
-const STEERING_VERSION = 2;
+// store, or the settings that produced them, change shape -- otherwise rows written under the old
+// semantics keep being served as hits. Version 3: sampling follows the checkpoint's
+// generation_config and applies the presence penalty.
+const STEERING_VERSION = 3;
 
 /**
  * The axis ids a request asks for, honouring the deprecated boolean.
@@ -142,6 +147,7 @@ async function saveSteerChatOutput(
           temperature: body.temperature,
           numTokens: body.n_tokens,
           freqPenalty: body.freq_penalty,
+          presencePenalty: body.presence_penalty,
           seed: body.seed,
           strengthMultiplier: body.strength_multiplier,
           version: STEERING_VERSION,
@@ -182,6 +188,7 @@ async function saveSteerChatOutput(
           temperature: body.temperature,
           numTokens: body.n_tokens,
           freqPenalty: body.freq_penalty,
+          presencePenalty: body.presence_penalty,
           seed: body.seed,
           strengthMultiplier: body.strength_multiplier,
           version: STEERING_VERSION,
@@ -294,7 +301,7 @@ async function* generateResponse(
     body.strength_multiplier,
     body.n_tokens,
     body.temperature,
-    body.freq_penalty,
+    body.presence_penalty,
     body.seed,
     body.steer_special_tokens,
     features,
@@ -442,6 +449,8 @@ export type SteerResultChat = {
     | {
         temperature: number;
         n_tokens: number;
+        presence_penalty: number;
+        /** Deprecated: no backend applies it. Stays so older callers keep parsing. */
         freq_penalty: number;
         seed: number;
         strength_multiplier: number;
@@ -514,8 +523,13 @@ const steerSchema = object({
     .required(),
   temperature: number().min(0).max(STEER_TEMPERATURE_MAX).required(),
   n_tokens: number().integer().min(1).required(),
-  // See the note in /api/steer: no backend applies this any more, so it is undocumented and
-  // optional, but it keeps a default because it is part of the saved-output lookup key.
+  // Flat subtraction from the logit of every token already generated; 0 is off. Part of the
+  // saved-output lookup key.
+  presence_penalty: number()
+    .min(STEER_PRESENCE_PENALTY_MIN)
+    .max(STEER_PRESENCE_PENALTY_MAX)
+    .default(STEER_PRESENCE_PENALTY),
+  // Deprecated: no backend applies it. Accepted so older callers keep working; stored, not keyed on.
   freq_penalty: number()
     .min(STEER_FREQUENCY_PENALTY_MIN)
     .max(STEER_FREQUENCY_PENALTY_MAX)
@@ -823,6 +837,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       settings: {
         temperature: body.temperature,
         n_tokens: body.n_tokens,
+        presence_penalty: body.presence_penalty,
         freq_penalty: body.freq_penalty,
         seed: body.seed,
         strength_multiplier: body.strength_multiplier,
@@ -909,7 +924,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(defaultChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
-        freqPenalty: body.freq_penalty,
+        presencePenalty: body.presence_penalty,
         seed: body.seed,
         strengthMultiplier: body.strength_multiplier,
         version: STEERING_VERSION,
@@ -961,7 +976,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         inputTextChatTemplateMd5: createHash('md5').update(JSON.stringify(steeredChatMessagesSorted)).digest('hex'),
         temperature: body.temperature,
         numTokens: body.n_tokens,
-        freqPenalty: body.freq_penalty,
+        presencePenalty: body.presence_penalty,
         seed: body.seed,
         strengthMultiplier: body.strength_multiplier,
         version: STEERING_VERSION,
@@ -1077,7 +1092,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       body.strength_multiplier,
       body.n_tokens,
       body.temperature,
-      body.freq_penalty,
+      body.presence_penalty,
       body.seed,
       body.steer_special_tokens,
       featuresWithVectors,
