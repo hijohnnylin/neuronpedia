@@ -55,7 +55,7 @@ dependencies = [
   # 1.8.0 adds `quantization=` and `kv_cache_dtype=` to load_model, which start.py's
   # --quantization / --kv_cache_dtype pass through: FP8 on load is what fits Llama-3.3-70B
   # on one 96 GB card. Nothing else on the surface this service calls changed.
-  "interp-engine[vllm,quant]==1.8.0",
+  "interp-engine[vllm,quant]==1.11.0",
 ]
 
 [dependency-groups]
