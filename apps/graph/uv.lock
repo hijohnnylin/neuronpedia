@@ -740,7 +740,7 @@ wheels = [
 
 [[package]]
 name = "interp-engine"
-version = "1.8.0"
+version = "1.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "einops" },
@@ -749,9 +749,9 @@ dependencies = [
     { name = "torch", version = "2.14.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/df/0b/0a406ace77f0264b6656cc49124e942a170f3e96e4ebfbc561ea007e011d/interp_engine-1.8.0.tar.gz", hash = "sha256:e998f17c27dcb9d7adc242b4964233003fa2b4047f34b6bbfa0e56fd46d6bcfc", size = 890339, upload-time = "2026-09-14T07:42:06.968Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/42/fc720db65a1ecaa37d7e8b263ba320c7007b1409ead877aa156024b02f95/interp_engine-1.11.1.tar.gz", hash = "sha256:6aa298773c0007aa7dd034a44d01677e92f432c0a44c0bf6b2a8b8285bb99187", size = 927715, upload-time = "2026-09-18T20:01:01.326Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/b4/06e42ddb90dd6aae047074045570fe24c080fa14f13d1f3617505860ef89/interp_engine-1.8.0-py3-none-any.whl", hash = "sha256:b046a0069570fb4f8cb61682d8e2a43ec16908ff9390dd8fc9a32db1de0c8ff8", size = 447479, upload-time = "2026-09-14T07:42:05.363Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/b9/fba4f333adbafe80298a25dba7507b6d5d998203b95c4746259794904d52/interp_engine-1.11.1-py3-none-any.whl", hash = "sha256:0086eefa6c4e55b7b291d255b6f77c71a93a8a5ebacfe670a8e576f16eef29ef", size = 466807, upload-time = "2026-09-18T20:00:59.623Z" },
 ]
 
 [[package]]
@@ -1189,7 +1189,7 @@ requires-dist = [
     { name = "circuit-tracer", extras = ["interp-engine"], marker = "extra == 'circuit-tracer'", git = "https://github.com/decoderesearch/circuit-tracer.git?rev=3f0965b6701f96ca498128c7226cb3e13d3c0d5e" },
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "hf-transfer", specifier = ">=0.1.9,<0.2" },
-    { name = "interp-engine", specifier = "==1.8.0" },
+    { name = "interp-engine", specifier = "==1.11.1" },
     { name = "llamascopium", marker = "extra == 'crm'", git = "https://github.com/OpenMOSS/Language-Model-SAEs.git?rev=cfd202b18b22007f3a293670b7bbac972bd62093" },
     { name = "psutil", specifier = ">=7.0,<8" },
     { name = "pydantic", specifier = ">=2.11.4" },
