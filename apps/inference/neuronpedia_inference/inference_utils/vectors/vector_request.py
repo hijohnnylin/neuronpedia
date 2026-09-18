@@ -29,7 +29,7 @@ import torch
 from neuronpedia_inference.inference_utils.vectors.vector_data import (
     MANIFEST_FILENAME,
     TENSORS_FILENAME,
-    CaptureSite,
+    CapturePoint,
     Normalize,
     Pooling,
     ReadSpec,
@@ -39,7 +39,7 @@ from neuronpedia_inference.inference_utils.vectors.vector_data import (
     load_vector,
 )
 from neuronpedia_inference.schemas import (
-    NPCaptureSite,
+    NPCapturePoint,
     NPNormalize,
     NPPooling,
     NPTokenSelection,
@@ -145,9 +145,9 @@ def _quantiles(payload: NPVectorRead) -> tuple[torch.Tensor | None, torch.Tensor
     return tensors["quantileLevels"], tensors["quantilesPos"], tensors["quantilesNeg"]
 
 
-def _site(value: NPCaptureSite) -> CaptureSite:
+def _point(value: NPCapturePoint) -> CapturePoint:
     match value:
-        case NPCaptureSite.RESID_POST:
+        case NPCapturePoint.RESID_POST:
             return "resid_post"
 
 
@@ -180,7 +180,7 @@ def _read_spec(payload: NPVectorRead) -> ReadSpec:
     if payload.read is None:
         return ReadSpec()
     return ReadSpec(
-        site=_site(payload.read.site),
+        point=_point(payload.read.point),
         tokens=_tokens(payload.read.tokens),
         pool=_pool(payload.read.pool),
     )

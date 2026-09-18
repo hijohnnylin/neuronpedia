@@ -65,7 +65,7 @@ from neuronpedia_inference.schemas.lens import (
     LensType,
 )
 from neuronpedia_inference.schemas.steer import (
-    NPCaptureSite,
+    NPCapturePoint,
     NPNormalize,
     NPPooling,
     NPReadSpec,
@@ -138,7 +138,7 @@ __all__ = [
     "LensPromptRequest",
     "LensSteerToken",
     "LensType",
-    "NPCaptureSite",
+    "NPCapturePoint",
     "NPFeature",
     "NPLogprob",
     "NPLogprobTop",

@@ -35,8 +35,8 @@ class NPNormalize(StrEnum):
     NONE = "none"
 
 
-class NPCaptureSite(StrEnum):
-    """Where in a layer an activation is read."""
+class NPCapturePoint(StrEnum):
+    """Where in a layer an activation is read: an interp-engine point name, spelled as the engine spells it."""
 
     RESID_POST = "resid_post"
 
@@ -69,7 +69,7 @@ class NPReadSpec(ExactSchema):
     ways costs one forward, not two.
     """
 
-    site: NPCaptureSite = Field(default=NPCaptureSite.RESID_POST, description="Where in the layer to read")
+    point: NPCapturePoint = Field(default=NPCapturePoint.RESID_POST, description="Where in the layer to read")
     tokens: NPTokenSelection = Field(
         default=NPTokenSelection.ASSISTANT_TURNS,
         description=(

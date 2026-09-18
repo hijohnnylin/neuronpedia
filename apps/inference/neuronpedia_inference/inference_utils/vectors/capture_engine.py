@@ -3,7 +3,7 @@
 The vLLM readout path captures mid-layer hidden states via the engine's
 `VLLMModel.capture(...)`. This module provides the eager equivalent (same
 per-message pooled activations) so readouts work on the EagerModel backend
-(CUDA-eager / MPS / CPU): capture the requested site at one or more layers for the
+(CUDA-eager / MPS / CPU): capture the requested point at one or more layers for the
 chat-templated conversation and pool per message.
 
 Every capture here is keyed by `CaptureKey`, which carries the reduction as well as the point,
@@ -86,11 +86,11 @@ def capture_turn_means_engine(
     full_ids, spans = _per_message_spans(model.tok, msgs, template_kwargs)
     tokens = torch.tensor(full_ids, dtype=torch.long, device=model.device).unsqueeze(0)
 
-    wanted = sorted({(key.site, key.layer) for key in keys})
+    wanted = sorted({(key.point, key.layer) for key in keys})
     ctx = engine_steer(model, specs) if specs else nullcontext()
     with ctx:
         cache = run_with_cache(model, tokens, list(wanted))
-    return {key: _pool_spans(cache.get(key.site, key.layer)[0], spans, key.pool) for key in set(keys)}
+    return {key: _pool_spans(cache.get(key.point, key.layer)[0], spans, key.pool) for key in set(keys)}
 
 
 def _reduce_span(span: torch.Tensor, pool: Pooling) -> torch.Tensor:
@@ -181,8 +181,8 @@ async def capture_turn_means_vllm(
     #
     # Deduplicated by point rather than by key, since two keys that differ only in pooling read the
     # same captured activations; asking for that point twice would be a second forward.
-    points = {(site, layer): Address(site, layer) for site, layer in sorted({(k.site, k.layer) for k in keys})}
+    points = {(point, layer): Address(point, layer) for point, layer in sorted({(k.point, k.layer) for k in keys})}
     # Per-request steering: capture() registers the steering under the same request id,
     # so this is concurrency-safe (no global steering state clobbered by other requests).
     caps = await backend.capture(full_ids, list(points.values()), steering_spec=steering_spec)
-    return {key: _pool_spans(caps[points[(key.site, key.layer)]], spans, key.pool) for key in set(keys)}
+    return {key: _pool_spans(caps[points[(key.point, key.layer)]], spans, key.pool) for key in set(keys)}

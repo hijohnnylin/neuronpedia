@@ -159,10 +159,10 @@ describe('personaAxisToVectorRead', () => {
     // its own model with its own fields.
     const payload = personaAxisToVectorRead(
       fit({
-        projectionParams: { read: { site: 'resid_post', tokens: 'assistant_turns', pool: 'mean', window: 4 } },
+        projectionParams: { read: { point: 'resid_post', tokens: 'assistant_turns', pool: 'mean', window: 4 } },
       }),
     );
-    expect(payload.read).toEqual({ site: 'resid_post', tokens: 'assistant_turns', pool: 'mean' });
+    expect(payload.read).toEqual({ point: 'resid_post', tokens: 'assistant_turns', pool: 'mean' });
   });
 
   it('says nothing about the read for a row that stores no spec', () => {

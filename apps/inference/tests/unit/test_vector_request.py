@@ -130,7 +130,7 @@ class TestPayloadShape:
         # A closed set of parameters says nothing about what is nested in one of them unless the
         # nested model is closed as well.
         with pytest.raises(ValidationError, match="window"):
-            payload(read={"site": "resid_post", "tokens": "assistant_turns", "pool": "mean", "window": 4})
+            payload(read={"point": "resid_post", "tokens": "assistant_turns", "pool": "mean", "window": 4})
 
     def test_either_spelling_of_a_known_field_still_validates(self):
         # What is refused is a name this server does not have, not a casing. `populate_by_name`
@@ -185,8 +185,8 @@ class TestDefaults:
         # What was hard-coded before the read spec existed, so what a vector that says nothing about
         # it still has to get. Changing this default re-reads every vector fitted so far.
         vector = build()
-        assert (vector.read.site, vector.read.tokens, vector.read.pool) == ("resid_post", "assistant_turns", "mean")
-        assert vector.capture_key == CaptureKey(site="resid_post", layer=3, pool="mean")
+        assert (vector.read.point, vector.read.tokens, vector.read.pool) == ("resid_post", "assistant_turns", "mean")
+        assert vector.capture_key == CaptureKey(point="resid_post", layer=3, pool="mean")
 
     def test_there_is_no_percentile_without_tables(self):
         values, percentiles = project_vector_with_percentile(acts(2.0), build())
