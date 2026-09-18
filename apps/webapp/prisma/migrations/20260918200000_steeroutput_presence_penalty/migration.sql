@@ -1,28 +1,5 @@
+-- Column only. On Postgres 11+ a NOT NULL column with a constant default is a catalog change,
+-- so this does not rewrite the table. The index change is the next migration.
+
 -- AlterTable
 ALTER TABLE "SteerOutput" ADD COLUMN     "presencePenalty" DOUBLE PRECISION NOT NULL DEFAULT 0;
-
--- The lookup key now includes presencePenalty in place of freqPenalty, which no backend applies.
-
--- DropIndex
-DROP INDEX "steerIndex";
-
--- DropIndex
-DROP INDEX "steerIndex2";
-
--- DropIndex
-DROP INDEX "steerIndexWithoutType";
-
--- DropIndex
-DROP INDEX "steerIndexWithoutType2";
-
--- CreateIndex
-CREATE INDEX "steerIndex" ON "SteerOutput"("modelId", "type", "inputTextMd5", "temperature", "numTokens", "presencePenalty", "seed", "strengthMultiplier", "version", "steerSpecialTokens", "steerMethod");
-
--- CreateIndex
-CREATE INDEX "steerIndex2" ON "SteerOutput"("modelId", "type", "inputTextChatTemplateMd5", "temperature", "numTokens", "presencePenalty", "seed", "strengthMultiplier", "version", "steerSpecialTokens", "steerMethod");
-
--- CreateIndex
-CREATE INDEX "steerIndexWithoutType" ON "SteerOutput"("modelId", "inputTextMd5", "temperature", "numTokens", "presencePenalty", "seed", "strengthMultiplier", "version", "steerSpecialTokens", "steerMethod");
-
--- CreateIndex
-CREATE INDEX "steerIndexWithoutType2" ON "SteerOutput"("modelId", "inputTextChatTemplateMd5", "temperature", "numTokens", "presencePenalty", "seed", "strengthMultiplier", "version", "steerSpecialTokens", "steerMethod");
