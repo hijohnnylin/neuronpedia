@@ -70,6 +70,8 @@ export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '';
+// TypeSafe (Jev) - explanation scoring. Server key only; there is no per-user key type for it.
+export const TYPESAFE_API_KEY = process.env.TYPESAFE_API_KEY || '';
 export const HF_TOKEN = process.env.HF_TOKEN || '';
 
 // These keys are used to use OpenAI embedding via OpenAI, Azure, or OpenRouter. By default we use OpenAI directly and the AZURE fields can be kept blank.

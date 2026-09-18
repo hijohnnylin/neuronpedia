@@ -1,4 +1,9 @@
 import CustomTooltip from '@/components/custom-tooltip';
+import type {
+  JevFuzzDetectionJsonDetails,
+  JevHolisticJsonDetails,
+  JevLogitFit,
+} from '@/lib/external/autointerp-scorer-jev';
 import { Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import ActivationItem from './activation-item';
@@ -76,6 +81,8 @@ export default function ExplanationScoreDetailDialog() {
   const [eleutherFuzzOrRecallJson, setEleutherFuzzOrRecallJson] = useState<EleutherFuzzOrRecallJsonDetails>();
   const [eleutherEmbeddingJson, setEleutherEmbeddingJson] = useState<EleutherEmbeddingJsonDetails>();
   const [nlaVerbalizerJson, setNlaVerbalizerJson] = useState<NlaVerbalizerJsonDetails>();
+  const [jevFuzzDetectionJson, setJevFuzzDetectionJson] = useState<JevFuzzDetectionJsonDetails>();
+  const [jevHolisticJson, setJevHolisticJson] = useState<JevHolisticJsonDetails>();
 
   const { explanationScoreTypes } = useGlobalContext();
 
@@ -119,9 +126,42 @@ export default function ExplanationScoreDetailDialog() {
         explanationScoreDetailScore.explanationScoreTypeName === 'nla_verbalizer_last'
       ) {
         setNlaVerbalizerJson(parsedJson as NlaVerbalizerJsonDetails);
+      } else if (
+        explanationScoreDetailScore.explanationScoreTypeName === 'jev_fuzz' ||
+        explanationScoreDetailScore.explanationScoreTypeName === 'jev_detection'
+      ) {
+        setJevFuzzDetectionJson(parsedJson as JevFuzzDetectionJsonDetails);
+      } else if (explanationScoreDetailScore.explanationScoreTypeName === 'jev_score') {
+        setJevHolisticJson(parsedJson as JevHolisticJsonDetails);
       }
     }
   }, [explanationScoreDetailScore]);
+
+  const jevExampleKindLabel: Record<string, string> = {
+    top: 'Top Activation',
+    zero: 'Zero Activation',
+    decoy: 'Decoy',
+  };
+
+  const renderJevLogitFit = (logitFit: JevLogitFit, model: string) => (
+    <div className="flex flex-row flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+      <div>
+        <span className="text-[10px] font-medium uppercase text-slate-400">Model </span>
+        <span className="font-mono">{model}</span>
+      </div>
+      {logitFit && (
+        <div className="flex flex-row items-center gap-x-1">
+          <span className="text-[10px] font-medium uppercase text-slate-400">Top Logits Fit </span>
+          <span className="font-bold">{(logitFit.noul * 100).toFixed(0)}%</span>
+          <CustomTooltip trigger={<Info className="h-3 w-3" />}>
+            The probability that the {`feature's`} top positive output logits fit the explanation. Stored for reference
+            only; it is not part of the score, because many features have byte-pair fragments as top logits.
+          </CustomTooltip>
+          <span className="font-mono text-[10px] text-slate-500">{logitFit.top_logits.join(' · ')}</span>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <Dialog open={explanationScoreDetailOpen} onOpenChange={setExplanationScoreDetailOpen}>
@@ -441,6 +481,123 @@ export default function ExplanationScoreDetailDialog() {
                   </div>
                 </div>
               )}
+
+            {(explanationScoreDetailScore?.explanationScoreTypeName === 'jev_fuzz' ||
+              explanationScoreDetailScore?.explanationScoreTypeName === 'jev_detection') &&
+              jevFuzzDetectionJson && (
+                <div className="flex w-full flex-col gap-y-2 px-5 pb-10 pt-3 text-slate-600">
+                  {renderJevLogitFit(jevFuzzDetectionJson.logit_fit, jevFuzzDetectionJson.model)}
+                  <table>
+                    <tr className="">
+                      <th className="gap-x-1 whitespace-pre px-2 py-1.5">
+                        Text{' '}
+                        <CustomTooltip trigger={<Info className="h-3 w-3" />}>
+                          The text that was scored.
+                          {explanationScoreDetailScore?.explanationScoreTypeName === 'jev_fuzz' &&
+                            ' For fuzz, the tokens the feature fires on were marked with << >> in the prompt.'}
+                        </CustomTooltip>
+                      </th>
+                      <th className="gap-x-1 whitespace-pre px-2 py-1.5">
+                        Set{' '}
+                        <CustomTooltip trigger={<Info className="h-3 w-3" />}>
+                          Top activations should match. Zero activations and decoys should not.
+                        </CustomTooltip>
+                      </th>
+                      <th className="gap-x-1 whitespace-pre px-2 py-1.5">
+                        Probability{' '}
+                        <CustomTooltip trigger={<Info className="h-3 w-3" />}>
+                          {`Jev's`} calibrated probability that the text matches the explanation. Above{' '}
+                          {(jevFuzzDetectionJson.threshold * 100).toFixed(0)}% counts as a match.
+                        </CustomTooltip>
+                      </th>
+                      <th className="gap-x-1 whitespace-pre px-2 py-1.5">Prediction</th>
+                      <th className="gap-x-1 whitespace-pre px-2 py-1.5">Correct</th>
+                    </tr>
+                    {jevFuzzDetectionJson.examples.map((item, i) => (
+                      <tr key={i} className={item.correct ? '' : 'bg-red-50'}>
+                        <td className="px-2 py-1.5 font-mono text-[10px]">
+                          <ActivationItem
+                            tokensToDisplayAroundMaxActToken={32}
+                            activation={{
+                              tokens: item.str_tokens,
+                              values: item.activations,
+                            }}
+                            overallMaxActivationValueInList={item.activations.indexOf(Math.max(...item.activations))}
+                            overrideTextSize="text-[10.5px]"
+                          />
+                        </td>
+                        <td className="whitespace-pre px-2 text-center">
+                          {jevExampleKindLabel[item.kind] || item.kind}
+                        </td>
+                        <td className="whitespace-pre px-2 text-center">{(item.noul * 100).toFixed(1)}%</td>
+                        <td className="whitespace-pre px-2 text-center">{item.prediction ? 'Match' : 'No Match'}</td>
+                        <td className="whitespace-pre px-2 text-center">{item.correct ? 'Correct' : 'Incorrect'}</td>
+                      </tr>
+                    ))}
+                  </table>
+                </div>
+              )}
+
+            {explanationScoreDetailScore?.explanationScoreTypeName === 'jev_score' && jevHolisticJson && (
+              <div className="flex w-full flex-col gap-y-4 px-5 pb-10 pt-3 text-slate-600">
+                {renderJevLogitFit(jevHolisticJson.logit_fit, jevHolisticJson.model)}
+                <div className="flex flex-col gap-y-1">
+                  <div className="flex flex-row items-center gap-x-4 text-[10px] font-medium uppercase text-slate-400">
+                    <span>
+                      Rating {jevHolisticJson.score.toFixed(2)} / {jevHolisticJson.levels.length - 1}
+                    </span>
+                    <span className="flex flex-row items-center gap-x-1">
+                      Confidence {(jevHolisticJson.confidence * 100).toFixed(0)}%
+                      <CustomTooltip trigger={<Info className="h-3 w-3" />}>
+                        How peaked the probability distribution over levels is. Low confidence often means the
+                        explanation is too broad or fits only some of the examples.
+                      </CustomTooltip>
+                    </span>
+                  </div>
+                  <table className="w-full max-w-3xl">
+                    {jevHolisticJson.levels.map((level, i) => {
+                      const p = jevHolisticJson.probabilities[String(i)] || 0;
+                      return (
+                        <tr key={i}>
+                          <td className="whitespace-pre px-2 py-0.5 text-right font-mono text-[10px] text-slate-400">
+                            {i}
+                          </td>
+                          <td className="px-2 py-0.5 text-xs">{level}</td>
+                          <td className="w-40 px-2 py-0.5">
+                            <div className="h-2 w-full rounded bg-slate-200">
+                              <div className="h-2 rounded bg-emerald-500" style={{ width: `${p * 100}%` }} />
+                            </div>
+                          </td>
+                          <td className="whitespace-pre px-2 py-0.5 text-right font-mono text-[10px]">
+                            {(p * 100).toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </table>
+                </div>
+                <div className="flex flex-col gap-y-1">
+                  <div className="text-[10px] font-medium uppercase text-slate-400">
+                    Examples Rated (tokens the feature fires on were marked with {'<< >>'} in the prompt)
+                  </div>
+                  <div className="flex flex-col gap-y-1">
+                    {jevHolisticJson.examples.map((item, i) => (
+                      <div key={i} className="font-mono text-[10px]">
+                        <ActivationItem
+                          tokensToDisplayAroundMaxActToken={32}
+                          activation={{
+                            tokens: item.str_tokens,
+                            values: item.activations,
+                          }}
+                          overallMaxActivationValueInList={item.activations.indexOf(Math.max(...item.activations))}
+                          overrideTextSize="text-[10.5px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {explanationScoreDetailScore?.explanationScoreTypeName === 'eleuther_embedding' && (
               <div className="flex w-full flex-col gap-y-2 px-5 pb-10 pt-2 text-slate-600">

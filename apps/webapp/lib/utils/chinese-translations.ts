@@ -13,66 +13,10 @@
 // cached in localStorage for subsequent loads.
 
 import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { decodeRawToken } from './byte-level-tokens';
 
 const TRANSLATIONS_URL = '/chinese-translations-qwen.json';
 const STORAGE_KEY = 'np-chinese-translations-v3';
-
-// --------------------------------------------------------------------------- //
-// Byte-level (GPT-2 / Qwen) decoding
-// --------------------------------------------------------------------------- //
-
-// Reproduces HF's `bytes_to_unicode`: a reversible map from each of the 256
-// byte values to a printable unicode codepoint. We build the inverse here
-// (printable char -> byte) so we can turn a raw vocab string back into bytes.
-function buildByteDecoder(): Map<string, number> {
-  const bs: number[] = [];
-  const addRange = (from: string, to: string) => {
-    for (let i = from.codePointAt(0)!; i <= to.codePointAt(0)!; i += 1) {
-      bs.push(i);
-    }
-  };
-  addRange('!', '~');
-  addRange('\u00a1', '\u00ac');
-  addRange('\u00ae', '\u00ff');
-
-  const cs = [...bs];
-  let n = 0;
-  for (let b = 0; b < 256; b += 1) {
-    if (!bs.includes(b)) {
-      bs.push(b);
-      cs.push(256 + n);
-      n += 1;
-    }
-  }
-
-  const decoder = new Map<string, number>();
-  for (let i = 0; i < bs.length; i += 1) {
-    decoder.set(String.fromCodePoint(cs[i]), bs[i]);
-  }
-  return decoder;
-}
-
-const BYTE_DECODER = buildByteDecoder();
-const UTF8_DECODER = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: false }) : null;
-
-// Decode a raw byte-level token string back into its real text, or null if the
-// string isn't a byte-level token (e.g. the file is already keyed by real
-// characters) or decodes to invalid UTF-8 (a partial multi-byte token).
-function decodeRawToken(raw: string): string | null {
-  if (!UTF8_DECODER) {
-    return null;
-  }
-  const bytes: number[] = [];
-  for (const ch of raw) {
-    const b = BYTE_DECODER.get(ch);
-    if (b === undefined) {
-      return null;
-    }
-    bytes.push(b);
-  }
-  const text = UTF8_DECODER.decode(Uint8Array.from(bytes));
-  return text.includes('\ufffd') ? null : text;
-}
 
 // Build the in-memory lookup. Works whether the file is keyed by raw byte-level
 // strings (decoded here) or already by real characters (stored as-is). Both the

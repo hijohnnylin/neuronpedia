@@ -555,7 +555,8 @@ export default function ExplanationsPane({
                                     <div
                                       className={`${
                                         selectedExplanationScoreType?.name === 'eleuther_embedding' ||
-                                        selectedExplanationScoreType?.name.startsWith('nla_')
+                                        selectedExplanationScoreType?.name.startsWith('nla_') ||
+                                        selectedExplanationScoreType?.name.startsWith('jev_')
                                           ? 'hidden'
                                           : 'flex'
                                       } min-w-[calc(50%-35px)] max-w-[calc(50%-35px)] flex-1 flex-row items-center justify-start gap-x-2 overflow-hidden text-ellipsis whitespace-pre`}
@@ -625,7 +626,8 @@ export default function ExplanationsPane({
                                         if (
                                           !selectedExplanationScoreModelType &&
                                           selectedExplanationScoreType?.name !== 'eleuther_embedding' &&
-                                          !selectedExplanationScoreType?.name.startsWith('nla_')
+                                          !selectedExplanationScoreType?.name.startsWith('nla_') &&
+                                          !selectedExplanationScoreType?.name.startsWith('jev_')
                                         ) {
                                           alert('Please select a scorer model.');
                                           return;
