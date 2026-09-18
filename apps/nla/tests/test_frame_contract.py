@@ -26,6 +26,7 @@ from server import (
     CompletionPromptFrame,
     CompletionTokenFrame,
     DescribeProgressFrame,
+    DescribeSamplingFrame,
     DescriptionResult,
     ExplainMetaFrame,
     ExplainProgressFrame,
@@ -37,11 +38,12 @@ from server import (
 # module docstring -- and, for ExplainResult, only alongside a migration for rows already in
 # NlaExplainCache.resultJson.
 EXPECTED_KEYS = {
-    CompletionPromptFrame: {"type", "prompt_length", "tokens"},
+    CompletionPromptFrame: {"type", "prompt_length", "tokens", "sampling"},
     CompletionTokenFrame: {"type", "token"},
     CompletionDoneFrame: {"type", "text"},
+    DescribeSamplingFrame: {"type", "sampling"},
     DescribeProgressFrame: {"index", "text", "done"},
-    ExplainMetaFrame: {"layer_index", "total", "prompt_length"},
+    ExplainMetaFrame: {"layer_index", "total", "prompt_length", "sampling"},
     ExplainProgressFrame: {"position", "text", "done"},
 }
 
@@ -76,6 +78,8 @@ def test_progress_frames_carry_no_description():
     finished explanation.
     """
     assert "description" not in DescribeProgressFrame.model_fields
+    assert "description" not in DescribeSamplingFrame.model_fields
+    assert "done" not in DescribeSamplingFrame.model_fields
     assert "description" not in ExplainProgressFrame.model_fields
     assert "description" in DescriptionResult.model_fields
     assert "description" in ExplainResult.model_fields

@@ -12,6 +12,7 @@ import asyncio
 import json
 
 import torch
+from interp_engine import SamplingSettings
 
 from neuronpedia_inference.endpoints.steer.completion_chat import (
     _vllm_chat_generate,
@@ -23,6 +24,7 @@ from neuronpedia_inference.inference_utils.steering import (
 )
 from neuronpedia_inference.schemas import NPSteerChatMessage, NPSteerType, NPSteerVector
 
+GREEDY = SamplingSettings(temperature=0.0, top_k=None, top_p=None, presence_penalty=0.0)
 HARMONY_VOCAB = ["<|start|>", "<|channel|>", "<|message|>", "<|end|>", "<|return|>"]
 PROMPT = "<|start|>user<|message|>Hi<|end|><|start|>assistant"
 DELTAS = [
@@ -81,7 +83,7 @@ async def _frames(model: StubBackend, steer_types: list[NPSteerType] | None = No
             ),
             steer_types=steer_types or [NPSteerType.DEFAULT],
             seed=1,
-            temperature=0.0,
+            sampling=GREEDY,
             max_new_tokens=32,
         )
     ]

@@ -32,6 +32,7 @@ import numpy as np
 import torch
 import yaml
 from huggingface_hub import snapshot_download
+from interp_engine import SamplingSettings, read_recommended_sampling, resolve_sampling
 from safetensors import safe_open
 from safetensors.torch import load_file
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
@@ -631,6 +632,7 @@ class NLAClient:
         local_path = resolve_checkpoint_path(verbalizer_model_path)
 
         self.tokenizer = _load_tokenizer(local_path)
+        self.recommended_sampling = read_recommended_sampling(local_path)
 
         # Load or use provided NLA config
         if nla_config is not None:
@@ -770,12 +772,30 @@ class NLAClient:
     # warning even though the model emitted it correctly.
     _DEFAULT_STOP_SEQUENCES: tuple[str, ...] = ("</explanation>",)
 
+    def sampling_settings(
+        self,
+        *,
+        temperature: float | None = None,
+        top_k: int | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+    ) -> SamplingSettings:
+        """What a generation with these knobs runs with: the caller's value, else the verbalizer
+        checkpoint's ``generation_config.json``, else neutral -- the inference server's rule."""
+        return resolve_sampling(
+            self.recommended_sampling,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            presence_penalty=presence_penalty,
+        )
+
     def _make_req(
         self,
         activation: Iterable[float] | np.ndarray | torch.Tensor,
         *,
         prompt: str | None = None,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 512,
     ) -> GenerateReqInput:
         """Build a GenerateReqInput with input_embeds.
@@ -792,10 +812,12 @@ class NLAClient:
         assert v.numel() == self.cfg.d_model, f"activation length {v.numel()} != d_model {self.cfg.d_model}"
         embeds_np = self._build_embeds(v, prompt)
 
+        settings = sampling or self.sampling_settings()
         return GenerateReqInput(
             input_embeds=embeds_np.tolist(),
             sampling_params={
-                "temperature": temperature,
+                # sglang spells "no filtering" as vLLM does: top_k -1, top_p 1.0.
+                **settings.vllm_kwargs(),
                 "max_new_tokens": max_new_tokens,
                 "skip_special_tokens": False,
                 "stop": list(self._DEFAULT_STOP_SEQUENCES),
@@ -831,7 +853,7 @@ class NLAClient:
         *,
         prompt: str | None = None,
         extract_explanation: bool = True,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
         context: str | None = None,
     ) -> str:
@@ -843,7 +865,7 @@ class NLAClient:
         obj = self._make_req(
             activation,
             prompt=prompt,
-            temperature=temperature,
+            sampling=sampling,
             max_new_tokens=max_new_tokens,
         )
         generator = self.engine.tokenizer_manager.generate_request(obj, None)
@@ -855,7 +877,7 @@ class NLAClient:
         activation: Iterable[float] | np.ndarray | torch.Tensor,
         *,
         prompt: str | None = None,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
     ):
         """Yield sglang output dicts as the verbalizer generates tokens.
@@ -870,7 +892,7 @@ class NLAClient:
         obj = self._make_req(
             activation,
             prompt=prompt,
-            temperature=temperature,
+            sampling=sampling,
             max_new_tokens=max_new_tokens,
         )
         obj.stream = True
@@ -884,7 +906,7 @@ class NLAClient:
         *,
         prompt: str | None = None,
         extract_explanation: bool = True,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
         context: str | None = None,
     ) -> str:
@@ -892,7 +914,7 @@ class NLAClient:
         obj = self._make_req(
             activation,
             prompt=prompt,
-            temperature=temperature,
+            sampling=sampling,
             max_new_tokens=max_new_tokens,
         )
         generator = self.engine.tokenizer_manager.generate_request(obj, None)
@@ -1611,6 +1633,7 @@ class SourceModel:
 
         print(f"[SourceModel] Loading {model_path} (layer {layer_index}, truncate={truncate}, fp8={fp8})...")
         self.tokenizer = _load_tokenizer(local_path)
+        self.recommended_sampling = read_recommended_sampling(local_path)
         # Load on CPU first so truncation drops weights BEFORE the .to(device)
         # transfer — avoids the transient GPU memory spike of loading the full
         # model onto GPU only to immediately free 25%+ of it.

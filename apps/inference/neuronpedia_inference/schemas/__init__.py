@@ -56,6 +56,7 @@ from neuronpedia_inference.schemas.common import (
     NPFeature,
     NPLogprob,
     NPLogprobTop,
+    NPSamplingSettings,
     PublicFrameSchema,
 )
 from neuronpedia_inference.schemas.lens import (
@@ -141,6 +142,7 @@ __all__ = [
     "NPCapturePoint",
     "NPFeature",
     "NPLogprob",
+    "NPSamplingSettings",
     "NPLogprobTop",
     "NPNormalize",
     "NPPooling",

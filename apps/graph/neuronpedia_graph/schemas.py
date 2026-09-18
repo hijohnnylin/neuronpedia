@@ -100,9 +100,32 @@ class SteerRequest(GraphSchema):
     messages: list[GraphChatMessage] | None = None
     features: list[SteerFeature]
     n_tokens: int = 10
-    top_k: int = 5
-    temperature: float = 0.0
-    freq_penalty: float = 0
+    top_k: int = Field(default=5, description="How many top logits to report per generated token")
+    temperature: float | None = Field(
+        default=None,
+        description="0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.",
+    )
+    sampling_top_k: int | None = Field(
+        default=None,
+        ge=0,
+        description="Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    top_p: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    presence_penalty: float | None = Field(
+        default=None,
+        ge=0,
+        le=2,
+        description="Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.",
+    )
+    freq_penalty: float | None = Field(
+        default=None,
+        description="Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.",
+    )
     seed: int | None = None
     freeze_attention: bool = False
 
@@ -196,6 +219,16 @@ class LogitsByToken(GraphSchema):
     top_logits: list[TopLogit]
 
 
+class SamplingReport(GraphSchema):
+    """The settings both generations ran with, every knob decided; see ``SteerRequest``."""
+
+    temperature: float
+    top_k: int | None = Field(default=None, description="Null: no top-k filtering")
+    top_p: float | None = Field(default=None, description="Null: no nucleus filtering")
+    presence_penalty: float
+    seed: int | None = None
+
+
 class SteerResponse(GraphSchema):
     """Default and steered generations, plus per-token logits for each.
 
@@ -208,6 +241,7 @@ class SteerResponse(GraphSchema):
     steered_generation: str = Field(alias="STEERED_GENERATION")
     default_logits_by_token: list[LogitsByToken] = Field(alias="DEFAULT_LOGITS_BY_TOKEN")
     steered_logits_by_token: list[LogitsByToken] = Field(alias="STEERED_LOGITS_BY_TOKEN")
+    sampling: SamplingReport | None = Field(default=None, description="What both generations ran with")
 
     # `serialize_by_alias` is what puts the SCREAMING_SNAKE names on the wire; without it the
     # aliases would only be accepted on input and the response would come back snake_case.

@@ -367,6 +367,28 @@ export interface components {
       token_id: number;
     };
     /**
+     * SamplingReport
+     * @description The settings both generations ran with, every knob decided; see ``SteerRequest``.
+     */
+    SamplingReport: {
+      /** Presence Penalty */
+      presence_penalty: number;
+      /** Seed */
+      seed?: number | null;
+      /** Temperature */
+      temperature: number;
+      /**
+       * Top K
+       * @description Null: no top-k filtering
+       */
+      top_k?: number | null;
+      /**
+       * Top P
+       * @description Null: no nucleus filtering
+       */
+      top_p?: number | null;
+    };
+    /**
      * SteerFeature
      * @description One feature intervention.
      *
@@ -406,9 +428,9 @@ export interface components {
       freeze_attention: boolean;
       /**
        * Freq Penalty
-       * @default 0
+       * @description Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.
        */
-      freq_penalty: number;
+      freq_penalty?: number | null;
       /** Messages */
       messages?: components['schemas']['GraphChatMessage'][] | null;
       /** Model Id */
@@ -419,22 +441,38 @@ export interface components {
        */
       n_tokens: number;
       /**
+       * Presence Penalty
+       * @description Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.
+       */
+      presence_penalty?: number | null;
+      /**
        * Prompt
        * @default
        */
       prompt: string;
+      /**
+       * Sampling Top K
+       * @description Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      sampling_top_k?: number | null;
       /** Seed */
       seed?: number | null;
       /**
        * Temperature
-       * @default 0
+       * @description 0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.
        */
-      temperature: number;
+      temperature?: number | null;
       /**
        * Top K
+       * @description How many top logits to report per generated token
        * @default 5
        */
       top_k: number;
+      /**
+       * Top P
+       * @description Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_p?: number | null;
     };
     /**
      * SteerResponse
@@ -453,6 +491,8 @@ export interface components {
       STEERED_GENERATION: string;
       /** Steered Logits By Token */
       STEERED_LOGITS_BY_TOKEN: components['schemas']['LogitsByToken'][];
+      /** @description What both generations ran with */
+      sampling?: components['schemas']['SamplingReport'] | null;
     };
     /** TopLogit */
     TopLogit: {

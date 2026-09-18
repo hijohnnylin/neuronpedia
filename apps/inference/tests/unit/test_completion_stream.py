@@ -10,12 +10,16 @@ from __future__ import annotations
 import asyncio
 import json
 
+from interp_engine import SamplingSettings
+
 from neuronpedia_inference.endpoints.steer.completion import _vllm_run_batched_generate
 from neuronpedia_inference.inference_utils.steering import (
     SteeringSettings,
     remove_sse_formatting,
 )
 from neuronpedia_inference.schemas import NPSteerType, NPSteerVector
+
+GREEDY = SamplingSettings(temperature=0.0, top_k=None, top_p=None, presence_penalty=0.0)
 
 
 class StubBackend:
@@ -54,7 +58,7 @@ async def _frames(model: StubBackend, steer_types: list[NPSteerType]) -> list[di
             ),
             steer_types=steer_types,
             seed=1,
-            temperature=0.0,
+            sampling=GREEDY,
             max_new_tokens=32,
         )
     ]

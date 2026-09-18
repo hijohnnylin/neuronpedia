@@ -273,7 +273,7 @@ import torch
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
-from interp_engine import check_cuda_driver
+from interp_engine import RecommendedSampling, SamplingSettings, check_cuda_driver, hf_generate_kwargs, resolve_sampling
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import Headers
 from transformers.generation.streamers import BaseStreamer
@@ -1057,14 +1057,75 @@ class NlaSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True, protected_namespaces=())
 
 
-class DescribeRequest(NlaSchema):
+class _SamplingKnobs(NlaSchema):
+    """The sampling knobs a generating endpoint takes.
+
+    A knob left unset takes the generating checkpoint's own ``generation_config.json``
+    recommendation (the verbalizer's for ``/describe``, ``/compare`` and ``/explain``, the source
+    model's for ``/completion``), or the neutral value where that states nothing. The response
+    reports what the generation ran with.
+    """
+
+    temperature: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=5.0,
+        description="0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.",
+    )
+    top_k: int | None = Field(
+        default=None,
+        ge=0,
+        description="Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    top_p: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        description="Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    presence_penalty: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2.0,
+        description="Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.",
+    )
+
+
+class SamplingReport(NlaSchema):
+    """The settings a generation ran with, every knob decided; see ``_SamplingKnobs``."""
+
+    temperature: float
+    top_k: int | None = Field(default=None, description="Null: no top-k filtering")
+    top_p: float | None = Field(default=None, description="Null: no nucleus filtering")
+    presence_penalty: float
+
+
+def _resolve_sampling(recommended: RecommendedSampling, req: _SamplingKnobs) -> SamplingSettings:
+    return resolve_sampling(
+        recommended,
+        temperature=req.temperature,
+        top_k=req.top_k,
+        top_p=req.top_p,
+        presence_penalty=req.presence_penalty,
+    )
+
+
+def _sampling_report(settings: SamplingSettings) -> SamplingReport:
+    return SamplingReport(
+        temperature=settings.temperature,
+        top_k=settings.top_k,
+        top_p=settings.top_p,
+        presence_penalty=settings.presence_penalty,
+    )
+
+
+class DescribeRequest(_SamplingKnobs):
     activations: list[list[float]] = Field(
         ...,
         description="List of activation vectors, each of length d_model",
         min_length=1,
         max_length=MAX_DESCRIBE_BATCH,
     )
-    temperature: float = Field(default=0.7, ge=0.0, le=5.0)
     max_new_tokens: int = Field(default=200, gt=0, le=MAX_NEW_TOKENS_LIMIT)
     stream: bool = Field(default=False, description="Stream results as SSE events")
 
@@ -1077,6 +1138,7 @@ class DescriptionResult(NlaSchema):
 
 class DescribeResponse(NlaSchema):
     results: list[DescriptionResult]
+    sampling: SamplingReport | None = Field(default=None, description="What every description ran with")
 
 
 class ScoreRequest(NlaSchema):
@@ -1096,10 +1158,9 @@ class ScoreResponse(NlaSchema):
     cosine_similarity: float
 
 
-class CompareRequest(NlaSchema):
+class CompareRequest(_SamplingKnobs):
     activation_a: list[float] = Field(..., description="First activation vector")
     activation_b: list[float] = Field(..., description="Second activation vector")
-    temperature: float = Field(default=0.7, ge=0.0, le=5.0)
     max_new_tokens: int = Field(default=200, gt=0, le=MAX_NEW_TOKENS_LIMIT)
 
 
@@ -1108,6 +1169,7 @@ class CompareResponse(NlaSchema):
     diff_norm: float = Field(description="L2 norm of the difference vector")
     mse: float | None = Field(default=None)
     cosine_similarity: float | None = Field(default=None)
+    sampling: SamplingReport | None = Field(default=None, description="What the description ran with")
 
 
 class ChatMessageInput(NlaSchema):
@@ -1146,7 +1208,7 @@ class TokenizeRequest(_ChatTemplateMixin):
     )
 
 
-class CompletionRequest(_ChatTemplateMixin):
+class CompletionRequest(_ChatTemplateMixin, _SamplingKnobs):
     text: str | None = Field(
         default=None,
         description="Prompt text to extend (or provide `messages`).",
@@ -1162,7 +1224,6 @@ class CompletionRequest(_ChatTemplateMixin):
             f"Number of tokens to generate as continuation (clamped server-side to 1-{MAX_COMPLETION_TOKENS})."
         ),
     )
-    temperature: float = Field(default=0.7, ge=0.0, le=5.0)
     stream: bool = Field(
         default=False,
         description="If true, stream tokens as SSE events instead of returning the full response.",
@@ -1253,6 +1314,9 @@ class TokenizeResponse(NlaSchema):
     tokens: list[TokenInfo]
     prompt_length: int = Field(description="Number of tokens from the original input text")
     text: str = Field(description="Full text (original + any generated completion)")
+    sampling: SamplingReport | None = Field(
+        default=None, description="What a /completion generation ran with; absent from /tokenize"
+    )
 
 
 class ExtractRequest(_ChatTemplateMixin):
@@ -1276,7 +1340,7 @@ class ExtractResponse(NlaSchema):
     tokens: list[TokenActivation]
 
 
-class ExplainRequest(_ChatTemplateMixin):
+class ExplainRequest(_ChatTemplateMixin, _SamplingKnobs):
     text: str | None = Field(
         default=None,
         description="Input text to extract activations from (or provide `messages`).",
@@ -1288,7 +1352,6 @@ class ExplainRequest(_ChatTemplateMixin):
         "If omitted or empty, all positions are described.",
         max_length=MAX_POSITIONS_PER_REQUEST,
     )
-    temperature: float = Field(default=0.7, ge=0.0, le=5.0)
     max_new_tokens: int = Field(
         default=200,
         gt=0,
@@ -1326,6 +1389,7 @@ class ExplainResult(NlaSchema):
 class ExplainResponse(NlaSchema):
     layer_index: int
     results: list[ExplainResult]
+    sampling: SamplingReport | None = Field(default=None, description="What every explanation ran with")
 
 
 class NlaFrameSchema(NlaSchema):
@@ -1342,11 +1406,12 @@ class NlaFrameSchema(NlaSchema):
 
 
 class CompletionPromptFrame(NlaFrameSchema):
-    """First frame of a ``/completion`` stream: the tokenized prompt."""
+    """First frame of a ``/completion`` stream: the tokenized prompt, and what the generation runs with."""
 
     type: Literal["prompt"] = "prompt"
     prompt_length: int
     tokens: list[TokenInfo]
+    sampling: SamplingReport | None = None
 
 
 class CompletionTokenFrame(NlaFrameSchema):
@@ -1361,6 +1426,14 @@ class CompletionDoneFrame(NlaFrameSchema):
 
     type: Literal["done"] = "done"
     text: str
+
+
+class DescribeSamplingFrame(NlaFrameSchema):
+    """First frame of a ``/describe`` stream: what every description runs with. Carries neither
+    ``description`` nor ``text``, so the consumers that key on those pass over it."""
+
+    type: Literal["sampling"] = "sampling"
+    sampling: SamplingReport
 
 
 class DescribeProgressFrame(NlaFrameSchema):
@@ -1381,6 +1454,7 @@ class ExplainMetaFrame(NlaFrameSchema):
     layer_index: int
     total: int
     prompt_length: int
+    sampling: SamplingReport | None = None
 
 
 class ExplainProgressFrame(NlaFrameSchema):
@@ -1694,12 +1768,10 @@ class _TokenIdStreamer(BaseStreamer):
         self.queue.put(None)
 
 
-def _sampling_kwargs(temperature: float) -> dict:
-    """`generate()` sampling kwargs. transformers rejects temperature=0 under
-    `do_sample=True`, so temperature<=0 means greedy decoding."""
-    if temperature and temperature > 0:
-        return {"do_sample": True, "temperature": float(temperature)}
-    return {"do_sample": False}
+def _sampling_kwargs(sampling: SamplingSettings, prompt_len: int) -> dict:
+    """`generate()` keywords for the resolved settings; the engine's translation, shared with
+    the graph server."""
+    return hf_generate_kwargs(sampling, prompt_len=prompt_len)
 
 
 def _source_terminal_token_ids() -> set[int]:
@@ -1732,6 +1804,7 @@ async def completion(req: CompletionRequest):
     text, prompt_spans = _resolve_text_and_spans(req)
     prompt_ids: list[int] = _encode_with_special(text)
     prompt_length = len(prompt_ids)
+    sampling = _resolve_sampling(model.recommended_sampling, req)
 
     def _spans_with_generated(all_ids: list[int]) -> list[dict] | None:
         # Generated (assistant) tokens can't be known by the prompt template;
@@ -1761,7 +1834,7 @@ async def completion(req: CompletionRequest):
                 gen_ids = model.model.generate(
                     input_ids,
                     max_new_tokens=completion_tokens,
-                    **_sampling_kwargs(req.temperature),
+                    **_sampling_kwargs(sampling, prompt_length),
                 )
             ids_out = gen_ids[0].tolist()
             del input_ids, gen_ids
@@ -1778,6 +1851,7 @@ async def completion(req: CompletionRequest):
             tokens=_make_token_infos(all_ids, _spans_with_generated(all_ids)),
             prompt_length=prompt_length,
             text=full_text,
+            sampling=_sampling_report(sampling),
         )
 
     # ── Streaming path ────────────────────────────────────────────────────
@@ -1796,7 +1870,7 @@ async def completion(req: CompletionRequest):
                         input_ids,
                         max_new_tokens=completion_tokens,
                         streamer=streamer,
-                        **_sampling_kwargs(req.temperature),
+                        **_sampling_kwargs(sampling, prompt_length),
                     )
             except Exception:
                 logger.exception("/completion: generation thread failed")
@@ -1813,7 +1887,9 @@ async def completion(req: CompletionRequest):
     async def event_stream():
         try:
             prompt_tokens = _make_token_infos(prompt_ids, prompt_spans)
-            prompt_event = CompletionPromptFrame(prompt_length=prompt_length, tokens=prompt_tokens)
+            prompt_event = CompletionPromptFrame(
+                prompt_length=prompt_length, tokens=prompt_tokens, sampling=_sampling_report(sampling)
+            )
             yield f"data: {prompt_event.model_dump_json()}\n\n"
 
             loop = asyncio.get_running_loop()
@@ -1990,7 +2066,7 @@ async def health_check():
             nla_client.async_generate(
                 np.zeros(nla_client.cfg.d_model, dtype=np.float32),
                 extract_explanation=False,
-                temperature=0.0,
+                sampling=nla_client.sampling_settings(temperature=0.0),
                 max_new_tokens=1,
             ),
             HEALTH_PROBE_TIMEOUT_SECONDS,
@@ -2071,9 +2147,10 @@ async def describe(req: DescribeRequest):
         )
 
     n = len(req.activations)
+    sampling = _resolve_sampling(client.recommended_sampling, req)
     logger.info(
         f"/describe: {n} vector(s), shape=({len(req.activations[0])},), "
-        f"temp={req.temperature}, max_tokens={req.max_new_tokens}, stream={req.stream}"
+        f"sampling={sampling}, max_tokens={req.max_new_tokens}, stream={req.stream}"
     )
 
     vectors = []
@@ -2119,7 +2196,7 @@ async def describe(req: DescribeRequest):
                                 last_out: dict = {"text": ""}
                                 async for out in client.async_generate_stream(
                                     v,
-                                    temperature=req.temperature,
+                                    sampling=sampling,
                                     max_new_tokens=req.max_new_tokens,
                                 ):
                                     last_out = out
@@ -2158,6 +2235,7 @@ async def describe(req: DescribeRequest):
                             if needs_skip and batcher is not None:
                                 batcher.skip()
 
+                    yield f"data: {DescribeSamplingFrame(sampling=_sampling_report(sampling)).model_dump_json()}\n\n"
                     tasks = [asyncio.create_task(_stream_one(v, i)) for i, v in enumerate(vectors)]
                     try:
                         done_count = 0
@@ -2188,7 +2266,7 @@ async def describe(req: DescribeRequest):
             t0 = time.perf_counter()
             description = await client.async_generate(
                 v,
-                temperature=req.temperature,
+                sampling=sampling,
                 max_new_tokens=req.max_new_tokens,
                 context=f"/describe index={i}",
             )
@@ -2211,7 +2289,7 @@ async def describe(req: DescribeRequest):
                 )
             )
 
-        return DescribeResponse(results=results)
+        return DescribeResponse(results=results, sampling=_sampling_report(sampling))
     finally:
         # Streaming path transferred ownership into event_stream's finally.
         # All other exits (validation error, non-streaming success, raised
@@ -2282,10 +2360,11 @@ async def compare(req: CompareRequest):
     if nla_client is None:
         raise HTTPException(status_code=503, detail="NLA client not loaded")
 
+    sampling = _resolve_sampling(nla_client.recommended_sampling, req)
     logger.info(
         f"/compare: activation_a=({len(req.activation_a)},) "
         f"activation_b=({len(req.activation_b)},) "
-        f"temp={req.temperature}, max_tokens={req.max_new_tokens}"
+        f"sampling={sampling}, max_tokens={req.max_new_tokens}"
     )
 
     a = np.array(req.activation_a, dtype=np.float32)
@@ -2309,7 +2388,7 @@ async def compare(req: CompareRequest):
     t0 = time.perf_counter()
     description = await nla_client.async_generate(
         diff,
-        temperature=req.temperature,
+        sampling=sampling,
         max_new_tokens=req.max_new_tokens,
         context="/compare diff=a-b",
     )
@@ -2327,6 +2406,7 @@ async def compare(req: CompareRequest):
         diff_norm=diff_norm,
         mse=mse,
         cosine_similarity=cos,
+        sampling=_sampling_report(sampling),
     )
 
 
@@ -2355,6 +2435,7 @@ async def _generate_explain_result(
     i: int,
     n: int,
     req: ExplainRequest,
+    sampling: SamplingSettings,
     *,
     is_generated: bool = False,
     batcher: _ReconstructionBatcher | None = None,
@@ -2373,7 +2454,7 @@ async def _generate_explain_result(
         t0 = time.perf_counter()
         description = await _require_client().async_generate(
             v,
-            temperature=req.temperature,
+            sampling=sampling,
             max_new_tokens=req.max_new_tokens,
             context=f"/explain token={tok['token']!r} pos={idx}",
         )
@@ -2473,11 +2554,12 @@ async def _explain_inner(req: ExplainRequest):
     t_total = time.perf_counter()
 
     text, spans = _resolve_text_and_spans(req)
+    sampling = _resolve_sampling(client.recommended_sampling, req)
     logger.info(
         f"/explain start: text_len={len(text)} text={text[:80]!r}... "
         f"messages={len(req.messages) if req.messages else 0} "
         f"positions={req.positions} reverse={req.reverse} "
-        f"stream={req.stream} temp={req.temperature} "
+        f"stream={req.stream} sampling={sampling} "
         f"max_new_tokens={req.max_new_tokens}"
     )
 
@@ -2528,7 +2610,12 @@ async def _explain_inner(req: ExplainRequest):
             batcher: _ReconstructionBatcher | None = None
             try:
                 # First event: metadata
-                meta = ExplainMetaFrame(layer_index=model.layer_index, total=n, prompt_length=prompt_length)
+                meta = ExplainMetaFrame(
+                    layer_index=model.layer_index,
+                    total=n,
+                    prompt_length=prompt_length,
+                    sampling=_sampling_report(sampling),
+                )
                 yield f"data: {meta.model_dump_json()}\n\n"
 
                 # Multiplex streaming from all positions concurrently via a queue
@@ -2553,7 +2640,7 @@ async def _explain_inner(req: ExplainRequest):
                             last_out: dict = {"text": ""}
                             async for out in client.async_generate_stream(
                                 v,
-                                temperature=req.temperature,
+                                sampling=sampling,
                                 max_new_tokens=req.max_new_tokens,
                             ):
                                 last_out = out
@@ -2649,6 +2736,7 @@ async def _explain_inner(req: ExplainRequest):
                 i,
                 n,
                 req,
+                sampling,
                 is_generated=idx >= prompt_length,
                 batcher=batcher,
             )
@@ -2666,6 +2754,7 @@ async def _explain_inner(req: ExplainRequest):
     return ExplainResponse(
         layer_index=model.layer_index,
         results=list(results),
+        sampling=_sampling_report(sampling),
     )
 
 

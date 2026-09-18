@@ -21,6 +21,7 @@ from typing import Any
 
 import numpy as np
 import torch
+from interp_engine import SamplingSettings, hf_generate_kwargs, read_recommended_sampling, resolve_sampling
 from transformers import TextIteratorStreamer
 
 from nla_inference import (
@@ -71,6 +72,7 @@ class EagerVerbalizer:
         self.dtype = dtype if dtype is not None else resolve_dtype_for_device(self.device)
 
         self.tokenizer = _load_tokenizer(local_path)
+        self.recommended_sampling = read_recommended_sampling(local_path)
 
         if nla_config is not None:
             self.cfg = nla_config
@@ -137,24 +139,40 @@ class EagerVerbalizer:
         attention_mask = torch.ones(inputs_embeds.shape[:2], dtype=torch.long, device=self.device)
         return inputs_embeds, attention_mask
 
-    def _gen_kwargs(self, temperature: float, max_new_tokens: int) -> dict[str, Any]:
+    def sampling_settings(
+        self,
+        *,
+        temperature: float | None = None,
+        top_k: int | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+    ) -> SamplingSettings:
+        """What a generation with these knobs runs with: the caller's value, else the verbalizer
+        checkpoint's ``generation_config.json``, else neutral -- the inference server's rule."""
+        return resolve_sampling(
+            self.recommended_sampling,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            presence_penalty=presence_penalty,
+        )
+
+    def _gen_kwargs(self, sampling: SamplingSettings | None, max_new_tokens: int) -> dict[str, Any]:
         pad_id = self.tokenizer.pad_token_id
         if pad_id is None:
             pad_id = self.tokenizer.eos_token_id
-        kwargs: dict[str, Any] = {
+        settings = sampling or self.sampling_settings()
+        return {
             "max_new_tokens": max_new_tokens,
             "pad_token_id": pad_id,
             # Keep the </explanation> stop string in the output (parity with the
             # sglang path's no_stop_trim=True) so extraction can find the tag.
             "stop_strings": list(_STOP_SEQUENCES),
             "tokenizer": self.tokenizer,
+            # Generating from `inputs_embeds`, `generate` holds no prompt ids, so every id the
+            # presence penalty sees is generated: prompt_len 0.
+            **hf_generate_kwargs(settings, prompt_len=0),
         }
-        if temperature and temperature > 0:
-            kwargs["do_sample"] = True
-            kwargs["temperature"] = float(temperature)
-        else:
-            kwargs["do_sample"] = False
-        return kwargs
 
     def _decode(self, output_ids: torch.Tensor) -> str:
         # generate(inputs_embeds=...) for decoder-only returns ONLY the newly
@@ -177,7 +195,7 @@ class EagerVerbalizer:
         activation: Iterable[float] | np.ndarray | torch.Tensor,
         *,
         prompt: str | None,
-        temperature: float,
+        sampling: SamplingSettings | None,
         max_new_tokens: int,
     ) -> dict:
         inputs_embeds, attention_mask = self._prepare(activation, prompt)
@@ -185,7 +203,7 @@ class EagerVerbalizer:
             output_ids = self.model.generate(
                 inputs_embeds=inputs_embeds,
                 attention_mask=attention_mask,
-                **self._gen_kwargs(temperature, max_new_tokens),
+                **self._gen_kwargs(sampling, max_new_tokens),
             )
         text = self._decode(output_ids)
         meta = self._make_meta(text, output_ids.shape[-1], inputs_embeds.shape[1])
@@ -197,7 +215,7 @@ class EagerVerbalizer:
         *,
         prompt: str | None = None,
         extract_explanation: bool = True,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
         context: str | None = None,
     ) -> str:
@@ -205,7 +223,7 @@ class EagerVerbalizer:
         out = self._generate_sync(
             activation,
             prompt=prompt,
-            temperature=temperature,
+            sampling=sampling,
             max_new_tokens=max_new_tokens,
         )
         return self._extract_text(out, extract_explanation, context=context)
@@ -216,7 +234,7 @@ class EagerVerbalizer:
         *,
         prompt: str | None = None,
         extract_explanation: bool = True,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
         context: str | None = None,
     ) -> str:
@@ -225,7 +243,7 @@ class EagerVerbalizer:
             self._generate_sync,
             activation,
             prompt=prompt,
-            temperature=temperature,
+            sampling=sampling,
             max_new_tokens=max_new_tokens,
         )
         return self._extract_text(out, extract_explanation, context=context)
@@ -235,7 +253,7 @@ class EagerVerbalizer:
         activation: Iterable[float] | np.ndarray | torch.Tensor,
         *,
         prompt: str | None = None,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
     ) -> AsyncGenerator[dict, None]:
         """Yield ``{"text": <cumulative>, "meta_info": {...}}`` as tokens decode."""
@@ -249,7 +267,7 @@ class EagerVerbalizer:
                     inputs_embeds=inputs_embeds,
                     attention_mask=attention_mask,
                     streamer=streamer,
-                    **self._gen_kwargs(temperature, max_new_tokens),
+                    **self._gen_kwargs(sampling, max_new_tokens),
                 )
 
         thread = threading.Thread(target=_run, daemon=True)

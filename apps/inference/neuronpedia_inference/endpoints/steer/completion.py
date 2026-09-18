@@ -11,6 +11,7 @@ from interp_engine import (
     LayerSteeringSpec,
     OrthogonalDecompSpec,
     ProjectionCapSpec,
+    SamplingSettings,
     SteeringOp,
     SteeringSpec,
     SteerMethod,
@@ -27,6 +28,11 @@ from neuronpedia_inference.engine_adapter import (
     assert_steering_available,
     declares_static_taps,
     tlens_hook_to_point,
+)
+from neuronpedia_inference.inference_utils.sampling import (
+    resolve_request_sampling,
+    sampling_report,
+    state_settings_once,
 )
 from neuronpedia_inference.inference_utils.steering import (
     SteeringSettings,
@@ -157,6 +163,9 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
     if no_room is not None:
         return no_room
 
+    seed = int(request.seed)
+    sampling = resolve_request_sampling(model, request)
+    report = sampling_report(sampling, seed)
     generator = run_batched_generate(
         prompt=prompt,
         settings=SteeringSettings(
@@ -166,15 +175,15 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
             normalize_steering=normalize_steering,
         ),
         steer_types=request.types,
-        seed=int(request.seed),
-        temperature=float(request.temperature),
-        freq_penalty=float(request.freq_penalty),
+        seed=seed,
+        sampling=sampling,
         max_new_tokens=max_new_tokens,
         use_stream_lock=request.stream if request.stream is not None else False,
     )
 
     if request.stream:
         logger.info("Streaming response")
+        generator = state_settings_once(generator, report, SteerCompletionResponse)
         return StreamingResponse(
             stop_when_client_leaves(generator, http_request, "STEER"),
             media_type="text/event-stream",
@@ -190,6 +199,8 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
         raise ValueError("Steer generator emitted no frame for any steer type")
 
     response = SteerCompletionResponse.model_validate_json(remove_sse_formatting(last_frame))
+    # The stream stated its settings on the first frame; the one response states them here.
+    response.sampling = report
     # Drop unset fields rather than serializing them as null: callers predating
     # `logprobs` expect the key to be absent when there is nothing to report.
     return JSONResponse(content=response.model_dump(exclude_none=True))
@@ -391,16 +402,14 @@ async def _vllm_run_batched_generate(
 ):
     """SSE generator for the vLLM backend, mirroring the STEERED/DEFAULT engine flow."""
     max_new_tokens = int(kwargs.get("max_new_tokens") or 0)
-    temperature = float(kwargs.get("temperature", 1.0))
-    if kwargs.get("freq_penalty"):
-        logger.warning("freq_penalty is not supported on the vLLM backend; ignoring")
+    sampling: SamplingSettings = kwargs["sampling"]
 
     # See the note in completion_chat.py's _vllm_chat_generate: build the spec only for a
     # run that steers, so a DEFAULT-only request with no features is not a 500.
     spec = features_to_vllm_steering_spec(settings) if NPSteerType.STEERED in steer_types else None
 
     def _sampling_params():
-        return SamplingParams(temperature=temperature, max_tokens=max_new_tokens, seed=seed)
+        return SamplingParams(max_tokens=max_new_tokens, seed=seed, **sampling.vllm_kwargs())
 
     async def _stream_type(
         active_spec: SteeringSpec | None,
@@ -434,7 +443,7 @@ def _engine_generate_text(
     specs: list[SteerSpec] | None,
     *,
     max_new_tokens: int,
-    temperature: float,
+    sampling: SamplingSettings,
     seed: int | None,
     position_mask: Any = None,
 ):
@@ -451,7 +460,10 @@ def _engine_generate_text(
             model,
             tokens,
             max_tokens=max_new_tokens,
-            temperature=temperature,
+            temperature=sampling.temperature,
+            top_k=sampling.top_k,
+            top_p=sampling.top_p,
+            presence_penalty=sampling.presence_penalty,
             stop_at_eos=True,
             seed=seed,
         ):
@@ -469,7 +481,7 @@ def _engine_run_batched_generate(
     """SSE generator for the engine backend, mirroring the TLens STEERED/DEFAULT flow."""
     tokens = model.to_tokens(prompt, prepend_bos=model.tok.tokenizer_prepends_bos, truncate=False)[0]
     max_new_tokens = int(kwargs.get("max_new_tokens") or 0)
-    temperature = float(kwargs.get("temperature", 1.0))
+    sampling: SamplingSettings = kwargs["sampling"]
 
     specs = [_feature_to_steerspec(f, settings) for f in settings.features]
 
@@ -482,7 +494,7 @@ def _engine_run_batched_generate(
             tokens,
             active_specs,
             max_new_tokens=max_new_tokens,
-            temperature=temperature,
+            sampling=sampling,
             seed=seed,
         ):
             text += delta

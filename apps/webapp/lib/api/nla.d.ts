@@ -255,10 +255,25 @@ export interface components {
        */
       max_new_tokens: number;
       /**
-       * Temperature
-       * @default 0.7
+       * Presence Penalty
+       * @description Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.
        */
-      temperature: number;
+      presence_penalty?: number | null;
+      /**
+       * Temperature
+       * @description 0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.
+       */
+      temperature?: number | null;
+      /**
+       * Top K
+       * @description Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_k?: number | null;
+      /**
+       * Top P
+       * @description Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_p?: number | null;
     };
     /** CompareResponse */
     CompareResponse: {
@@ -276,6 +291,8 @@ export interface components {
       diff_norm: number;
       /** Mse */
       mse?: number | null;
+      /** @description What the description ran with */
+      sampling?: components['schemas']['SamplingReport'] | null;
     };
     /** CompletionRequest */
     CompletionRequest: {
@@ -303,6 +320,11 @@ export interface components {
        */
       messages?: components['schemas']['ChatMessageInput'][] | null;
       /**
+       * Presence Penalty
+       * @description Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.
+       */
+      presence_penalty?: number | null;
+      /**
        * Stream
        * @description If true, stream tokens as SSE events instead of returning the full response.
        * @default false
@@ -310,14 +332,24 @@ export interface components {
       stream: boolean;
       /**
        * Temperature
-       * @default 0.7
+       * @description 0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.
        */
-      temperature: number;
+      temperature?: number | null;
       /**
        * Text
        * @description Prompt text to extend (or provide `messages`).
        */
       text?: string | null;
+      /**
+       * Top K
+       * @description Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_k?: number | null;
+      /**
+       * Top P
+       * @description Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_p?: number | null;
     };
     /** DescribeRequest */
     DescribeRequest: {
@@ -332,6 +364,11 @@ export interface components {
        */
       max_new_tokens: number;
       /**
+       * Presence Penalty
+       * @description Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.
+       */
+      presence_penalty?: number | null;
+      /**
        * Stream
        * @description Stream results as SSE events
        * @default false
@@ -339,14 +376,26 @@ export interface components {
       stream: boolean;
       /**
        * Temperature
-       * @default 0.7
+       * @description 0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.
        */
-      temperature: number;
+      temperature?: number | null;
+      /**
+       * Top K
+       * @description Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_k?: number | null;
+      /**
+       * Top P
+       * @description Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_p?: number | null;
     };
     /** DescribeResponse */
     DescribeResponse: {
       /** Results */
       results: components['schemas']['DescriptionResult'][];
+      /** @description What every description ran with */
+      sampling?: components['schemas']['SamplingReport'] | null;
     };
     /** DescriptionResult */
     DescriptionResult: {
@@ -394,6 +443,11 @@ export interface components {
        */
       positions?: number[] | null;
       /**
+       * Presence Penalty
+       * @description Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.
+       */
+      presence_penalty?: number | null;
+      /**
        * Reverse
        * @description Process token positions in reverse order (last to first)
        * @default true
@@ -407,14 +461,24 @@ export interface components {
       stream: boolean;
       /**
        * Temperature
-       * @default 0.7
+       * @description 0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.
        */
-      temperature: number;
+      temperature?: number | null;
       /**
        * Text
        * @description Input text to extract activations from (or provide `messages`).
        */
       text?: string | null;
+      /**
+       * Top K
+       * @description Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_k?: number | null;
+      /**
+       * Top P
+       * @description Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      top_p?: number | null;
     };
     /** ExplainResponse */
     ExplainResponse: {
@@ -422,6 +486,8 @@ export interface components {
       layer_index: number;
       /** Results */
       results: components['schemas']['ExplainResult'][];
+      /** @description What every explanation ran with */
+      sampling?: components['schemas']['SamplingReport'] | null;
     };
     /** ExplainResult */
     ExplainResult: {
@@ -599,6 +665,26 @@ export interface components {
       /** Verbalizer Torch Compile */
       verbalizer_torch_compile?: boolean | null;
     };
+    /**
+     * SamplingReport
+     * @description The settings a generation ran with, every knob decided; see ``_SamplingKnobs``.
+     */
+    SamplingReport: {
+      /** Presence Penalty */
+      presence_penalty: number;
+      /** Temperature */
+      temperature: number;
+      /**
+       * Top K
+       * @description Null: no top-k filtering
+       */
+      top_k?: number | null;
+      /**
+       * Top P
+       * @description Null: no nucleus filtering
+       */
+      top_p?: number | null;
+    };
     /** ScoreRequest */
     ScoreRequest: {
       /**
@@ -699,6 +785,8 @@ export interface components {
        * @description Number of tokens from the original input text
        */
       prompt_length: number;
+      /** @description What a /completion generation ran with; absent from /tokenize */
+      sampling?: components['schemas']['SamplingReport'] | null;
       /**
        * Text
        * @description Full text (original + any generated completion)

@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import Request
+from interp_engine import resolve_sampling
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.steer.completion_chat import completion_chat
@@ -66,6 +67,9 @@ class StubTokenizer:
 class StubModel:
     def __init__(self):
         self.tokenizer = StubTokenizer()
+
+    def sampling_settings(self, **knobs):
+        return resolve_sampling(None, **knobs)
 
 
 @pytest.fixture(autouse=True)

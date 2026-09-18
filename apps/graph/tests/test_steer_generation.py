@@ -1,10 +1,11 @@
-"""`/steer` generates through `transformers` while its wire contract stays TransformerLens-shaped.
+"""`/steer` generates through `transformers`, with its knobs decided as the inference server decides them.
 
 The endpoint used to call `HookedTransformer.generate` directly, so on the default `interp_engine`
 it raised `AttributeError: 'InterpEngineReplacementModel' object has no attribute 'generate'`. The
 attribute was the loud half. The quiet half is everything `steer_generation` translates: keywords
-`transformers` rejects, sampling defaults it reads out of the checkpoint, and a continuation it
-hands back as text when the endpoint needs the token ids.
+`transformers` rejects, sampling knobs resolved against the checkpoint's own file, a presence
+penalty `transformers` has no flag for, and a continuation it hands back as text when the
+endpoint needs the token ids.
 
 Everything here runs on a randomly initialized two-layer GPT-2 built from a local config, so there
 is no download, no GPU and no tokenizer to fetch: what is under test is the keywords and the ids,
@@ -16,18 +17,26 @@ from typing import Any
 
 import pytest
 import torch
+from interp_engine import RecommendedSampling, SamplingSettings
 from transformers import GPT2Config, GPT2LMHeadModel
 
 from neuronpedia_graph.steer_generation import (
     _generation_kwargs,
     _SequenceCollector,
-    _TransformerLensSampling,
     generate_default,
     generate_steered,
+    recommended_sampling,
+    resolve_request_sampling,
 )
 
 PROMPT_IDS = torch.tensor([0, 7, 11, 19])
 NEW_TOKENS = 6
+PROMPT_LEN = len(PROMPT_IDS)
+GREEDY = SamplingSettings(temperature=0.0, top_k=None, top_p=None, presence_penalty=0.0)
+
+
+def _sampled(temperature: float) -> SamplingSettings:
+    return SamplingSettings(temperature=temperature, top_k=None, top_p=None, presence_penalty=0.0)
 
 
 @pytest.fixture(scope="module")
@@ -89,8 +98,8 @@ class FakeInterpEngineModel:
 
 
 def test_temperature_zero_asks_for_greedy_decoding():
-    """The steer modal sends 0 by default, and `transformers` raises on it where TL means argmax."""
-    kwargs = _generation_kwargs(NEW_TOKENS, temperature=0.0, freq_penalty=0.0)
+    """The steer modal sends 0 by default, and `transformers` raises on it where greedy is meant."""
+    kwargs = _generation_kwargs(NEW_TOKENS, GREEDY, prompt_len=PROMPT_LEN)
     assert kwargs["do_sample"] is False
     assert "logits_processor" not in kwargs
     # `generate` logs a line for every flag it was handed and will not use, and none of the sampling
@@ -98,35 +107,53 @@ def test_temperature_zero_asks_for_greedy_decoding():
     assert "top_k" not in kwargs and "temperature" not in kwargs
 
 
-def test_sampling_ignores_the_checkpoints_own_generation_config():
-    """Qwen3 ships temperature 0.6 / top_p 0.95 / top_k 20; TransformerLens applies none of them."""
-    kwargs = _generation_kwargs(NEW_TOKENS, temperature=0.7, freq_penalty=0.0)
+def test_every_resolved_knob_is_stated_so_the_file_adds_nothing():
+    """Qwen3 ships temperature 0.6 / top_p 0.95 / top_k 20 in its file. Whatever was resolved is
+    what `generate` is told, so the file cannot add a knob the request did not get."""
+    kwargs = _generation_kwargs(NEW_TOKENS, _sampled(0.7), prompt_len=PROMPT_LEN)
     assert kwargs["do_sample"] is True
-    assert kwargs["temperature"] == 1.0
+    assert kwargs["temperature"] == 0.7
     assert kwargs["top_k"] == 0
     assert kwargs["top_p"] == 1.0
     assert kwargs["repetition_penalty"] == 1.0
 
-
-def test_frequency_penalty_is_applied_after_the_temperature():
-    """`sample_logits` divides first, then subtracts. Reversed, the penalty is scaled by 1/temperature."""
-    scores = torch.tensor([[1.0, 2.0, 3.0, 4.0]])
-    tokens = torch.tensor([[1, 1, 3]])
-
-    penalized = _TransformerLensSampling(temperature=2.0, freq_penalty=0.5)(tokens, scores.clone())
-
-    counts = torch.tensor([[0.0, 2.0, 0.0, 1.0]])
-    assert torch.allclose(penalized, scores / 2.0 - 0.5 * counts)
+    kwargs = _generation_kwargs(NEW_TOKENS, SamplingSettings(0.6, 20, 0.95, 0.0), prompt_len=PROMPT_LEN)
+    assert (kwargs["temperature"], kwargs["top_k"], kwargs["top_p"]) == (0.6, 20, 0.95)
 
 
-def test_non_positive_frequency_penalty_does_nothing():
-    """The slider goes to -2, and `sample_logits` applies the penalty only when it is positive."""
-    scores = torch.tensor([[1.0, 2.0, 3.0, 4.0]])
-    tokens = torch.tensor([[1, 1, 3]])
+def test_the_request_resolves_against_the_models_own_generation_config(hf_model: GPT2LMHeadModel):
+    """Unset knobs take the file `transformers` loaded onto the model; passed ones win."""
+    model = FakeInterpEngineModel(hf_model)
+    hf_model.generation_config.temperature = 0.6
+    hf_model.generation_config.top_k = 20
+    hf_model.generation_config.top_p = 0.95
+    try:
+        assert recommended_sampling(model) == RecommendedSampling(
+            temperature=0.6, top_k=20, top_p=0.95, do_sample=False, source="hf_model.generation_config"
+        )
+        # `do_sample` is False on a fresh GPT-2 config: the file recommends greedy.
+        assert resolve_request_sampling(model, temperature=None, top_k=None, top_p=None, presence_penalty=None) == (
+            SamplingSettings(temperature=0.0, top_k=20, top_p=0.95, presence_penalty=0.0)
+        )
+        assert resolve_request_sampling(model, temperature=0.7, top_k=0, top_p=None, presence_penalty=1.5) == (
+            SamplingSettings(temperature=0.7, top_k=None, top_p=0.95, presence_penalty=1.5)
+        )
+    finally:
+        hf_model.generation_config.temperature = 1.0
+        hf_model.generation_config.top_k = 50
+        hf_model.generation_config.top_p = 1.0
 
-    penalized = _TransformerLensSampling(temperature=1.0, freq_penalty=-0.5)(tokens, scores.clone())
 
-    assert torch.allclose(penalized, scores)
+def test_a_model_without_a_generation_config_is_neutral():
+    assert recommended_sampling(SimpleNamespace(hf_model=SimpleNamespace())) == RecommendedSampling()
+    assert recommended_sampling(SimpleNamespace()) == RecommendedSampling()
+
+
+def test_the_penalty_is_applied_on_the_greedy_path_too():
+    """As vLLM has it: a greedy generation is penalized out of a loop as well."""
+    kwargs = _generation_kwargs(NEW_TOKENS, SamplingSettings(0.0, None, None, 1.5), prompt_len=PROMPT_LEN)
+    assert kwargs["do_sample"] is False
+    assert len(kwargs["logits_processor"]) == 1
 
 
 def test_default_generation_returns_the_prompt_and_the_continuation(hf_model: GPT2LMHeadModel):
@@ -134,8 +161,7 @@ def test_default_generation_returns_the_prompt_and_the_continuation(hf_model: GP
         FakeInterpEngineModel(hf_model),
         "a prompt",
         max_new_tokens=NEW_TOKENS,
-        temperature=0.0,
-        freq_penalty=0.0,
+        sampling=GREEDY,
     )
 
     assert tokens.tolist()[: len(PROMPT_IDS)] == PROMPT_IDS.tolist()
@@ -157,8 +183,7 @@ def test_steered_generation_returns_ids_rather_than_the_text(hf_model: GPT2LMHea
         "a prompt",
         [],
         max_new_tokens=NEW_TOKENS,
-        temperature=temperature,
-        freq_penalty=0.0,
+        sampling=_sampled(temperature),
         freeze_attention=True,
     )
 
@@ -177,8 +202,7 @@ def test_an_engine_that_cannot_steer_says_which_one_it_was(engine: str):
             SimpleNamespace(backend=engine),
             "a prompt",
             max_new_tokens=NEW_TOKENS,
-            temperature=0.0,
-            freq_penalty=0.0,
+            sampling=GREEDY,
         )
 
 
@@ -189,8 +213,7 @@ def test_a_model_that_is_not_a_replacement_model_is_named_by_type():
             SimpleNamespace(),
             "a prompt",
             max_new_tokens=NEW_TOKENS,
-            temperature=0.0,
-            freq_penalty=0.0,
+            sampling=GREEDY,
         )
 
 

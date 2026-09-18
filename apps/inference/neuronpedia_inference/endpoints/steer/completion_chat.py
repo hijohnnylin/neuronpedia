@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from interp_engine import (
     Address,
     EagerModel,
+    SamplingSettings,
     SteerMask,
     VLLMModel,
     compose_assistant_turns,
@@ -32,6 +33,11 @@ from neuronpedia_inference.engine_adapter import (
     assert_steering_available,
     declares_static_taps,
     get_tokenize,
+)
+from neuronpedia_inference.inference_utils.sampling import (
+    resolve_request_sampling,
+    sampling_report,
+    state_settings_once,
 )
 from neuronpedia_inference.inference_utils.steering import (
     SteeringSettings,
@@ -323,6 +329,9 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
 
     generation_start = time.time()
 
+    seed = int(request.seed)
+    sampling = resolve_request_sampling(model, request)
+    report = sampling_report(sampling, seed)
     generator = run_batched_generate(
         promptTokenized=promptTokenized,
         inputPrompt=inputPromptForReads if reads else promptChat,
@@ -333,9 +342,8 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
             normalize_steering=normalize_steering,
         ),
         steer_types=request.types,
-        seed=int(request.seed),
-        temperature=float(request.temperature),
-        freq_penalty=float(request.freq_penalty),
+        seed=seed,
+        sampling=sampling,
         max_new_tokens=max_new_tokens,
         steer_special_tokens=steer_special_tokens,
         use_stream_lock=request.stream if request.stream is not None else False,
@@ -343,11 +351,13 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
     )
 
     if request.stream:
+        stated = state_settings_once(generator, report, SteerCompletionChatResponse)
+
         # For streaming, wrap the generator to add timing logs
         async def timed_generator():
             chunk_count = 0
             try:
-                async for item in generator:
+                async for item in stated:
                     chunk_count += 1
                     yield item
                 generation_time = time.time() - generation_start
@@ -381,6 +391,8 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
         raise ValueError("No response generated")
     results = remove_sse_formatting(last_item)
     response = SteerCompletionChatResponse.model_validate_json(results)
+    # The stream states its settings on the first frame; the one response states them here.
+    response.sampling = report
     # set exclude_none to True to omit the logprobs field when n_logprobs isn't set in the request, for backwards compatibility
     return JSONResponse(content=response.model_dump(exclude_none=True))
 
@@ -619,7 +631,7 @@ async def run_batched_generate(
                 settings=settings,
                 steer_types=steer_types,
                 seed=seed,
-                temperature=float(kwargs.get("temperature", 1.0)),
+                sampling=kwargs["sampling"],
                 max_new_tokens=int(kwargs.get("max_new_tokens") or 0),
                 reads=reads or [],
                 position_mask=steer_position_mask,
@@ -629,8 +641,6 @@ async def run_batched_generate(
 
         if not (VLLM_AVAILABLE and isinstance(model, VLLMModel)):
             raise ValueError("The /steer/completion-chat endpoint only supports the interp-engine and vLLM backends")
-        if kwargs.get("freq_penalty"):
-            logger.warning("freq_penalty is not supported on the vLLM backend; ignoring")
         async for msg in _vllm_chat_generate(
             model=model,
             promptTokenized=promptTokenized,
@@ -638,7 +648,7 @@ async def run_batched_generate(
             settings=settings,
             steer_types=steer_types,
             seed=seed,
-            temperature=float(kwargs.get("temperature", 1.0)),
+            sampling=kwargs["sampling"],
             max_new_tokens=int(kwargs.get("max_new_tokens") or 0),
             reads=reads or [],
             position_mask=steer_position_mask,
@@ -783,7 +793,7 @@ async def _vllm_chat_generate(
     settings: SteeringSettings,
     steer_types: list[NPSteerType],
     seed: int | None,
-    temperature: float,
+    sampling: SamplingSettings,
     max_new_tokens: int,
     reads: list[VectorAsset] | None = None,
     position_mask: Any = None,
@@ -834,9 +844,9 @@ async def _vllm_chat_generate(
             await model.generate_steered(
                 prompt_token_ids,
                 SamplingParams(
-                    temperature=temperature,
                     max_tokens=max_new_tokens,
                     seed=seed,
+                    **sampling.vllm_kwargs(),
                     # A chat response's structure is carried by special tokens (harmony's
                     # <|channel|>/<|message|>, turn-end markers). vLLM's detokenizer drops
                     # them by default, which left the assistant turn unrecoverable on this
@@ -902,7 +912,7 @@ async def _engine_chat_generate(
     settings: SteeringSettings,
     steer_types: list[NPSteerType],
     seed: int | None,
-    temperature: float,
+    sampling: SamplingSettings,
     max_new_tokens: int,
     reads: list[VectorAsset] | None = None,
     position_mask: Any = None,
@@ -933,7 +943,7 @@ async def _engine_chat_generate(
             tokens,
             active_specs,
             max_new_tokens=max_new_tokens,
-            temperature=temperature,
+            sampling=sampling,
             seed=seed,
             position_mask=position_mask,
         ):

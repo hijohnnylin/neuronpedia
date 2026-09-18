@@ -13,19 +13,21 @@ rather than one `getattr`. Three further things differ, and each is silent rathe
 - `feature_intervention_generate` forwards unrecognized keywords into `transformers`' `generate`,
   which rejects them ("The following `model_kwargs` are not used by the model"). So the request's
   knobs have to be *translated*, not passed along.
-- `transformers` starts from the checkpoint's own `generation_config.json`, and several families
-  ship sampling defaults there (Qwen3: temperature 0.6, top_p 0.95, top_k 20). The wire contract
-  applies none of those, so leaving them would sample from a truncated distribution for a request
-  that did not ask for one. `_NEUTRAL_SAMPLING` turns them off.
+- `transformers` starts from the checkpoint's own `generation_config.json`. That is the right
+  default, and the same one the inference server applies: a knob the request leaves unset takes
+  the file's value (`interp_engine.resolve_sampling`). Every knob is then passed explicitly, so
+  what `generate` samples from is exactly the resolved settings and nothing the file adds on its
+  own (`repetition_penalty` in particular is turned off).
 - It returns the continuation as *text*. `/steer` needs the token ids: it reports one row of top
   logits per token, so it has to know where the boundaries were. Re-tokenizing the text to find
   them is exactly the bug commit bff40b1e ("correctly handle qwen steering") removed, hence
   `_SequenceCollector`.
 
-The request itself is still in TransformerLens' terms, because that is what the steer modal has
-always sent and its sliders are calibrated to: `temperature=0` means greedy rather than an error,
-and `freq_penalty` subtracts from a logit per earlier occurrence of that token rather than scaling
-it. Translating that is most of what this module does.
+`temperature=0` means greedy rather than an error, as the steer modal has always sent it. The one
+repetition control is the presence penalty, a flat subtraction from the logit of every token the
+generation has produced so far, applied before the temperature and on the greedy path too, as
+vLLM and the inference server order it. `interp_engine.hf_generate_kwargs` does that translation,
+so this module and the NLA server hand `generate` the same keywords.
 
 The other two engines are turned away. `transformerlens` could be supported -- it is where these
 keywords come from -- but nothing deploys it, so a second path here would be a second untested
@@ -34,57 +36,43 @@ through a tracing context this endpoint never enters, so steering never worked t
 """
 
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any
 
 import torch
-from transformers import LogitsProcessor, LogitsProcessorList
+from interp_engine import RecommendedSampling, SamplingSettings, hf_generate_kwargs, resolve_sampling
+from interp_engine.sampling import parse_recommended_sampling
 from transformers.generation.streamers import BaseStreamer
 
-# The sampling knobs `transformers` reads from the checkpoint's `generation_config.json`, set to
-# the values that mean "do nothing", so that what `/steer` samples from is decided by the request
-# alone. `temperature` is 1.0 because ours is applied inside `_TransformerLensSampling` instead,
-# for the ordering reason documented there. Every one of these is ignored unless `do_sample` is on,
-# which is why they are applied on that branch alone: `generate` warns about each flag it was given
-# and is not going to use, and a line of that per steer request is noise in a pod's logs.
-_NEUTRAL_SAMPLING: dict[str, Any] = {
-    "temperature": 1.0,
-    "top_k": 0,
-    "top_p": 1.0,
-    "min_p": None,
-    "typical_p": 1.0,
-}
 
+def recommended_sampling(model: Any) -> RecommendedSampling:
+    """What the loaded checkpoint's `generation_config.json` states, read off the HF model.
 
-class _TransformerLensSampling(LogitsProcessor):
-    """The request's temperature and frequency penalty, in the order `sample_logits` applies them.
-
-    Both in one processor, and the temperature not left to `transformers`, because
-    `_get_logits_processor` appends its `TemperatureLogitsWarper` *after* any caller-supplied
-    processor (there is a standing TODO in `generation/utils.py` about the ordering).
-    TransformerLens divides by the temperature and only then subtracts the penalty, so a separate
-    processor would subtract from logits that had not been scaled yet -- a difference the steer
-    modal's sliders would show as the penalty quietly changing strength with the temperature.
-
-    `freq_penalty` is a flat subtraction per earlier occurrence of a token, which is not
-    `transformers`' `repetition_penalty` -- that one scales a logit instead, so it cannot stand in
-    for this. Non-positive penalties are ignored, as `sample_logits` ignores them.
+    `transformers` loaded the file onto `hf_model.generation_config` at load time, so this reads
+    that rather than the Hub a second time. Empty for a model that carries none.
     """
+    hf_model = getattr(model, "hf_model", None)
+    config = getattr(hf_model, "generation_config", None)
+    if config is None:
+        return RecommendedSampling()
+    return parse_recommended_sampling(config.to_dict(), source="hf_model.generation_config")
 
-    def __init__(self, temperature: float, freq_penalty: float) -> None:
-        self.temperature = temperature
-        self.freq_penalty = freq_penalty
 
-    # Returns `FloatTensor` because `LogitsProcessor.__call__` declares it and an override cannot
-    # widen a return type. The casts are what that costs: `FloatTensor` is a legacy per-dtype alias
-    # and no torch operation is annotated as producing one, so every expression below types as
-    # plain `Tensor`. Parameters stay `Tensor`, which is allowed -- accepting more than the base
-    # promises is safe, and `input_ids` is integral rather than float anyway.
-    def __call__(self, input_ids: torch.Tensor, scores: torch.Tensor) -> torch.FloatTensor:
-        scaled = scores / self.temperature
-        if self.freq_penalty <= 0:
-            return cast(torch.FloatTensor, scaled)
-        counts = torch.stack([torch.bincount(row, minlength=scaled.shape[-1]) for row in input_ids])
-        return cast(torch.FloatTensor, scaled - self.freq_penalty * counts.to(scaled.dtype))
+def resolve_request_sampling(
+    model: Any,
+    *,
+    temperature: float | None,
+    top_k: int | None,
+    top_p: float | None,
+    presence_penalty: float | None,
+) -> SamplingSettings:
+    """The request's knobs decided the way the inference server decides them."""
+    return resolve_sampling(
+        recommended_sampling(model),
+        temperature=temperature,
+        top_k=top_k,
+        top_p=top_p,
+        presence_penalty=presence_penalty,
+    )
 
 
 class _SequenceCollector(BaseStreamer):
@@ -134,34 +122,16 @@ def _require_interp_engine(model: Any) -> None:
     )
 
 
-def _generation_kwargs(max_new_tokens: int, temperature: float, freq_penalty: float) -> dict[str, Any]:
-    """The request in `transformers`' terms, sampling the way the wire contract means."""
-    kwargs: dict[str, Any] = {
-        "max_new_tokens": max_new_tokens,
-        # Honored whether or not sampling is on, unlike the knobs below, and shipped in the
-        # `generation_config.json` of families this serves. The request has no repetition penalty
-        # to ask for, so this is turned off rather than mirrored.
-        "repetition_penalty": 1.0,
-    }
-    if temperature == 0:
-        # `sample_logits` reads temperature 0 as argmax, and the graph steer modal sends 0 by
-        # default (`STEER_TEMPERATURE_GRAPH`). `transformers` raises on it instead, so ask for
-        # greedy decoding, which is the same thing. The frequency penalty is dropped on this path
-        # for the same reason `sample_logits` drops it: there is no distribution left to shape.
-        kwargs["do_sample"] = False
-        return kwargs
-    kwargs["do_sample"] = True
-    kwargs.update(_NEUTRAL_SAMPLING)
-    kwargs["logits_processor"] = LogitsProcessorList([_TransformerLensSampling(temperature, freq_penalty)])
-    return kwargs
+def _generation_kwargs(max_new_tokens: int, sampling: SamplingSettings, prompt_len: int) -> dict[str, Any]:
+    """The resolved settings in `transformers`' terms: the engine's own translation, plus the length."""
+    return {"max_new_tokens": max_new_tokens, **hf_generate_kwargs(sampling, prompt_len=prompt_len)}
 
 
 def generate_default(
     model: Any,
     prompt: str,
     max_new_tokens: int,
-    temperature: float,
-    freq_penalty: float,
+    sampling: SamplingSettings,
 ) -> torch.Tensor:
     """The unsteered continuation: the prompt's token ids followed by the generated ones.
 
@@ -178,7 +148,7 @@ def generate_default(
         attention_mask=torch.ones_like(input_ids),
         pad_token_id=model.tokenizer.pad_token_id or model.tokenizer.eos_token_id,
         use_cache=True,
-        **_generation_kwargs(max_new_tokens, temperature, freq_penalty),
+        **_generation_kwargs(max_new_tokens, sampling, prompt_len=int(tokens.shape[-1])),
     )
     return sequences[0]
 
@@ -188,8 +158,7 @@ def generate_steered(
     prompt: str,
     interventions: Sequence[tuple[Any, Any, Any, Any]],
     max_new_tokens: int,
-    temperature: float,
-    freq_penalty: float,
+    sampling: SamplingSettings,
     freeze_attention: bool,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """The steered continuation, and the logits that chose each generated token.
@@ -202,12 +171,13 @@ def generate_steered(
     """
     _require_interp_engine(model)
     collector = _SequenceCollector()
+    prompt_len = int(model.ensure_tokenized(prompt).shape[-1])
     _, logits, _ = model.feature_intervention_generate(
         prompt,
         interventions,
         freeze_attention=freeze_attention,
         streamer=collector,
-        **_generation_kwargs(max_new_tokens, temperature, freq_penalty),
+        **_generation_kwargs(max_new_tokens, sampling, prompt_len=prompt_len),
     )
     # `generate` hands the streamer its tokens on the CPU whatever the model's device; the caller
     # decodes them and runs a forward pass over them, so put them back where the model is.

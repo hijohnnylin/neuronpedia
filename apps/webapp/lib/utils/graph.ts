@@ -395,6 +395,17 @@ export const SteerResponseSchema: yup.ObjectSchema<GraphSteerResponse> = yup.obj
   STEERED_GENERATION: yup.string().required('Steered generation is required'),
   DEFAULT_LOGITS_BY_TOKEN: SteerResponseLogitsByTokenSchema,
   STEERED_LOGITS_BY_TOKEN: SteerResponseLogitsByTokenSchema,
+  // What both generations ran with, every knob decided. Absent from older servers.
+  sampling: yup
+    .object({
+      temperature: yup.number().required(),
+      top_k: yup.number().nullable(),
+      top_p: yup.number().nullable(),
+      presence_penalty: yup.number().required(),
+      seed: yup.number().nullable(),
+    })
+    .nullable()
+    .default(undefined),
 });
 
 export type SteerResponse = GraphSteerResponse;

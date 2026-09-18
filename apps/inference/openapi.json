@@ -1704,6 +1704,63 @@
         "title": "NPRenderConditions",
         "type": "object"
       },
+      "NPSamplingSettings": {
+        "description": "The sampling settings a generation ran with, every knob decided.\n\nA knob the request passed is as passed; one it left unset is the checkpoint's own\n`generation_config.json` recommendation, or neutral where that states nothing. Reported so the\nreader sees what produced the text. In a stream it is sent once, on the first frame.",
+        "properties": {
+          "presencePenalty": {
+            "description": "Flat subtraction from the logit of every token already generated; 0 is none",
+            "title": "Presencepenalty",
+            "type": "number"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The seed the generation ran with",
+            "title": "Seed"
+          },
+          "temperature": {
+            "description": "0 is greedy",
+            "title": "Temperature",
+            "type": "number"
+          },
+          "topK": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: no top-k filtering",
+            "title": "Topk"
+          },
+          "topP": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: no nucleus filtering",
+            "title": "Topp"
+          }
+        },
+        "required": [
+          "temperature",
+          "presencePenalty"
+        ],
+        "title": "NPSamplingSettings",
+        "type": "object"
+      },
       "NPSteerChatMessage": {
         "description": "One message in a steered chat exchange.",
         "properties": {
@@ -2183,8 +2240,16 @@
             "title": "Features"
           },
           "freqPenalty": {
-            "title": "Freqpenalty",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.",
+            "title": "Freqpenalty"
           },
           "model": {
             "description": "Name of the model",
@@ -2215,6 +2280,20 @@
           "normalizeSteering": {
             "title": "Normalizesteering",
             "type": "boolean"
+          },
+          "presencePenalty": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Flat subtraction from the logit of every token already generated, before the temperature. Breaks repetition loops. Unset: 0.",
+            "title": "Presencepenalty"
           },
           "prompt": {
             "description": "Array of chat messages to pass to the model",
@@ -2269,9 +2348,44 @@
             "type": "number"
           },
           "temperature": {
-            "minimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.",
+            "title": "Temperature"
+          },
+          "topK": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Keep the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Topk"
+          },
+          "topP": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Topp"
           },
           "types": {
             "description": "Array that specifies whether or not to generate STEERED output, DEFAULT (non-steered) output, or both.",
@@ -2304,9 +2418,7 @@
           "normalizeSteering",
           "types",
           "nCompletionTokens",
-          "temperature",
           "strengthMultiplier",
-          "freqPenalty",
           "seed",
           "steerSpecialTokens"
         ],
@@ -2340,6 +2452,17 @@
             ],
             "description": "One entry per requested vector per steer type, in the order the vectors were sent",
             "title": "Readouts"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NPSamplingSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The settings the generation ran with. In a stream, present on the first frame only."
           }
         },
         "required": [
@@ -2374,8 +2497,16 @@
             "title": "Features"
           },
           "freqPenalty": {
-            "title": "Freqpenalty",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.",
+            "title": "Freqpenalty"
           },
           "model": {
             "description": "Name of the model",
@@ -2406,6 +2537,20 @@
           "normalizeSteering": {
             "title": "Normalizesteering",
             "type": "boolean"
+          },
+          "presencePenalty": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Flat subtraction from the logit of every token already generated, before the temperature. Breaks repetition loops. Unset: 0.",
+            "title": "Presencepenalty"
           },
           "prompt": {
             "description": "Text to pass the model for completion",
@@ -2438,9 +2583,44 @@
             "type": "number"
           },
           "temperature": {
-            "minimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.",
+            "title": "Temperature"
+          },
+          "topK": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Keep the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Topk"
+          },
+          "topP": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Topp"
           },
           "types": {
             "description": "Array that specifies whether or not to generate STEERED output, DEFAULT (non-steered) output, or both.",
@@ -2473,9 +2653,7 @@
           "normalizeSteering",
           "types",
           "nCompletionTokens",
-          "temperature",
           "strengthMultiplier",
-          "freqPenalty",
           "seed"
         ],
         "title": "SteerCompletionRequest",
@@ -2490,6 +2668,17 @@
             },
             "title": "Outputs",
             "type": "array"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NPSamplingSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The settings the generation ran with. In a stream, present on the first frame only."
           }
         },
         "required": [

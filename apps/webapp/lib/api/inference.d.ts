@@ -1268,6 +1268,41 @@ export interface components {
       };
     };
     /**
+     * NPSamplingSettings
+     * @description The sampling settings a generation ran with, every knob decided.
+     *
+     *     A knob the request passed is as passed; one it left unset is the checkpoint's own
+     *     `generation_config.json` recommendation, or neutral where that states nothing. Reported so the
+     *     reader sees what produced the text. In a stream it is sent once, on the first frame.
+     */
+    NPSamplingSettings: {
+      /**
+       * Presencepenalty
+       * @description Flat subtraction from the logit of every token already generated; 0 is none
+       */
+      presencePenalty: number;
+      /**
+       * Seed
+       * @description The seed the generation ran with
+       */
+      seed?: number | null;
+      /**
+       * Temperature
+       * @description 0 is greedy
+       */
+      temperature: number;
+      /**
+       * Topk
+       * @description Null: no top-k filtering
+       */
+      topK?: number | null;
+      /**
+       * Topp
+       * @description Null: no nucleus filtering
+       */
+      topP?: number | null;
+    };
+    /**
      * NPSteerChatMessage
      * @description One message in a steered chat exchange.
      */
@@ -1519,8 +1554,11 @@ export interface components {
        * @description Features to steer towards or away from
        */
       features?: components['schemas']['NPSteerFeature'][] | null;
-      /** Freqpenalty */
-      freqPenalty: number;
+      /**
+       * Freqpenalty
+       * @description Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.
+       */
+      freqPenalty?: number | null;
       /**
        * Model
        * @description Name of the model
@@ -1539,6 +1577,11 @@ export interface components {
       nLogprobs: number | null;
       /** Normalizesteering */
       normalizeSteering: boolean;
+      /**
+       * Presencepenalty
+       * @description Flat subtraction from the logit of every token already generated, before the temperature. Breaks repetition loops. Unset: 0.
+       */
+      presencePenalty?: number | null;
       /**
        * Prompt
        * @description Array of chat messages to pass to the model
@@ -1565,8 +1608,21 @@ export interface components {
        * @description The steering strength will be multiplied by this number
        */
       strengthMultiplier: number;
-      /** Temperature */
-      temperature: number;
+      /**
+       * Temperature
+       * @description 0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.
+       */
+      temperature?: number | null;
+      /**
+       * Topk
+       * @description Keep the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      topK?: number | null;
+      /**
+       * Topp
+       * @description Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      topP?: number | null;
       /**
        * Types
        * @description Array that specifies whether or not to generate STEERED output, DEFAULT (non-steered) output, or both.
@@ -1588,6 +1644,8 @@ export interface components {
        * @description One entry per requested vector per steer type, in the order the vectors were sent
        */
       readouts?: components['schemas']['SteerVectorReadout'][] | null;
+      /** @description The settings the generation ran with. In a stream, present on the first frame only. */
+      sampling?: components['schemas']['NPSamplingSettings'] | null;
     };
     /**
      * SteerCompletionRequest
@@ -1605,8 +1663,11 @@ export interface components {
        * @description Features to steer towards or away from
        */
       features?: components['schemas']['NPSteerFeature'][] | null;
-      /** Freqpenalty */
-      freqPenalty: number;
+      /**
+       * Freqpenalty
+       * @description Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.
+       */
+      freqPenalty?: number | null;
       /**
        * Model
        * @description Name of the model
@@ -1626,6 +1687,11 @@ export interface components {
       /** Normalizesteering */
       normalizeSteering: boolean;
       /**
+       * Presencepenalty
+       * @description Flat subtraction from the logit of every token already generated, before the temperature. Breaks repetition loops. Unset: 0.
+       */
+      presencePenalty?: number | null;
+      /**
        * Prompt
        * @description Text to pass the model for completion
        */
@@ -1644,8 +1710,21 @@ export interface components {
        * @description The steering strength will be multiplied by this number
        */
       strengthMultiplier: number;
-      /** Temperature */
-      temperature: number;
+      /**
+       * Temperature
+       * @description 0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.
+       */
+      temperature?: number | null;
+      /**
+       * Topk
+       * @description Keep the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      topK?: number | null;
+      /**
+       * Topp
+       * @description Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.
+       */
+      topP?: number | null;
       /**
        * Types
        * @description Array that specifies whether or not to generate STEERED output, DEFAULT (non-steered) output, or both.
@@ -1661,6 +1740,8 @@ export interface components {
     SteerCompletionResponse: {
       /** Outputs */
       outputs: components['schemas']['NPSteerCompletionOutput'][];
+      /** @description The settings the generation ran with. In a stream, present on the first frame only. */
+      sampling?: components['schemas']['NPSamplingSettings'] | null;
     };
     /**
      * SteerReadoutTurn

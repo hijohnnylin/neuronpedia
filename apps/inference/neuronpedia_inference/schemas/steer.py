@@ -10,7 +10,7 @@ from typing import Annotated
 
 from pydantic import Field, StrictBool, StrictFloat, StrictInt, StrictStr, model_validator
 
-from neuronpedia_inference.schemas.common import BaseSchema, ExactSchema, NPLogprob
+from neuronpedia_inference.schemas.common import BaseSchema, ExactSchema, NPLogprob, NPSamplingSettings
 
 
 class NPSteerMethod(StrEnum):
@@ -312,9 +312,27 @@ class SteerCompletionRequest(BaseSchema):
     n_completion_tokens: Annotated[int, Field(strict=True, ge=1)] = Field(
         description="Number of completion tokens to generate"
     )
-    temperature: Annotated[float, Field(strict=True, ge=0)]
+    temperature: Annotated[float, Field(strict=True, ge=0)] | None = Field(
+        default=None,
+        description="0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.",
+    )
+    top_k: Annotated[int, Field(strict=True, ge=0)] | None = Field(
+        default=None,
+        description="Keep the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    top_p: Annotated[float, Field(strict=True, gt=0, le=1)] | None = Field(
+        default=None,
+        description="Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    presence_penalty: Annotated[float, Field(strict=True, ge=0, le=2)] | None = Field(
+        default=None,
+        description="Flat subtraction from the logit of every token already generated, before the temperature. Breaks repetition loops. Unset: 0.",
+    )
     strength_multiplier: StrictFloat = Field(description="The steering strength will be multiplied by this number")
-    freq_penalty: StrictFloat
+    freq_penalty: StrictFloat | None = Field(
+        default=None,
+        description="Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.",
+    )
     seed: StrictFloat
     stream: StrictBool | None = Field(
         default=False,
@@ -336,6 +354,10 @@ class SteerCompletionResponse(BaseSchema):
     """
 
     outputs: list[NPSteerCompletionOutput]
+    sampling: NPSamplingSettings | None = Field(
+        default=None,
+        description="The settings the generation ran with. In a stream, present on the first frame only.",
+    )
 
 
 class SteerReadoutTurn(BaseSchema):
@@ -427,9 +449,27 @@ class SteerCompletionChatRequest(BaseSchema):
     n_completion_tokens: Annotated[int, Field(strict=True, ge=1)] = Field(
         description="Number of completion tokens to generate"
     )
-    temperature: Annotated[float, Field(strict=True, ge=0)]
+    temperature: Annotated[float, Field(strict=True, ge=0)] | None = Field(
+        default=None,
+        description="0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.",
+    )
+    top_k: Annotated[int, Field(strict=True, ge=0)] | None = Field(
+        default=None,
+        description="Keep the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    top_p: Annotated[float, Field(strict=True, gt=0, le=1)] | None = Field(
+        default=None,
+        description="Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+    )
+    presence_penalty: Annotated[float, Field(strict=True, ge=0, le=2)] | None = Field(
+        default=None,
+        description="Flat subtraction from the logit of every token already generated, before the temperature. Breaks repetition loops. Unset: 0.",
+    )
     strength_multiplier: StrictFloat = Field(description="The steering strength will be multiplied by this number")
-    freq_penalty: StrictFloat
+    freq_penalty: StrictFloat | None = Field(
+        default=None,
+        description="Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.",
+    )
     seed: StrictFloat
     stream: StrictBool | None = Field(
         default=False,
@@ -465,3 +505,7 @@ class SteerCompletionChatResponse(BaseSchema):
     )
     outputs: list[NPSteerChatResult]
     input: NPSteerChatResult
+    sampling: NPSamplingSettings | None = Field(
+        default=None,
+        description="The settings the generation ran with. In a stream, present on the first frame only.",
+    )

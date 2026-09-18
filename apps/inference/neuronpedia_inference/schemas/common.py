@@ -139,3 +139,21 @@ class NPLogprob(BaseSchema):
     top_logprobs: list[NPLogprobTop] = Field(
         description="The highest-scoring candidates at this position, most likely first"
     )
+
+
+class NPSamplingSettings(BaseSchema):
+    """
+    The sampling settings a generation ran with, every knob decided.
+
+    A knob the request passed is as passed; one it left unset is the checkpoint's own
+    `generation_config.json` recommendation, or neutral where that states nothing. Reported so the
+    reader sees what produced the text. In a stream it is sent once, on the first frame.
+    """
+
+    temperature: StrictFloat = Field(description="0 is greedy")
+    top_k: StrictInt | None = Field(default=None, description="Null: no top-k filtering")
+    top_p: StrictFloat | None = Field(default=None, description="Null: no nucleus filtering")
+    presence_penalty: StrictFloat = Field(
+        description="Flat subtraction from the logit of every token already generated; 0 is none"
+    )
+    seed: StrictInt | None = Field(default=None, description="The seed the generation ran with")

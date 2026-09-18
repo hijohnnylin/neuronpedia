@@ -72,6 +72,21 @@ async def capabilities():
     # them through the forward at all. Cheap and side-effect-free on both backends.
     grad_support = model.grad_support.describe()
 
+    # What the checkpoint's generation_config.json states, as the engine read it. A steer request
+    # that leaves a knob unset runs with this, so a client that shows its sliders at their defaults
+    # has this to show. Null when the checkpoint states nothing (Qwen3.5 ships no file).
+    stated = model.recommended_sampling
+    recommended_sampling = (
+        None
+        if stated.is_empty
+        else {
+            "temperature": stated.temperature,
+            "top_k": stated.top_k,
+            "top_p": stated.top_p,
+            "do_sample": stated.do_sample,
+        }
+    )
+
     return {
         "model": config.custom_hf_model_id or config.override_model_id or config.model_id,
         "backend": "vllm" if is_vllm else "eager",
@@ -95,6 +110,7 @@ async def capabilities():
         "max_num_results": MAX_NUM_RESULTS,
         "capture_points": capture_points,
         "grad_support": grad_support,
+        "recommended_sampling": recommended_sampling,
         # False only on a GENERATION_ONLY pod. Reported next to the endpoint map rather than in place
         # of it, so a client sees both which endpoints are off and the one reason they are.
         "hooks_available": hooks,

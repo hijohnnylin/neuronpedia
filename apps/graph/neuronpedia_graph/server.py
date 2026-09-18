@@ -47,11 +47,12 @@ from neuronpedia_graph.schemas import (
     ParseChatPromptRequest,
     ParseChatPromptResponse,
     SalientLogit,
+    SamplingReport,
     SteerRequest,
     SteerResponse,
     TopLogit,
 )
-from neuronpedia_graph.steer_generation import generate_default, generate_steered
+from neuronpedia_graph.steer_generation import generate_default, generate_steered, resolve_request_sampling
 
 load_dotenv()
 
@@ -811,6 +812,16 @@ async def steer_handler(req_data: SteerRequest):
                     )
                 )
 
+        # Decided once, for both runs, the way the inference server decides them: the request's
+        # knobs, else the checkpoint's generation_config.json, else neutral.
+        sampling = resolve_request_sampling(
+            model,
+            temperature=req_data.temperature,
+            top_k=req_data.sampling_top_k,
+            top_p=req_data.top_p,
+            presence_penalty=req_data.presence_penalty,
+        )
+
         # set the seed
         if req_data.seed is not None:
             torch.manual_seed(req_data.seed)
@@ -818,8 +829,7 @@ async def steer_handler(req_data: SteerRequest):
             model,
             req_data.prompt,
             max_new_tokens=req_data.n_tokens,
-            temperature=req_data.temperature,
-            freq_penalty=req_data.freq_penalty,
+            sampling=sampling,
         )
 
         default_tokenized_str_tokens = [model.tokenizer.decode([token]) for token in default_tokenized]
@@ -837,8 +847,7 @@ async def steer_handler(req_data: SteerRequest):
             # loops below index the steered tokens by the *default* run's length, so a steered run
             # that is shorter reads off the end.
             max_new_tokens=req_data.n_tokens + 1,
-            temperature=req_data.temperature,
-            freq_penalty=req_data.freq_penalty,
+            sampling=sampling,
             freeze_attention=req_data.freeze_attention,
         )
 
@@ -900,6 +909,13 @@ async def steer_handler(req_data: SteerRequest):
             STEERED_LOGITS_BY_TOKEN=topk_steered_by_token,
             DEFAULT_GENERATION=default_generation,
             STEERED_GENERATION=steered_generation,
+            sampling=SamplingReport(
+                temperature=sampling.temperature,
+                top_k=sampling.top_k,
+                top_p=sampling.top_p,
+                presence_penalty=sampling.presence_penalty,
+                seed=req_data.seed,
+            ),
         )
 
     finally:

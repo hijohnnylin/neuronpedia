@@ -58,12 +58,60 @@
             "title": "Max New Tokens",
             "type": "integer"
           },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.",
+            "title": "Presence Penalty"
+          },
           "temperature": {
-            "default": 0.7,
-            "maximum": 5.0,
-            "minimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.",
+            "title": "Temperature"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top K"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top P"
           }
         },
         "required": [
@@ -106,6 +154,17 @@
               }
             ],
             "title": "Mse"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SamplingReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the description ran with"
           }
         },
         "required": [
@@ -160,6 +219,20 @@
             "description": "Structured chat messages. When set, the server applies the model's chat template (ignoring `text`) and returns per-token spans.",
             "title": "Messages"
           },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.",
+            "title": "Presence Penalty"
+          },
           "stream": {
             "default": false,
             "description": "If true, stream tokens as SSE events instead of returning the full response.",
@@ -167,11 +240,18 @@
             "type": "boolean"
           },
           "temperature": {
-            "default": 0.7,
-            "maximum": 5.0,
-            "minimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.",
+            "title": "Temperature"
           },
           "text": {
             "anyOf": [
@@ -185,6 +265,33 @@
             ],
             "description": "Prompt text to extend (or provide `messages`).",
             "title": "Text"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top K"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top P"
           }
         },
         "title": "CompletionRequest",
@@ -212,6 +319,20 @@
             "title": "Max New Tokens",
             "type": "integer"
           },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.",
+            "title": "Presence Penalty"
+          },
           "stream": {
             "default": false,
             "description": "Stream results as SSE events",
@@ -219,11 +340,45 @@
             "type": "boolean"
           },
           "temperature": {
-            "default": 0.7,
-            "maximum": 5.0,
-            "minimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.",
+            "title": "Temperature"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top K"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top P"
           }
         },
         "required": [
@@ -240,6 +395,17 @@
             },
             "title": "Results",
             "type": "array"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SamplingReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What every description ran with"
           }
         },
         "required": [
@@ -347,6 +513,20 @@
             "description": "Token positions to describe (Python-style indexing, e.g. [-1] for last). If omitted or empty, all positions are described.",
             "title": "Positions"
           },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.",
+            "title": "Presence Penalty"
+          },
           "reverse": {
             "default": true,
             "description": "Process token positions in reverse order (last to first)",
@@ -360,11 +540,18 @@
             "type": "boolean"
           },
           "temperature": {
-            "default": 0.7,
-            "maximum": 5.0,
-            "minimum": 0.0,
-            "title": "Temperature",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0 is greedy. Unset: the checkpoint's generation_config.json recommendation, else 1.0.",
+            "title": "Temperature"
           },
           "text": {
             "anyOf": [
@@ -378,6 +565,33 @@
             ],
             "description": "Input text to extract activations from (or provide `messages`).",
             "title": "Text"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top K"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top P"
           }
         },
         "title": "ExplainRequest",
@@ -395,6 +609,17 @@
             },
             "title": "Results",
             "type": "array"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SamplingReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What every explanation ran with"
           }
         },
         "required": [
@@ -922,6 +1147,49 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "SamplingReport": {
+        "description": "The settings a generation ran with, every knob decided; see ``_SamplingKnobs``.",
+        "properties": {
+          "presence_penalty": {
+            "title": "Presence Penalty",
+            "type": "number"
+          },
+          "temperature": {
+            "title": "Temperature",
+            "type": "number"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: no top-k filtering",
+            "title": "Top K"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: no nucleus filtering",
+            "title": "Top P"
+          }
+        },
+        "required": [
+          "temperature",
+          "presence_penalty"
+        ],
+        "title": "SamplingReport",
+        "type": "object"
+      },
       "ScoreRequest": {
         "properties": {
           "activation": {
@@ -1142,6 +1410,17 @@
             "description": "Number of tokens from the original input text",
             "title": "Prompt Length",
             "type": "integer"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SamplingReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What a /completion generation ran with; absent from /tokenize"
           },
           "text": {
             "description": "Full text (original + any generated completion)",

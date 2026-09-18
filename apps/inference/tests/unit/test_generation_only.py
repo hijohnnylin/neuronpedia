@@ -26,6 +26,7 @@ from argparse import Namespace
 from types import SimpleNamespace
 
 import pytest
+from interp_engine import RecommendedSampling
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.engine_adapter import (
@@ -310,6 +311,18 @@ class TestResidualReads:
 class TestWhatCapabilitiesReports:
     """The advertised contract, assembled from the same code path the endpoint runs."""
 
+    def test_a_checkpoint_that_states_nothing_reports_no_recommended_sampling(self):
+        assert self._report(hooks=True)["recommended_sampling"] is None
+
+    def test_the_checkpoints_recommendation_is_reported_as_read(self):
+        stated = RecommendedSampling(temperature=1.0, top_k=64, top_p=0.95, do_sample=True, source="x")
+        assert self._report(hooks=True, recommended_sampling=stated)["recommended_sampling"] == {
+            "temperature": 1.0,
+            "top_k": 64,
+            "top_p": 0.95,
+            "do_sample": True,
+        }
+
     @staticmethod
     def _report(*, hooks: bool, **model_extra: object) -> dict:
         from neuronpedia_inference.endpoints import capabilities as module
@@ -330,6 +343,7 @@ class TestWhatCapabilitiesReports:
                 "static_writes": (),
                 "grad_support": SimpleNamespace(describe=lambda: {}),
                 "tensor_parallel_size": 1,
+                "recommended_sampling": RecommendedSampling(),
                 **model_extra,
             }
         )

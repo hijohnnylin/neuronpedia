@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
+from interp_engine import SamplingSettings, read_recommended_sampling, resolve_sampling
 
 from nla_inference import (
     NLAConfig,
@@ -82,6 +83,7 @@ class VLLMVerbalizer:
             )
 
         self.tokenizer = _load_tokenizer(local_path)
+        self.recommended_sampling = read_recommended_sampling(local_path)
         if nla_config is not None:
             self.cfg = nla_config
         else:
@@ -177,7 +179,7 @@ class VLLMVerbalizer:
             await self.async_generate(
                 np.zeros(self.cfg.d_model, dtype=np.float32),
                 extract_explanation=False,
-                temperature=0.0,
+                sampling=self.sampling_settings(temperature=0.0),
                 max_new_tokens=1,
             )
         except Exception as e:
@@ -217,11 +219,30 @@ class VLLMVerbalizer:
         )  # [1, T, d] fp32 CPU
         return injected[0].to(torch.bfloat16).contiguous()  # [T, d]
 
-    def _sampling_params(self, temperature: float, max_new_tokens: int):
+    def sampling_settings(
+        self,
+        *,
+        temperature: float | None = None,
+        top_k: int | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+    ) -> SamplingSettings:
+        """What a generation with these knobs runs with: the caller's value, else the verbalizer
+        checkpoint's ``generation_config.json``, else neutral -- the inference server's rule."""
+        return resolve_sampling(
+            self.recommended_sampling,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            presence_penalty=presence_penalty,
+        )
+
+    def _sampling_params(self, sampling: SamplingSettings | None, max_new_tokens: int):
         from vllm import SamplingParams
 
+        settings = sampling or self.sampling_settings()
         return SamplingParams(
-            temperature=float(temperature),
+            **settings.vllm_kwargs(),
             max_tokens=int(max_new_tokens),
             stop=list(_STOP_SEQUENCES),
             # Keep the matched </explanation> in the output (parity with the sglang path's
@@ -249,14 +270,14 @@ class VLLMVerbalizer:
         *,
         prompt: str | None = None,
         extract_explanation: bool = True,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
         context: str | None = None,
     ) -> str:
         """Decode one activation vector (async — concurrency-safe: own vLLM request)."""
         embeds = self._build_prompt_embeds(activation, prompt)
         out = await self._require_backend().generate_from_embeds(
-            embeds, self._sampling_params(temperature, max_new_tokens)
+            embeds, self._sampling_params(sampling, max_new_tokens)
         )
         comp = out.outputs[0]
         result = {
@@ -270,14 +291,14 @@ class VLLMVerbalizer:
         activation: Iterable[float] | np.ndarray | torch.Tensor,
         *,
         prompt: str | None = None,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
     ) -> AsyncGenerator[dict, None]:
         """Yield ``{"text": <cumulative>, "meta_info": {...}}`` as tokens decode."""
         embeds = self._build_prompt_embeds(activation, prompt)
         prompt_len = embeds.shape[0]
         gen = await self._require_backend().generate_from_embeds(
-            embeds, self._sampling_params(temperature, max_new_tokens), stream=True
+            embeds, self._sampling_params(sampling, max_new_tokens), stream=True
         )
         last = None
         async for out in gen:
@@ -296,7 +317,7 @@ class VLLMVerbalizer:
         *,
         prompt: str | None = None,
         extract_explanation: bool = True,
-        temperature: float = 1.0,
+        sampling: SamplingSettings | None = None,
         max_new_tokens: int = 200,
         context: str | None = None,
     ) -> str:
@@ -306,7 +327,7 @@ class VLLMVerbalizer:
                 activation,
                 prompt=prompt,
                 extract_explanation=extract_explanation,
-                temperature=temperature,
+                sampling=sampling,
                 max_new_tokens=max_new_tokens,
                 context=context,
             )

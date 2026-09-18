@@ -81,12 +81,14 @@ def test_field_names_stay_snake_case():
     assert GraphSchema.model_config.get("alias_generator") is None
 
     # The steer response is the one place with deliberate aliases, and they are louder than
-    # camelCase rather than a casing convention, so they are checked by name instead.
+    # camelCase rather than a casing convention, so they are checked by name instead. `sampling`
+    # is the one later field, and it is snake_case like every other name here.
     expected_steer_keys = {
         "DEFAULT_GENERATION",
         "STEERED_GENERATION",
         "DEFAULT_LOGITS_BY_TOKEN",
         "STEERED_LOGITS_BY_TOKEN",
+        "sampling",
     }
     assert set(SteerResponse.model_json_schema()["properties"]) == expected_steer_keys
 

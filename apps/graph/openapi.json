@@ -466,6 +466,60 @@
         "title": "SalientLogit",
         "type": "object"
       },
+      "SamplingReport": {
+        "description": "The settings both generations ran with, every knob decided; see ``SteerRequest``.",
+        "properties": {
+          "presence_penalty": {
+            "title": "Presence Penalty",
+            "type": "number"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "temperature": {
+            "title": "Temperature",
+            "type": "number"
+          },
+          "top_k": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: no top-k filtering",
+            "title": "Top K"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null: no nucleus filtering",
+            "title": "Top P"
+          }
+        },
+        "required": [
+          "temperature",
+          "presence_penalty"
+        ],
+        "title": "SamplingReport",
+        "type": "object"
+      },
       "SteerFeature": {
         "description": "One feature intervention.\n\nThese field names are public: ``/api/steer-logits`` documents them in its swagger and\nforwards the array here untouched, so renaming one is an API break.",
         "properties": {
@@ -537,9 +591,16 @@
             "type": "boolean"
           },
           "freq_penalty": {
-            "default": 0,
-            "title": "Freq Penalty",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Deprecated and ignored: use presence_penalty. Accepted so older clients keep working.",
+            "title": "Freq Penalty"
           },
           "messages": {
             "anyOf": [
@@ -564,10 +625,37 @@
             "title": "N Tokens",
             "type": "integer"
           },
+          "presence_penalty": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Flat subtraction from the logit of every token already generated, before the temperature. Unset: 0.",
+            "title": "Presence Penalty"
+          },
           "prompt": {
             "default": "",
             "title": "Prompt",
             "type": "string"
+          },
+          "sampling_top_k": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample from the k most likely tokens; 0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Sampling Top K"
           },
           "seed": {
             "anyOf": [
@@ -581,14 +669,36 @@
             "title": "Seed"
           },
           "temperature": {
-            "default": 0.0,
-            "title": "Temperature",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "0 is greedy. Unset: the checkpoint's own generation_config.json recommendation, else 1.0.",
+            "title": "Temperature"
           },
           "top_k": {
             "default": 5,
+            "description": "How many top logits to report per generated token",
             "title": "Top K",
             "type": "integer"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Nucleus sampling mass; 1.0 keeps all. Unset: the checkpoint's recommendation, else all.",
+            "title": "Top P"
           }
         },
         "required": [
@@ -622,6 +732,17 @@
             },
             "title": "Steered Logits By Token",
             "type": "array"
+          },
+          "sampling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SamplingReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What both generations ran with"
           }
         },
         "required": [
