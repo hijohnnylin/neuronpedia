@@ -2,6 +2,7 @@ import { toErrorResponse } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
 import { getAutoInterpKeyToUse } from '@/lib/db/userSecret';
 import { generateScoreEleuther } from '@/lib/external/autointerp-scorer-eleuther';
+import { generateScoreJev, isJevScoreType, JEV_SCORE_MODEL_NAME } from '@/lib/external/autointerp-scorer-jev';
 import {
   generateScoreNlaReconstructor,
   generateScoreNlaVerbalizer,
@@ -14,7 +15,7 @@ import {
   requiresOpenRouterForExplanationScoreType,
 } from '@/lib/utils/autointerp';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
-import { UserSecretType } from '@prisma/client';
+import { ExplanationScoreModel, UserSecretType } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { object, string } from 'yup';
 import { getUserByName } from '../../../../lib/db/user';
@@ -52,7 +53,7 @@ import { getUserByName } from '../../../../lib/db/user';
  *                 example: "gpt-4o-mini"
  *               scorerType:
  *                 type: string
- *                 description: The type of scoring method to use (recall_alt, eleuther_fuzz, eleuther_recall, or eleuther_embedding)
+ *                 description: The type of scoring method to use (recall_alt, eleuther_fuzz, eleuther_recall, eleuther_embedding, jev_fuzz, jev_detection, or jev_score). The jev_* types ignore scorerModel.
  *                 example: "recall_alt"
  *     responses:
  *       200:
@@ -152,33 +153,41 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       return NextResponse.json({ score });
     }
 
-    // get the scorer model type
-    const explanationScoreModel = await prisma.explanationScoreModel.findUnique({
-      where: {
-        name: body.scorerModel,
-      },
-    });
-    if (!explanationScoreModel) {
-      return NextResponse.json({ message: 'Unsupported explanation score model' }, { status: 400 });
-    }
-    const explanationScoreModelOpenRouterId = explanationScoreModel.openRouterModelId;
+    // Jev scorers use the server's TypeSafe key and a fixed model, so they skip the model lookup
+    // and the user's OpenRouter key.
+    const isJev = isJevScoreType(explanationScoreType.name);
 
-    // enforce using OpenRouter
+    let explanationScoreModel: ExplanationScoreModel | null = null;
+    let scorerKey = '';
     const scorerKeyType = UserSecretType.OPENROUTER;
-    let scorerKey = await getAutoInterpKeyToUse(UserSecretType.OPENROUTER, user);
-    if (!scorerKey && requiresOpenRouterForExplanationScoreType(explanationScoreType.name)) {
-      console.log('no openrouter key found and needed it');
-      return NextResponse.json({ message: ERROR_REQUIRES_OPENROUTER }, { status: 400 });
+    if (!isJev) {
+      // get the scorer model type
+      explanationScoreModel = await prisma.explanationScoreModel.findUnique({
+        where: {
+          name: body.scorerModel,
+        },
+      });
+      if (!explanationScoreModel) {
+        return NextResponse.json({ message: 'Unsupported explanation score model' }, { status: 400 });
+      }
+
+      // enforce using OpenRouter
+      const foundKey = await getAutoInterpKeyToUse(UserSecretType.OPENROUTER, user);
+      if (!foundKey && requiresOpenRouterForExplanationScoreType(explanationScoreType.name)) {
+        console.log('no openrouter key found and needed it');
+        return NextResponse.json({ message: ERROR_REQUIRES_OPENROUTER }, { status: 400 });
+      }
+      scorerKey = foundKey || '';
     }
-    // silence ts warnings later
-    scorerKey = scorerKey || '';
+    const explanationScoreModelName = explanationScoreModel ? explanationScoreModel.name : JEV_SCORE_MODEL_NAME;
+    const explanationScoreModelOpenRouterId = explanationScoreModel ? explanationScoreModel.openRouterModelId : null;
 
     // if the explanation score type and model already exist for this explanationId, return error
     const existingExplanationScore = await prisma.explanationScore.findFirst({
       where: {
         explanationId: body.explanationId,
         explanationScoreTypeName: explanationScoreType.name,
-        explanationScoreModelName: explanationScoreModel.name,
+        explanationScoreModelName,
       },
     });
     if (existingExplanationScore) {
@@ -236,6 +245,28 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       ...activation,
       values: activation.values.map((value) => (value * 10) / activation.maxValue),
     }));
+
+    if (isJevScoreType(explanationScoreType.name)) {
+      const neuron = await prisma.neuron.findUnique({
+        where: {
+          modelId_layer_index: { modelId: explanation.modelId, layer: explanation.layer, index: explanation.index },
+        },
+        select: { pos_str: true },
+      });
+      const score = await generateScoreJev(
+        explanationScoreType.name,
+        activations,
+        zeroActivations,
+        explanation,
+        neuron?.pos_str || [],
+        request.user,
+      );
+      return NextResponse.json({ score });
+    }
+    // The remaining scorers all looked up a model above.
+    if (!explanationScoreModel) {
+      return NextResponse.json({ message: 'Unsupported explanation score model' }, { status: 400 });
+    }
 
     if (explanationScoreType.name === 'recall_alt') {
       try {

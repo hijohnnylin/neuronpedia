@@ -14,7 +14,8 @@ type ScoreMatchAndRawQuery = {
   messages: string;
 };
 
-const decoyScoreActivationsRaw = [
+// Shared with the Jev scorers, so both test against the same fixed decoy texts.
+export const decoyScoreActivationsRaw = [
   {
     tokens: [
       'Sources',
