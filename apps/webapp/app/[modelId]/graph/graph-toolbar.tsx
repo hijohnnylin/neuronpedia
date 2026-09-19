@@ -442,6 +442,11 @@ export default function GraphToolbar() {
                       )
                         ? selectedMetadataGraph
                         : null;
+                    // featured graphs that have a featured solution get their own section
+                    const hasFeaturedSolution = (graph: (typeof allVisibleGraphs)[0]) =>
+                      !!graph.subgraphs?.some((sg) => sg.isFeaturedSolution);
+                    const featuredGraphsWithSubgraphs = featuredGraphs.filter(hasFeaturedSolution);
+                    const featuredGraphsWithoutSubgraphs = featuredGraphs.filter((g) => !hasFeaturedSolution(g));
                     const communityGraphs = allVisibleGraphs
                       .filter((graph) => !graph.isFeatured && session.data?.user?.id !== graph.userId)
                       .filter((graph) => graph.sourceSetName === selectedSourceSetName);
@@ -564,16 +569,28 @@ export default function GraphToolbar() {
                             {myGraphs.sort((a, b) => a.slug.localeCompare(b.slug)).map((g) => renderGraphItem(g, true))}
                           </Select.Group>
                         )}
-                        {filterGraphsSetting.includes(FilterGraphType.Featured) && featuredGraphs.length > 0 && (
-                          <Select.Group className="divide-y divide-slate-200">
-                            <Select.Label className="sticky top-0 z-10 border-b border-t border-slate-100 bg-slate-50 py-2 pl-4 pr-6 pt-2.5 text-center text-xs font-bold text-slate-500">
-                              Featured Graphs
-                            </Select.Label>
-                            {featuredGraphs
-                              .sort((a, b) => a.slug.localeCompare(b.slug))
-                              .map((g) => renderGraphItem(g, session.data?.user?.id === g.userId))}
-                          </Select.Group>
-                        )}
+                        {filterGraphsSetting.includes(FilterGraphType.Featured) &&
+                          featuredGraphsWithSubgraphs.length > 0 && (
+                            <Select.Group className="divide-y divide-slate-200">
+                              <Select.Label className="sticky top-0 z-10 border-b border-t border-slate-100 bg-slate-50 py-2 pl-4 pr-6 pt-2.5 text-center text-xs font-bold text-slate-500">
+                                Featured Graphs with Subgraphs
+                              </Select.Label>
+                              {featuredGraphsWithSubgraphs
+                                .sort((a, b) => a.slug.localeCompare(b.slug))
+                                .map((g) => renderGraphItem(g, session.data?.user?.id === g.userId))}
+                            </Select.Group>
+                          )}
+                        {filterGraphsSetting.includes(FilterGraphType.Featured) &&
+                          featuredGraphsWithoutSubgraphs.length > 0 && (
+                            <Select.Group className="divide-y divide-slate-200">
+                              <Select.Label className="sticky top-0 z-10 border-b border-t border-slate-100 bg-slate-50 py-2 pl-4 pr-6 pt-2.5 text-center text-xs font-bold text-slate-500">
+                                Featured Graphs
+                              </Select.Label>
+                              {featuredGraphsWithoutSubgraphs
+                                .sort((a, b) => a.slug.localeCompare(b.slug))
+                                .map((g) => renderGraphItem(g, session.data?.user?.id === g.userId))}
+                            </Select.Group>
+                          )}
                         {/* {filterGraphsSetting.includes(FilterGraphType.Community) && communityGraphs.length > 0 && (
                           <Select.Group className="divide-y divide-slate-200">
                             <Select.Label className="sticky top-0 z-10 border-b border-t border-slate-100 bg-slate-50 py-2 pl-4 pr-6 pt-2.5 text-center text-xs font-bold text-slate-500">

@@ -23,6 +23,7 @@ import {
 } from '@/app/[modelId]/graph/utils';
 import {
   ActivationWithPartialRelations,
+  GraphMetadataSubgraphPartialWithRelations,
   GraphMetadataSubgraphWithPartialRelations,
   GraphMetadataWithPartialRelations,
   NeuronWithPartialRelations,
@@ -160,7 +161,7 @@ export function GraphProvider({
   initialModelIdToMetadataGraphsMap?: ModelToGraphMetadatasMap;
   initialModel?: string;
   initialSourceSetName?: string;
-  initialMetadataGraph?: GraphMetadata;
+  initialMetadataGraph?: GraphMetadataWithPartialRelations;
   initialPinnedIds?: string;
   initialSupernodes?: string[][];
   initialClerps?: string[][];
@@ -184,7 +185,7 @@ export function GraphProvider({
         ? Object.keys(initialModelIdToMetadataGraphsMap)[0]
         : ''),
   );
-  const [selectedMetadataGraph, setSelectedMetadataGraph] = useState<GraphMetadata | null>(
+  const [selectedMetadataGraph, setSelectedMetadataGraph] = useState<GraphMetadataWithPartialRelations | null>(
     initialMetadataGraph ||
       (selectedModelId && initialModelIdToMetadataGraphsMap[selectedModelId]?.length > 0
         ? initialModelIdToMetadataGraphsMap[selectedModelId][0]
@@ -411,27 +412,70 @@ export function GraphProvider({
     return visStateToReturn;
   }
 
+  // Copy a saved subgraph's pins, supernodes, clerps and thresholds onto a vis state.
+  function applySubgraphToVisState(
+    baseVisState: CltVisState,
+    subgraph: GraphMetadataSubgraphPartialWithRelations,
+  ): CltVisState {
+    return {
+      ...baseVisState,
+      clerps: parseGraphClerps(JSON.stringify(subgraph.clerps ?? [])),
+      pinnedIds: subgraph.pinnedIds ?? [],
+      subgraph: {
+        supernodes: parseGraphSupernodes(JSON.stringify(subgraph.supernodes ?? [])),
+        sticky: true,
+        dagrefy: true,
+        activeGrouping: {
+          isActive: false,
+          selectedNodeIds: new Set(),
+        },
+      },
+      pruningThreshold: subgraph.pruningThreshold || baseVisState.pruningThreshold,
+      densityThreshold: subgraph.densityThreshold || baseVisState.densityThreshold,
+    };
+  }
+
+  // The featured solution is the default subgraph for a graph. The server includes
+  // only the newest one in the metadata.
+  function getFeaturedSolution(
+    metadataGraph: GraphMetadataWithPartialRelations | null,
+  ): GraphMetadataSubgraphPartialWithRelations | undefined {
+    return metadataGraph?.subgraphs?.find((sg) => sg.isFeaturedSolution);
+  }
+
   function resetSelectedGraphToBlankVisState() {
     // default vis state is either saved qParams or blank
     setVisStateInternal(blankVisState);
   }
 
   function resetSelectedGraphToDefaultVisState() {
-    // default vis state is either saved qParams or blank
+    // default vis state is the featured solution, else saved qParams, else blank
     if (selectedGraph) {
-      setVisStateInternal(getGraphDefaultVisState(selectedGraph));
+      const featuredSolution = getFeaturedSolution(selectedMetadataGraph);
+      const defaultVisState = getGraphDefaultVisState(selectedGraph);
+      setVisStateInternal(
+        featuredSolution ? applySubgraphToVisState(defaultVisState, featuredSolution) : defaultVisState,
+      );
     }
   }
 
   useEffect(() => {
     if (selectedGraph) {
-      const visStateToSet = getGraphDefaultVisState(selectedGraph);
+      let visStateToSet = getGraphDefaultVisState(selectedGraph);
+      const featuredSolution = getFeaturedSolution(selectedMetadataGraph);
 
       if (!hasAppliedInitialOverrides.current) {
         console.log('applying initial overrides');
         // apply overrides with each state value from initial values
         // only do this one time (first load from url)
         // we don't want to reapply these values when we switch graphs
+        // subgraph state in the url wins over the featured solution
+        const hasUrlSubgraphState = !!(initialPinnedIds || initialSupernodes || initialClerps);
+        const defaultSolution = hasUrlSubgraphState ? undefined : featuredSolution;
+
+        if (defaultSolution) {
+          visStateToSet = applySubgraphToVisState(visStateToSet, defaultSolution);
+        }
 
         // override pinnedIds
         if (initialPinnedIds) {
@@ -466,11 +510,14 @@ export function GraphProvider({
 
         if (initialDensityThreshold !== undefined) {
           visStateToSet.densityThreshold = initialDensityThreshold;
-        } else {
+        } else if (!defaultSolution?.densityThreshold) {
           visStateToSet.densityThreshold = DEFAULT_DENSITY_THRESHOLD;
         }
 
         hasAppliedInitialOverrides.current = true;
+      } else if (featuredSolution) {
+        // graph was switched in the ui: show its featured solution
+        visStateToSet = applySubgraphToVisState(visStateToSet, featuredSolution);
       } else {
         console.log('not applying initial overrides');
       }
@@ -531,22 +578,7 @@ export function GraphProvider({
   }, []);
 
   const loadSubgraph = (subgraph: GraphMetadataSubgraphWithPartialRelations) => {
-    setVisStateInternal(() => ({
-      ...blankVisState,
-      clerps: parseGraphClerps(JSON.stringify(subgraph.clerps)),
-      pinnedIds: subgraph.pinnedIds,
-      subgraph: {
-        supernodes: parseGraphSupernodes(JSON.stringify(subgraph.supernodes)),
-        sticky: true,
-        dagrefy: true,
-        activeGrouping: {
-          isActive: false,
-          selectedNodeIds: new Set(),
-        },
-      },
-      pruningThreshold: subgraph.pruningThreshold || undefined,
-      densityThreshold: subgraph.densityThreshold || undefined,
-    }));
+    setVisStateInternal(() => applySubgraphToVisState(blankVisState, subgraph));
   };
 
   async function fetchAnthropicFeatureDetail(
