@@ -14,7 +14,8 @@ import { decoyScoreActivationsRaw } from './autointerp-scorer-recall-json';
 // - jev_detection: one yes/no question per example on the plain text. Value = balanced accuracy.
 // - jev_fuzz: the same, but the tokens the feature fires on are wrapped in << >>. Value =
 //   balanced accuracy. Catches explanations that are true of any text ("the word 'the'").
-// - jev_score: one 5-level rating of the explanation against the top examples. Value = level / 4.
+// - jev_score: one 5-level rating of the explanation against the top examples. Value = Jev's
+//   probability-weighted level / 4, so it is continuous in [0, 1].
 //
 // All three also ask whether the feature's top output logits fit the explanation and store the
 // answer in jsonDetails as `logit_fit`. It never enters `value`: for many features the top logits

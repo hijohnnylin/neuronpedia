@@ -59,12 +59,13 @@ export function decodeRawToken(raw: string): string | null {
 // newlines are still `Ċ` and curly quotes are still `âĢĻ`. This maps the
 // byte-level characters back to bytes, passes real characters through, and
 // returns the input unchanged when the result is not valid UTF-8.
+// SentencePiece models (Gemma, Llama) mark a word-leading space as `▁`.
 export function decodeMixedToken(token: string): string {
   if (!UTF8_DECODER || !UTF8_ENCODER) {
     return token;
   }
   const bytes: number[] = [];
-  for (const ch of token) {
+  for (const ch of token.replace(/\u2581/g, ' ')) {
     const b = BYTE_DECODER.get(ch);
     if (b !== undefined) {
       bytes.push(b);

@@ -13,6 +13,12 @@ describe('decodeMixedToken', () => {
     expect(decodeMixedToken(' weakness')).toBe(' weakness');
     expect(decodeMixedToken('café')).toBe('café');
   });
+
+  it('turns the SentencePiece word marker into a space', () => {
+    expect(decodeMixedToken('▁dog')).toBe(' dog');
+    expect(decodeMixedToken('▁')).toBe(' ');
+    expect(plainText(['▁your', '▁dog', 'Ċ'])).toBe(' your dog ');
+  });
 });
 
 describe('plainText', () => {
