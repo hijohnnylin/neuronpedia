@@ -18,8 +18,10 @@ import argparse
 import csv
 import datetime as dt
 import glob
+import importlib.metadata
 import json
 import os
+import platform
 import re
 import shlex
 import subprocess
@@ -175,6 +177,44 @@ def query_gpus() -> list[dict[str, Any]]:
     return gpus
 
 
+# Libraries whose version changes the forward pass, and so the fitted lens.
+# transformers is the one that has bitten: 5.0 to 5.12 ran OLMo-3 with YaRN on
+# every layer, so lenses fitted there differ from the model served on >= 5.13.
+ENVIRONMENT_PACKAGES = ("transformers", "torch", "accelerate", "datasets")
+
+
+def query_environment() -> dict[str, Any]:
+    """Versions of the packages that decide what forward pass a lens encodes.
+
+    ``fit_lens.py`` runs under ``sys.executable``, the same interpreter as this
+    script, so what is importable here is what the fit uses.
+    """
+    env: dict[str, Any] = {}
+    for package in ENVIRONMENT_PACKAGES:
+        try:
+            env[package] = importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError:
+            env[package] = None
+    env["python"] = platform.python_version()
+    env["jlens_commit"] = git_commit(SCRIPT_DIR)
+    return env
+
+
+def git_commit(path: Path) -> str | None:
+    """HEAD commit of the checkout containing ``path``, or None outside git."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=path,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    return out or None
+
+
 def run_dir_for_model(exports_dir: Path, np_model_id: str, dataset_name: str) -> Path:
     return exports_dir / np_model_id / "jlens" / sanitize_filename_part(dataset_name)
 
@@ -289,6 +329,7 @@ def write_config_yaml(
     command: list[str],
     gpus: list[dict[str, Any]],
     results: dict[str, Any],
+    environment: dict[str, Any],
 ) -> None:
     """Write config.yaml: a comment header (GPUs/command/attribution) + the
     full config used to generate the lens (including default arguments)."""
@@ -304,6 +345,14 @@ def write_config_yaml(
             )
     else:
         header.append("#   (nvidia-smi unavailable — VRAM not recorded)")
+    header.append("#")
+    header.append(
+        "# Environment (the forward pass this lens encodes depends on these):"
+    )
+    header.append(
+        "#   "
+        + ", ".join(f"{key} {value or 'unknown'}" for key, value in environment.items())
+    )
     header.append("#")
     header.append("# Exact command used:")
     header.append(f"#   {shlex.join(command)}")
@@ -349,6 +398,7 @@ def write_config_yaml(
             for gpu in gpus
         }
         or None,
+        "environment": environment,
         "results": results or None,
         "command": shlex.join(command),
         "attribution": ATTRIBUTION,
@@ -371,6 +421,8 @@ def main() -> None:
 
     model_pairs = load_model_map(models_json_path)
     print(f"Loaded {len(model_pairs)} unique models from {models_json_path}")
+    environment = query_environment()
+    print("Environment: " + ", ".join(f"{k}={v}" for k, v in environment.items()))
 
     for index, (np_model_id, hf_model_name) in enumerate(model_pairs, start=1):
         run_dir = run_dir_for_model(exports_dir, np_model_id, args.dataset_name)
@@ -405,6 +457,7 @@ def main() -> None:
             command=command,
             gpus=gpus,
             results=results,
+            environment=environment,
         )
         print(f"{prefix}: done -> {run_dir}")
 
