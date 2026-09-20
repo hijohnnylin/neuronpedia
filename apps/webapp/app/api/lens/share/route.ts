@@ -470,6 +470,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
             type: LENS_TYPE_ORDER,
             inputTokenIds: body.inputTokenIds,
             topN: body.topN,
+            temperature: body.temperature,
             numCompletionTokens: 0,
             // Capture the run with the sharer's non-word filter applied, so the
             // stored blob matches what they were viewing (the share is a frozen
@@ -521,6 +522,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         type: LENS_TYPE_ORDER,
         inputTokenIds: body.steer.inputTokenIds,
         topN: body.topN,
+        // Not used for sampling (forced decode), but recorded in the meta.
+        temperature: body.temperature,
         numCompletionTokens: 0,
         steerTokens: [{ token: body.steer.token, type: body.steer.type as LensType }],
         steerLayers: body.steer.layers,
