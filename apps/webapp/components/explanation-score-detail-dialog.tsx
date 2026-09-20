@@ -272,9 +272,7 @@ export default function ExplanationScoreDetailDialog() {
                                 values: activation.values,
                                 maxValueTokenIndex: activation.values.indexOf(Math.max(...activation.values)),
                               }}
-                              overallMaxActivationValueInList={activation.values.indexOf(
-                                Math.max(...activation.values),
-                              )}
+                              overallMaxActivationValueInList={Math.max(...activation.values)}
                               overrideTextSize="text-[10.5px]"
                             />
                           </div>
@@ -310,9 +308,7 @@ export default function ExplanationScoreDetailDialog() {
                                   values: activation.values,
                                   maxValueTokenIndex: activation.values.indexOf(Math.max(...activation.values)),
                                 }}
-                                overallMaxActivationValueInList={activation.values.indexOf(
-                                  Math.max(...activation.values),
-                                )}
+                                overallMaxActivationValueInList={Math.max(...activation.values)}
                                 overrideTextSize="text-[10.5px]"
                               />
                             </div>
@@ -349,9 +345,7 @@ export default function ExplanationScoreDetailDialog() {
                                 values: activation.values,
                                 maxValueTokenIndex: activation.values.indexOf(Math.max(...activation.values)),
                               }}
-                              overallMaxActivationValueInList={activation.values.indexOf(
-                                Math.max(...activation.values),
-                              )}
+                              overallMaxActivationValueInList={Math.max(...activation.values)}
                               overrideTextSize="text-[10.5px]"
                             />
                           </div>
@@ -416,8 +410,9 @@ export default function ExplanationScoreDetailDialog() {
                           activation={{
                             tokens: item.str_tokens,
                             values: item.activations,
+                            maxValueTokenIndex: item.activations.indexOf(Math.max(...item.activations)),
                           }}
-                          overallMaxActivationValueInList={item.activations.indexOf(Math.max(...item.activations))}
+                          overallMaxActivationValueInList={Math.max(...item.activations)}
                           overrideTextSize="text-[10.5px]"
                         />
                       </td>
@@ -630,8 +625,9 @@ export default function ExplanationScoreDetailDialog() {
                           activation={{
                             tokens: item.str_tokens,
                             values: item.activations,
+                            maxValueTokenIndex: item.activations.indexOf(Math.max(...item.activations)),
                           }}
-                          overallMaxActivationValueInList={item.activations.indexOf(Math.max(...item.activations))}
+                          overallMaxActivationValueInList={Math.max(...item.activations)}
                           overrideTextSize="text-[10.5px]"
                         />
                       </td>
