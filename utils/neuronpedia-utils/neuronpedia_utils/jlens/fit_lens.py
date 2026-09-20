@@ -32,14 +32,20 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import os
+import platform
 import re
 import shutil
+import subprocess
 from collections import deque
+from typing import Any
 
-import jlens
 import torch
 import transformers
+
+import jlens
+from jlens.fitting import SKIP_FIRST_N_POSITIONS
 
 
 def load_prompts(
@@ -104,6 +110,76 @@ def _slug(model: str) -> str:
     """Filesystem-safe stem derived from a model id or path."""
     base = model.rstrip("/").split("/")[-1]
     return re.sub(r"[^0-9A-Za-z._-]+", "-", base).strip("-") or "model"
+
+
+def _git_commit() -> str | None:
+    """HEAD commit of the checkout holding this script, or None outside git."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+    return out or None
+
+
+def build_provenance(
+    args: argparse.Namespace, lens: jlens.JacobianLens, dataset_config: str | None
+) -> dict[str, Any]:
+    """What produced this lens, stored inside the ``.pt`` next to ``J``.
+
+    A lens encodes one forward pass, and library versions change that pass
+    (transformers 5.0-5.12 ran OLMo-3 with the wrong RoPE on most layers), so
+    the versions travel with the weights rather than only in config.yaml.
+    Key names follow convert-external-lens.py (``model_id``, ``dataset_id``,
+    ``t_max`` ...) so both kinds of lens read the same way.
+    """
+    return {
+        "model_id": args.model,
+        "dataset_id": args.dataset,
+        "dataset_config": dataset_config,
+        "dataset_split": args.dataset_split,
+        "text_field": args.text_field,
+        "n_prompts": lens.n_prompts,
+        "t_max": args.max_seq_len,
+        # fit() uses every layer below the target, so the target is one past
+        # the deepest source layer whatever --target_layer resolved to.
+        "target_layer": lens.source_layers[-1] + 1,
+        "skip_first": SKIP_FIRST_N_POSITIONS,
+        "dim_batch": args.dim_batch,
+        "model_dtype": args.dtype,
+        # Plain str: torch.__version__ is a TorchVersion, which the
+        # weights_only unpickler in JacobianLens.load refuses.
+        "transformers": str(transformers.__version__),
+        "torch": str(torch.__version__),
+        "python": platform.python_version(),
+        "jlens_commit": _git_commit(),
+        "generated": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "fitted_by": "neuronpedia fit_lens.py",
+    }
+
+
+def save_lens(lens: jlens.JacobianLens, path: str, provenance: dict[str, Any]) -> None:
+    """``JacobianLens.save`` layout plus a ``provenance`` dict.
+
+    Same keys and fp16 Jacobians as upstream ``save``, so ``JacobianLens.load``
+    reads the file unchanged; it ignores the extra key. Written here rather
+    than by patching the vendored library, which stays a verbatim copy.
+    """
+    torch.save(
+        {
+            "J": {layer: J.to(torch.float16) for layer, J in lens.jacobians.items()},
+            "n_prompts": lens.n_prompts,
+            "source_layers": lens.source_layers,
+            "d_model": lens.d_model,
+            "provenance": provenance,
+        },
+        path,
+    )
 
 
 def peak_vram_gb() -> float:
@@ -440,7 +516,7 @@ def main() -> None:
             )
         finally:
             tracker.close()
-        lens.save(lens_path)
+        save_lens(lens, lens_path, build_provenance(args, lens, config))
 
         # The checkpoint only exists to resume an interrupted fit; once the lens
         # is saved it is dead weight, so drop it.

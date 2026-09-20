@@ -6,11 +6,15 @@ requires-python = ">=3.10"
 dependencies = [
     "accelerate>=1.0.0",
     "datasets>=3.0.0",
+    "huggingface-hub>=0.30.0",
     "numpy>=1.26.0",
     "sentencepiece>=0.2.0",
     "torch>=2.8.0",
     "tqdm>=4.66.0",
-    "transformers>=4.50.0",
+    # 5.13.0 restored per-layer-type RoPE for OLMo-3 (huggingface/transformers#46911).
+    # 5.0 to 5.12 applied YaRN to its sliding-window layers too, so a lens fitted there
+    # encodes a forward pass the served model does not run. See hijohnnylin/neuronpedia#235.
+    "transformers>=5.13.0",
 ]
 
 [tool.uv]
