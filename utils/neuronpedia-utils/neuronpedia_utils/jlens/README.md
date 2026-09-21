@@ -65,6 +65,17 @@ commands without fitting.
 (`/tmp/jlens-hf-cache`) and deleted after each model so the cache doesn't grow
 across the whole model list. Pass `--keep-hf-cache` to retain them.
 
+**Interrupted fits resume.** A `*_checkpoint.pt` holds the running sum after
+every prompt; re-running the same command continues from it and appends to the
+existing `*_convergence.csv`, so the curve stays continuous. Write outputs to a
+local disk: the checkpoint is multi-GB for a 32B model and a network volume at
+~100 MB/s adds tens of seconds per prompt.
+
+**Containers with a CPU quota:** `fit_lens.py` caps torch's CPU threads at the
+cgroup quota (`/sys/fs/cgroup/cpu.max`). Without the cap a pod that shows 192
+host cores but allows 20 runs 96 threads, and the fit is ~2.5× slower. Set
+`OMP_NUM_THREADS` to override.
+
 ### Choosing how many prompts
 
 The fit reports `Δmean` — the relative change of the running-mean Jacobian per

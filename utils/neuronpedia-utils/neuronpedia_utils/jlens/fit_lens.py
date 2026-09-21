@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime as dt
+import math
 import os
 import platform
 import re
@@ -41,10 +42,9 @@ import subprocess
 from collections import deque
 from typing import Any
 
+import jlens
 import torch
 import transformers
-
-import jlens
 from jlens.fitting import SKIP_FIRST_N_POSITIONS
 
 
@@ -110,6 +110,37 @@ def _slug(model: str) -> str:
     """Filesystem-safe stem derived from a model id or path."""
     base = model.rstrip("/").split("/")[-1]
     return re.sub(r"[^0-9A-Za-z._-]+", "-", base).strip("-") or "model"
+
+
+def _cgroup_cpu_quota() -> int | None:
+    """CPUs the cgroup v2 quota allows, or None when unlimited or unknown."""
+    try:
+        with open("/sys/fs/cgroup/cpu.max") as f:
+            quota, period = f.read().split()
+    except (OSError, ValueError):
+        return None
+    if quota == "max":
+        return None
+    return max(1, int(quota) // int(period))
+
+
+def cap_cpu_threads() -> None:
+    """Cap torch's CPU thread pool at the container's CPU quota.
+
+    A container sees every host core, so torch sizes its pool from them (96
+    threads on a 192-core host) while the cgroup quota may allow 20. That
+    oversubscription made the per-prompt CPU work in ``jlens.fit`` — the
+    running-mean update over every layer's ``d_model²`` matrix — about 7x
+    slower and a whole fit about 2.5x slower. An explicit ``OMP_NUM_THREADS``
+    is left alone.
+    """
+    if os.environ.get("OMP_NUM_THREADS"):
+        return
+    quota = _cgroup_cpu_quota()
+    current = torch.get_num_threads()
+    if quota is not None and quota < current:
+        torch.set_num_threads(quota)
+        print(f"CPU threads: {current} -> {quota} (cgroup CPU quota)")
 
 
 def _git_commit() -> str | None:
@@ -206,7 +237,21 @@ class ConvergenceTracker:
       * at least ``min_prompts`` prompts have been accumulated, and
       * the mean of the last ``window`` ``Δmean`` values is below
         ``stop_at_delta`` (smoothing avoids tripping on a single noisy step).
+
+    With ``resume=True`` and an existing CSV, rows are appended and the earlier
+    rows are replayed into the window and milestones, so a fit resumed from its
+    checkpoint keeps one continuous curve and the same stop behaviour.
     """
+
+    CSV_COLUMNS = (
+        "n_done",
+        "prompt_idx",
+        "seq_len",
+        "n_valid_positions",
+        "elapsed_s",
+        "identity_distance",
+        "mean_rel_change",
+    )
 
     def __init__(
         self,
@@ -216,6 +261,7 @@ class ConvergenceTracker:
         stop_at_delta: float | None = None,
         min_prompts: int = 100,
         window: int = 10,
+        resume: bool = False,
     ) -> None:
         self.csv_path = csv_path
         self.thresholds = thresholds
@@ -226,19 +272,38 @@ class ConvergenceTracker:
         self.stopped_at: int | None = None
         self._crossed: dict[float, int] = {}
         self._recent: deque[float] = deque(maxlen=self.window)
-        self._file = open(csv_path, "w", newline="")  # noqa: SIM115 (closed in close())
+        append = resume and self._replay(csv_path)
+        self._file = open(csv_path, "a" if append else "w", newline="")  # noqa: SIM115 (closed in close())
         self._writer = csv.writer(self._file)
-        self._writer.writerow(
-            [
-                "n_done",
-                "prompt_idx",
-                "seq_len",
-                "n_valid_positions",
-                "elapsed_s",
-                "identity_distance",
-                "mean_rel_change",
-            ]
-        )
+        if not append:
+            self._writer.writerow(self.CSV_COLUMNS)
+
+    def _replay(self, csv_path: str) -> bool:
+        """Load an earlier run's rows into the window and milestones.
+
+        Returns True when the file held usable rows, i.e. it should be appended
+        to rather than rewritten.
+        """
+        try:
+            with open(csv_path, newline="") as f:
+                rows = list(csv.DictReader(f))
+        except OSError:
+            return False
+        if not rows or set(self.CSV_COLUMNS) - set(rows[0]):
+            return False
+        for row in rows:
+            value = float(row["mean_rel_change"])
+            if not math.isnan(value):  # the first prompt has no Δmean
+                self._note(int(row["n_done"]), value)
+        print(f"Resuming convergence log: {len(rows)} earlier prompts in {csv_path}")
+        return True
+
+    def _note(self, n_done: int, mean_rel_change: float) -> None:
+        self.history.append((n_done, mean_rel_change))
+        self._recent.append(mean_rel_change)
+        for thr in self.thresholds:
+            if thr not in self._crossed and mean_rel_change < thr:
+                self._crossed[thr] = n_done
 
     def record(self, p: jlens.FitProgress) -> bool:
         self._writer.writerow(
@@ -255,11 +320,7 @@ class ConvergenceTracker:
         self._file.flush()
         if p.mean_rel_change != p.mean_rel_change:  # NaN (first prompt)
             return False
-        self.history.append((p.n_done, p.mean_rel_change))
-        self._recent.append(p.mean_rel_change)
-        for thr in self.thresholds:
-            if thr not in self._crossed and p.mean_rel_change < thr:
-                self._crossed[thr] = p.n_done
+        self._note(p.n_done, p.mean_rel_change)
 
         if (
             self.stop_at_delta is not None
@@ -414,6 +475,7 @@ def main() -> None:
 
     if not torch.cuda.is_available():
         raise SystemExit("CUDA GPU required for fitting.")
+    cap_cpu_threads()
 
     jlens.configure_logging()
     os.makedirs(args.out_dir, exist_ok=True)
@@ -500,6 +562,9 @@ def main() -> None:
             stop_at_delta=args.stop_at_delta,
             min_prompts=args.min_prompts,
             window=args.stop_window,
+            # jlens.fit resumes whenever the checkpoint exists; keep the CSV
+            # in step with it.
+            resume=os.path.exists(checkpoint_path),
         )
         print(
             f"Fitting lens over {len(prompts)} prompts (first call compiles, ~1-2 min) ..."
