@@ -49,7 +49,9 @@ export const JEV_SCORE_LEVELS = [
 
 type NoulQuestion = { type: 'noul'; instructions: string; criteria?: { true: string; false: string } };
 type ScoreQuestion = { type: 'score'; instructions: string; criteria: string[] };
-type JevQuestion = NoulQuestion | ScoreQuestion;
+// Choice criteria map each option name to its description (or null when the name is enough).
+export type ChoiceQuestion = { type: 'choice'; instructions: string; criteria: Record<string, string | null> };
+export type JevQuestion = NoulQuestion | ScoreQuestion | ChoiceQuestion;
 
 type NoulAnswer = { type: 'noul'; noul: number };
 type ScoreAnswer = {
@@ -59,9 +61,15 @@ type ScoreAnswer = {
   probabilities: Record<string, number>;
   confidence: number;
 };
-type JevResponse = {
+export type ChoiceAnswer = {
+  type: 'choice';
+  choice: string;
+  probabilities: Record<string, number>;
+  confidence: number;
+};
+export type JevResponse = {
   model: string;
-  answers: Record<string, NoulAnswer | ScoreAnswer>;
+  answers: Record<string, NoulAnswer | ScoreAnswer | ChoiceAnswer>;
   usage: { input_tokens: number; output_tokens: number };
 };
 
@@ -167,7 +175,8 @@ const sleep = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
-async function callJev(state: unknown, questions: Record<string, JevQuestion>): Promise<JevResponse> {
+// Shared with the interpretability check, which asks Choice questions of the same endpoint.
+export async function callJev(state: unknown, questions: Record<string, JevQuestion>): Promise<JevResponse> {
   if (!TYPESAFE_API_KEY) {
     throw new ApiError(503, 'Jev scoring is not configured on this server.');
   }

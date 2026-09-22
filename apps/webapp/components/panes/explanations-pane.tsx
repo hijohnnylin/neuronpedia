@@ -1,8 +1,10 @@
 import CustomTooltip from '@/components/custom-tooltip';
+import InterpretabilityCheckDialog from '@/components/interpretability-check-dialog';
 import { useExplanationScoreDetailContext } from '@/components/provider/explanation-score-detail-provider';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
 import type { DescriptionResult } from '@/lib/api/nla-types';
+import type { InterpretabilityCheckResult } from '@/lib/external/interpretability-jev';
 import {
   ERROR_NO_AUTOINTERP_KEY,
   ERROR_RECALL_ALT_FAILED,
@@ -83,6 +85,10 @@ export default function ExplanationsPane({
   const [nlaResult, setNlaResult] = useState<DescriptionResult | null>(null);
   const [nlaError, setNlaError] = useState<string | null>(null);
   const nlaAbortRef = useRef<AbortController | null>(null);
+  const [interpretableOpen, setInterpretableOpen] = useState(false);
+  const [interpretableLoading, setInterpretableLoading] = useState(false);
+  const [interpretableResult, setInterpretableResult] = useState<InterpretabilityCheckResult | null>(null);
+  const [interpretableError, setInterpretableError] = useState<string | null>(null);
 
   useEffect(() => {
     if (explanationTypesFiltered.length > 0) {
@@ -120,6 +126,36 @@ export default function ExplanationsPane({
     return getNlaSaeFormat(currentNeuron.modelId, layerNum);
   })();
   const isNlaSupported = nlaSaeFormat !== undefined;
+
+  // On demand and not saved: the result is about the feature, not any explanation.
+  const handleCheckInterpretable = async () => {
+    if (!currentNeuron?.modelId || !currentNeuron?.layer || !currentNeuron?.index) return;
+    setInterpretableOpen(true);
+    setInterpretableLoading(true);
+    setInterpretableResult(null);
+    setInterpretableError(null);
+    try {
+      const res = await fetch('/api/feature/interpretable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: currentNeuron.modelId,
+          layer: currentNeuron.layer,
+          index: currentNeuron.index,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setInterpretableError(data.message || data.error || `Error: ${res.status}`);
+      } else {
+        setInterpretableResult(data as InterpretabilityCheckResult);
+      }
+    } catch (e) {
+      setInterpretableError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setInterpretableLoading(false);
+    }
+  };
 
   const handleNlaExplain = async () => {
     const hfRepoId = currentNeuron?.source?.hfRepoId;
@@ -1003,16 +1039,17 @@ export default function ExplanationsPane({
           </button>
         </div>
       </div>
-      {isNlaSupported && (
-        <div className="flex w-full flex-col border-t border-slate-200 px-3 py-3">
-          <div className="flex w-full items-center justify-center">
+      {/* Extra tools. One column on mobile, side by side with a divider from sm up. */}
+      <div className="flex w-full flex-col divide-y divide-slate-200 border-t border-slate-200 px-3 py-3 sm:flex-row sm:divide-x sm:divide-y-0">
+        {isNlaSupported && (
+          <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
             <Popover.Root open={nlaPopoverOpen} onOpenChange={setNlaPopoverOpen}>
               <Popover.Trigger asChild>
                 <button
                   type="button"
                   onClick={handleNlaExplain}
                   disabled={nlaLoading || !currentNeuron?.source?.hfRepoId || !currentNeuron?.source?.hfFolderId}
-                  className="flex max-w-[140px] flex-1 items-center justify-center rounded bg-slate-200 px-3 py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+                  className="flex w-[140px] items-center justify-center rounded bg-slate-200 px-3 py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
                 >
                   {nlaLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Explain With NLA'}
                 </button>
@@ -1070,9 +1107,51 @@ export default function ExplanationsPane({
                 </Popover.Content>
               </Popover.Portal>
             </Popover.Root>
+            <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
+              <p className="leading-relaxed">
+                Generates an explanation with a Natural Language Autoencoder, which reads the {`feature's`} decoder
+                vector directly instead of its activating texts.
+              </p>
+            </CustomTooltip>
           </div>
+        )}
+        <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
+          <button
+            type="button"
+            onClick={handleCheckInterpretable}
+            disabled={interpretableLoading || !currentNeuron?.index}
+            className="flex w-[140px] items-center justify-center rounded bg-slate-200 px-3 py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+          >
+            {interpretableLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Check If Interpretable'}
+          </button>
+          <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
+            <p className="leading-relaxed">
+              Tests whether this feature is interpretable from its contexts alone, with no explanation. Shows a model
+              groups of four activating texts plus one intruder and asks it to find the odd one out.
+            </p>
+            <p className="mt-2 leading-relaxed">
+              Based on the intruder detection task in{' '}
+              <a
+                href="https://arxiv.org/pdf/2507.08473"
+                target="_blank"
+                rel="noreferrer"
+                className="text-sky-700 underline hover:text-sky-900"
+              >
+                Paulo &amp; Belrose (2025)
+              </a>
+              .
+            </p>
+          </CustomTooltip>
         </div>
-      )}
+      </div>
+      <InterpretabilityCheckDialog
+        open={interpretableOpen}
+        onOpenChange={setInterpretableOpen}
+        loading={interpretableLoading}
+        error={interpretableError}
+        result={interpretableResult}
+        featureLabel={`${currentNeuron?.modelId} · ${currentNeuron?.layer} · ${currentNeuron?.index}`}
+      />
       {/* <div className="rounded-b-md px-2 py-2 pt-0">
         </div>
         <div className="relative mb-0 flex flex-col rounded-lg border border-slate-200 bg-white text-xs shadow transition-all sm:mt-0 ">             
