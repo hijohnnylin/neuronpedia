@@ -128,7 +128,16 @@ export default function InterpretabilityCheckDialog({
                       Intruder detection, with no explanation involved. Each group has four texts where this feature
                       fires, with the firing tokens marked {'<< >>'}, and one intruder where it does not, with random
                       tokens marked. The model picks the odd one out. A feature that is interpretable from its contexts
-                      alone should score well here even if its explanations score poorly.
+                      alone should score well here even if its explanations score poorly. Based on{' '}
+                      <a
+                        href="https://arxiv.org/pdf/2507.08473"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sky-700 underline hover:text-sky-900"
+                      >
+                        Paulo &amp; Belrose (2025)
+                      </a>
+                      .
                     </div>
                   </div>
                   <div className="flex flex-col sm:basis-2/6">
