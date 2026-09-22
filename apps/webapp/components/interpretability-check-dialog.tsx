@@ -117,8 +117,9 @@ export default function InterpretabilityCheckDialog({
                       {result.score}
                     </div>
                     <div className="mt-2 text-xs text-slate-600">
-                      {result.correct} of {result.total} intruders found for {featureLabel}
+                      {result.correct} of {result.total} Intruders Found
                     </div>
+                    <div className="text-xs text-slate-600">{featureLabel}</div>
                   </div>
                   <div className="flex flex-col sm:basis-1/3">
                     <div className="mb-0 flex flex-row items-center gap-x-1 text-[10px] font-medium uppercase text-slate-400">
