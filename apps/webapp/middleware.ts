@@ -24,6 +24,7 @@ const NORMAL_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api/activation/new', limit: 1000 },
   { endpoint: '/api/explanation/search', limit: 200 },
   { endpoint: '/api/explanation/score', limit: 120, exact: true },
+  { endpoint: '/api/feature/interpretable', limit: 120, exact: true },
   { endpoint: '/api/steer', limit: 240 },
   { endpoint: '/api/search-topk-by-token', limit: 500 },
   { endpoint: '/api/search-all', limit: 1600 },
@@ -70,6 +71,7 @@ const HIGHER_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api', limit: 25000 },
   { endpoint: '/api/activation/new', limit: 3000 }, // higher
   { endpoint: '/api/explanation/search', limit: 3000 }, // higher
+  { endpoint: '/api/feature/interpretable', limit: 480, exact: true }, // higher
   { endpoint: '/api/steer', limit: 1000 }, // higher
   { endpoint: '/api/search-topk-by-token', limit: 1200 }, // higher
   { endpoint: '/api/search-all', limit: 1600 },
