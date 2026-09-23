@@ -899,6 +899,21 @@ export function useJlensAnalysis({
     }
   }, [inferenceAvailable, onInferenceUnavailable]);
 
+  // Set the swap token and run the swap at once. `steerRef` is set here because
+  // the effect that syncs it from state runs only after the next render.
+  const applySwapToken = useCallback(
+    (swapToken: string) => {
+      const cur = steerRef.current;
+      if (!cur) {
+        return;
+      }
+      setSwapToken(swapToken);
+      steerRef.current = { ...cur, swapToken };
+      void runSteer();
+    },
+    [setSwapToken, runSteer],
+  );
+
   const stopSteer = useCallback(() => {
     steerStopperRef.current?.();
   }, []);
@@ -987,6 +1002,7 @@ export function useJlensAnalysis({
     setSteerAblate,
     setSteerMode,
     setSwapToken,
+    applySwapToken,
     setSteerGenerated,
     setSteerLayers,
     resetSteerLayers,

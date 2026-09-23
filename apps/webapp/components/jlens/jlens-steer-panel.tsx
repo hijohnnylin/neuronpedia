@@ -349,6 +349,7 @@ export function JlensSteerPanel({
     setSteerAblate,
     setSteerMode,
     setSwapToken,
+    applySwapToken,
     setSteerGenerated,
     setSteerLayers,
     resetSteerLayers,
@@ -618,15 +619,17 @@ export function JlensSteerPanel({
                   {unknownSwap.suggestedToken !== null ? (
                     <>
                       <span>Closest:</span>
-                      <span className="rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 font-mono font-semibold text-rose-700">
+                      <span className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 font-mono font-semibold text-slate-700">
                         {displayToken(unknownSwap.suggestedToken)}
                       </span>
                       <button
                         type="button"
-                        onClick={() => setSwapToken(unknownSwap.suggestedToken ?? '')}
-                        disabled={locked}
-                        className="shrink-0 whitespace-nowrap rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={() => applySwapToken(unknownSwap.suggestedToken ?? '')}
+                        disabled={locked || selectedLayers.length === 0}
+                        style={{ backgroundColor: `rgb(${steerColorRgbDark})` }}
+                        className="flex shrink-0 flex-row items-center gap-x-1 whitespace-nowrap rounded-md px-2 py-0.5 text-[9px] font-semibold uppercase text-white transition-all hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 sm:text-[10px]"
                       >
+                        <PlayIcon className="h-2.5 w-2.5" />
                         Apply
                       </button>
                     </>
