@@ -43,6 +43,7 @@ from neuronpedia_inference.engine_adapter import (
 )
 from neuronpedia_inference.memory_cost import lens_cost
 from neuronpedia_inference.schemas import (
+    LensErrorResponse,
     LensPromptRequest,
     LensSteerToken,
     LensType,
@@ -606,19 +607,57 @@ def _decoded_string_to_ids(tokenizer) -> dict[str, list[int]]:
     return index
 
 
+# Longest prefix the closest-token search tries. It bounds the search cost for any
+# input length, and is longer than any real vocab entry.
+_MAX_SUGGEST_PREFIX_CHARS = 256
+
+
+class SteerTokenNotFound(ValueError):
+    """A steer or swap token string that is not exactly one vocab entry."""
+
+    def __init__(self, token: str, suggestion: str | None) -> None:
+        """Store the token and the closest vocab entry, and build the message."""
+        message = f"{token!r} is not a single token in this model's vocabulary."
+        if suggestion is not None:
+            message += f" Closest token: {suggestion!r}."
+        super().__init__(message)
+        self.token = token
+        self.suggestion = suggestion
+
+
+def _suggest_steer_token(index: dict[str, list[int]], token: str) -> str | None:
+    """Return the vocab entry that is the longest prefix of ``token``, or None.
+
+    Tries ``token`` as typed, then with exactly one leading space. The score is the number
+    of matched characters after the leading whitespace, so ``" ants"`` wins over ``"ant"``
+    for input ``"ants"``. On a tie, the form as typed wins. Cost is at most
+    ``2 * _MAX_SUGGEST_PREFIX_CHARS`` dict lookups.
+    """
+    if not token.strip():
+        return None
+    best: str | None = None
+    best_score = 0
+    for form in dict.fromkeys([token, " " + token.lstrip()]):
+        lead = len(form) - len(form.lstrip())
+        for end in range(min(len(form), _MAX_SUGGEST_PREFIX_CHARS), lead, -1):
+            prefix = form[:end]
+            if prefix in index:
+                if end - lead > best_score:
+                    best, best_score = prefix, end - lead
+                break
+    return best
+
+
 def _resolve_steer_token_id(index: dict[str, list[int]], token: str) -> int:
-    """Resolve an exact (or, failing that, whitespace-trimmed) decoded string to
-    a single vocab id. True collisions (multiple ids -> same string) are rare;
-    we take the lowest id (their unembedding directions are near-identical)."""
+    """Resolve an exact decoded string to a single vocab id.
+
+    No near match is used, so the model steers on the token the caller named. When there
+    is no exact match, raise ``SteerTokenNotFound`` with the closest token. True collisions
+    (multiple ids -> same string) are rare; we take the lowest id (their unembedding
+    directions are near-identical)."""
     ids = index.get(token)
     if not ids:
-        stripped = token.strip()
-        for decoded, candidate_ids in index.items():
-            if decoded.strip() == stripped:
-                ids = candidate_ids
-                break
-    if not ids:
-        raise ValueError(f"Could not resolve steer token to a vocab id: {token!r}")
+        raise SteerTokenNotFound(token, _suggest_steer_token(index, token))
     return int(min(ids))
 
 
@@ -2229,7 +2268,10 @@ async def _acquire_request_lock(fail_if_busy: bool = False):
     return await limiter.acquire(exclusive=False, timeout=REQUEST_LOCK_TIMEOUT)
 
 
-@router.post("/lens/prompt")
+@router.post(
+    "/lens/prompt",
+    responses={400: {"model": LensErrorResponse, "description": "The request was refused before the stream started."}},
+)
 async def lens_prompt(request: LensPromptRequest, http_request: Request):
     config = Config.get_instance()
     model = Model.get_instance()
@@ -2374,6 +2416,9 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
             steer_deltas = await _build_steer_deltas(model, lens, request.steer_tokens, request.steer_layers)
             if swap_active and request.swap_token is not None:
                 swap_deltas = await _build_steer_deltas(model, lens, [request.swap_token], request.steer_layers)
+        except SteerTokenNotFound as exc:
+            body = LensErrorResponse(error=str(exc), token=exc.token, suggested_token=exc.suggestion)
+            return JSONResponse(content=body.model_dump(), status_code=400)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to build steering/swap vectors")
             return JSONResponse(content={"error": str(exc)}, status_code=400)

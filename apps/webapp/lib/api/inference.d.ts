@@ -1022,6 +1022,21 @@ export interface components {
       role: string;
     };
     /**
+     * LensErrorResponse
+     * @description Error body for a ``/v1/lens/prompt`` request refused before the stream starts.
+     *
+     *     ``token`` is set when a steer or swap token is not a token in the vocabulary.
+     *     ``suggested_token`` is then the closest token that is, or null if none is close.
+     */
+    LensErrorResponse: {
+      /** Error */
+      error: string;
+      /** Suggestedtoken */
+      suggestedToken?: string | null;
+      /** Token */
+      token?: string | null;
+    };
+    /**
      * LensPromptRequest
      * @description Everything one lens run needs: what to read out, where, and how to intervene.
      */
@@ -2426,6 +2441,15 @@ export interface operations {
         };
         content: {
           'application/json': unknown;
+        };
+      };
+      /** @description The request was refused before the stream started. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LensErrorResponse'];
         };
       };
       /** @description Validation Error */

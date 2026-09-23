@@ -6,6 +6,7 @@ import {
   LENS_TYPES,
   LensChatMessage,
   LensDoneMessage,
+  LensErrorResponse,
   LensMetaMessage,
   LensSteerToken,
   LensTokenMessage,
@@ -309,7 +310,21 @@ const lensPromptRequestSchema = yup.object({
  *                   type: object
  *                   description: The final `done` message, including the generated `completion` string.
  *       400:
- *         description: Invalid JSON, validation error, or not exactly one of `prompt`/`chat` provided.
+ *         description: Invalid JSON, validation error, not exactly one of `prompt`/`chat` provided, or a steer/swap token that is not exactly one token in the model's vocabulary.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                 token:
+ *                   type: string
+ *                   description: Set when a steer/swap token is not in the vocabulary. The token as sent.
+ *                 suggestedToken:
+ *                   type: string
+ *                   nullable: true
+ *                   description: Set with `token`. The longest vocabulary token that is a prefix of `token` (as sent, or with one leading space), or null if there is none.
  *       500:
  *         description: Lens request failed or an internal error occurred.
  */
@@ -362,9 +377,16 @@ export async function POST(request: Request) {
     );
 
     if (!inferenceResponse.ok || !inferenceResponse.body) {
-      const errorBody = await inferenceResponse.json().catch(() => ({ error: inferenceResponse.statusText }));
+      const errorBody: Partial<LensErrorResponse> = await inferenceResponse
+        .json()
+        .catch(() => ({ error: inferenceResponse.statusText }));
       return NextResponse.json(
-        { error: errorBody.error ?? `Lens request failed (${inferenceResponse.status})` },
+        {
+          error: errorBody.error ?? `Lens request failed (${inferenceResponse.status})`,
+          ...(typeof errorBody.token === 'string'
+            ? { token: errorBody.token, suggestedToken: errorBody.suggestedToken ?? null }
+            : {}),
+        },
         { status: inferenceResponse.status >= 400 ? inferenceResponse.status : 500 },
       );
     }

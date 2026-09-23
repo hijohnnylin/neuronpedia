@@ -31,6 +31,7 @@ import {
   TypeSidebar,
 } from './jlens-analysis';
 import { LensModeContext, lensTypesForMode } from './jlens-lens-mode';
+import { LensUnknownTokenError } from './jlens-stream';
 import { setJlensPopupsSuppressed, TokenBand, useIsLensMobile } from './jlens-token';
 import { LayerRange, LayerStatsResolver, LensSliderControls, PillColorResolver } from './jlens-token-popup';
 
@@ -96,7 +97,11 @@ function computeDefaultSteerLayers(
 // state (or, with `null`, clears those results / aborts). Registered by the
 // chat/completion interface, which owns `runLensStream`. Returns a promise that
 // resolves when the steered run finishes (or is aborted).
+// A runner reports its other errors itself, but throws `LensUnknownTokenError`
+// for the swap token so the steer panel can offer the closest token.
 export type SteerRunner = (config: SteerConfig | null) => Promise<void> | void;
+
+export type UnknownSwapToken = { token: string; suggestedToken: string | null };
 
 export type JlensAnalysis = ReturnType<typeof useJlensAnalysis>;
 
@@ -666,6 +671,9 @@ export function useJlensAnalysis({
     steerRef.current = steer;
   }, [steer]);
   const [steerInfo, setSteerInfo] = useState<SteerInfo | null>(null);
+  // The last swap token the server refused as not a single vocab token, with its
+  // closest vocab token. The panel shows it only while the input still matches.
+  const [unknownSwapToken, setUnknownSwapToken] = useState<UnknownSwapToken | null>(null);
 
   // The current scope subset of tokens (selected positions / hovered / all),
   // used for per-layer counting so it matches the sidebar.
@@ -877,9 +885,15 @@ export function useJlensAnalysis({
     if (config.mode === 'swap' && !config.swapToken.trim()) {
       return;
     }
+    setUnknownSwapToken(null);
     setSteerStreaming(true);
     try {
       await fn(config);
+    } catch (err) {
+      if (!(err instanceof LensUnknownTokenError)) {
+        throw err;
+      }
+      setUnknownSwapToken({ token: err.token, suggestedToken: err.suggestedToken });
     } finally {
       setSteerStreaming(false);
     }
@@ -894,6 +908,7 @@ export function useJlensAnalysis({
     setSteer(null);
     setSteerInfo(null);
     setSteerStreaming(false);
+    setUnknownSwapToken(null);
     steerRunnerRef.current?.(null);
   }, []);
 
@@ -965,6 +980,7 @@ export function useJlensAnalysis({
     steer,
     steerInfo,
     steerStreaming,
+    unknownSwapToken,
     beginSteer,
     restoreSteer,
     setSteerStrength,

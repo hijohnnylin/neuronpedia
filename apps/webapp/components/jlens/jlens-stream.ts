@@ -14,6 +14,21 @@ import {
   LensType,
 } from '@/lib/utils/lens';
 
+// A steer/swap token that is not a single vocab token. `suggestedToken` is the
+// closest token that is, or null if the server found none.
+export class LensUnknownTokenError extends Error {
+  token: string;
+
+  suggestedToken: string | null;
+
+  constructor(message: string, token: string, suggestedToken: string | null) {
+    super(message);
+    this.name = 'LensUnknownTokenError';
+    this.token = token;
+    this.suggestedToken = suggestedToken;
+  }
+}
+
 export interface RunLensStreamParams {
   modelId: string;
   prompt?: string;
@@ -132,7 +147,11 @@ export async function runLensStream(params: RunLensStreamParams): Promise<void> 
       onRateLimit?.(0);
       throw new Error('Hourly limit reached. Please wait a bit and try again later.');
     }
-    throw new Error(data.error ?? `Request failed (${res.status})`);
+    const message = data.error ?? `Request failed (${res.status})`;
+    if (typeof data?.token === 'string') {
+      throw new LensUnknownTokenError(message, data.token, data.suggestedToken ?? null);
+    }
+    throw new Error(message);
   }
 
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();

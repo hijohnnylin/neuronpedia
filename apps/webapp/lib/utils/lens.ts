@@ -105,6 +105,10 @@ export interface LensSteerToken {
  */
 export type LensPromptRequest = Partial<components['schemas']['LensPromptRequest']>;
 
+// Error body for a lens request refused before the stream starts. `token` and
+// `suggestedToken` are set when a steer/swap token is not in the vocabulary.
+export type LensErrorResponse = components['schemas']['LensErrorResponse'];
+
 // The streamed NDJSON frames, mirroring the models in apps/inference's lens/prompt.py.
 //
 // Hand-written because NDJSON frames never reach openapi.json, so there is nothing to
