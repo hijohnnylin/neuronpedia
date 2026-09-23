@@ -1,5 +1,6 @@
 import Plotly from 'plotly.js-dist-min';
 // import { Data } from "plotly.js";
+import { getLogSparsityColorFromValue, SEARCH_NOT_MATCHED_COLOR } from './umap-constants';
 import {
   UMAP_HEIGHT,
   UMAP_INITIAL_COLORS,
@@ -7,9 +8,8 @@ import {
 } from '@/components/provider/umap-provider';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
 import createPlotlyComponent from 'react-plotly.js/factory';
-import { getLogSparsityColorFromValue, SEARCH_NOT_MATCHED_COLOR } from './umap-constants';
 
-export { getLogSparsityColorFromValue, SEARCH_NOT_MATCHED_COLOR };
+export { SEARCH_NOT_MATCHED_COLOR, getLogSparsityColorFromValue };
 
 const Plot = createPlotlyComponent(Plotly);
 
