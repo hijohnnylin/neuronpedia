@@ -61,6 +61,7 @@ from neuronpedia_inference.schemas.common import (
 )
 from neuronpedia_inference.schemas.lens import (
     LensChatMessage,
+    LensErrorResponse,
     LensPromptRequest,
     LensSteerToken,
     LensType,
@@ -136,6 +137,7 @@ __all__ = [
     "HealthGpu",
     "HealthResponse",
     "LensChatMessage",
+    "LensErrorResponse",
     "LensPromptRequest",
     "LensSteerToken",
     "LensType",

@@ -41,6 +41,18 @@ class LensSteerToken(BaseSchema):
     type: LensType
 
 
+class LensErrorResponse(BaseSchema):
+    """Error body for a ``/v1/lens/prompt`` request refused before the stream starts.
+
+    ``token`` is set when a steer or swap token is not a token in the vocabulary.
+    ``suggested_token`` is then the closest token that is, or null if none is close.
+    """
+
+    error: str
+    token: str | None = None
+    suggested_token: str | None = None
+
+
 class LensPromptRequest(BaseSchema):
     """Everything one lens run needs: what to read out, where, and how to intervene."""
 

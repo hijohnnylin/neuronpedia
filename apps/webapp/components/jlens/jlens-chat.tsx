@@ -50,7 +50,7 @@ import {
 import { LensModeSetContext } from './jlens-lens-mode';
 import { JlensShareDialog } from './jlens-share-dialog';
 import { DefaultOutputHeader, SteerOutputHeader } from './jlens-steer-panel';
-import { runLensStream as baseRunLensStream, RunLensStreamParams } from './jlens-stream';
+import { runLensStream as baseRunLensStream, LensUnknownTokenError, RunLensStreamParams } from './jlens-stream';
 import JlensTokenChip, { JlensTokenRun, scrollContainerToTokenPositions, TokenBand } from './jlens-token';
 import { LayerRange } from './jlens-token-popup';
 import { SteerConfig, useJlensAnalysis } from './use-jlens-analysis';
@@ -751,6 +751,10 @@ export default function JlensChat({
           },
         });
       } catch (err) {
+        // The steer panel shows this one, next to the swap input.
+        if (err instanceof LensUnknownTokenError && config.mode === 'swap' && err.token === config.swapToken) {
+          throw err;
+        }
         if (!(err instanceof DOMException && err.name === 'AbortError')) {
           setError(err instanceof Error ? err.message : String(err));
         }

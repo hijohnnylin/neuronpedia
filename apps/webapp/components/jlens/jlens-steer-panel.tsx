@@ -344,6 +344,7 @@ export function JlensSteerPanel({
     steer,
     steerInfo,
     steerStreaming,
+    unknownSwapToken,
     setSteerStrength,
     setSteerAblate,
     setSteerMode,
@@ -396,10 +397,12 @@ export function JlensSteerPanel({
     selectedLayers.every((l, i) => l === [...steerInfo.defaultLayers].sort((a, b) => a - b)[i]);
   const isSwap = steer.mode === 'swap';
   const swapMissing = isSwap && !steer.swapToken.trim();
+  // The server refused this exact swap token as not a single vocab token.
+  const unknownSwap = isSwap && unknownSwapToken?.token === steer.swapToken ? unknownSwapToken : null;
   // Caution the user when the token being swapped out starts with a leading
   // space but their swap-in token doesn't (only once they've typed something).
   const leadingSpaceMismatch =
-    isSwap && steer.swapToken !== '' && steer.token.startsWith(' ') && !steer.swapToken.startsWith(' ');
+    isSwap && !unknownSwap && steer.swapToken !== '' && steer.token.startsWith(' ') && !steer.swapToken.startsWith(' ');
   const typeLabel = steer.type === LensType.JACOBIAN_LENS ? 'Jacobian Lens' : 'Logit Lens';
   const steerByLabel = `${isSwap ? 'Swap' : 'Steer'} ${typeLabel} Readout`;
 
@@ -586,7 +589,7 @@ export function JlensSteerPanel({
                       } ${
                         isPanelTourStep ? 'disabled:opacity-100' : 'disabled:opacity-100'
                       } ${isPanelTourStep ? 'text-center' : 'text-center'} ${
-                        swapMissing
+                        swapMissing || unknownSwap
                           ? 'border-rose-400 ring-1 ring-rose-400 focus:border-rose-500 focus:ring-rose-500'
                           : 'border-slate-300 focus:border-slate-500'
                       }`}
@@ -609,6 +612,29 @@ export function JlensSteerPanel({
                   </>
                 )}
               </div>
+              {unknownSwap && (
+                <div className="flex flex-row flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[9px] font-medium leading-snug text-rose-600 sm:text-[10px]">
+                  <span>Not a single token.</span>
+                  {unknownSwap.suggestedToken !== null ? (
+                    <>
+                      <span>Closest:</span>
+                      <span className="rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 font-mono font-semibold text-rose-700">
+                        {displayToken(unknownSwap.suggestedToken)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSwapToken(unknownSwap.suggestedToken ?? '')}
+                        disabled={locked}
+                        className="shrink-0 whitespace-nowrap rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 font-mono text-[9px] font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Apply
+                      </button>
+                    </>
+                  ) : (
+                    <span>No close token found.</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Interactive layer selector. */}

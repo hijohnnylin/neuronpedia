@@ -1362,6 +1362,42 @@
         "title": "LensChatMessage",
         "type": "object"
       },
+      "LensErrorResponse": {
+        "description": "Error body for a ``/v1/lens/prompt`` request refused before the stream starts.\n\n``token`` is set when a steer or swap token is not a token in the vocabulary.\n``suggested_token`` is then the closest token that is, or null if none is close.",
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "suggestedToken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestedtoken"
+          },
+          "token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "LensErrorResponse",
+        "type": "object"
+      },
       "LensPromptRequest": {
         "description": "Everything one lens run needs: what to read out, where, and how to intervene.",
         "properties": {
@@ -3766,6 +3802,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LensErrorResponse"
+                }
+              }
+            },
+            "description": "The request was refused before the stream started."
           },
           "422": {
             "content": {
