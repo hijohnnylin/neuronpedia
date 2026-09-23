@@ -1049,7 +1049,7 @@ export default function ExplanationsPane({
                   type="button"
                   onClick={handleNlaExplain}
                   disabled={nlaLoading || !currentNeuron?.source?.hfRepoId || !currentNeuron?.source?.hfFolderId}
-                  className="flex w-[140px] items-center justify-center rounded bg-slate-200 px-3 py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+                  className="flex h-9 w-[140px] items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
                 >
                   {nlaLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Explain With NLA'}
                 </button>
@@ -1120,9 +1120,16 @@ export default function ExplanationsPane({
             type="button"
             onClick={handleCheckInterpretable}
             disabled={interpretableLoading || !currentNeuron?.index}
-            className="flex w-[140px] items-center justify-center rounded bg-slate-200 px-3 py-1.5 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+            className="flex h-9 w-[140px] flex-col items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium leading-tight text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
           >
-            {interpretableLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Check If Interpretable'}
+            {interpretableLoading ? (
+              <LoadingSpinner size={16} className="text-sky-700" />
+            ) : (
+              <>
+                <span>Interpretable Score</span>
+                <span className="text-[8px] uppercase text-slate-400">Intrusion Detection</span>
+              </>
+            )}
           </button>
           <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
             <p className="leading-relaxed">
@@ -1151,6 +1158,7 @@ export default function ExplanationsPane({
         error={interpretableError}
         result={interpretableResult}
         featureLabel={`${currentNeuron?.modelId} · ${currentNeuron?.layer} · ${currentNeuron?.index}`}
+        explanations={currentNeuron?.explanations || []}
       />
       {/* <div className="rounded-b-md px-2 py-2 pt-0">
         </div>
