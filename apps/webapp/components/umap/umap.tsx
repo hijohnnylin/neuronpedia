@@ -34,8 +34,11 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import UmapListRow from './umap-list-row';
-import UmapPlotActive, { SEARCH_NOT_MATCHED_COLOR } from './umap-plot-active';
-import UmapPlotInactive from './umap-plot-inactive';
+import dynamic from 'next/dynamic';
+import { SEARCH_NOT_MATCHED_COLOR } from './umap-constants';
+
+const UmapPlotActive = dynamic(() => import('./umap-plot-active'), { ssr: false });
+const UmapPlotInactive = dynamic(() => import('./umap-plot-inactive'), { ssr: false });
 import UmapSearch from './umap-search';
 import UmapSelectedItem from './umap-selected-item';
 
