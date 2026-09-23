@@ -9,8 +9,6 @@ import {
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
-export { SEARCH_NOT_MATCHED_COLOR, getLogSparsityColorFromValue };
-
 const Plot = createPlotlyComponent(Plotly);
 
 const SEARCH_NOT_MATCHED_SIZE = 3.5;
