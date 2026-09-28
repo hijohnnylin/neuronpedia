@@ -41,7 +41,11 @@ regenerated=0
 for app in "${apps[@]}"; do
   [ -n "$app" ] || continue
   [ -f "$repo_root/$app/dump_openapi.py" ] || continue
-  if out=$(cd -- "$repo_root/$app" && uv run python dump_openapi.py 2>&1); then
+  # A synced run swaps an engine-linked venv back to the pinned release, as `uv_run` in the
+  # Makefile says.
+  sync_flag=""
+  [ -f "$repo_root/$app/.engine-linked" ] && sync_flag="--no-sync"
+  if out=$(cd -- "$repo_root/$app" && uv run $sync_flag python dump_openapi.py 2>&1); then
     regenerated=1
   else
     failed=1
