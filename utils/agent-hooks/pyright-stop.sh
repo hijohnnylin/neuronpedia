@@ -48,7 +48,11 @@ for project in "${projects[@]}"; do
   # No path args: honors each package's [tool.pyright] include/exclude (engine
   # scopes to interp_engine; inference excludes local_scripts / .venv).
   if command -v uv >/dev/null 2>&1; then
-    out=$(cd -- "$project" && uv run pyright 2>&1) || true
+    # A synced run swaps an engine-linked venv back to the pinned release, as `uv_run` in the
+    # Makefile says.
+    sync_flag=""
+    [ -f "$project/.engine-linked" ] && sync_flag="--no-sync"
+    out=$(cd -- "$project" && uv run $sync_flag pyright 2>&1) || true
   else
     out=$(cd -- "$project" && .venv/bin/pyright --pythonpath .venv/bin/python 2>&1) || true
   fi
@@ -64,7 +68,7 @@ done
 [ "$failed" -eq 1 ] || exit 0
 
 jq -n --arg r "$report" '
-  ("Pyright failed on Python packages edited this turn. Fix these type errors (do not skip with blanket type: ignore unless unavoidable), then re-run `uv run pyright` in each affected package until clean:\n\n" + $r) as $m
+  ("Pyright failed on Python packages edited this turn. Fix these type errors (do not skip with blanket type: ignore unless unavoidable), then re-run `uv run pyright` (`uv run --no-sync pyright` where `.engine-linked` exists) in each affected package until clean:\n\n" + $r) as $m
   | { followup_message: $m, decision: "block", reason: $m }
 '
 exit 0
