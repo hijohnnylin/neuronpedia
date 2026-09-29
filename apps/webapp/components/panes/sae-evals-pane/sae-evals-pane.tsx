@@ -336,12 +336,8 @@ export default function SAEEvalsPane({
                                     }<extra></extra>`,
                                   },
                                   {
-                                    alignmentgroup: true,
                                     bingroup: 'x',
                                     hovertemplate: 'log10_feature_density=%{x}<br>count=%{y}<extra></extra>',
-                                    marker: {
-                                      size: 2,
-                                    },
                                     showlegend: false,
                                     x: featureDensityLog10,
                                     xaxis: 'x3',
@@ -349,13 +345,9 @@ export default function SAEEvalsPane({
                                     type: 'histogram',
                                   },
                                   {
-                                    alignmentgroup: true,
                                     bingroup: 'y',
                                     hovertemplate:
                                       'log10_consistent_activation_heuristic=%{y}<br>count=%{x}<extra></extra>',
-                                    marker: {
-                                      size: 2,
-                                    },
                                     showlegend: false,
                                     xaxis: 'x2',
                                     y: consistentActivationHeuristicLog10,
