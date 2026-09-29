@@ -130,6 +130,15 @@ export const GITHUB_SECRET = process.env.GITHUB_SECRET || '';
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 
+// Cloudflare Turnstile - bot check on email sign-in. It is on only when both keys are set.
+export const CLOUDFLARE_TURNSTILE_SITEKEY = process.env.CLOUDFLARE_TURNSTILE_SITEKEY || '';
+export const CLOUDFLARE_TURNSTILE_SECRETKEY = process.env.CLOUDFLARE_TURNSTILE_SECRETKEY || '';
+export const TURNSTILE_ENABLED = CLOUDFLARE_TURNSTILE_SITEKEY !== '' && CLOUDFLARE_TURNSTILE_SECRETKEY !== '';
+
+// Maximum sign-in emails for the whole site in 24 hours. At the cap, email sign-in stops and admins get an alert.
+const signInEmailsPerDay = parseInt(process.env.SIGN_IN_EMAILS_PER_DAY || '', 10);
+export const SIGN_IN_EMAILS_PER_DAY = Number.isNaN(signInEmailsPerDay) ? 1000 : signInEmailsPerDay;
+
 // Authentication Refresh - for updating the Apple Client Secret every 6 months (using ./node scripts/apple-gen-secret.js and .secret.apple.p8)
 // export const APPLE_KEY_ID = process.env.APPLE_KEY_ID || '';
 // export const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || '';

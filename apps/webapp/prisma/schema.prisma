@@ -360,6 +360,18 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// One row for each sign-in (magic link) email that we send. It sets the per-inbox and site-wide limits.
+// `toKey` is the inbox key: lowercase, no "+tag", and no dots for Gmail.
+model SignInEmailLog {
+  id     String   @id @default(cuid())
+  to     String
+  toKey  String
+  sentAt DateTime @default(now())
+
+  @@index([toKey, sentAt])
+  @@index([sentAt])
+}
+
 model Model {
   /// @zod.custom.use(z.string().regex(new RegExp(/^[a-zA-Z0-9-_]+$/), "Name should contain only numbers, letters, underscores, or dashes",).min(1).max(128).transform((val) => val.toLowerCase()))
   id               String @id

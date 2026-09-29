@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 
 import CustomPrismaAdapterForNextAuth from '@/lib/db/custom-prisma-adapter';
+import { reserveSignInEmail } from '@/lib/db/sign-in-email-log';
 import { sendLoginEmail, sendWelcomeEmail } from '@/lib/email/email';
 import {
   APPLE_CLIENT_ID,
@@ -11,9 +12,12 @@ import {
   GITHUB_SECRET,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
+  NEXT_PUBLIC_URL,
+  NEXTAUTH_URL,
   SMTP_SERVER_HOST,
   SMTP_SERVER_PORT,
 } from '@/lib/env';
+import { authErrorUrl, SIGN_IN_ERROR_INBOX_LIMIT, SIGN_IN_ERROR_SITE_CAP } from '@/lib/utils/sign-in-email';
 import { User, UserSecretType } from '@prisma/client';
 import crypto from 'crypto';
 import type { NextAuthOptions } from 'next-auth/index';
@@ -127,6 +131,20 @@ export const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
+    // For email, next-auth calls this just before it sends the login email. A returned URL stops the send.
+    signIn: async ({ user, account, email }) => {
+      if (account?.provider !== 'email' || !email?.verificationRequest) {
+        return true;
+      }
+      const block = await reserveSignInEmail(user.email || account.providerAccountId);
+      if (block) {
+        return authErrorUrl(
+          NEXTAUTH_URL || NEXT_PUBLIC_URL,
+          block === 'site' ? SIGN_IN_ERROR_SITE_CAP : SIGN_IN_ERROR_INBOX_LIMIT,
+        );
+      }
+      return true;
+    },
     session: async ({ session, user }) => {
       if (session?.user) {
         session.user.id = user.id;

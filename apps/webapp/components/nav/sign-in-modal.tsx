@@ -1,12 +1,14 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import Modal from '@/components/sign-in-modal/modal';
 import Github from '@/components/svg/github';
+import { useTurnstile } from '@/components/turnstile-widget';
 import { NEXT_PUBLIC_ENABLE_SIGNIN } from '@/lib/env';
+import { signInErrorMessage } from '@/lib/utils/sign-in-email';
 import emailSpellChecker from '@zootools/email-spell-checker';
 import { Mail } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import Image from 'next/image';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { generateFromEmail } from 'unique-username-generator';
 import isEmail from 'validator/lib/isEmail';
 
@@ -14,9 +16,23 @@ function SignInModal() {
   const [signInClicked, setSignInClicked] = useState(false);
   const { signInModalOpen: signInOpen, setSignInModalOpen } = useGlobalContext();
   const [emailValue, setEmailValue] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const turnstile = useTurnstile();
+  const { reset: resetTurnstile } = turnstile;
+  const emailDisabled = signInClicked || !turnstile.ready;
 
-  function emailSignIn() {
+  useEffect(() => {
+    if (!signInOpen) {
+      resetTurnstile();
+    }
+  }, [signInOpen, resetTurnstile]);
+
+  async function emailSignIn() {
+    if (emailDisabled) {
+      return;
+    }
     setSignInClicked(true);
+    setEmailError('');
     if (!isEmail(emailValue)) {
       alert('Invalid Email. Please try again.');
       setSignInClicked(false);
@@ -26,17 +42,24 @@ function SignInModal() {
       email: emailValue,
     });
     // TODO: use better dialog
-    if (suggestedEmail && window.confirm(`Did you mean "${suggestedEmail.full}"?`)) {
-      signIn('email', {
-        email: suggestedEmail.full,
-        name: generateFromEmail(suggestedEmail.full),
-      });
-    } else {
-      signIn('email', {
-        email: emailValue,
-        name: generateFromEmail(emailValue),
-      });
+    const email =
+      suggestedEmail && window.confirm(`Did you mean "${suggestedEmail.full}"?`) ? suggestedEmail.full : emailValue;
+    const result = await signIn(
+      'email',
+      {
+        email,
+        name: generateFromEmail(email),
+        redirect: false,
+      },
+      turnstile.signInParams,
+    );
+    resetTurnstile();
+    if (!result || result.error || !result.url) {
+      setEmailError(signInErrorMessage(result?.error));
+      setSignInClicked(false);
+      return;
     }
+    window.location.href = result.url;
   }
 
   return (
@@ -80,11 +103,12 @@ function SignInModal() {
                   }}
                   className="mb-2 w-full rounded-md border-slate-400 text-center"
                 />
+                {turnstile.widget && <div className="mb-2">{turnstile.widget}</div>}
                 <button
                   type="button"
-                  disabled={signInClicked}
+                  disabled={emailDisabled}
                   className={`${
-                    signInClicked
+                    emailDisabled
                       ? 'cursor-not-allowed border-slate-200 bg-slate-100'
                       : 'border border-slate-200 bg-white text-black hover:bg-slate-50'
                   } flex h-10 w-full items-center justify-center space-x-1.5 rounded-md border text-sm shadow-sm transition-all duration-75 focus:outline-none`}
@@ -95,6 +119,7 @@ function SignInModal() {
                   <Mail className="h-5 w-5" />
                   <p>Sign In with Email</p>
                 </button>
+                {emailError && <p className="mt-2 text-center text-xs text-red-600">{emailError}</p>}
               </div>
               <hr />
               <button

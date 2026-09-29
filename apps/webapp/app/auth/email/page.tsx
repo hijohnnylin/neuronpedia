@@ -4,7 +4,7 @@ export default async function Page(props: { searchParams?: Promise<{ [key: strin
 
   return (
     <div className="flex w-full max-w-md flex-col justify-center px-1 pt-20">
-      <form action="/api/auth/callback/email" method="get" className="flex flex-col text-center">
+      <form action="/auth/email/confirm" method="post" className="flex flex-col text-center">
         <label
           htmlFor="layer"
           className="mb-3 flex flex-col items-center justify-center gap-x-2 text-sm font-medium text-slate-500"

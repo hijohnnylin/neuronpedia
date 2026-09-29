@@ -80,6 +80,8 @@ export const ListsOnActivationsScalarFieldEnumSchema = z.enum(['activationId','l
 
 export const VerificationTokenScalarFieldEnumSchema = z.enum(['identifier','token','expires']);
 
+export const SignInEmailLogScalarFieldEnumSchema = z.enum(['id','to','toKey','sentAt']);
+
 export const ModelScalarFieldEnumSchema = z.enum(['id','displayNameShort','displayName','creatorId','tlensId','openRouterId','hfRepoId','dimension','thinking','visibility','defaultSourceSetName','defaultSourceId','defaultGraphSourceSetName','inferenceEnabled','instruct','layers','neuronsPerLayer','createdAt','owner','updatedAt','website']);
 
 export const ModelHeadMetricsScalarFieldEnumSchema = z.enum(['id','modelId','layer','headIndex','modelName','datasetName','nSequences','seqLen','dtype','attnImplementation','selfAttentionScore','prevTokenScore','patternEntropy','qkDistance','qkDistanceVariance','inductionScore','qkDistanceHistogram','topQueryTokens','topKeyTokens','activationHistogram','headStatistics','createdAt','updatedAt']);
@@ -1251,6 +1253,27 @@ export type VerificationToken = z.infer<typeof VerificationTokenSchema>
 export const VerificationTokenPartialSchema = VerificationTokenSchema.partial()
 
 export type VerificationTokenPartial = z.infer<typeof VerificationTokenPartialSchema>
+
+/////////////////////////////////////////
+// SIGN IN EMAIL LOG SCHEMA
+/////////////////////////////////////////
+
+export const SignInEmailLogSchema = z.object({
+  id: z.string().cuid(),
+  to: z.string(),
+  toKey: z.string(),
+  sentAt: z.coerce.date(),
+})
+
+export type SignInEmailLog = z.infer<typeof SignInEmailLogSchema>
+
+/////////////////////////////////////////
+// SIGN IN EMAIL LOG PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const SignInEmailLogPartialSchema = SignInEmailLogSchema.partial()
+
+export type SignInEmailLogPartial = z.infer<typeof SignInEmailLogPartialSchema>
 
 /////////////////////////////////////////
 // MODEL SCHEMA

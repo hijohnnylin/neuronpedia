@@ -1,11 +1,13 @@
 'use client';
 
 import { Button } from '@/components/shadcn/button';
+import { useTurnstile } from '@/components/turnstile-widget';
+import { signInErrorMessage } from '@/lib/utils/sign-in-email';
 import emailSpellChecker from '@zootools/email-spell-checker';
 import { MailIcon } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { generateFromEmail } from 'unique-username-generator';
 import isEmail from 'validator/lib/isEmail';
 
@@ -22,8 +24,15 @@ export default function HomeNewsletterSignup({ latestPost }: { latestPost?: Late
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [turnstileShown, setTurnstileShown] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const turnstile = useTurnstile(emailInputRef);
+  const submitDisabled = submitting || !turnstile.ready;
 
   async function handleSubmit() {
+    if (submitDisabled) {
+      return;
+    }
     setSubmitting(true);
     setError('');
     if (!isEmail(email)) {
@@ -41,13 +50,18 @@ export default function HomeNewsletterSignup({ latestPost }: { latestPost?: Late
     ) {
       finalEmail = suggestedEmail.full;
     }
-    const result = await signIn('email', {
-      email: finalEmail,
-      name: generateFromEmail(finalEmail),
-      redirect: false,
-    });
-    if (result?.error) {
-      setError('Something went wrong. Please try again.');
+    const result = await signIn(
+      'email',
+      {
+        email: finalEmail,
+        name: generateFromEmail(finalEmail),
+        redirect: false,
+      },
+      turnstile.signInParams,
+    );
+    turnstile.reset();
+    if (!result || result.error) {
+      setError(signInErrorMessage(result?.error));
       setSubmitting(false);
     } else {
       setSubmitted(true);
@@ -97,17 +111,19 @@ export default function HomeNewsletterSignup({ latestPost }: { latestPost?: Late
                 </div>
               </div>
               <input
+                ref={emailInputRef}
                 type="email"
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setTurnstileShown(true)}
                 onKeyUp={(e) => {
                   if (e.key === 'Enter') handleSubmit();
                 }}
                 className="mx-0 w-full flex-1 rounded-none rounded-b-none border border-b-0 border-none border-slate-200 bg-slate-50 pt-5 text-center text-[12.5px] leading-none outline-none ring-0 placeholder:text-slate-400 focus:border-sky-600 focus:bg-sky-50 focus:outline-none focus:ring-0 focus:ring-sky-600"
               />
               <Button
-                disabled={submitting}
+                disabled={submitDisabled}
                 onClick={() => handleSubmit()}
                 className="mx-0 h-8 min-h-8 w-full shrink-0 gap-x-1.5 rounded-none border-none border-slate-300 bg-slate-200 px-4 text-[10px] font-semibold uppercase text-slate-600 shadow-none hover:border-sky-600 hover:bg-sky-300 hover:text-sky-800"
                 size="sm"
@@ -116,6 +132,7 @@ export default function HomeNewsletterSignup({ latestPost }: { latestPost?: Late
                 <span>Get Updates</span>
               </Button>
             </div>
+            {(turnstileShown || email !== '') && turnstile.widget}
             {error && <div className="text-xs text-red-500">{error}</div>}
           </div>
         )}

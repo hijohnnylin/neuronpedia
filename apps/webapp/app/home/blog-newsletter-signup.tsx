@@ -1,11 +1,13 @@
 'use client';
 
 import { Button } from '@/components/shadcn/button';
+import { useTurnstile } from '@/components/turnstile-widget';
+import { signInErrorMessage } from '@/lib/utils/sign-in-email';
 import emailSpellChecker from '@zootools/email-spell-checker';
 import { MailIcon } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { generateFromEmail } from 'unique-username-generator';
 import isEmail from 'validator/lib/isEmail';
 
@@ -22,8 +24,15 @@ export default function BlogNewsletterSignup({ latestPost }: { latestPost?: Late
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [turnstileShown, setTurnstileShown] = useState(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const turnstile = useTurnstile(emailInputRef);
+  const submitDisabled = submitting || !turnstile.ready;
 
   async function handleSubmit() {
+    if (submitDisabled) {
+      return;
+    }
     setSubmitting(true);
     setError('');
     if (!isEmail(email)) {
@@ -41,13 +50,18 @@ export default function BlogNewsletterSignup({ latestPost }: { latestPost?: Late
     ) {
       finalEmail = suggestedEmail.full;
     }
-    const result = await signIn('email', {
-      email: finalEmail,
-      name: generateFromEmail(finalEmail),
-      redirect: false,
-    });
-    if (result?.error) {
-      setError('Something went wrong. Please try again.');
+    const result = await signIn(
+      'email',
+      {
+        email: finalEmail,
+        name: generateFromEmail(finalEmail),
+        redirect: false,
+      },
+      turnstile.signInParams,
+    );
+    turnstile.reset();
+    if (!result || result.error) {
+      setError(signInErrorMessage(result?.error));
       setSubmitting(false);
     } else {
       setSubmitted(true);
@@ -105,17 +119,19 @@ export default function BlogNewsletterSignup({ latestPost }: { latestPost?: Late
           <div className="flex w-full flex-1 flex-col gap-y-1">
             <div className="flex flex-row items-center gap-x-2">
               <input
+                ref={emailInputRef}
                 type="email"
                 placeholder="your-email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setTurnstileShown(true)}
                 onKeyUp={(e) => {
                   if (e.key === 'Enter') handleSubmit();
                 }}
                 className="h-8.5 flex-1 rounded-md border border-slate-300 px-3 text-xs focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600 sm:text-[13px]"
               />
               <Button
-                disabled={submitting}
+                disabled={submitDisabled}
                 onClick={() => handleSubmit()}
                 className="gap-x-1.5 bg-sky-600 text-white hover:bg-sky-700"
                 size="sm"
@@ -123,6 +139,7 @@ export default function BlogNewsletterSignup({ latestPost }: { latestPost?: Late
                 <span>Submit</span>
               </Button>
             </div>
+            {(turnstileShown || email !== '') && turnstile.widget}
             {error && <div className="text-xs text-red-500">{error}</div>}
           </div>
         )}
