@@ -112,7 +112,7 @@
     "next-mdx-remote": "^6.0.0",
     "next-swagger-doc": "^0.4.0",
     "node-gzip": "^1.1.2",
-    "nodemailer": "^9.0.5",
+    "nodemailer": "^10.0.11",
     "openai": "^4.24.2",
     "openapi-fetch": "^0.13.4",
     "pg": "^8.13.1",
