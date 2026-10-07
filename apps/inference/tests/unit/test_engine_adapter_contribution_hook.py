@@ -69,10 +69,10 @@ class TestTheRawOutputNamesAreUntouched:
             ("blocks.5.hook_resid_mid", Address("resid_mid", 5)),
             ("blocks.5.attn.hook_z", Address("z", 5)),
             ("blocks.5.mlp.hook_post", Address("mlp_act", 5)),
-            # An alias whose round trip also disagrees with the name asked for (`hook_mlp_in` comes
-            # back as `mlp.hook_in`), so it exercises the guard that only sublayer *outputs* are
+            # An alias whose round trip also disagrees with the name asked for (`hook_in` comes
+            # back as `hook_resid_pre`), so it exercises the guard that only sublayer *outputs* are
             # eligible for the upgrade.
-            ("blocks.5.hook_mlp_in", Address("mlp_in", 5)),
+            ("blocks.5.hook_in", Address("resid_pre", 5)),
         ],
     )
     def test_every_other_hook_is_plain_translation(self, hook: str, expected: Address):
