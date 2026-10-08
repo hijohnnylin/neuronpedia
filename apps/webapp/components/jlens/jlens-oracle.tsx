@@ -199,6 +199,7 @@ function layerBullets(entry: OracleEntry | null, layer: number): string[] | null
 }
 
 export type OracleState = {
+  modelId: string;
   // True when the servers can read, may read (a loaded run, before its first
   // read), or the run has stored reads.
   available: boolean;
@@ -220,6 +221,14 @@ export type OracleState = {
 };
 
 export const OracleContext = createContext<OracleState | null>(null);
+
+// Who trained each model's Oracle Lens adapter, shown under the load button.
+const ORACLE_CREDITS: Record<string, { label: string; href: string }> = {
+  'qwen3.6-27b': {
+    label: 'Bhatia, Blank et al.',
+    href: 'https://huggingface.co/agu18dec/olens_and_ar/tree/main/olens_s3d_rl600',
+  },
+};
 
 type Sweep = {
   // Positions 0..count-1 are the sweep's.
@@ -669,6 +678,7 @@ export function useOracleReads({
 
   return useMemo(
     () => ({
+      modelId,
       available: enabled && (canRead || seededLayers.length > 0),
       layers,
       busy,
@@ -680,7 +690,20 @@ export function useOracleReads({
       setSweepActive,
       sweepStore,
     }),
-    [enabled, canRead, seededLayers, layers, busy, entryFor, request, unavailableReason, sharedReads, seed, sweepStore],
+    [
+      modelId,
+      enabled,
+      canRead,
+      seededLayers,
+      layers,
+      busy,
+      entryFor,
+      request,
+      unavailableReason,
+      sharedReads,
+      seed,
+      sweepStore,
+    ],
   );
 }
 
@@ -724,8 +747,9 @@ export function OracleLayerReadout({
 
   let body: ReactNode;
   if (!entry) {
+    const credit = ORACLE_CREDITS[oracle.modelId];
     body = (
-      <div className="flex flex-1 items-center justify-center px-3">
+      <div className="flex flex-1 flex-col items-center justify-center gap-y-1.5 px-3">
         <button
           type="button"
           onClick={() => oracle.request(token.position)}
@@ -735,6 +759,16 @@ export function OracleLayerReadout({
         >
           Load Oracle Lens
         </button>
+        {credit && (
+          <a
+            href={credit.href}
+            className="text-[10px] text-sky-700 underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {credit.label}
+          </a>
+        )}
       </div>
     );
   } else if (entry.status === 'error') {
