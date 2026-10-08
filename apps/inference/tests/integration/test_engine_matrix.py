@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
+import torch
 from fastapi.testclient import TestClient
 
 from tests.harness import (
@@ -28,6 +29,7 @@ from tests.harness import (
 )
 
 PROMPT = "Hello, world!"
+GPT2_D_MODEL = 768
 
 
 @pytest.fixture(
@@ -179,3 +181,25 @@ def test_steering_actually_steers_across_engines(matrix_client: TestClient):
         "On the vLLM backend the usual cause is an engine whose Python forward hooks never run "
         "(CUDA graphs left on), which is silent by nature -- see VLLMModel.hooks_available."
     )
+
+
+def test_vectors_at_two_points_both_steer_across_engines(matrix_client: TestClient):
+    """A residual vector and an attention-output vector in one request are one steer at two points.
+
+    The second vector must change the output, so it reached the forward on every backend.
+    """
+    gen = torch.Generator().manual_seed(0)
+    resid, z = (torch.randn(GPT2_D_MODEL, generator=gen) for _ in range(2))
+
+    def steered(vectors: list[tuple[str, torch.Tensor, float]]) -> str:
+        req = _steer_request(strength=1.0, types=["STEERED"])
+        del req["features"]
+        req["normalize_steering"] = True
+        req["vectors"] = [{"hook": h, "steering_vector": v.tolist(), "strength": s} for h, v, s in vectors]
+        resp = matrix_client.post("/v1/steer/completion", json=req, headers={"X-SECRET-KEY": X_SECRET_KEY})
+        assert resp.status_code == 200, resp.text
+        return {o["type"]: o["output"] for o in resp.json()["outputs"]}["STEERED"]
+
+    one = steered([("blocks.2.hook_resid_post", resid, 20.0)])
+    two = steered([("blocks.2.hook_resid_post", resid, 20.0), ("blocks.4.attn.hook_z", z, 60.0)])
+    assert one != two, "the attention-output vector did not change the output, so it was not applied"

@@ -1,4 +1,5 @@
 import type { components } from '@/lib/api/inference';
+import { JPP_LENS_MODEL_IDS } from '@/lib/env';
 // Shared types + constants for the streaming Jacobian/Logit lens endpoint
 // (`POST /v1/lens/prompt` on the inference server). Pure types only — safe to
 // import from both server and client code.
@@ -8,19 +9,30 @@ import type { components } from '@/lib/api/inference';
 // `done` message (or an `error` message). When `stream` is false the same
 // messages are buffered into a single `{ meta, tokens, done }` object.
 
-// Canonical string values for the two lens types. Reference these (e.g.
+// Canonical string values for the lens types. Reference these (e.g.
 // `LensType.JACOBIAN_LENS`) instead of bare string literals to avoid typos.
+// JPP_LENS (the J++ Lens) has the same form as the Jacobian lens, from another fit.
 export const LensType = {
   LOGIT_LENS: 'LOGIT_LENS',
   JACOBIAN_LENS: 'JACOBIAN_LENS',
+  JPP_LENS: 'JPP_LENS',
 } as const;
 export type LensType = (typeof LensType)[keyof typeof LensType];
 
-export const LENS_TYPES = [LensType.LOGIT_LENS, LensType.JACOBIAN_LENS] as const;
+export const LENS_TYPES = [LensType.LOGIT_LENS, LensType.JACOBIAN_LENS, LensType.JPP_LENS] as const;
 
-// Lens display mode used by the UI toggle: a single lens type, or DIFF (two
-// columns showing each lens's advantage over the other). The single-mode values
-// intentionally match `LensType`.
+// The types that carry a layer through a fitted J_bar (the logit lens does not).
+export function isJBarLensType(t: LensType): boolean {
+  return t === LensType.JACOBIAN_LENS || t === LensType.JPP_LENS;
+}
+
+// Whether the inference servers for `modelId` serve the J++ Lens.
+export function jppLensAvailable(modelId: string | null | undefined): boolean {
+  return !!modelId && JPP_LENS_MODEL_IDS.includes(modelId);
+}
+
+// The share's stored lens tab. DIFF is the old two-column view; it now loads as
+// the Jacobian and Logit columns.
 export const LensMode = {
   JACOBIAN_LENS: LensType.JACOBIAN_LENS,
   LOGIT_LENS: LensType.LOGIT_LENS,
@@ -29,6 +41,56 @@ export const LensMode = {
 export type LensMode = (typeof LensMode)[keyof typeof LensMode];
 
 export const LENS_MODES = [LensMode.JACOBIAN_LENS, LensMode.LOGIT_LENS, LensMode.DIFF] as const;
+
+// A column the UI can show. The oracle is not a `LensType`: its read comes from
+// `/v1/lens/oracle`, one position at a time, as text.
+export const LensColumn = {
+  JACOBIAN_LENS: LensType.JACOBIAN_LENS,
+  JPP_LENS: LensType.JPP_LENS,
+  ORACLE_LENS: 'ORACLE_LENS',
+  LOGIT_LENS: LensType.LOGIT_LENS,
+} as const;
+export type LensColumn = (typeof LensColumn)[keyof typeof LensColumn];
+
+// Display order of the columns (and of the toggle buttons).
+export const LENS_COLUMN_ORDER: LensColumn[] = [
+  LensColumn.JACOBIAN_LENS,
+  LensColumn.JPP_LENS,
+  LensColumn.ORACLE_LENS,
+  LensColumn.LOGIT_LENS,
+];
+
+export function isLensTypeColumn(c: LensColumn): c is LensType {
+  return c === LensColumn.JACOBIAN_LENS || c === LensColumn.JPP_LENS || c === LensColumn.LOGIT_LENS;
+}
+
+// The columns a legacy share tab opens with.
+export function lensColumnsFromTab(tab: string | null | undefined): LensColumn[] {
+  if (tab === LensMode.DIFF) {
+    return [LensColumn.JACOBIAN_LENS, LensColumn.LOGIT_LENS];
+  }
+  if (tab === LensMode.LOGIT_LENS) {
+    return [LensColumn.LOGIT_LENS];
+  }
+  return [LensColumn.JACOBIAN_LENS];
+}
+
+// A share's columns: `lensColumns` in display order, or the legacy tab's
+// columns when `lensColumns` has none.
+export function shareLensColumns(lensColumns: string[] | null | undefined, tab: string | null | undefined) {
+  const columns = LENS_COLUMN_ORDER.filter((c) => lensColumns?.includes(c));
+  return columns.length > 0 ? columns : lensColumnsFromTab(tab);
+}
+
+// The legacy tab stored next to `lensColumns`: the token lenses in `columns`.
+export function lensTabFromColumns(columns: LensColumn[]): LensMode {
+  const j = columns.includes(LensColumn.JACOBIAN_LENS);
+  const l = columns.includes(LensColumn.LOGIT_LENS);
+  if (j && l) {
+    return LensMode.DIFF;
+  }
+  return l ? LensMode.LOGIT_LENS : LensMode.JACOBIAN_LENS;
+}
 
 // Neuronpedia model id (route segment) for the default jlens model. The
 // underlying HF/TransformerLens id (e.g. google/gemma-3-4b-pt) is resolved
@@ -79,15 +141,37 @@ export const DEFAULT_LENS_STEER_STRENGTH = -0.1;
 export const MAX_LENS_STEER_STRENGTH = 2;
 export const LENS_STEER_STRENGTH_STEP = 0.1;
 
+// A tool call in an assistant message. `arguments` is the call's JSON object.
+export interface LensChatToolCall {
+  name: string;
+  arguments?: Record<string, unknown>;
+  id?: string;
+}
+
+// `role` is `system`, `user`, `assistant` or `tool`. The chat template renders
+// `toolCalls` (assistant only) and `toolCallId` (tool only, the call it answers).
 export interface LensChatMessage {
   role: string;
   content: string;
+  toolCalls?: LensChatToolCall[];
+  toolCallId?: string;
 }
+
+// A tool definition, in the OpenAI function-schema shape that chat templates
+// read: `{ type: 'function', function: { name, description, parameters } }`.
+export type LensChatTool = Record<string, unknown>;
+
+// Chat payload limits shared by `/api/lens/prompt` and `/api/lens/share`.
+export const MAX_LENS_CHAT_TOOL_CALLS = 64;
+export const MAX_LENS_CHAT_TOOLS = 128;
+export const MAX_LENS_CHAT_TOOL_NAME_CHARS = 256;
+export const MAX_LENS_CHAT_TOOL_ARGUMENT_CHARS = 10000;
+export const MAX_LENS_CHAT_TOOLS_CHARS = 50000;
 
 // A single readout to steer on. `token` is the EXACT decoded token string
 // (whitespace preserved, e.g. " cat") as it appeared in a read-out slice; the
 // server resolves it back to a vocab id. `type` selects which lens's readout
-// direction to use (Jacobian: J_bar^T·w_t; Logit: plain unembedding w_t).
+// direction to use (Jacobian or J++: J_bar^T·w_t; Logit: plain unembedding w_t).
 export interface LensSteerToken {
   token: string;
   type: LensType;
@@ -184,6 +268,9 @@ export interface LensMetaMessage {
   // client's cache (skipped this run). Token messages are only emitted for
   // positions >= reuse_len; the client keeps its prior results for the rest.
   reuse_len: number;
+  // Layers the server's oracle lens reads. Empty (or absent, on older servers
+  // and stored runs) when the server has no oracle.
+  oracle_layers?: number[];
 }
 
 // One per token position: the token plus its per-type lens slices.
@@ -228,8 +315,101 @@ export interface LensPromptResponse {
 
 export const LENS_TYPE_LABELS: Record<LensType, string> = {
   [LensType.JACOBIAN_LENS]: 'Jacobian Lens',
+  [LensType.JPP_LENS]: 'J++ Lens',
   [LensType.LOGIT_LENS]: 'Logit Lens',
 };
 
+// Short labels for a lens type's read-out, its sidebar and its space.
+export const LENS_TYPE_SHORT_LABELS: Record<LensType, string> = {
+  [LensType.JACOBIAN_LENS]: 'J-Lens',
+  [LensType.JPP_LENS]: 'J++ Lens',
+  [LensType.LOGIT_LENS]: 'Logit Lens',
+};
+export const LENS_TYPE_READOUT_LABELS: Record<LensType, string> = {
+  [LensType.JACOBIAN_LENS]: 'J-Lens Readout',
+  [LensType.JPP_LENS]: 'J++ Readout',
+  [LensType.LOGIT_LENS]: 'Logit Lens',
+};
+export const LENS_TYPE_SPACE_LABELS: Record<LensType, string> = {
+  [LensType.JACOBIAN_LENS]: 'J-Space',
+  [LensType.JPP_LENS]: 'J++ Space',
+  [LensType.LOGIT_LENS]: 'Logit Lens',
+};
+
+export const LENS_COLUMN_LABELS: Record<LensColumn, string> = {
+  [LensColumn.JACOBIAN_LENS]: 'Jacobian',
+  [LensColumn.JPP_LENS]: 'J++',
+  [LensColumn.ORACLE_LENS]: 'Oracle',
+  [LensColumn.LOGIT_LENS]: 'Logit',
+};
+
+// ---- Oracle lens (`POST /v1/lens/oracle`) ---------------------------------
+// One read describes the activation at one position, in words, at each oracle
+// layer. Frames mirror the models in apps/inference's lens/oracle.py.
+
+// Every read is one bullet of at most ORACLE_MAX_TOKENS tokens.
+export const ORACLE_BULLETS = 1;
+export const ORACLE_MAX_TOKENS = 32;
+// The largest bullet cap a stored share can have.
+export const MAX_ORACLE_BULLETS = 5;
+export const MAX_ORACLE_POSITIONS = 64;
+
+export type LensOracleRequest = Partial<components['schemas']['LensOracleRequest']>;
+
+// `position` and `token` are the first of `positions` and `tokens`. Servers
+// that read one position per request send neither list.
+export interface LensOracleMetaMessage {
+  kind: 'meta';
+  model: string;
+  adapter: string;
+  position: number;
+  token: string;
+  positions?: number[];
+  tokens?: string[];
+  layers: number[];
+  max_bullets: number;
+}
+
+// One layer's read at one position. Reads arrive in the order they end.
+// Servers that read one position per request send no `position`.
+export interface LensOracleReadMessage {
+  kind: 'read';
+  position?: number;
+  layer: number;
+  bullets: string[];
+  text: string;
+  // "bullets" (the cap), "eos", or "length".
+  finish: string;
+  cached: boolean;
+  // Set by the webapp: lets `/api/lens/share` store this read as is.
+  sig?: string;
+}
+
+export interface LensOracleDoneMessage {
+  kind: 'done';
+  elapsed_ms: number;
+  cached_layers: number;
+}
+
+// One layer's text so far, while its read runs. Its `read` comes after.
+export interface LensOraclePartialMessage {
+  kind: 'partial';
+  position?: number;
+  layer: number;
+  text: string;
+}
+
+export type LensOracleStreamMessage =
+  | LensOracleMetaMessage
+  | LensOraclePartialMessage
+  | LensOracleReadMessage
+  | LensOracleDoneMessage
+  | LensErrorMessage;
+
 // Preferred order for display columns / default selection.
-export const LENS_TYPE_ORDER: LensType[] = [LensType.JACOBIAN_LENS, LensType.LOGIT_LENS];
+export const LENS_TYPE_ORDER: LensType[] = [LensType.JACOBIAN_LENS, LensType.JPP_LENS, LensType.LOGIT_LENS];
+
+// The types to request for `modelId`: the J++ Lens only where its servers have it.
+export function requestLensTypes(modelId: string | null | undefined): LensType[] {
+  return LENS_TYPE_ORDER.filter((t) => t !== LensType.JPP_LENS || jppLensAvailable(modelId));
+}

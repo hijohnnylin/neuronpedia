@@ -16,6 +16,7 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi import Request
+from interp_engine import Tokenize
 
 from neuronpedia_inference.endpoints.lens.prompt import lens_prompt
 from neuronpedia_inference.endpoints.steer.completion_chat import completion_chat
@@ -41,6 +42,7 @@ class StubTokenizer:
 class StubModel:
     def __init__(self):
         self.tokenizer = StubTokenizer()
+        self.tok = Tokenize(self.tokenizer, device="cpu")
 
 
 @pytest.fixture(autouse=True)
@@ -125,10 +127,11 @@ def test_lens_prompt_refuses_chat_without_a_chat_template():
 def test_lens_prompt_still_accepts_raw_text_from_the_same_model():
     """The refusal is scoped to `chat` — these models' read-outs are otherwise fine.
 
-    The stub is not a real backend, so the request is still rejected — but by the
-    backend check further down, which is how we know it cleared the gate.
+    The stub's tokenizer cannot tokenize a prompt, so the request is still rejected — but
+    at tokenization, further down, which is how we know it cleared the gate.
     """
     response = asyncio.run(lens_prompt(_lens_request(chat=None, prompt="What is 2+2?"), _http_request()))
 
-    assert "backends" in _body(response)["error"]
+    assert response.status_code == 400
+    assert "StubTokenizer" in _body(response)["error"]
     assert "chat template" not in _body(response)["error"]

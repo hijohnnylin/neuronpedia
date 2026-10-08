@@ -11,10 +11,11 @@ import {
   LensSteerToken,
   LensTokenMessage,
   LensType,
-  MAX_LENS_CHAT_USER_CHARS,
   MAX_LENS_COMPLETION_PROMPT_CHARS,
   maxLensCompletionTokens,
+  requestLensTypes,
 } from '@/lib/utils/lens';
+import { lensChatMessageSchema, lensChatToolsSchema } from '@/lib/utils/lens-chat-schema';
 import { NextResponse } from 'next/server';
 import * as yup from 'yup';
 
@@ -23,10 +24,10 @@ import * as yup from 'yup';
 // responding; the run's wall time counts entirely against this limit.
 export const maxDuration = 180;
 
-// Non-user chat messages (assistant / system) keep a generous cap: generated or
-// edited assistant turns are replayed back through this endpoint for
-// re-analysis and are legitimately longer than a user turn. User-supplied
-// input (user messages + completion prompt) is capped tightly instead.
+// Chat messages of every role share one generous cap: imported transcripts and
+// generated or edited turns are replayed here for re-analysis. The UI still caps
+// what the user types (MAX_LENS_CHAT_USER_CHARS), and the server's lens token
+// limit bounds the compute.
 const MAX_PROMPT_CHARS = 10000;
 const MAX_STEER_STRENGTH = 50;
 // Upper bound on client-supplied token-id arrays (`inputTokenIds` /
@@ -42,17 +43,7 @@ const MAX_STEER_LAYERS = 512;
 const MAX_STEER_TOKEN_CHARS = 256;
 const MAX_MODEL_ID_CHARS = 128;
 
-const chatMessageSchema = yup.object({
-  role: yup.string().oneOf(['user', 'assistant', 'system']).required(),
-  content: yup
-    .string()
-    .required()
-    .when('role', {
-      is: 'user',
-      then: (schema) => schema.max(MAX_LENS_CHAT_USER_CHARS),
-      otherwise: (schema) => schema.max(MAX_PROMPT_CHARS),
-    }),
-});
+const chatMessageSchema = lensChatMessageSchema(MAX_PROMPT_CHARS);
 
 const steerTokenSchema = yup.object({
   token: yup.string().max(MAX_STEER_TOKEN_CHARS).required(),
@@ -67,12 +58,15 @@ const lensPromptRequestSchema = yup.object({
   // Exactly one of `prompt` (completion) or `chat` (instruct) is required.
   prompt: yup.string().max(MAX_LENS_COMPLETION_PROMPT_CHARS).optional(),
   chat: yup.array().of(chatMessageSchema).max(MAX_CHAT_MESSAGES).optional(),
+  // Tool definitions for `chat`, which the chat template writes into the prompt.
+  tools: lensChatToolsSchema,
   type: yup
     .array()
     .of(yup.string().oneOf(LENS_TYPES as unknown as string[]))
     .min(1)
     .max(LENS_TYPES.length)
-    .default([...LENS_TYPES]),
+    // Omitted: every type this model's servers have (see `requestLensTypes`).
+    .optional(),
   topN: yup.number().integer().min(1).max(8).default(DEFAULT_LENS_TOP_N),
   temperature: yup.number().min(0).max(2).default(DEFAULT_LENS_TEMPERATURE),
   // The generation ceiling is per model (see `maxLensCompletionTokens`), so the
@@ -161,13 +155,38 @@ const lensPromptRequestSchema = yup.object({
  *                   properties:
  *                     role:
  *                       type: string
- *                       enum: [user, assistant, system]
+ *                       enum: [user, assistant, system, tool]
  *                     content:
  *                       type: string
- *                       description: Message content. User messages are capped at 1024 characters; assistant/system messages at 10000.
+ *                       description: Message content, at most 10000 characters. May be empty for an assistant message that only calls tools.
+ *                     toolCalls:
+ *                       type: array
+ *                       description: Assistant only. The tools this message calls, rendered by the model's chat template.
+ *                       maxItems: 64
+ *                       items:
+ *                         type: object
+ *                         required:
+ *                           - name
+ *                         properties:
+ *                           name:
+ *                             type: string
+ *                           arguments:
+ *                             type: object
+ *                             description: The call's arguments, as a JSON object.
+ *                           id:
+ *                             type: string
+ *                     toolCallId:
+ *                       type: string
+ *                       description: Tool only. The id of the call this message answers.
  *                 example:
  *                   - role: user
  *                     content: "What is the capital of France? Answer in 1 word."
+ *               tools:
+ *                 type: array
+ *                 description: Tool definitions for `chat`, in the OpenAI function-schema shape. The chat template writes them into the prompt. Rejected if the model's chat template does not read tools.
+ *                 maxItems: 128
+ *                 items:
+ *                   type: object
  *               type:
  *                 type: array
  *                 description: Which lens types to compute. Defaults to both.
@@ -354,9 +373,10 @@ export async function POST(request: Request) {
       // not a translation. Still listed explicitly rather than spread, so a new field in the
       // public schema is a deliberate decision to forward rather than an automatic one.
       {
-        type: validated.type as LensType[],
+        type: (validated.type as LensType[] | undefined) ?? requestLensTypes(validated.modelId),
         prompt: !hasInputTokenIds && hasPrompt ? validated.prompt : undefined,
         chat: !hasInputTokenIds && hasChat ? (validated.chat as LensChatMessage[]) : undefined,
+        tools: !hasInputTokenIds && hasChat && validated.tools?.length ? validated.tools : undefined,
         inputTokenIds: hasInputTokenIds ? (validated.inputTokenIds as number[]) : undefined,
         topN: validated.topN,
         temperature: validated.temperature,

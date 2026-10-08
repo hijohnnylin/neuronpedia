@@ -24,14 +24,18 @@ from __future__ import annotations
 
 from argparse import Namespace
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 from interp_engine import RecommendedSampling
+from interp_engine.describe import describe_model
+from interp_engine.protocol import InterpModel
+from interp_engine.residual_basis import ResidualBasis
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
-    _assert_vllm_points_supported,
+    _assert_points_served,
     assert_hooks_available,
     assert_residual_available,
 )
@@ -224,7 +228,7 @@ class TestTheRequestLevelRefusal:
         # the whole-pod condition has to be checked first or the error would name a red herring.
         model = SimpleNamespace(hooks_available=False, tensor_parallel_size=1)
         with pytest.raises(BackendUnsupported, match="GENERATION_ONLY"):
-            _assert_vllm_points_supported(model, [])
+            _assert_points_served(cast("InterpModel", model), [])
 
 
 class TestResidualReads:
@@ -335,6 +339,10 @@ class TestWhatCapabilitiesReports:
             token_limit=200,
             generation_only=not hooks,
         )
+        # `serves` / `residual_basis` are not optional extras on this double: the endpoint asks the
+        # model which points it serves rather than deriving a set, so a double without them is not a
+        # model this app can advertise. Serving everything keeps these tests about the pod-level
+        # flags they were written for; what gets refused per point is tested next door.
         model = SimpleNamespace(
             **{
                 "hooks_available": hooks,
@@ -343,10 +351,23 @@ class TestWhatCapabilitiesReports:
                 "static_writes": (),
                 "grad_support": SimpleNamespace(describe=lambda: {}),
                 "tensor_parallel_size": 1,
+                "residual_basis": ResidualBasis(),
+                "serves": lambda *_a, **_k: True,
                 "recommended_sampling": RecommendedSampling(),
+                "hf_model_id": "gpt2",
+                "n_layers": 12,
+                "d_model": 768,
+                "n_heads": 12,
+                "n_kv_heads": 12,
+                "head_dim": 64,
                 **model_extra,
             }
         )
+        # vLLM's rule: native extraction serves the residual when it is on and the RPC exists.
+        native = bool(getattr(model, "enable_extraction", False)) and callable(
+            getattr(model, "capture_resid_post", None)
+        )
+        model.describe = lambda: describe_model(cast("InterpModel", model), "vllm", native_residual=native)
         Config._instance = config
         module.Model._instance = model  # type: ignore[assignment]
         try:

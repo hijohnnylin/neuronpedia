@@ -1,8 +1,8 @@
 """
 FastAPI server for NLA (Natural Language Autoencoder) inference.
 
-Loads verbalizer model via sgl.Engine in-process (no separate SGLang server needed).
-Uses async_generate() to avoid event-loop conflicts with uvicorn's uvloop.
+Loads the verbalizer through interp-engine (vLLM on CUDA, transformers on MPS / CPU, MLX on a
+Mac); the legacy in-process sgl.Engine stays available as NLA_VERBALIZER_BACKEND=sglang.
 
 Endpoints:
   GET  /health   — one token through the verbalizer; 200 only when it works
@@ -16,6 +16,8 @@ Config via env vars:
   SECRET                          — shared auth secret (X-SECRET-KEY header), covers /docs too
   HEALTH_PROBE_TIMEOUT            — seconds the /health generation may take (default: 20)
   NLA_VERBALIZER_MODEL            — HF hub ID or local path (e.g. kitft/nla-qwen2.5-7b-actor-step4200)
+  NLA_VERBALIZER_BACKEND          — auto (default: vllm on CUDA, eager elsewhere), vllm, eager, mlx,
+                                    or sglang (legacy; install sglang yourself)
   NLA_RECONSTRUCTOR_MODEL         — HF hub ID or local path (optional, enables /score)
   NLA_SOURCE_MODEL                — HF hub ID for the base model (default: Qwen/Qwen2.5-7B-Instruct)
 
@@ -303,7 +305,6 @@ from chat_template_spans import (  # noqa: E402
     has_chat_template,
     terminal_token_ids,
 )
-from eager_verbalizer import EagerVerbalizer  # noqa: E402
 from nla_inference import (  # noqa: E402
     NLAClient,
     NLAReconstructor,
@@ -314,7 +315,7 @@ from nla_inference import (  # noqa: E402
 from startup_memory import (  # noqa: E402
     compute_serving_limits as _nla_compute_serving_limits,
 )
-from vllm_verbalizer import VLLMVerbalizer  # noqa: E402
+from verbalizer import Verbalizer  # noqa: E402
 
 load_dotenv()
 
@@ -396,9 +397,10 @@ SECRET = os.environ.get("SECRET")
 # ─── NLA config from env ────────────────────────────────────────────────────
 
 VERBALIZER_MODEL = os.environ.get("NLA_VERBALIZER_MODEL", "kitft/nla-qwen2.5-7b-actor-step4200")
-# CUDA verbalizer backend: "vllm" (default, engine-owned VLLMModel + prompt_embeds)
-# or "sglang" (legacy in-process sgl.Engine; requires sglang installed).
-VERBALIZER_BACKEND = os.environ.get("NLA_VERBALIZER_BACKEND", "vllm").strip().lower()
+# Which library runs the verbalizer: "auto" (vllm on CUDA, eager transformers elsewhere), a
+# named engine backend ("vllm", "eager", "mlx"), or "sglang" for the legacy in-process
+# sgl.Engine, which you must install yourself.
+VERBALIZER_BACKEND = os.environ.get("NLA_VERBALIZER_BACKEND", "auto").strip().lower()
 RECONSTRUCTOR_MODEL = os.environ.get("NLA_RECONSTRUCTOR_MODEL", "kitft/nla-qwen2.5-7b-critic-step4200")
 SOURCE_MODEL = os.environ.get("NLA_SOURCE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 
@@ -642,7 +644,7 @@ if "NLA_MAX_CONCURRENT" not in os.environ:
 
 
 # Globals
-nla_client: NLAClient | EagerVerbalizer | VLLMVerbalizer | None = None
+nla_client: NLAClient | Verbalizer | None = None
 nla_reconstructor: NLAReconstructor | None = None
 source_model: SourceModel | None = None
 
@@ -658,7 +660,7 @@ def _require_source_model() -> SourceModel:
     return source_model
 
 
-def _require_client() -> NLAClient | EagerVerbalizer | VLLMVerbalizer:
+def _require_client() -> NLAClient | Verbalizer:
     if nla_client is None:
         raise HTTPException(status_code=503, detail="NLA client not loaded")
     return nla_client
@@ -768,38 +770,25 @@ def load_models():
         f"max_model_len={VERBALIZER_MAX_MODEL_LEN or 'model default'}, "
         f"torch_compile={TORCH_COMPILE})"
     )
-    # CUDA verbalizer: the engine-owned vLLM prompt_embeds backend (default), or the
-    # legacy in-process sgl.Engine when NLA_VERBALIZER_BACKEND=sglang (requires sglang
-    # installed). On a no-CUDA box (MPS / CPU) fall back to the eager transformers
-    # verbalizer, which exposes the same interface but runs generate(inputs_embeds=...)
-    # directly (dev/test parity, not production throughput). Embedding lookup is tiny
-    # (~300 MB for Qwen 7B), so CPU is fine for the embed table when no GPU is available.
-    verb_is_cuda = VERBALIZER_DEVICE.startswith("cuda")
-    if verb_is_cuda:
-        verbalizer_cls = NLAClient if VERBALIZER_BACKEND == "sglang" else VLLMVerbalizer
-        print(f"[NLA] CUDA verbalizer backend: {verbalizer_cls.__name__}")
-        nla_client = verbalizer_cls(
-            VERBALIZER_MODEL,
-            nla_config=cfg,
-            embed_device=VERBALIZER_DEVICE,
-            device=VERBALIZER_DEVICE,
-            tp_size=TP_SIZE,
-            mem_fraction_static=MEM_FRACTION,
-            quantization=VERBALIZER_QUANTIZATION,
-            kv_cache_dtype=KV_CACHE_DTYPE,
-            cuda_graph_max_bs=CUDA_GRAPH_MAX_BS,
-            enable_torch_compile=TORCH_COMPILE,
-            max_model_len=VERBALIZER_MAX_MODEL_LEN,
-        )
+    # The engine verbalizer picks its library from NLA_VERBALIZER_BACKEND and the device (see
+    # verbalizer.resolve_backend); the legacy in-process sgl.Engine is the one path outside it.
+    # Embedding lookup is tiny (~300 MB for Qwen 7B), so the embed table stays on CPU.
+    verbalizer_kwargs: dict[str, Any] = {
+        "nla_config": cfg,
+        "embed_device": "cpu",
+        "device": VERBALIZER_DEVICE,
+        "tp_size": TP_SIZE,
+        "mem_fraction_static": MEM_FRACTION,
+        "quantization": VERBALIZER_QUANTIZATION,
+        "kv_cache_dtype": KV_CACHE_DTYPE,
+        "cuda_graph_max_bs": CUDA_GRAPH_MAX_BS,
+        "enable_torch_compile": TORCH_COMPILE,
+        "max_model_len": VERBALIZER_MAX_MODEL_LEN,
+    }
+    if VERBALIZER_BACKEND == "sglang":
+        nla_client = NLAClient(VERBALIZER_MODEL, **verbalizer_kwargs)
     else:
-        print(f"[NLA] No CUDA verbalizer device ({VERBALIZER_DEVICE}); using eager transformers verbalizer backend.")
-        nla_client = EagerVerbalizer(
-            VERBALIZER_MODEL,
-            nla_config=cfg,
-            embed_device="cpu",
-            device=VERBALIZER_DEVICE,
-            dtype=resolve_dtype_for_device(VERBALIZER_DEVICE),
-        )
+        nla_client = Verbalizer(VERBALIZER_MODEL, backend=VERBALIZER_BACKEND, **verbalizer_kwargs)
     if is_cuda:
         _log_per_device_vram("after verbalizer", cuda_idxs_for_models)
 
@@ -906,7 +895,8 @@ def _print_ready_banner(elapsed_seconds: float) -> None:
     _print_banner(
         f"==== LOADING COMPLETE - SERVING ON {_serving_url()} ====",
         [
-            f"verbalizer: {verb_status} @ {VERBALIZER_DEVICE} (backend={VERBALIZER_BACKEND})",
+            f"verbalizer: {verb_status} @ {VERBALIZER_DEVICE} "
+            f"(backend={nla_client.backend if nla_client is not None else VERBALIZER_BACKEND})",
             f"reconstructor: {recon_status} @ {RECONSTRUCTOR_DEVICE}",
             f"source: {source_status} @ {SOURCE_DEVICE}",
             f"concurrency: source={SOURCE_MAX_CONCURRENT} "
@@ -929,17 +919,15 @@ async def lifespan(app: FastAPI):
     _reconstructor_semaphore = asyncio.Semaphore(RECONSTRUCTOR_MAX_CONCURRENT)
     _describe_semaphore = asyncio.Semaphore(MAX_DESCRIBE_REQUESTS)
     load_models()
-    # Boot the verbalizer's vLLM engine here rather than letting the first /explain
-    # pay for it (~75s). Must stay AFTER load_models(): vLLM sizes its KV pool from
-    # free VRAM at profiling time, so the source model and reconstructor have to be
-    # resident first or the pool grows and they no longer fit.
-    # Only the vLLM verbalizer has an engine to warm; the eager and sglang backends load
-    # their weights synchronously in load_models() above.
-    if isinstance(nla_client, VLLMVerbalizer):
+    # Boot the verbalizer here rather than letting the first /explain pay for it (~75s on
+    # vLLM). Must stay AFTER load_models(): vLLM sizes its KV pool from free VRAM at profiling
+    # time, so the source model and reconstructor have to be resident first or the pool grows
+    # and they no longer fit.
+    if nla_client is not None:
         _warm_t0 = time.monotonic()
-        print("[NLA] warming verbalizer vLLM engine...")
+        print("[NLA] warming verbalizer...")
         await nla_client.aload()
-        print(f"[NLA] verbalizer engine warm in {time.monotonic() - _warm_t0:.1f}s")
+        print(f"[NLA] verbalizer warm in {time.monotonic() - _warm_t0:.1f}s")
     print(f"[NLA] source-model concurrency gate: max={SOURCE_MAX_CONCURRENT} (NLA_SOURCE_MAX_CONCURRENT)")
     print(f"[NLA] /explain concurrency gate: max={MAX_CONCURRENT_EXPLAINS} (NLA_MAX_CONCURRENT_EXPLAINS)")
     print(f"[NLA] verbalizer fan-out gate (server-wide): max={MAX_CONCURRENT} (NLA_MAX_CONCURRENT)")

@@ -9,10 +9,9 @@
 
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { JlensShareSteer } from '@/lib/utils/jlens-share';
-import { DEFAULT_LENS_STEER_STRENGTH, LensMetaMessage, LensMode, LensTokenMessage, LensType } from '@/lib/utils/lens';
+import { DEFAULT_LENS_STEER_STRENGTH, LensMetaMessage, LensTokenMessage, LensType } from '@/lib/utils/lens';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildDiffSidebar,
   buildSidebar,
   buildSidebarWithOutputTokens,
   COLOR_PILL,
@@ -30,7 +29,8 @@ import {
   TokenViz,
   TypeSidebar,
 } from './jlens-analysis';
-import { LensModeContext, lensTypesForMode } from './jlens-lens-mode';
+import { hasJppLens, LensColumnsContext, lensTypesOf, resolveLensColumns } from './jlens-lens-mode';
+import { useOracleReads } from './jlens-oracle';
 import { LensUnknownTokenError } from './jlens-stream';
 import { setJlensPopupsSuppressed, TokenBand, useIsLensMobile } from './jlens-token';
 import { LayerRange, LayerStatsResolver, LensSliderControls, PillColorResolver } from './jlens-token-popup';
@@ -113,6 +113,7 @@ export function useJlensAnalysis({
   inferenceAvailable = true,
   onInferenceUnavailable,
   onSidebarSelectionChange,
+  oracleEnabled = true,
 }: {
   tokens: LensTokenMessage[];
   meta: LensMetaMessage | null;
@@ -129,20 +130,20 @@ export function useJlensAnalysis({
   // whose sidebar selection is edited has diverged from the shared snapshot, so
   // the shared view uses this to drop the `?shareId=` (URL + tracked state).
   onSidebarSelectionChange?: () => void;
+  // False when the oracle cannot read this run (the steered run: a read uses
+  // the unsteered activations).
+  oracleEnabled?: boolean;
 }) {
   const { globalModels, showToastMessage } = useGlobalContext();
   // Kept in a ref so `toggleSelect` (below) can call the latest handler without
   // listing it as a dependency / recreating the callback on every render.
   const onSidebarSelectionChangeRef = useRef(onSidebarSelectionChange);
   onSidebarSelectionChangeRef.current = onSidebarSelectionChange;
-  const lensMode = useContext(LensModeContext);
-  const sidebarTypes = lensTypesForMode(lensMode);
-  const lensModeLabel =
-    lensMode === LensMode.DIFF
-      ? 'J-Space vs Logit Lens'
-      : lensMode === LensMode.JACOBIAN_LENS
-        ? 'J-Space'
-        : 'Logit Lens';
+  const oracle = useOracleReads({ modelId, tokens, meta, enabled: oracleEnabled, busy });
+  const chosenColumns = useContext(LensColumnsContext);
+  const jppAvailable = hasJppLens(meta?.layers_by_type);
+  const columns = useMemo(() => resolveLensColumns(chosenColumns, jppAvailable), [chosenColumns, jppAvailable]);
+  const sidebarTypes = useMemo(() => lensTypesOf(columns), [columns]);
   const modelLayers = globalModels[modelId]?.layers ?? null;
   const layersByType = useMemo(() => meta?.layers_by_type ?? {}, [meta]);
 
@@ -387,13 +388,7 @@ export function useJlensAnalysis({
     return buildSidebarWithOutputTokens(filtered, layersByType, listRange, false, hideNonWordTokens);
   }, [selectedPositions, tokens, layersByType, listRange, hideNonWordTokens]);
 
-  const activeSidebarBase = filteredSidebar ?? positionSidebar ?? listSidebar;
-  // In DIFF mode each column shows its lens's net advantage over the other; the
-  // per-type viz/highlighting below still uses the untransformed per-type data.
-  const activeSidebar = useMemo(
-    () => (lensMode === LensMode.DIFF ? buildDiffSidebar(activeSidebarBase, hideNonWordTokens) : activeSidebarBase),
-    [lensMode, activeSidebarBase, hideNonWordTokens],
-  );
+  const activeSidebar = filteredSidebar ?? positionSidebar ?? listSidebar;
 
   const positionScopeLabel = useMemo(() => {
     if (selectedPositions.size > 0) {
@@ -414,39 +409,30 @@ export function useJlensAnalysis({
   const [maxSelectError, setMaxSelectError] = useState(false);
   const [barHover, setBarHover] = useState<{ key: string; type: LensType; layer: number } | null>(null);
 
-  // Migrate the existing selection when the lens mode changes so the chosen
-  // tokens follow the user across modes.
+  // When a lens column is hidden and one lens column is left, its locked
+  // tokens move to that column, so the chosen tokens follow the user.
+  const sidebarTypesKey = sidebarTypes.join(',');
   useEffect(() => {
+    if (sidebarTypes.length !== 1) {
+      return;
+    }
+    const [only] = sidebarTypes;
     setSelected((cur) => {
-      if (cur.length === 0) {
+      if (cur.every((s) => s.type === only)) {
         return cur;
       }
-      const keysInOrder: string[] = [];
       const seen = new Set<string>();
+      const out: SelectedToken[] = [];
       for (const s of cur) {
         if (!seen.has(s.key)) {
           seen.add(s.key);
-          keysInOrder.push(s.key);
+          out.push({ key: s.key, type: only });
         }
       }
-      if (lensMode === LensMode.DIFF) {
-        // Preserve each token's existing column (its lens type) instead of
-        // mirroring the selection into both columns — keep only the column that
-        // was selected last (coming from a single-lens mode, that's that mode).
-        const seenPair = new Set<string>();
-        const kept: SelectedToken[] = [];
-        for (const s of cur) {
-          const pairKey = `${s.type}:${s.key}`;
-          if (!seenPair.has(pairKey)) {
-            seenPair.add(pairKey);
-            kept.push(s);
-          }
-        }
-        return kept.slice(0, MAX_SELECT);
-      }
-      return keysInOrder.map((key) => ({ key, type: lensMode }));
+      return out;
     });
-  }, [lensMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarTypesKey]);
 
   const toggleSelect = useCallback(
     (key: string, type: LensType) => {
@@ -932,10 +918,10 @@ export function useJlensAnalysis({
     // response). Used to gate steer/swap entry points so they can't start a
     // second inference run mid-generation.
     busy,
-    // lens mode
-    lensMode,
+    // lens columns
+    columns,
     sidebarTypes,
-    lensModeLabel,
+    oracle,
     layersByType,
     // layer range
     layerBounds,

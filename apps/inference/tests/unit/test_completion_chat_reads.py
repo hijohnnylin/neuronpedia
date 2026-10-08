@@ -1,4 +1,4 @@
-"""Requesting several readout reads at once: agreement, capture points, and shaping.
+"""Requesting several readout reads at once: agreement and shaping.
 
 Three properties matter, and the shipped assets make each of them load-bearing rather than
 speculative -- the 8B model ships six traits spread over five layers:
@@ -7,8 +7,8 @@ speculative -- the 8B model ships six traits spread over five layers:
   they change the text itself. Two reads fitted under different conditions cannot both be
   measured in one generation, and serving one vector's numbers off the other's prompt would be a
   wrong answer rather than a missing one.
-- **Captures are shared.** One forward per condition, however many reads ask for it. What is shared
-  is the point in the model; two reads that reduce it differently still cost one forward.
+- **Captures are shared.** One forward per condition, however many reads ask for it; that half
+  is pinned in ``test_capture_engine_spans.py``, where the capture lives.
 - **Readouts are keyed by id, not title.** A title is a display string; these values get
   persisted.
 
@@ -24,8 +24,6 @@ import torch
 
 from neuronpedia_inference.endpoints.steer.completion_chat import (
     _agreed_render_conditions,
-    _declared_points,
-    _read_capture_points,
     build_readouts,
 )
 from neuronpedia_inference.inference_utils.vectors.vector_data import (
@@ -135,32 +133,6 @@ class TestRenderAgreement:
         last = _read("t_last", 19, read=ReadSpec(pool="last"))
         _render, conflict = _agreed_render_conditions([mean, last])
         assert conflict is None
-
-
-class TestCapturePoints:
-    def test_nothing_requested_captures_nothing(self):
-        assert _read_capture_points([]) == {}
-
-    def test_layers_are_deduplicated(self):
-        # Two reads at layer 19 must not cost two captures; the 8B asset has exactly that pair.
-        points = _read_capture_points([_read("mit_empathy", 19), _read("mit_erudite", 19), _read("mit_toxic", 13)])
-        assert sorted(key.layer for key in points) == [13, 19]
-
-    def test_each_point_reads_the_residual_stream_at_its_layer(self):
-        points = _read_capture_points([_read("t_a", 29)])
-        assert str(points[_cap(29)]) == "resid_post.29"
-
-    def test_two_poolings_at_one_layer_are_two_captures(self):
-        # A layer used to be the whole key, so the second of these read the first's mean under
-        # its own name -- a plausible number from the wrong reduction.
-        points = _read_capture_points([_read("t_mean", 19), _read("t_last", 19, read=ReadSpec(pool="last"))])
-        assert sorted(key.pool for key in points) == ["last", "mean"]
-
-    def test_two_poolings_at_one_layer_declare_one_address(self):
-        # And the point of keying by the reduction rather than capturing twice: the generation is
-        # asked for that layer once, and the one tensor is pooled two ways.
-        points = _read_capture_points([_read("t_mean", 19), _read("t_last", 19, read=ReadSpec(pool="last"))])
-        assert [str(point) for point in _declared_points(points)] == ["resid_post.19"]
 
 
 class TestBuildReadouts:

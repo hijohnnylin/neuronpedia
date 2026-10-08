@@ -40,8 +40,13 @@ export interface JlensTokenGroup {
   messageIndex?: number;
 }
 
-export function toChatPayload(messages: { role: ChatRole; content: string }[]): LensChatMessage[] {
-  return messages.map((m) => ({ role: m.role, content: m.content }));
+export function toChatPayload(messages: readonly LensChatMessage[]): LensChatMessage[] {
+  return messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+    ...(m.toolCalls?.length ? { toolCalls: m.toolCalls } : {}),
+    ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+  }));
 }
 
 // The text a run of tokens spells out. This is NOT `tokens.map(t => t.token).join('')`: a
@@ -100,6 +105,11 @@ function sectionBucket(section: string | null | undefined): 'header' | 'content'
   if (section === 'footer') return 'footer';
   if (section === 'header' || section === 'scaffold') return 'header';
   return 'content';
+}
+
+// A tool result shows on the assistant side, with the calls of its agent turn.
+function bubbleRole(role: string): BubbleRole {
+  return role === 'user' || role === 'system' ? role : 'assistant';
 }
 
 // Group the flat, span-tagged token stream into per-message bubbles.
@@ -174,7 +184,7 @@ export function groupTokensBySpans(tokens: LensTokenMessage[]): {
     else group.contentTokens.push(t);
     if (t.role != null && group.roleLabel === undefined) {
       group.roleLabel = t.role;
-      group.role = t.role === 'user' || t.role === 'system' ? t.role : 'assistant';
+      group.role = bubbleRole(t.role);
     }
     if (t.channel && group.channel === undefined) {
       group.channel = t.channel;

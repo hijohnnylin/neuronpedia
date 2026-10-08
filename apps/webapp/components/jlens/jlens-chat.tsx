@@ -14,14 +14,15 @@ import {
   DEFAULT_LENS_COMPLETION_TOKENS,
   DEFAULT_LENS_TEMPERATURE,
   DEFAULT_LENS_TOP_N,
-  LENS_TYPE_ORDER,
+  LensChatMessage,
+  LensChatTool,
   LensMetaMessage,
-  LensMode,
   LensTokenMessage,
   LensType,
   MAX_LENS_CHAT_PREFILL_CHARS,
   MAX_LENS_CHAT_USER_CHARS,
   maxLensCompletionTokens,
+  requestLensTypes,
 } from '@/lib/utils/lens';
 import { ArrowUp, Check, Copy, Download, Pencil, Settings, Share2, Trash2, X } from 'lucide-react';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -40,6 +41,7 @@ import {
 import { JlensCommentary, useSharedCommentary } from './jlens-commentary';
 import {
   buildSteerShareBody,
+  clampLayerRange,
   defaultExportFilename,
   downloadJson,
   JlensExportChat,
@@ -47,7 +49,7 @@ import {
   parseFixture,
   tokenSpansOf,
 } from './jlens-export';
-import { LensModeSetContext } from './jlens-lens-mode';
+import { LensColumnsSetContext } from './jlens-lens-mode';
 import { JlensShareDialog } from './jlens-share-dialog';
 import { DefaultOutputHeader, SteerOutputHeader } from './jlens-steer-panel';
 import { runLensStream as baseRunLensStream, LensUnknownTokenError, RunLensStreamParams } from './jlens-stream';
@@ -55,7 +57,7 @@ import JlensTokenChip, { JlensTokenRun, scrollContainerToTokenPositions, TokenBa
 import { LayerRange } from './jlens-token-popup';
 import { SteerConfig, useJlensAnalysis } from './use-jlens-analysis';
 
-type ChatMessage = { role: 'user' | 'assistant'; content: string };
+type ChatMessage = LensChatMessage;
 
 export default function JlensChat({
   modelId,
@@ -115,12 +117,19 @@ export default function JlensChat({
   // steer, filter toggle) hits the same endpoint/bucket, so all go through
   // `runLensStream` below, which updates this via `onRateLimit`.
   const [limitRemaining, setLimitRemaining] = useState<number | null>(null);
+  // Tool definitions of a loaded chat (e.g. an imported transcript). Every chat
+  // request must send them, or the template renders a different prompt.
+  const toolsRef = useRef<LensChatTool[]>([]);
   // Wrap the shared stream helper so every call reports its remaining rate
-  // limit into `limitRemaining` without threading the callback through each
-  // call site.
+  // limit into `limitRemaining` and sends the loaded tools, without threading
+  // either through each call site.
   const runLensStream = useCallback(
     (params: Omit<RunLensStreamParams, 'onRateLimit'>) =>
-      baseRunLensStream({ ...params, onRateLimit: setLimitRemaining }),
+      baseRunLensStream({
+        ...params,
+        tools: params.chat ? toolsRef.current : undefined,
+        onRateLimit: setLimitRemaining,
+      }),
     [],
   );
 
@@ -164,7 +173,7 @@ export default function JlensChat({
   const [steerMeta, setSteerMeta] = useState<LensMetaMessage | null>(null);
 
   const { user } = useGlobalContext();
-  const setLensMode = useContext(LensModeSetContext);
+  const setLensColumns = useContext(LensColumnsSetContext);
 
   // The shared-commentary banner state, lifted here so the mobile banner (above
   // the chat) and the desktop banner (in the analysis panel) share one dismiss.
@@ -186,9 +195,10 @@ export default function JlensChat({
     meta: steerMeta,
     modelId,
     busy: analysis.steerStreaming,
+    oracleEnabled: false,
   });
   const {
-    lensMode,
+    columns: lensColumns,
     layersByType,
     effectiveRange,
     hideNonWordTokens,
@@ -217,6 +227,9 @@ export default function JlensChat({
   // A steered run restored from a shared link, applied once the main tokens have
   // been hydrated (so the steer panel's per-layer counts compute correctly).
   const pendingSteerRef = useRef<JlensExportSteer | null>(null);
+  // A shared run's layer range (null = default). It is set after the tokens
+  // render, because new layers reset the range. Undefined = nothing to set.
+  const pendingLayerRangeRef = useRef<[number, number] | null | undefined>(undefined);
   // The readout to highlight in the steered transcript, snapshotted when a
   // steered run is started (or restored). Editing the swap token afterwards does
   // NOT change it — the highlight only updates on a new steered run.
@@ -325,7 +338,7 @@ export default function JlensChat({
       await runLensStream({
         modelId,
         chat: toChatPayload(requestMessages),
-        type: LENS_TYPE_ORDER,
+        type: requestLensTypes(modelId),
         topN,
         temperature,
         numCompletionTokens,
@@ -444,7 +457,7 @@ export default function JlensChat({
         await runLensStream({
           modelId,
           chat: toChatPayload(conversation),
-          type: LENS_TYPE_ORDER,
+          type: requestLensTypes(modelId),
           topN,
           temperature,
           numCompletionTokens: 0,
@@ -610,7 +623,11 @@ export default function JlensChat({
       return;
     }
     const idx = editingIdx;
-    const conversation: ChatMessage[] = [...messages.slice(0, idx), { role: 'assistant', content: editingText }];
+    // Keep the message's other fields (its tool calls), so only the text changes.
+    const conversation: ChatMessage[] = [
+      ...messages.slice(0, idx),
+      { ...messages[idx], role: 'assistant', content: editingText },
+    ];
     // Tokens for the turns before the edited assistant, shown while the
     // re-analysis streams back so they don't flicker into placeholders.
     const cutoff = tokenCutoffForMessage(idx);
@@ -717,7 +734,7 @@ export default function JlensChat({
         await runLensStream({
           modelId,
           chat: toChatPayload(requestConvo),
-          type: LENS_TYPE_ORDER,
+          type: requestLensTypes(modelId),
           topN,
           temperature,
           numCompletionTokens,
@@ -793,7 +810,7 @@ export default function JlensChat({
         await runLensStream({
           modelId,
           inputTokenIds: ids as number[],
-          type: LENS_TYPE_ORDER,
+          type: requestLensTypes(modelId),
           topN,
           temperature,
           numCompletionTokens: 0,
@@ -843,7 +860,7 @@ export default function JlensChat({
           await runLensStream({
             modelId,
             inputTokenIds: steerIds as number[],
-            type: LENS_TYPE_ORDER,
+            type: requestLensTypes(modelId),
             topN,
             temperature,
             numCompletionTokens: 0,
@@ -1051,6 +1068,7 @@ export default function JlensChat({
       return;
     }
     setMessages([]);
+    toolsRef.current = [];
     setTokens([]);
     setMeta(null);
     setError(null);
@@ -1082,6 +1100,7 @@ export default function JlensChat({
     setEditingText('');
     setAwaitingReanalyze(false);
     setMessages(loadedData.messages ?? []);
+    toolsRef.current = loadedData.tools ?? [];
     setMeta(loadedData.meta ?? null);
     // Shares are re-run server-side with generation disabled, so their tokens
     // come back without `is_generated` set. Rebuild the prompt→generated
@@ -1092,6 +1111,8 @@ export default function JlensChat({
     const restoreGenerated = (t: LensTokenMessage, i: number): LensTokenMessage =>
       typeof numPromptTokens === 'number' ? { ...t, is_generated: i >= numPromptTokens } : t;
     setTokens((loadedData.tokens ?? []).map(restoreGenerated));
+    pendingLayerRangeRef.current = loadedData.layerRange ?? null;
+    analysis.oracle.seed(loadedData.oracle, loadedData.tokens ?? [], loadedData.meta ?? null);
     // Restore a saved steered run (if any). The steered results are applied
     // immediately; entering steer mode is deferred to the effect below so the
     // per-layer counts compute against the just-set main tokens.
@@ -1121,19 +1142,13 @@ export default function JlensChat({
       // now offers, so keep the restored value within it.
       setNumCompletionTokens(Math.min(ui.numCompletionTokens, maxCompletionTokens));
       pendingScrollSelectionRef.current = ui.selectedPositions.length > 0 ? ui.selectedPositions : null;
-      if (
-        ui.activeLensModeTab === LensMode.JACOBIAN_LENS ||
-        ui.activeLensModeTab === LensMode.LOGIT_LENS ||
-        ui.activeLensModeTab === LensMode.DIFF
-      ) {
-        setLensMode(ui.activeLensModeTab);
-      }
+      setLensColumns(ui.lensColumns);
     } else {
       setSelectedPositions(new Set());
       pendingScrollSelectionRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedData, setLensMode]);
+  }, [loadedData, setLensColumns]);
 
   // Once a shared run's tokens have rendered, bring its restored selection into
   // view by scrolling ONLY the transcript container (never the page). Re-runs
@@ -1152,6 +1167,15 @@ export default function JlensChat({
     return () => cancelAnimationFrame(raf);
   }, [tokens, steerTokens]);
 
+  useEffect(() => {
+    const range = pendingLayerRangeRef.current;
+    if (range !== undefined && tokens.length > 0) {
+      pendingLayerRangeRef.current = undefined;
+      analysis.setLayerRange(clampLayerRange(range, analysis.layerBounds));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokens]);
+
   // Enter steer mode for a restored share once the main tokens are in place.
   useEffect(() => {
     const pending = pendingSteerRef.current;
@@ -1169,12 +1193,14 @@ export default function JlensChat({
       modelId,
       exportedAt: new Date().toISOString(),
       messages,
+      ...(toolsRef.current.length ? { tools: toolsRef.current } : {}),
       meta,
       tokens,
       steer:
         analysis.steer && steerTokens.length > 0
           ? { config: analysis.steer, meta: steerMeta, tokens: steerTokens }
           : undefined,
+      oracle: analysis.oracle.sharedReads(),
     };
     downloadJson(data, defaultExportFilename('chat', modelId));
   }
@@ -1182,6 +1208,7 @@ export default function JlensChat({
   // Sharing requires every token to carry an id so the server can faithfully
   // re-run inference over the exact sequence (older fixtures may lack ids).
   const canShare = tokens.length > 0 && tokens.every((t) => typeof t.id === 'number');
+  const shareLabel = 'Share this chat';
 
   const hasConversation = messages.length > 0 || tokens.length > 0;
 
@@ -1229,9 +1256,9 @@ export default function JlensChat({
                       canCopy: !isEditing,
                       canEdit: !streaming && !steering && !isEditing,
                       onCopy: () => handleCopyMessage(idx, copyContent),
-                      // System turns are copy-only: there is no system-prompt editor.
+                      // System and tool turns are copy-only: there is no editor for them.
                       onEdit:
-                        msgIdx == null || group.role === 'system'
+                        msgIdx == null || group.role === 'system' || group.roleLabel === 'tool'
                           ? undefined
                           : () =>
                               group.role === 'user'
@@ -1297,8 +1324,8 @@ export default function JlensChat({
             type="button"
             onClick={() => setShareOpen(true)}
             disabled={!canShare || streaming}
-            title="Share this chat"
-            aria-label="Share this chat"
+            title={shareLabel}
+            aria-label={shareLabel}
             className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8"
           >
             <Share2 className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -1422,6 +1449,7 @@ export default function JlensChat({
             inputTokenIds: tokens.map((t) => t.id),
             spans: tokenSpansOf(tokens),
             messages,
+            tools: toolsRef.current.length ? toolsRef.current : undefined,
             topN,
             temperature,
             numCompletionTokens,
@@ -1429,12 +1457,14 @@ export default function JlensChat({
               const firstGen = tokens.findIndex((t) => t.is_generated);
               return firstGen === -1 ? tokens.length : firstGen;
             })(),
-            activeLensModeTab: lensMode,
+            lensColumns,
             hideNonWordTokens,
+            layerRange: analysis.layerRange ?? undefined,
             lockedTokens: selected.map((s) => ({ key: s.key, type: s.type })),
             selectedPositions: Array.from(selectedPositions),
             description: description || undefined,
             steer: buildSteerShareBody(analysis.steer, steerTokens),
+            oracle: analysis.oracle.sharedReads(),
           })}
         />
 
@@ -1556,7 +1586,7 @@ export default function JlensChat({
           onShare={() => setShareOpen(true)}
           canShare={canShare}
           shareDisabled={streaming}
-          shareLabel="Share this chat"
+          shareLabel={shareLabel}
           onExport={handleExport}
           exportDisabled={tokens.length === 0}
           exportLabel="Export this chat to JSON"
@@ -1629,8 +1659,10 @@ function GroupBubble({
     <div className={`group flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`relative flex max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`flex flex-col rounded-xl bg-white px-3 py-2 sm:gap-y-0.5`}>
-          {group.role === 'system' && (
-            <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">system</div>
+          {(group.role === 'system' || group.roleLabel === 'tool') && (
+            <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+              {group.role === 'system' ? 'system' : 'tool'}
+            </div>
           )}
           {group.headerTokens.length > 0 && (
             <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">

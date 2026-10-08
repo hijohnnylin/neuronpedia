@@ -11,11 +11,13 @@ from neuronpedia_inference.endpoints.activation.single import (
     get_layer_num_from_sae_id,
     process_feature_activations,
     process_neuron_activations,
+    vector_activation_values,
 )
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     calculate_dfa_for_values,
     capture_padded_cache_async,
+    project_vector_async,
 )
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import activation_single_batch_cost
@@ -150,7 +152,7 @@ async def activation_single_batch(
         # exactly one of (source, index) / (vector, hook).
         vector = cast(list[float], request.vector)
         hook = cast(str, request.hook)
-        prepend_bos = model.tok.tokenizer_prepends_bos
+        prepend_bos = model.tokenizer_prepends_bos
 
         all_tokens = []
         all_str_tokens = []
@@ -172,7 +174,7 @@ async def activation_single_batch(
 
         # Process all prompts in batch
         try:
-            results = await process_vector_activations_batch(vector, all_tokens, hook, model, sae_manager.device)
+            results = await process_vector_activations_batch(vector, all_tokens, hook, model)
         except BackendUnsupported as e:
             return JSONResponse(content={"error": str(e)}, status_code=400)
 
@@ -288,68 +290,14 @@ async def process_activations_batch(
 
 
 async def process_vector_activations_batch(
-    vector: torch.Tensor | list[float],
+    vector: list[float],
     tokens_list: list[torch.Tensor],
     hook_name: str,
     model: LoadedModel,
-    device: str | torch.device,
 ) -> list[ActivationValues]:
-    """
-    Process multiple token sequences with a custom vector in a single batch for GPU efficiency.
-    Returns results in the same order as input.
-    """
-    if not isinstance(vector, torch.Tensor):
-        vector = torch.tensor(vector, device=device)
-
-    # Pad sequences to the same length
-    max_len = max(len(tokens) for tokens in tokens_list)
-    batch_size = len(tokens_list)
-
-    # Create padded batch tensor
-    pad_token_id = (
-        model.tokenizer.pad_token_id if model.tokenizer.pad_token_id is not None else model.tokenizer.eos_token_id
-    )
-
-    padded_tokens = torch.full(
-        (batch_size, max_len),
-        pad_token_id,
-        dtype=tokens_list[0].dtype,
-        device=tokens_list[0].device,
-    )
-
-    # Track original lengths
-    original_lengths = []
-
-    for i, tokens in enumerate(tokens_list):
-        padded_tokens[i, : len(tokens)] = tokens
-        original_lengths.append(len(tokens))
-
-    # Run batch inference (backend-aware)
-    cache = await capture_padded_cache_async(model, padded_tokens, original_lengths, [hook_name])
-
-    # Get activations for the batch
-    activations = cache[hook_name].to(device)
-
-    # Ensure vector has the same dtype as activations
-    vector = vector.to(dtype=activations.dtype)
-
-    # Process each sequence separately
-    results = []
-    for i in range(batch_size):
-        seq_len = original_lengths[i]
-        # Extract activations for this sequence (non-padded portion)
-        seq_activations = activations[i : i + 1, :seq_len]
-
-        # Apply vector projection
-        feature_acts = torch.matmul(seq_activations, vector)
-        values = feature_acts.squeeze(0).detach().tolist()
-        max_value = max(values)
-
-        result = ActivationValues(
-            values=values,
-            max_value=max_value,
-            max_value_index=values.index(max_value),
-        )
-        results.append(result)
-
-    return results
+    """One direction read over each prompt, in input order: one ``project`` per prompt."""
+    direction = torch.tensor(vector)
+    return [
+        vector_activation_values(await project_vector_async(model, tokens, hook_name, direction))
+        for tokens in tokens_list
+    ]

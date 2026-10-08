@@ -1,12 +1,17 @@
-// Client helper to POST to `/api/lens/prompt` and consume the NDJSON stream
-// (one JSON message per line). Invokes the provided callbacks as `meta`,
-// `token`, and `done` messages arrive, and throws on `error` messages or a
-// non-ok response.
+// Client helpers to POST to `/api/lens/prompt` and `/api/lens/oracle` and
+// consume their NDJSON streams (one JSON message per line). They invoke the
+// callbacks as messages arrive, and throw on `error` messages or a non-ok
+// response.
 
 import {
   LensChatMessage,
+  LensChatTool,
   LensDoneMessage,
   LensMetaMessage,
+  LensOracleMetaMessage,
+  LensOraclePartialMessage,
+  LensOracleReadMessage,
+  LensOracleStreamMessage,
   LensPromptTokensMessage,
   LensSteerToken,
   LensStreamMessage,
@@ -33,6 +38,8 @@ export interface RunLensStreamParams {
   modelId: string;
   prompt?: string;
   chat?: LensChatMessage[];
+  // Tool definitions for `chat`, rendered into the prompt by the chat template.
+  tools?: LensChatTool[];
   type: LensType[];
   topN: number;
   temperature: number;
@@ -83,6 +90,7 @@ export async function runLensStream(params: RunLensStreamParams): Promise<void> 
     modelId,
     prompt,
     chat,
+    tools,
     type,
     topN,
     temperature,
@@ -113,6 +121,7 @@ export async function runLensStream(params: RunLensStreamParams): Promise<void> 
       modelId,
       prompt,
       chat,
+      tools: tools?.length ? tools : undefined,
       type,
       topN,
       temperature,
@@ -154,20 +163,7 @@ export async function runLensStream(params: RunLensStreamParams): Promise<void> 
     throw new Error(message);
   }
 
-  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-  let buffer = '';
-
-  const handleLine = (line: string) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      return;
-    }
-    let msg: LensStreamMessage;
-    try {
-      msg = JSON.parse(trimmed) as LensStreamMessage;
-    } catch {
-      return;
-    }
+  await readNdjson<LensStreamMessage>(res.body, (msg) => {
     switch (msg.kind) {
       case 'meta':
         onMeta?.(msg);
@@ -186,8 +182,27 @@ export async function runLensStream(params: RunLensStreamParams): Promise<void> 
       default:
         break;
     }
-  };
+  });
+}
 
+// Calls `onMessage` with each JSON line of an NDJSON body. Lines that do not
+// parse are skipped.
+async function readNdjson<T>(body: NonNullable<Response['body']>, onMessage: (msg: T) => void): Promise<void> {
+  const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  const handleLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return;
+    }
+    let msg: T;
+    try {
+      msg = JSON.parse(trimmed) as T;
+    } catch {
+      return;
+    }
+    onMessage(msg);
+  };
   while (true) {
     // eslint-disable-next-line no-await-in-loop
     const { done, value } = await reader.read();
@@ -207,4 +222,56 @@ export async function runLensStream(params: RunLensStreamParams): Promise<void> 
   if (buffer.trim()) {
     handleLine(buffer);
   }
+}
+
+export interface RunOracleStreamParams {
+  modelId: string;
+  // The token ids of the run; only `tokenIds[0..position]` affect the read.
+  tokenIds: number[];
+  position: number;
+  // More positions to read in the same request.
+  positions?: number[];
+  layers?: number[];
+  // False: no `onPartial` calls.
+  partial?: boolean;
+  signal?: AbortSignal;
+  onMeta?: (msg: LensOracleMetaMessage) => void;
+  // A layer's text so far, before its read.
+  onPartial?: (msg: LensOraclePartialMessage) => void;
+  onRead?: (msg: LensOracleReadMessage) => void;
+}
+
+// An error whose status says the servers have no oracle for this model.
+export class OracleUnavailableError extends Error {}
+
+export async function runOracleStream(params: RunOracleStreamParams): Promise<void> {
+  const { modelId, tokenIds, position, positions, layers, partial, signal } = params;
+  const { onMeta, onPartial, onRead } = params;
+  const res = await fetch('/api/lens/oracle', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modelId, tokenIds, position, positions, layers, partial }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 404) {
+      throw new OracleUnavailableError(data.error ?? 'The oracle lens is not available for this model.');
+    }
+    if (res.status === 429 && typeof data?.limitPerWindow === 'number') {
+      throw new Error('Hourly limit reached. Please wait a bit and try again later.');
+    }
+    throw new Error(data.error ?? `Request failed (${res.status})`);
+  }
+  await readNdjson<LensOracleStreamMessage>(res.body, (msg) => {
+    if (msg.kind === 'meta') {
+      onMeta?.(msg);
+    } else if (msg.kind === 'partial') {
+      onPartial?.(msg);
+    } else if (msg.kind === 'read') {
+      onRead?.(msg);
+    } else if (msg.kind === 'error') {
+      throw new Error(msg.error || 'Oracle stream error');
+    }
+  });
 }

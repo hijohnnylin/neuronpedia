@@ -17,6 +17,7 @@ Neuronpedia serves and writes the results into the shared `exports/` tree.
 | `fit_lens.py` | Fit one model on one dataset. Streams a corpus, fits `J̄`, writes the lens + a per-prompt convergence curve. |
 | `run-all-fit-lens.py` | Fit **every** model in `np_model_to_hf.json`, into the Neuronpedia `exports/` layout with a `config.yaml` per run. |
 | `backfill-config-environment.py` | Add the `environment` block to `config.yaml` files already on the Hub (configs only, no weights) and open a PR there. |
+| `jpp/` | Fit and convert J++ Lenses (Ayonrinde & Lindsey, 2026). See [`jpp/README.md`](jpp/README.md). |
 | `../np_model_to_hf.json` | Neuronpedia model id → Hugging Face model id. Shared with `headvis/` (lives in the parent `neuronpedia_utils/` dir). |
 
 ## Setup (uv)

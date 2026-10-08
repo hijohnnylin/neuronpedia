@@ -1,24 +1,21 @@
 import logging
-from collections.abc import AsyncGenerator, Sequence
-from typing import Any, cast
+from collections.abc import AsyncIterator, Sequence
+from contextlib import nullcontext
+from typing import Any
 
 import torch
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from interp_engine import (
+    Address,
     AddSpec,
-    EagerModel,
-    LayerSteeringSpec,
+    InterpModel,
     OrthogonalDecompSpec,
     ProjectionCapSpec,
     SamplingSettings,
     SteeringOp,
     SteeringSpec,
-    SteerMethod,
-    SteerSpec,
-    VLLMModel,
 )
-from interp_engine import generate_stream as engine_generate_stream
 from interp_engine import steer as engine_steer
 
 from neuronpedia_inference.config import Config
@@ -56,7 +53,6 @@ from neuronpedia_inference.schemas import (
     SteerCompletionResponse,
 )
 from neuronpedia_inference.shared import Model, with_request_lock
-from neuronpedia_inference.vllm_optional import SamplingParams
 
 logger = logging.getLogger(__name__)
 
@@ -128,13 +124,9 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
     if bos_token and not prompt.startswith(bos_token):
         prompt = bos_token + prompt
 
-    tokens = []
-    if isinstance(model, EagerModel):
-        tokens = model.to_tokens(prompt, prepend_bos=model.tok.tokenizer_prepends_bos, truncate=False)[0]
-    elif isinstance(model, VLLMModel):
-        # prompt already has BOS prepended above; model.generate tokenizes it with
-        # add_special_tokens=False, so tokenize the same way just for the length check.
-        tokens = model.to_tokens(prompt, prepend_bos=False, truncate=False)[0]
+    # The prompt carries its BOS as text now, so the tokenizer must not add a second one. Asking it
+    # to prepend as well doubled the BOS on every tokenizer that adds its own (Gemma, Llama).
+    tokens = model.to_tokens(prompt, prepend_bos=False, truncate=False)[0]
 
     too_long = reject_if_over_token_limit(len(tokens), config.token_limit)
     if too_long is not None:
@@ -155,7 +147,8 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
     # 500 mid-stream rather than a status this can return.
     if NPSteerType.STEERED in request.types and declares_static_taps(model):
         try:
-            assert_steer_layers_declared(model, steer_write_layers(features))
+            for point, layers in steer_write_targets(features).items():
+                assert_steer_layers_declared(model, layers, point=point)
         except BackendUnsupported as exc:
             return JSONResponse(content={"error": str(exc)}, status_code=400)
 
@@ -220,23 +213,10 @@ async def run_batched_generate(
         if seed is not None:
             torch.manual_seed(seed)
 
-        # Two backends: EagerModel (forward write-hooks) and the engine-owned
-        # vLLM backend (worker steering write-hooks + streaming generation).
-        if isinstance(model, VLLMModel):
-            async for msg in _vllm_run_batched_generate(
-                model=model,
-                prompt=prompt,
-                settings=settings,
-                steer_types=steer_types,
-                seed=seed,
-                **kwargs,
-            ):
-                yield msg
-            return
-        if not isinstance(model, EagerModel):
-            raise ValueError("The /steer/completion endpoint only supports the interp-engine and vLLM backends")
-        # NOTE: this is an async generator, so `yield from` is illegal here.
-        for msg in _engine_run_batched_generate(  # noqa: UP028
+        # One path for every backend: `steer()` records the spec and `generate_stream` honors it,
+        # on eager through hooks and elsewhere per request. A point a backend cannot steer is the
+        # engine's refusal, with its reason, not a branch here.
+        async for msg in _run_batched_generate(
             model=model,
             prompt=prompt,
             settings=settings,
@@ -247,134 +227,73 @@ async def run_batched_generate(
             yield msg
 
 
-def _feature_to_steerspec(
-    feature: NPSteerFeature | NPSteerVector,
-    settings: SteeringSettings,
-) -> SteerSpec:
-    """Map an SAE feature / raw vector (with its TLens hook) to an engine ``SteerSpec``.
+def steer_target(hook_name: str) -> Address:
+    """The engine point a steer at a TransformerLens ``hook_name`` writes.
 
-    A ``resid_pre[X]`` steering point equals the output of decoder layer ``X-1``
-    (``resid_post[X-1]``), or the embedding output for ``X == 0``; ``resid_post[X]`` maps
-    directly. This mirrors adding the vector at the same residual position TransformerLens
-    steers at.
+    ``resid_pre[X]`` is the output of decoder layer ``X-1`` (``resid_post[X-1]``), or the embedding
+    output for ``X == 0``; ``resid_post[X]`` maps directly; ``hook_z`` steers the concatenated
+    per-head attention output that attention-output SAEs live in. One mapping for every backend,
+    so a pod passes a check for one target and reaches the engine at the same one.
     """
-    sae_manager = SAEManager.get_instance()
-    hook_name = sae_manager.get_sae_hook(feature.source) if isinstance(feature, NPSteerFeature) else feature.hook
     address = tlens_hook_to_point(hook_name)
-    name = address.name
-    if address.layer is None:
+    name, layer = address.name, address.layer
+    if layer is None:
         raise ValueError(f"Engine steering needs a per-layer hook, but {hook_name!r} maps to the global point {name!r}")
-    layer = address.layer
-    vector = torch.tensor(feature.steering_vector, dtype=torch.float32)
-    coeff = settings.strength_multiplier * feature.strength
-    method = (
-        SteerMethod.ORTHOGONAL if settings.steer_method == NPSteerMethod.ORTHOGONAL_DECOMP else SteerMethod.ADDITIVE
-    )
-
-    if name == "resid_post":
-        point, spec_layer = "resid_post", layer
-    elif name == "resid_pre":
-        if layer == 0:
-            point, spec_layer = "embeddings", 0
-        else:
-            point, spec_layer = "resid_post", layer - 1
-    elif name == "z":
-        # Attention-output SAEs steer in hook_z space: add the vector to the concatenated
-        # per-head attention output (the attention output projection's input).
-        point, spec_layer = "z", layer
-    else:
-        raise ValueError(f"Engine steering supports resid_pre/resid_post/attn.hook_z hooks only, got {hook_name!r}")
-    return SteerSpec(
-        vector=vector,
-        layer=spec_layer,
-        coeff=coeff,
-        method=method,
-        point=point,
-        normalize=settings.normalize_steering,
-    )
+    if name == "resid_pre":
+        return Address("embeddings") if layer == 0 else Address("resid_post", layer - 1)
+    if name in ("resid_post", "z"):
+        return Address(name, layer)
+    raise ValueError(f"Engine steering supports resid_pre/resid_post/attn.hook_z hooks only, got {hook_name!r}")
 
 
-def steer_layer_for_hook(hook_name: str) -> int:
-    """Which layer a steer at ``hook_name`` writes: ``resid_pre[X]`` lands at ``X-1``.
-
-    Split out so the pre-flight write check and the spec that does the writing read the layer the
-    same way. Computing it twice is how a pod passes a check for one layer and fails the engine at
-    another.
-    """
-    if "resid_post" in hook_name:
-        return int(hook_name.split(".")[1])
-    if "resid_pre" in hook_name:
-        return int(hook_name.split(".")[1]) - 1
-    raise ValueError(f"Unsupported hook name for vLLM steering: {hook_name}")
+def _hook_of(feature: NPSteerFeature | NPSteerVector) -> str:
+    sae_manager = SAEManager.get_instance()
+    return sae_manager.get_sae_hook(feature.source) if isinstance(feature, NPSteerFeature) else feature.hook
 
 
-def steer_write_layers(features: Sequence[NPSteerFeature | NPSteerVector]) -> list[int]:
-    """The layers a steer over ``features`` will write to, sorted and deduplicated.
+def steer_write_targets(features: Sequence[NPSteerFeature | NPSteerVector]) -> dict[str, list[int]]:
+    """The layers a steer over ``features`` will write, per engine point, sorted and deduplicated.
 
     Answerable in the request handler, before a StreamingResponse has taken the reply away, where
-    :func:`features_to_vllm_steering_spec` runs inside the generator and cannot return a status.
+    :func:`features_to_steering_specs` runs inside the generator and cannot return a status.
     Hooks it cannot map are left to that function, whose ValueError is already handled.
     """
-    sae_manager = SAEManager.get_instance()
-    layers: set[int] = set()
+    targets: dict[str, set[int]] = {}
     for feature in features:
-        hook_name = sae_manager.get_sae_hook(feature.source) if isinstance(feature, NPSteerFeature) else feature.hook
         try:
-            layers.add(steer_layer_for_hook(hook_name))
+            spec = SteeringSpec.at(steer_target(_hook_of(feature)))
         except ValueError:
             continue
-    return sorted(layers)
+        targets.setdefault(spec.point, set()).update(spec.layers)
+    return {point: sorted(layers) for point, layers in targets.items()}
 
 
-def features_to_vllm_steering_spec(settings: SteeringSettings) -> SteeringSpec:
-    """Build an engine ``SteeringSpec`` (per-layer Add/ProjectionCap ops) for the vLLM backend.
+def _steer_op(method: NPSteerMethod, vector: list[float], coeff: float, *, normalize: bool) -> SteeringOp:
+    """The engine op for one feature. The other methods use only the direction, so they ignore ``normalize``."""
+    if method == NPSteerMethod.SIMPLE_ADDITIVE:
+        return AddSpec(vector=vector, scale=coeff, normalize=normalize)
+    if method == NPSteerMethod.ORTHOGONAL_DECOMP:
+        return OrthogonalDecompSpec(vector=vector, coeff=coeff)
+    return ProjectionCapSpec(vector=vector, max=coeff)
 
-    Shared by ``/steer/completion`` and ``/steer/completion-chat`` so both backends stay in
-    sync. Supports ``resid_pre``/``resid_post`` hooks (``resid_pre[X]`` -> layer ``X-1``).
+
+def features_to_steering_specs(settings: SteeringSettings) -> list[SteeringSpec]:
+    """The engine ``SteeringSpec``s for ``settings``, one per feature, in request order.
+
+    Shared by ``/steer/completion`` and ``/steer/completion-chat``. The list is one ``steer()``
+    block. Each strength is scaled by ``strength_multiplier``; ``normalize_steering`` makes each
+    vector unit length first.
     """
-    sae_manager = SAEManager.get_instance()
-    layer_features: dict[int, list[tuple[NPSteerFeature | NPSteerVector, torch.Tensor]]] = {}
-    for feature in settings.features:
-        hook_name = sae_manager.get_sae_hook(feature.source) if isinstance(feature, NPSteerFeature) else feature.hook
-        layer = steer_layer_for_hook(hook_name)
-
-        steering_vector = torch.tensor(feature.steering_vector, dtype=torch.float32)
-        if not torch.isfinite(steering_vector).all():
-            raise ValueError("Steering vector contains inf or nan values")
-        if settings.normalize_steering:
-            norm = torch.norm(steering_vector)
-            if norm == 0:
-                raise ValueError("Zero norm steering vector")
-            steering_vector = steering_vector / norm
-        layer_features.setdefault(layer, []).append((feature, steering_vector))
-
-    steering_spec_layers: dict[int, LayerSteeringSpec] = {}
-    for layer, layer_feature_list in layer_features.items():
-        operations: list[SteeringOp] = []
-        if settings.steer_method == NPSteerMethod.SIMPLE_ADDITIVE:
-            for feature, steering_vector in layer_feature_list:
-                coeff = settings.strength_multiplier * feature.strength
-                norm = torch.norm(steering_vector)
-                if norm > 0:
-                    operations.append(AddSpec(vector=steering_vector / norm, scale=norm.item() * coeff))
-        elif settings.steer_method == NPSteerMethod.ORTHOGONAL_DECOMP:
-            # h -> (I-P)h + coeff*P h; the worker uses only the vector's direction, so pass the
-            # raw (un-normalized) vector. Matches the eager OrthogonalProjector numerics.
-            for feature, steering_vector in layer_feature_list:
-                coeff = settings.strength_multiplier * feature.strength
-                operations.append(OrthogonalDecompSpec(vector=steering_vector, coeff=coeff))
-        elif settings.steer_method == NPSteerMethod.PROJECTION_CAP:
-            for feature, steering_vector in layer_feature_list:
-                coeff = settings.strength_multiplier * feature.strength
-                operations.append(ProjectionCapSpec(vector=steering_vector, min=None, max=coeff))
-        if operations:
-            steering_spec_layers[layer] = LayerSteeringSpec(operations=operations)
-
-    if not steering_spec_layers:
-        raise ValueError(
-            "No valid steering layers found. All features may have zero-norm vectors or invalid configurations."
-        )
-    return SteeringSpec(layers=steering_spec_layers)
+    if not settings.features:
+        raise ValueError("A steered generation needs at least one feature or vector to steer with")
+    specs = []
+    for f in settings.features:
+        if f.steering_vector is None:
+            raise ValueError("A feature has no steering vector")
+        coeff = settings.strength_multiplier * f.strength
+        op = _steer_op(settings.steer_method, f.steering_vector, coeff, normalize=settings.normalize_steering)
+        specs.append(SteeringSpec.at(steer_target(_hook_of(f)), op))
+    return specs
 
 
 def _completion_frame(steer_types: list[NPSteerType], output_by_type: dict[NPSteerType, str]) -> str:
@@ -392,104 +311,58 @@ def _completion_frame(steer_types: list[NPSteerType], output_by_type: dict[NPSte
     )
 
 
-async def _vllm_run_batched_generate(
-    model: VLLMModel,
-    prompt: str,
-    settings: SteeringSettings,
-    steer_types: list[NPSteerType],
-    seed: int | None,
-    **kwargs: Any,
-):
-    """SSE generator for the vLLM backend, mirroring the STEERED/DEFAULT engine flow."""
-    max_new_tokens = int(kwargs.get("max_new_tokens") or 0)
-    sampling: SamplingSettings = kwargs["sampling"]
-
-    # See the note in completion_chat.py's _vllm_chat_generate: build the spec only for a
-    # run that steers, so a DEFAULT-only request with no features is not a 500.
-    spec = features_to_vllm_steering_spec(settings) if NPSteerType.STEERED in steer_types else None
-
-    def _sampling_params():
-        return SamplingParams(max_tokens=max_new_tokens, seed=seed, **sampling.vllm_kwargs())
-
-    async def _stream_type(
-        active_spec: SteeringSpec | None,
-    ) -> AsyncGenerator[str, None]:
-        # With stream=True the backend returns an async generator of text deltas; it only
-        # returns the full string when stream=False.
-        return cast(
-            AsyncGenerator[str, None],
-            await model.generate(prompt, _sampling_params(), steering_spec=active_spec, stream=True),
-        )
-
-    output_by_type: dict[NPSteerType, str] = {}
-    for flag in steer_types:
-        active_spec = spec if flag == NPSteerType.STEERED else None
-        text = ""
-        async for delta in await _stream_type(active_spec):
-            text += delta
-            output_by_type[flag] = text
-            yield _completion_frame(steer_types, output_by_type)
-        output_by_type[flag] = text
-        if not text:
-            # No delta arrives when the model samples EOS first, or emits only special tokens
-            # (vLLM's detokenizer drops them). Close the type with a frame so the completion
-            # reads as empty rather than missing: a stream with no frame is a 500 downstream.
-            yield _completion_frame(steer_types, output_by_type)
-
-
-def _engine_generate_text(
-    model: EagerModel,
-    tokens: torch.Tensor,
-    specs: list[SteerSpec] | None,
+async def _generate_text(
+    model: InterpModel,
+    tokens: Sequence[int],
+    specs: list[SteeringSpec] | None,
     *,
     max_new_tokens: int,
     sampling: SamplingSettings,
     seed: int | None,
     position_mask: Any = None,
-):
-    """Stream decoded text deltas from the engine, optionally under steering.
+) -> AsyncIterator[str]:
+    """Stream decoded text deltas from the engine, under ``specs`` when given.
 
-    ``position_mask`` (a ``interp_engine.SteerMask`` preset or ``list[int]``) excludes
-    prompt positions from steering (e.g. special tokens); resolved against ``tokens``.
+    ``specs`` is one ``steer()`` block, which stays open until the stream is exhausted: that is
+    what keeps a served backend's per-request steer attached to the request. A backend that
+    cannot carry ``position_mask`` refuses it there.
     """
-    from contextlib import nullcontext
-
-    ctx = engine_steer(model, specs, prompt_token_ids=tokens, position_mask=position_mask) if specs else nullcontext()
-    with ctx:
-        for step in engine_generate_stream(
-            model,
+    block = engine_steer(model, specs, prompt_token_ids=tokens, position_mask=position_mask) if specs else nullcontext()
+    with block:
+        async for delta in model.generate_stream(
             tokens,
             max_tokens=max_new_tokens,
             temperature=sampling.temperature,
             top_k=sampling.top_k,
             top_p=sampling.top_p,
             presence_penalty=sampling.presence_penalty,
-            stop_at_eos=True,
             seed=seed,
         ):
-            yield step.token_str
+            yield delta
 
 
-def _engine_run_batched_generate(
-    model: EagerModel,
-    prompt: str,  # noqa: ARG001 - tokens are derived from the model tokenizer below
+async def _run_batched_generate(
+    model: InterpModel,
+    prompt: str,
     settings: SteeringSettings,
     steer_types: list[NPSteerType],
     seed: int | None,
     **kwargs: Any,
 ):
-    """SSE generator for the engine backend, mirroring the TLens STEERED/DEFAULT flow."""
-    tokens = model.to_tokens(prompt, prepend_bos=model.tok.tokenizer_prepends_bos, truncate=False)[0]
+    """SSE generator for the STEERED/DEFAULT flow, on whichever backend is loaded."""
+    # BOS is in the prompt text already; see the handler.
+    tokens = [int(t) for t in model.to_tokens(prompt, prepend_bos=False, truncate=False)[0]]
     max_new_tokens = int(kwargs.get("max_new_tokens") or 0)
     sampling: SamplingSettings = kwargs["sampling"]
 
-    specs = [_feature_to_steerspec(f, settings) for f in settings.features]
+    # Built only for a run that steers, so a DEFAULT-only request with no features is not a 500.
+    specs = features_to_steering_specs(settings) if NPSteerType.STEERED in steer_types else None
 
     output_by_type: dict[NPSteerType, str] = {}
     for flag in steer_types:
         active_specs = specs if flag == NPSteerType.STEERED else None
         text = ""
-        for delta in _engine_generate_text(
+        async for delta in _generate_text(
             model,
             tokens,
             active_specs,
@@ -502,7 +375,8 @@ def _engine_run_batched_generate(
             yield _completion_frame(steer_types, output_by_type)
         output_by_type[flag] = text
         if not text:
-            # Same guard as the vLLM path: one frame per type, even for an empty completion.
+            # No delta arrives when the model samples EOS first, or emits only special tokens.
+            # One frame per type, even for an empty completion: no frame is a 500 downstream.
             yield _completion_frame(steer_types, output_by_type)
 
 

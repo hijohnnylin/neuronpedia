@@ -11,6 +11,12 @@ Renaming a field here changes what existing viewers and existing stored shares r
 fails this test first.
 """
 
+from neuronpedia_inference.endpoints.lens.oracle import (
+    OracleDoneMessage,
+    OracleMetaMessage,
+    OraclePartialMessage,
+    OracleReadMessage,
+)
 from neuronpedia_inference.endpoints.lens.prompt import (
     LensDoneMessage,
     LensErrorMessage,
@@ -35,6 +41,7 @@ EXPECTED_KEYS: dict[type, set[str]] = {
         "temperature",
         "prepend_bos",
         "reuse_len",
+        "oracle_layers",
     },
     LensPromptToken: {
         "position",
@@ -65,6 +72,23 @@ EXPECTED_KEYS: dict[type, set[str]] = {
     LensErrorMessage: {"kind", "error"},
 }
 
+ORACLE_KEYS: dict[type, set[str]] = {
+    OracleMetaMessage: {
+        "kind",
+        "model",
+        "adapter",
+        "position",
+        "token",
+        "positions",
+        "tokens",
+        "layers",
+        "max_bullets",
+    },
+    OracleReadMessage: {"kind", "position", "layer", "bullets", "text", "finish", "cached"},
+    OraclePartialMessage: {"kind", "position", "layer", "text"},
+    OracleDoneMessage: {"kind", "elapsed_ms", "cached_layers"},
+}
+
 
 def test_every_frame_model_is_pinned():
     """A new frame model must be added here rather than shipping unchecked.
@@ -85,9 +109,19 @@ def test_every_frame_model_is_pinned():
         "a lens frame is on BaseSchema, so it will be camelCased and break existing readers"
     )
 
+    from neuronpedia_inference.endpoints.lens import oracle
+
+    declared = {
+        obj
+        for obj in vars(oracle).values()
+        if isinstance(obj, type) and obj.__module__ == oracle.__name__ and issubclass(obj, BaseSchema)
+    }
+    assert declared == set(ORACLE_KEYS), "oracle frame models changed; update ORACLE_KEYS"
+    assert all(issubclass(model, PublicFrameSchema) for model in declared)
+
 
 def test_frame_keys_are_exact_and_not_camel_cased():
-    for model, expected in EXPECTED_KEYS.items():
+    for model, expected in {**EXPECTED_KEYS, **ORACLE_KEYS}.items():
         actual = set(model.model_json_schema()["properties"])
         assert actual == expected, f"{model.__name__} wire keys drifted"
 

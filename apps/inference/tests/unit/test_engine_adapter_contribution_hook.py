@@ -78,6 +78,12 @@ class TestTheRawOutputNamesAreUntouched:
     def test_every_other_hook_is_plain_translation(self, hook: str, expected: Address):
         assert tlens_hook_to_point(hook) == expected
 
+    @pytest.mark.parametrize("hook", ["blocks.5.hook_mlp_in", "blocks.5.hook_attn_in"])
+    def test_a_pre_norm_block_input_is_refused(self, hook: str):
+        # TransformerLens fires these before the norm; the engine's `mlp_in` / `attn_in` are after it.
+        with pytest.raises(ValueError, match="BEFORE the block norm"):
+            tlens_hook_to_point(hook)
+
 
 class TestTheTwinTableIsCheckedAgainstTheEngine:
     def test_each_pair_is_verified_at_import(self):

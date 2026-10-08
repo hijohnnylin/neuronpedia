@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db';
 import { resolveHosts } from '@/lib/db/compute-host';
 import { ASSET_BASE_URL, DEFAULT_CREATOR_USER_ID } from '@/lib/env';
 import { JlensShareLockedToken } from '@/lib/utils/jlens-share';
-import { JLENS_METADATA_PATH } from '@/lib/utils/lens';
+import { JLENS_METADATA_PATH, shareLensColumns } from '@/lib/utils/lens';
 import { ComputeService } from '@prisma/client';
 import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
@@ -99,7 +99,7 @@ export default async function Page({
       descriptionAttribution,
       lockedTokens: (row.lockedTokens as unknown as JlensShareLockedToken[]) ?? [],
       selectedPositions: row.selectedPositions ?? [],
-      activeLensModeTab: row.activeLensModeTab,
+      lensColumns: shareLensColumns(row.lensColumns, row.activeLensModeTab),
       topN: row.topN,
       hideNonWordTokens: row.hideNonWordTokens,
       temperature: row.temperature,

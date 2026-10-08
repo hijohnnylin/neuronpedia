@@ -6,8 +6,8 @@ message bubbles, replacing the per-family state machines in `jlens-chat-format.t
 
 Span computation lives in the engine's `Tokenize.message_spans` (family-agnostic: it renders
 the model's real chat template over a growing message prefix and diffs token counts). This
-endpoint just exposes it over HTTP and works with whichever backend is loaded (the engine
-`EagerModel` exposes `.tok`; other backends get a `Tokenize` built from their `.tokenizer`).
+endpoint just exposes it over HTTP and works with whichever backend is loaded, through the
+protocol's `.tok`.
 """
 
 import logging
@@ -16,7 +16,6 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from neuronpedia_inference.config import Config
-from neuronpedia_inference.engine_adapter import get_tokenize
 from neuronpedia_inference.schemas import (
     ApplyChatTemplateRequest,
     ApplyChatTemplateResponse,
@@ -33,7 +32,7 @@ router = APIRouter()
 @with_request_lock(exclusive=False)
 async def apply_chat_template(request: ApplyChatTemplateRequest):
     config = Config.get_instance()
-    tok = get_tokenize(Model.get_instance())
+    tok = Model.get_instance().tok
 
     messages = [m.model_dump(exclude_none=True) for m in request.messages]
 

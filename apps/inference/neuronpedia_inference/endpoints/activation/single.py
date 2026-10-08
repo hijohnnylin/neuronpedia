@@ -10,8 +10,8 @@ from neuronpedia_inference.config import Config
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     calculate_dfa_for_values,
-    capture_activation_async,
     capture_cache_async,
+    project_vector_async,
 )
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import activation_single_cost
@@ -112,7 +112,7 @@ async def activation_single(
         # exactly one of (source, index) / (vector, hook).
         vector = cast(list[float], request.vector)
         hook = cast(str, request.hook)
-        prepend_bos = model.tok.tokenizer_prepends_bos
+        prepend_bos = model.tokenizer_prepends_bos
         tokens = model.to_tokens(
             prompt,
             prepend_bos=prepend_bos,
@@ -124,10 +124,10 @@ async def activation_single(
 
         str_tokens: list[str] = model.to_str_tokens(prompt, prepend_bos=prepend_bos)  # type: ignore
         try:
-            cache = {hook: await capture_activation_async(model, tokens, hook)}
+            projected = await project_vector_async(model, tokens, hook, torch.tensor(vector))
         except BackendUnsupported as e:
             return JSONResponse(content={"error": str(e)}, status_code=400)
-        result = process_vector_activations(vector, cache, hook, sae_manager.device)  # type: ignore
+        result = vector_activation_values(projected)
 
     logger.info("Returning result: %s", result)
 
@@ -234,21 +234,9 @@ def process_saelens_activations(
     )
 
 
-def process_vector_activations(
-    vector: torch.Tensor | list[float],
-    cache: dict[str, torch.Tensor],
-    hook_name: str,
-    device: torch.device,
-) -> ActivationValues:
-    if not isinstance(vector, torch.Tensor):
-        vector = torch.tensor(vector, device=device)
-    # not normalizing it for now
-    # vector = vector / torch.linalg.norm(vector)
-    activations = cache[hook_name].to(device)
-    # ensure vector has the same dtype as activations
-    vector = vector.to(dtype=activations.dtype)
-    feature_acts = torch.matmul(activations, vector)
-    values = feature_acts.squeeze(0).detach().tolist()
+def vector_activation_values(projected: torch.Tensor) -> ActivationValues:
+    """One direction's ``[seq]`` values, and where they peak."""
+    values = projected.detach().cpu().tolist()
     max_value = max(values)
     return ActivationValues(
         values=values,

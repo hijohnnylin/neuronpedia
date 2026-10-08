@@ -22,7 +22,7 @@ from neuronpedia_inference import memory_cost
 from neuronpedia_inference.memory_cost import FLAT_LENS_BYTES, lens_cost
 
 # Qwen3.6-27B, the pod this was sized against: 64 read-out layers at d_model 5120, staged a
-# full `_TRANSPORT_BATCH_SIZE` at a time.
+# full `lens_stream.STAGE_BATCH` at a time.
 QWEN = {"staged_positions": 128, "d_model": 5120}
 ONE_BLOCK_BYTES = 128 * 64 * 5120 * 4
 

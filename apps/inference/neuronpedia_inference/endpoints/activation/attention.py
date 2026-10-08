@@ -4,14 +4,12 @@ import torch
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 from interp_engine import (
+    Address,
     EagerModel,
-    VLLMModel,
-    is_linear_attention_layer,
     run_with_cache,
 )
 
 from neuronpedia_inference.config import Config
-from neuronpedia_inference.engine_adapter import vllm_attention_unsupported_reason
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import attention_cost
 from neuronpedia_inference.schemas import (
@@ -50,64 +48,35 @@ async def activation_attention(
     model = Model.get_instance()
     config = Config.get_instance()
 
-    # Resolve layer/head counts and the per-layer attention kind for validation. Both
-    # backends read the same `layer_types` config field, so the linear-attention guard
-    # below covers them equally -- it used to sit inside the EagerModel branch, which left
-    # the vLLM path to reconstruct a softmax for layers that have none.
-    if not isinstance(model, EagerModel | VLLMModel):
-        return JSONResponse(
-            content={"error": "Attention patterns are only supported on the interp-engine and vLLM backends."},
-            status_code=400,
-        )
+    # Shape and kind come off the protocol, so a backend the engine grows serves attention here
+    # without this endpoint learning its name. The layer bound is checked first: every question
+    # below is asked about a layer, and `refuses` on one that does not exist is a worse sentence.
     num_layers = model.n_layers
-    if isinstance(model, EagerModel):
-        num_heads = model.n_heads
-        is_linear = model.arch.is_linear_attention_layer(request.layer)
-        # Eager reads the real softmax out of the model, so no config quirk can be missed.
-        unsupported: tuple[str, ...] = ()
-    else:
-        num_heads = model._attn_dims["n_heads"]
-        is_linear = is_linear_attention_layer(model._attn_dims, request.layer)
-        unsupported = model._attn_dims.get("unsupported", ())
-
     if not (0 <= request.layer < num_layers):
         return JSONResponse(
             content={"error": f"Invalid layer: {request.layer}. Must be in [0, {num_layers})."},
             status_code=400,
         )
-    if num_heads is not None and not (0 <= request.head < num_heads):
+    num_heads = model.n_heads
+    if not (0 <= request.head < num_heads):
         return JSONResponse(
             content={"error": f"Invalid head: {request.head}. Must be in [0, {num_heads})."},
             status_code=400,
         )
-    if is_linear:
+    if model.is_linear_attention_layer(request.layer):
         return JSONResponse(
             content={"error": f"Layer {request.layer} is a linear-attention layer with no softmax attention pattern."},
             status_code=400,
         )
-    # The vLLM path rebuilds the softmax from captured q/k, so a config term it cannot
-    # reproduce yields a plausible-looking pattern that is not the model's. Refusing is the
-    # only honest answer; returning the wrong numbers is what this check exists to prevent.
-    if unsupported:
-        logger.error(
-            "Refusing attention for %s: unsupported config for off-kernel recompute: %s",
-            request.model,
-            "; ".join(unsupported),
-        )
+    # Whether this engine can produce the pattern at all: a graph-replaying pod with no attention
+    # tap, or a model whose configuration the off-kernel recompute cannot reproduce, where a
+    # plausible-looking wrong pattern is the failure being prevented. Tensor parallelism is not
+    # among the reasons -- the worker gathers the heads before they leave the device.
+    refusal = model.refuses(Address("attn_probs", request.layer))
+    if refusal is not None:
+        logger.error("Refusing attention for %s: %s", request.model, refusal)
         return JSONResponse(
-            content={
-                "error": "Attention patterns are not supported for this model on the vLLM "
-                "backend: " + "; ".join(unsupported)
-            },
-            status_code=400,
-        )
-    # Same reasoning, but about the deployment rather than the model: a sharded pod has no
-    # rank holding every head, so there is no pattern to return.
-    sharding_reason = vllm_attention_unsupported_reason(model) if isinstance(model, VLLMModel) else None
-    if sharding_reason is not None:
-        logger.error("Refusing attention for %s: %s", request.model, sharding_reason)
-        return JSONResponse(
-            content={"error": f"Attention patterns are not available on this instance: {sharding_reason}."},
+            content={"error": f"Attention patterns are not available on this instance: {refusal}"},
             status_code=400,
         )
 
@@ -131,10 +100,10 @@ async def activation_attention(
     # Extract the [q, k] attention pattern for the requested (layer, head). Attention-sink models
     # (gpt-oss) intentionally do not sum to 1 across keys; we never renormalize.
     #
-    # `capture_attention` would serve both backends in one call, and is deliberately not used: it
-    # returns the whole triple, so the eager arm would also rebuild the pre-softmax scores through
-    # the re-dispatched attention -- another [heads, q, q] per layer that this endpoint discards.
-    # The vLLM arm has no such choice, since one off-kernel recompute produces all three.
+    # The branch is about cost, not capability: `capture_attention` returns the whole triple, so
+    # eager -- the one backend that can hook the probabilities on their own -- would also rebuild
+    # the pre-softmax scores, another [heads, q, q] per layer this endpoint discards. Every other
+    # backend takes the arm below, which asks only the protocol.
     if isinstance(model, EagerModel):
         ids = tokens.unsqueeze(0) if tokens.ndim == 1 else tokens
         cache = run_with_cache(model, ids, [("attn_probs", request.layer)])

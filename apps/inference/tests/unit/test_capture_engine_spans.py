@@ -14,12 +14,13 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 import torch
-from interp_engine import Address, Tokenize, VLLMModel, to_address
+from interp_engine import Address, AddSpec, InterpModel, LayerSteeringSpec, SteeringSpec, Tokenize, to_address
+from interp_engine.steer import active_steering
 
 from neuronpedia_inference.inference_utils.vectors.capture_engine import (
     _per_message_spans,
-    capture_turn_means_vllm,
-    turn_means_from_generation_capture,
+    _pool_spans,
+    capture_turn_means,
 )
 from neuronpedia_inference.inference_utils.vectors.vector_data import CaptureKey, Pooling
 
@@ -125,34 +126,8 @@ def test_per_message_spans_partition_the_whole_sequence():
     assert all(a[1] == b[0] for a, b in zip(spans, spans[1:]))
 
 
-def test_turn_means_from_generation_capture_pools_prompt_and_generated():
-    msgs = [{"role": "user", "content": "hi"}]
-    # The prompt is the rendered message (ids 1,2) plus a generation-header token (9);
-    # the capture then adds a row per generated token.
-    prompt_ids = [1, 2, 9]
-    acts = torch.tensor(
-        [[0.0, 0.0], [2.0, 4.0], [1.0, 1.0], [3.0, 3.0], [5.0, 5.0]],
-    )
-    means = turn_means_from_generation_capture(_tok(_ListTokenizer()), msgs, prompt_ids, acts)
-    assert means is not None
-    assert means.shape == (2, 2)
-    torch.testing.assert_close(means[0], torch.tensor([1.0, 2.0]))
-    # The generated turn runs from the header token through the last captured row.
-    torch.testing.assert_close(means[1], torch.tensor([3.0, 3.0]))
-
-
-def test_turn_means_from_generation_capture_rejects_misaligned_prompt():
-    msgs = [{"role": "user", "content": "hi"}]
-    assert turn_means_from_generation_capture(_tok(_ListTokenizer()), msgs, [7, 7, 7], torch.zeros(5, 2)) is None
-
-
-def test_turn_means_from_generation_capture_rejects_short_capture():
-    msgs = [{"role": "user", "content": "hi"}]
-    assert turn_means_from_generation_capture(_tok(_ListTokenizer()), msgs, [1, 2, 9], torch.zeros(2, 2)) is None
-
-
 class _CapturingBackend:
-    """Stub vLLM backend recording the points it was asked for."""
+    """Stub backend recording the points it was asked for, and the steering open at the time."""
 
     tokenizer = _ListTokenizer()
 
@@ -160,25 +135,28 @@ class _CapturingBackend:
         self.tok = _tok(_ListTokenizer())
         self.asked: list[Any] = []
         self.calls = 0
+        self.steered: list[Any] = []
 
-    async def capture(self, token_ids: Sequence[int], points: Sequence[Any], *, steering_spec: Any = None):  # noqa: ARG002
+    async def capture(self, token_ids: Sequence[int], points: Sequence[Any], *, detach: bool = True):  # noqa: ARG002
         self.asked.extend(points)
         self.calls += 1
+        self.steered.append(active_steering(cast(InterpModel, self)))
         # Keyed the way the real capture keys it: parsed back from the worker's wire key.
         return {to_address(p): torch.tensor([[1.0, 2.0], [3.0, 4.0]]) for p in points}
 
 
-def test_capture_turn_means_vllm_reads_back_the_point_it_asked_for():
+def _means(backend: _CapturingBackend, keys: list[CaptureKey], specs: Any = None) -> dict[CaptureKey, torch.Tensor]:
+    return asyncio.run(capture_turn_means(cast(InterpModel, backend), [{"role": "user", "content": "hi"}], keys, specs))
+
+
+def test_capture_turn_means_reads_back_the_point_it_asked_for():
     """``capture`` keys its result by ``Address``, so a second spelling of the point is a KeyError.
 
     A ``("resid_post", layer)`` tuple survived the ``Point`` -> ``Address`` migration here, and
-    every steered readout turn runs through this function -- a steered generation's own means
-    are post-cap, so the pre-cap ones always come from a second capture like this one.
+    every readout turn runs through this function.
     """
     backend = _CapturingBackend()
-    means = asyncio.run(
-        capture_turn_means_vllm(cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [_key(40)])
-    )
+    means = _means(backend, [_key(40)])
 
     assert backend.asked == [Address("resid_post", 40)]
     torch.testing.assert_close(means[_key(40)], torch.tensor([[2.0, 3.0]]))
@@ -199,51 +177,28 @@ def test_pinned_template_kwargs_reach_the_render():
     assert pinned != unpinned
 
 
-def test_a_generation_capture_pooled_with_the_wrong_render_is_refused():
-    """The prefix check is what stops a mismatched render from being pooled over.
-
-    The prompt was rendered with the pin; re-rendering without it yields ids that are not a
-    prefix of it, so the pooling declines rather than attributing tokens to the wrong turns.
-    """
-    msgs = [{"role": "user", "content": "hi"}]
-    tok = _tok(_DateTokenizer())
-    prompt_ids = [900 + len("26 Jul 2024"), 1, 2, 9]
-    acts = torch.zeros(len(prompt_ids) + 2, 2)
-
-    assert turn_means_from_generation_capture(tok, msgs, prompt_ids, acts) is None
-    assert turn_means_from_generation_capture(tok, msgs, prompt_ids, acts, {"date_string": "26 Jul 2024"}) is not None
-
-
-def test_capture_turn_means_vllm_asks_for_every_layer_in_one_call():
+def test_capture_turn_means_asks_for_every_layer_in_one_call():
     """Axes at different layers must not cost one forward each.
 
     A model can ship six reads across five layers, so looping per vector here would turn one
     extra pass into five. The layers are deduplicated and requested together.
     """
     backend = _CapturingBackend()
-    means = asyncio.run(
-        capture_turn_means_vllm(
-            cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [_key(19), _key(13), _key(19)]
-        )
-    )
+    means = _means(backend, [_key(19), _key(13), _key(19)])
 
     assert backend.calls == 1
     assert backend.asked == [Address("resid_post", 13), Address("resid_post", 19)]
     assert sorted(key.layer for key in means) == [13, 19]
 
 
-def test_capture_turn_means_vllm_asks_once_for_a_layer_read_two_ways():
+def test_capture_turn_means_asks_once_for_a_layer_read_two_ways():
     """Two poolings of one layer are one capture, not two.
 
     What keying the captures by their reduction is for: a vector that pools differently needs its
     own result, and getting it by capturing that layer again would double the cost of the pass.
     """
     backend = _CapturingBackend()
-    means = asyncio.run(
-        capture_turn_means_vllm(
-            cast(VLLMModel, backend), [{"role": "user", "content": "hi"}], [_key(19), _key(19, "last")]
-        )
-    )
+    means = _means(backend, [_key(19), _key(19, "last")])
 
     assert backend.asked == [Address("resid_post", 19)]
     assert sorted(key.pool for key in means) == ["last", "mean"]
@@ -253,20 +208,29 @@ def test_capture_turn_means_vllm_asks_once_for_a_layer_read_two_ways():
     torch.testing.assert_close(means[_key(19, "last")], torch.tensor([[3.0, 4.0]]))
 
 
+def test_a_post_cap_capture_runs_under_the_specs_it_was_given():
+    """The post-cap read has to see the steer the text was generated under, on any backend.
+
+    The specs open one ``steer()`` block around the capture, which is what a served backend's
+    ``capture`` reads its request steering from; nothing is open once it returns.
+    """
+    spec = SteeringSpec(layers={3: LayerSteeringSpec(operations=[AddSpec(vector=torch.ones(2), scale=1.0)])})
+    backend = _CapturingBackend()
+
+    _means(backend, [_key(3)], specs=[spec])
+    _means(backend, [_key(3)])
+
+    assert [None if s is None else s.specs for s in backend.steered] == [(spec,), None]
+    assert active_steering(cast(InterpModel, backend)) is None
+
+
 def test_pooling_a_span_the_three_implemented_ways():
     """Each mode reduces the same span differently; a new mode raises rather than defaulting."""
-    msgs = [{"role": "user", "content": "hi"}]
-    prompt_ids = [1, 2, 9]
     acts = torch.tensor([[0.0, 6.0], [2.0, 4.0], [1.0, 1.0], [3.0, 3.0], [5.0, 5.0]])
-    tok = _tok(_ListTokenizer())
+    spans = [(0, 2), (2, 5)]
 
-    by_pool = {
-        pool: turn_means_from_generation_capture(tok, msgs, prompt_ids, acts, None, pool)
-        for pool in cast(list[Pooling], ["mean", "last", "max"])
-    }
-    for pooled in by_pool.values():
-        assert pooled is not None
-    torch.testing.assert_close(by_pool["mean"][0], torch.tensor([1.0, 5.0]))  # type: ignore[index]
-    torch.testing.assert_close(by_pool["last"][0], torch.tensor([2.0, 4.0]))  # type: ignore[index]
+    by_pool = {pool: _pool_spans(acts, spans, pool) for pool in cast(list[Pooling], ["mean", "last", "max"])}
+    torch.testing.assert_close(by_pool["mean"][0], torch.tensor([1.0, 5.0]))
+    torch.testing.assert_close(by_pool["last"][0], torch.tensor([2.0, 4.0]))
     # Per dimension, so the result need not be any one token's activation.
-    torch.testing.assert_close(by_pool["max"][0], torch.tensor([2.0, 6.0]))  # type: ignore[index]
+    torch.testing.assert_close(by_pool["max"][0], torch.tensor([2.0, 6.0]))

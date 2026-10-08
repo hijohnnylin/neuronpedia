@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import Request
-from interp_engine import resolve_sampling
+from interp_engine import Tokenize, resolve_sampling
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.steer.completion_chat import completion_chat
@@ -63,10 +63,14 @@ class StubTokenizer:
     ) -> dict[str, list[int]]:
         return {"input_ids": [7] * len(text.split())}
 
+    def decode(self, ids: Any) -> str:
+        return " ".join("w" for _ in ids)
+
 
 class StubModel:
     def __init__(self):
         self.tokenizer = StubTokenizer()
+        self.tok = Tokenize(self.tokenizer, device="cpu")
 
     def sampling_settings(self, **knobs):
         return resolve_sampling(None, **knobs)
@@ -101,7 +105,7 @@ def _chat_request(content: str) -> SteerCompletionChatRequest:
         types=[NPSteerType.STEERED],
         vectors=[
             NPSteerVector(
-                steering_vector=[0.0] * 8,
+                steering_vector=[0.0] * 7 + [1.0],
                 strength=1.0,
                 hook="blocks.0.hook_resid_post",
             )
@@ -135,10 +139,10 @@ def test_chat_over_the_token_limit_is_refused():
 
 
 def test_chat_within_the_token_limit_clears_the_guard():
-    """The stub is not a real backend, so this still fails — past the guard, at generation.
+    """The stub cannot generate, so this still fails — past the guard, at generation.
 
     Asserting where it fails is what distinguishes "the limit let it through" from "the limit
     happens to reject everything".
     """
-    with pytest.raises(ValueError, match="only supports"):
+    with pytest.raises(AttributeError, match="generate_stream"):
         asyncio.run(completion_chat(_chat_request("hello there"), _http_request()))

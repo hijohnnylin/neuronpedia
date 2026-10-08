@@ -49,10 +49,9 @@ def parse_env_and_args():
     _pinned_host = os.getenv("SAE_PINNED_HOST_GIB")
     args.sae_pinned_host_gib = float(_pinned_host) if _pinned_host else None
     args.sentry_dsn = os.getenv("SENTRY_DSN")
-    # Backend force override (None when unset => auto-select). "vllm" forces the
-    # engine-owned vLLM backend; "eager" forces the EagerModel core. Set via
-    # --force-vllm / --force-eager (start.py) -> FORCE_BACKEND. The final choice
-    # (args.backend) is written in server.py after select_backend() runs.
+    # The named backend (None when unset => auto-select): "vllm", "eager" or "mlx", set via
+    # --backend (start.py) -> FORCE_BACKEND. The final choice (args.backend) is written in
+    # server.py after select_backend() runs, which refuses a name this machine cannot run.
     args.force_backend = os.getenv("FORCE_BACKEND") or None
     # Number of GPUs to shard the model across on one node: vLLM tensor_parallel_size,
     # or EagerModel device_map="auto". 1 = single GPU.
@@ -109,6 +108,14 @@ def parse_env_and_args():
     # Optional exact path (within the HF repo) to the lens .pt file. When set, this
     # is used verbatim instead of deriving it from the model id / dataset.
     args.jlens_hf_path = os.getenv("JLENS_HF_PATH")
+    # The J++ Lens (JPP_LENS), a second lens of the same form. Loaded only when JPP_LENS is
+    # true, from "<np_model_id>/jpp/<JPP_DATASET>/<slug>_jpp_lens.pt" in JPP_HF_REPO, or from
+    # the local directory JPP_SOURCE. Its dataset is apart from the Jacobian lens's.
+    args.jpp_lens = os.getenv("JPP_LENS", "").lower() == "true"
+    args.jpp_source = os.getenv("JPP_SOURCE")
+    args.jpp_dataset = os.getenv("JPP_DATASET", "Salesforce-wikitext")
+    args.jpp_hf_repo = os.getenv("JPP_HF_REPO", "neuronpedia/jacobian-lens")
+    args.jpp_hf_path = os.getenv("JPP_HF_PATH")
     # GPU memory the lens may keep its per-layer J_bar in: GiB, "auto" (measure what is
     # left of the card once the model and SAEs are up), or off. A read-out transports
     # through every fitted layer on every batch, so a lens that does not fit here is
@@ -117,6 +124,12 @@ def parse_env_and_args():
     # Explicit neuronpedia model id (used to build the HF path). Only needed when
     # np_model_to_hf.json is not present at the repo root.
     args.neuronpedia_model_id = os.getenv("NEURONPEDIA_MODEL_ID")
+    # Oracle lens (an adapter that reads one activation aloud): "auto" (the adapter registered
+    # for this model, if any), "off", or "<hf repo>:<subdir>". On vLLM it adds embeds and LoRA.
+    args.oracle_lens = os.getenv("ORACLE_LENS", "auto")
+    # The layers an oracle read covers: "all" (every trained layer), "fast" (5 of them), or a
+    # comma list.
+    args.oracle_layers = os.getenv("ORACLE_LAYERS", "all")
 
     return args
 

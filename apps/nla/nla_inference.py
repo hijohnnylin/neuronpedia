@@ -463,8 +463,8 @@ def build_injected_embeds(
 ) -> torch.Tensor:
     """Tokenize -> embed -> arch-scale -> inject. Returns embeds ``[1, T, d]`` (fp32, CPU).
 
-    Shared by both verbalizer backends (sglang ``NLAClient`` and the eager
-    ``EagerVerbalizer``); all math here is device-neutral.
+    Shared by the engine ``Verbalizer`` and the sglang ``NLAClient``; all math here is
+    device-neutral.
     """
     if prompt_content is None:
         content = cfg.verbalizer_prompt_template.format(injection_char=cfg.injection_char)
@@ -727,6 +727,7 @@ class NLAClient:
         # would otherwise each have to re-prove the engine is still up.
         self.engine: Any = sgl.Engine(**engine_kwargs)
 
+        self.backend = "sglang"
         self.quantization = quantization
         self.kv_cache_dtype = kv_cache_dtype
         self.cuda_graph_max_bs = cuda_graph_max_bs
@@ -741,6 +742,9 @@ class NLAClient:
             f"cuda_graph_max_bs={cuda_graph_max_bs or 'default'} "
             f"torch_compile={enable_torch_compile} device={self.device}"
         )
+
+    async def aload(self) -> None:
+        """Nothing deferred: ``sgl.Engine`` loads and warms in ``__init__``. Here for interface parity."""
 
     def shutdown(self):
         """Shut down the sgl.Engine."""

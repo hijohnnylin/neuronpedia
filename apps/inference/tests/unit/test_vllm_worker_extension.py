@@ -133,16 +133,25 @@ def test_no_collective_rpc_passes_a_callable() -> None:
 
 
 def test_every_collective_rpc_name_exists_on_a_worker() -> None:
-    """A typo'd method name is a GPU-only AttributeError, so resolve them all here."""
+    """A typo'd method name is a GPU-only AttributeError, so resolve them all here.
+
+    A call in the vllm-metal front end may also name a method of the Metal extension.
+    """
     from vllm.v1.worker.gpu_worker import Worker
+
+    metal: type | None = None
+    if (_ENGINE_ROOT / "vllm_metal_plugin.py").exists():
+        from interp_engine.vllm_metal_plugin import InterpMetalWorkerExtension as metal
+
+    def known(path: Path, name: str) -> bool:
+        if hasattr(InterpWorkerExtension, name) or hasattr(Worker, name):
+            return True
+        return metal is not None and path.name.startswith("vllm_metal") and hasattr(metal, name)
 
     unknown = [
         f"{path.name}:{lineno} -> {arg.value!r}"
         for path, lineno, arg in _collective_rpc_first_args()
-        if isinstance(arg, ast.Constant)
-        and isinstance(arg.value, str)
-        and not hasattr(InterpWorkerExtension, arg.value)
-        and not hasattr(Worker, arg.value)
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and not known(path, arg.value)
     ]
     assert not unknown, (
         f"collective_rpc names that are neither an InterpWorkerExtension method nor a vLLM "

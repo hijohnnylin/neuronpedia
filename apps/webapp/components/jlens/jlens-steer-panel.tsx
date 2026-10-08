@@ -15,6 +15,9 @@ import { useJlensTourStep } from '@/app/[modelId]/jlens/jlens-tour-context';
 import {
   DEFAULT_MAX_LENS_COMPLETION_TOKENS,
   LENS_STEER_STRENGTH_STEP,
+  LENS_TYPE_LABELS,
+  LENS_TYPE_READOUT_LABELS,
+  LENS_TYPE_SPACE_LABELS,
   LensType,
   MAX_LENS_STEER_STRENGTH,
 } from '@/lib/utils/lens';
@@ -77,9 +80,8 @@ function formatLayerSelection(layers: number[]): string {
 // in J-Space`.
 export function steerOutputSummary(steer: SteerConfig): { label: string; description: React.ReactNode } {
   const isSwap = steer.mode === 'swap';
-  const isJacobian = steer.type === LensType.JACOBIAN_LENS;
-  const readoutName = isJacobian ? 'J-Lens Readout' : 'Logit Lens Readout';
-  const spaceName = isJacobian ? 'J-Space' : 'Logit Lens';
+  const readoutName = steer.type === LensType.LOGIT_LENS ? 'Logit Lens Readout' : LENS_TYPE_READOUT_LABELS[steer.type];
+  const spaceName = LENS_TYPE_SPACE_LABELS[steer.type];
   if (isSwap) {
     return {
       label: 'Swapped Output',
@@ -404,7 +406,7 @@ export function JlensSteerPanel({
   // space but their swap-in token doesn't (only once they've typed something).
   const leadingSpaceMismatch =
     isSwap && !unknownSwap && steer.swapToken !== '' && steer.token.startsWith(' ') && !steer.swapToken.startsWith(' ');
-  const typeLabel = steer.type === LensType.JACOBIAN_LENS ? 'Jacobian Lens' : 'Logit Lens';
+  const typeLabel = LENS_TYPE_LABELS[steer.type];
   const steerByLabel = `${isSwap ? 'Swap' : 'Steer'} ${typeLabel} Readout`;
 
   // The color this readout has (or would get) as a sidebar selection, so the

@@ -107,7 +107,7 @@ def test_worker_lens_readout_word_mask_preserves_final_row_top1():
         true_final_top1 = int(logits[2].argmax())
 
     # Mask out the final row's true top-1; intermediate rows must drop it,
-    # final row must keep it (eager `_TypeReadoutState` contract).
+    # final row must keep it (the `lens_topk` contract).
     mask = torch.ones(16, dtype=torch.bool)
     mask[true_final_top1] = False
     out = worker_lens_readout(

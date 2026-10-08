@@ -248,8 +248,8 @@ wheels = [
 
 [[package]]
 name = "circuit-tracer"
-version = "0.5.3.dev1+g3f0965b67"
-source = { git = "https://github.com/decoderesearch/circuit-tracer.git?rev=3f0965b6701f96ca498128c7226cb3e13d3c0d5e#3f0965b6701f96ca498128c7226cb3e13d3c0d5e" }
+version = "0.5.3.dev4+g405db9a58"
+source = { git = "https://github.com/decoderesearch/circuit-tracer.git?rev=405db9a5881ecb1591f28b1e25b7fb16baa9a75a#405db9a5881ecb1591f28b1e25b7fb16baa9a75a" }
 dependencies = [
     { name = "einops" },
     { name = "huggingface-hub" },
@@ -1186,7 +1186,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "circuit-tracer", extras = ["interp-engine"], marker = "extra == 'circuit-tracer'", git = "https://github.com/decoderesearch/circuit-tracer.git?rev=3f0965b6701f96ca498128c7226cb3e13d3c0d5e" },
+    { name = "circuit-tracer", extras = ["interp-engine"], marker = "extra == 'circuit-tracer'", git = "https://github.com/decoderesearch/circuit-tracer.git?rev=405db9a5881ecb1591f28b1e25b7fb16baa9a75a" },
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "hf-transfer", specifier = ">=0.1.9,<0.2" },
     { name = "interp-engine", specifier = "==1.11.1" },

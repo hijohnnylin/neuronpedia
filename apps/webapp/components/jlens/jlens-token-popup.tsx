@@ -1,9 +1,17 @@
 'use client';
 
 import { useChineseTranslation } from '@/lib/utils/chinese-translations';
-import { LensMode, LensTokenMessage, LensType, LensTypeSlice } from '@/lib/utils/lens';
-import { createContext, CSSProperties, UIEvent, useContext, useMemo, useRef, useState } from 'react';
-import { LensModeContext, lensTypesForMode } from './jlens-lens-mode';
+import {
+  LENS_TYPE_READOUT_LABELS,
+  LENS_TYPE_SHORT_LABELS,
+  LENS_TYPE_SPACE_LABELS,
+  LensTokenMessage,
+  LensType,
+  LensTypeSlice,
+} from '@/lib/utils/lens';
+import { createContext, CSSProperties, UIEvent, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { hasJppLens, LensColumnsContext, lensTypesOf, resolveLensColumns } from './jlens-lens-mode';
+import { OracleContext, OracleLayerReadout } from './jlens-oracle';
 import { START_LAYER_FRACTION } from './jlens-panel';
 
 // "r, g, b" for the per-row occurrence-by-layer mini heatmap stripes.
@@ -729,7 +737,7 @@ function TopByLayerRow({
       style={rowStyle}
       className="group mx-0 flex h-5 max-h-5 min-h-5 w-full flex-row items-center gap-x-1.5 rounded px-2 py-0.5 text-left font-mono text-[10px] transition-colors"
     >
-      <span className="w-10 shrink-0 text-[9px] tabular-nums text-slate-400">{layer}</span>
+      <span className="w-[21px] shrink-0 text-[9px] tabular-nums text-slate-400 sm:w-10">{layer}</span>
       {selected ? (
         <span
           className="h-2.5 w-2.5 shrink-0 rounded-sm"
@@ -801,8 +809,8 @@ function LayerReadout({
   layers: number[];
   activeLayer: number | null;
   range: LayerRange | null;
-  // Optional scroll-sync hooks (DIFF mode): attach to the scroll container so
-  // the two side-by-side readouts can mirror each other's scroll position.
+  // Optional scroll-sync hooks: attach to the scroll container so side-by-side
+  // readouts can mirror each other's scroll position.
   scrollRef?: (el: HTMLDivElement | null) => void;
   onScroll?: (e: UIEvent<HTMLDivElement>) => void;
 }) {
@@ -815,7 +823,14 @@ function LayerReadout({
     return new Map(sel.map((s) => [s.key, s.colorRgb]));
   }, [sliderCtx, slice.type]);
   const nextColorRgb = sliderCtx?.nextColorRgb ?? POPUP_BAR_RGB;
-  const lensLabel = slice.type === LensType.JACOBIAN_LENS ? 'J-Lens Readout' : 'Logit Lens';
+  const lensLabel = LENS_TYPE_READOUT_LABELS[slice.type];
+  // Mobile columns are narrow: "J-Lens", not "J-Lens Readout".
+  const lensLabelNode = (
+    <>
+      <span className="sm:hidden">{lensLabel.replace(/ Readout$/, '')}</span>
+      <span className="hidden sm:inline">{lensLabel}</span>
+    </>
+  );
   // For the J-Lens, warn when the active layer sits before the default layer
   // selection (the first ~1/3 of the model), where readouts are unreliable.
   const showDegenerateWarning =
@@ -858,8 +873,7 @@ function LayerReadout({
         <>
           <div className="flex shrink-0 flex-row items-center justify-between border-b border-slate-200 px-5 py-1.5 text-[9px] uppercase tracking-wide text-slate-500">
             <span>
-              Layer <span className="font-bold text-slate-700">{layers[activeLayer]}</span>{' '}
-              {slice.type === LensType.JACOBIAN_LENS ? 'J-Lens Readout' : 'Logit Lens'}
+              Layer <span className="font-bold text-slate-700">{layers[activeLayer]}</span> {lensLabelNode}
             </span>
             <span className="text-slate-400">Count by layer</span>
           </div>
@@ -898,8 +912,8 @@ function LayerReadout({
       ) : (
         <>
           <div className="flex shrink-0 flex-row items-center gap-x-1.5 border-b border-slate-200 px-2 py-1.5 text-[9px] uppercase tracking-wide text-slate-500 sm:px-5">
-            <span className="w-8 shrink-0 sm:w-10">Layer</span>
-            <span className="min-w-0 flex-1 whitespace-nowrap">{lensLabel}</span>
+            <span className="hidden w-10 shrink-0 sm:block">Layer</span>
+            <span className="min-w-0 flex-1 whitespace-nowrap text-center sm:text-left">{lensLabelNode}</span>
             <span className="hidden w-1/2 shrink-0 text-slate-400 sm:block">Count by layer</span>
           </div>
           <div
@@ -931,79 +945,43 @@ function LayerReadout({
   );
 }
 
-// One lens type's column in the popup: a layer selector strip on top and the
-// active layer's readout below. Used in single-lens modes.
-function LensColumn({ slice, layersByType }: { slice: LensTypeSlice; layersByType: Record<string, number[]> }) {
-  const layers = useMemo(() => layersByType[slice.type] ?? [], [layersByType, slice.type]);
-  // Transient hover preview (local) vs. a locked (clicked) layer that lives in
-  // the shared analysis state so it persists across token hovers; hover takes
-  // priority for the readout shown.
-  const [hoveredLayer, setHoveredLayer] = useState<number | null>(null);
-  const sliderCtx = useContext(LensSliderContext);
-  const lockedLayer = sliderCtx?.lockedLayer ?? null;
-  const setLockedLayer = sliderCtx?.setLockedLayer;
-  const activeLayer = hoveredLayer ?? lockedLayer;
-  const steerActive = useContext(SteerActiveContext);
-  const range = sliderCtx?.range ?? null;
-
-  // One heatmap row per selected sidebar token (of this lens type). While
-  // steering, restrict to the steered/swapped token so its band fills the strip.
-  const bands = useMemo<StripBand[]>(() => {
-    let sel = (sliderCtx?.selected ?? []).filter((s) => s.type === slice.type);
-    if (steerActive) {
-      sel = sel.filter((s) => s.key === steerActive.key && s.type === steerActive.type);
-    }
-    return sel.map((s) => ({
-      key: s.key,
-      type: s.type,
-      colorRgb: s.colorRgb,
-      weights: sliceLayerWeights(slice, layers, s.key, s.canonicalOf),
-    }));
-  }, [sliderCtx, slice, layers, steerActive]);
-
-  return (
-    <div className="flex w-full flex-col gap-y-0 sm:pt-3">
-      <LayerSelectorStrip
-        layers={layers}
-        bands={bands}
-        hoveredLayer={hoveredLayer}
-        lockedLayer={lockedLayer}
-        onHover={setHoveredLayer}
-        onLock={(i) => setLockedLayer?.(lockedLayer === i ? null : i)}
-        onShowAll={() => setLockedLayer?.(null)}
-        caption={`Hover a layer to preview, click to lock its ${
-          slice.type === LensType.JACOBIAN_LENS ? 'J-Lens readouts' : 'Logit Lens tokens'
-        }.`}
-      />
-      <LayerReadout slice={slice} layers={layers} activeLayer={activeLayer} range={range} />
-    </div>
-  );
-}
-
-// DIFF mode: a SINGLE combined layer selector strip (striped horizontally by
-// every selected sidebar token across both lenses) drives two readouts below,
-// kept split left/right by lens type.
-function CombinedLensColumns({
+// The popup's columns: ONE layer selector strip (striped by every selected
+// sidebar token across the shown lenses) drives every readout below it, side by
+// side: one per lens type, then the oracle's when the model has it.
+function SharedStripColumns({
+  token,
   slices,
   layersByType,
+  showOracle,
 }: {
+  token: LensTokenMessage;
   slices: LensTypeSlice[];
   layersByType: Record<string, number[]>;
+  showOracle: boolean;
 }) {
   const sliderCtx = useContext(LensSliderContext);
   const steerActive = useContext(SteerActiveContext);
+  const oracle = useContext(OracleContext);
   const range = sliderCtx?.range ?? null;
   const [hoveredLayer, setHoveredLayer] = useState<number | null>(null);
   const lockedLayer = sliderCtx?.lockedLayer ?? null;
   const setLockedLayer = sliderCtx?.setLockedLayer;
   const activeLayer = hoveredLayer ?? lockedLayer;
   // Layers are shared across lens types (the model's layers); use the first.
-  const layers = layersByType[slices[0]?.type] ?? [];
+  const layers =
+    (slices.length > 0 ? layersByType[slices[0].type] : Object.values(layersByType)[0]) ?? oracle?.layers ?? [];
 
-  // Keep the two readouts' scroll positions mirrored: scrolling one scrolls the
-  // other to the same offset. The equality guard avoids a programmatic-scroll
+  // Keep the readouts' scroll positions mirrored: scrolling one scrolls the
+  // others to the same offset. The equality guard avoids a programmatic-scroll
   // feedback loop between the paired containers.
   const scrollEls = useRef<(HTMLDivElement | null)[]>([]);
+  // On mobile the columns scroll sideways; each token starts at the left end.
+  const columnsRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (columnsRef.current) {
+      columnsRef.current.scrollLeft = 0;
+    }
+  }, [token.position]);
   const syncScroll = (idx: number) => (e: UIEvent<HTMLDivElement>) => {
     const top = e.currentTarget.scrollTop;
     scrollEls.current.forEach((el, i) => {
@@ -1013,7 +991,7 @@ function CombinedLensColumns({
     });
   };
 
-  // One horizontal stripe per selected token, across both lenses, each colored
+  // One horizontal stripe per selected token, across the lenses, each colored
   // by its per-layer prominence within its own lens slice. While steering,
   // restrict to the steered/swapped token so its band fills the strip.
   const bands = useMemo<StripBand[]>(() => {
@@ -1037,6 +1015,11 @@ function CombinedLensColumns({
     return out;
   }, [sliderCtx, slices, layersByType, steerActive]);
 
+  const names = [...slices.map((sl) => LENS_TYPE_SHORT_LABELS[sl.type]), ...(showOracle ? ['Oracle'] : [])];
+  const caption = `Hover a layer to preview, click to lock its ${
+    names.length > 1 ? `${names.slice(0, -1).join(', ')} & ${names[names.length - 1]}` : names[0]
+  } readouts.`;
+
   return (
     <div className="flex w-full flex-col gap-y-0 sm:pt-3">
       <LayerSelectorStrip
@@ -1047,53 +1030,71 @@ function CombinedLensColumns({
         onHover={setHoveredLayer}
         onLock={(i) => setLockedLayer?.(lockedLayer === i ? null : i)}
         onShowAll={() => setLockedLayer?.(null)}
-        caption="Hover a layer to preview, click to lock its J-Lens & Logit Lens readouts."
+        caption={caption}
       />
-      <div className="flex flex-row divide-x-2 divide-slate-200">
+      <div ref={columnsRef} className="flex flex-row divide-x-2 divide-slate-200 overflow-x-auto sm:overflow-x-visible">
         {slices.map((slice, idx) => (
-          <LayerReadout
-            key={slice.type}
-            slice={slice}
-            layers={layersByType[slice.type] ?? []}
-            activeLayer={activeLayer}
-            range={range}
-            scrollRef={(el) => {
-              scrollEls.current[idx] = el;
-            }}
-            onScroll={syncScroll(idx)}
-          />
+          <div key={slice.type} className="min-w-[140px] flex-1 sm:min-w-0">
+            <LayerReadout
+              slice={slice}
+              layers={layersByType[slice.type] ?? []}
+              activeLayer={activeLayer}
+              range={range}
+              scrollRef={(el) => {
+                scrollEls.current[idx] = el;
+              }}
+              onScroll={syncScroll(idx)}
+            />
+          </div>
         ))}
+        {showOracle && (
+          <div className="min-w-[140px] flex-1 sm:min-w-0">
+            {/* Mirrored only in the by-layer overview, where its rows match the lens rows. */}
+            <OracleLayerReadout
+              token={token}
+              layers={layers}
+              activeLayer={activeLayer}
+              range={range}
+              scrollRef={(el) => {
+                scrollEls.current[slices.length] = activeLayer == null ? el : null;
+              }}
+              onScroll={activeLayer == null ? syncScroll(slices.length) : undefined}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// The hovered-token popup body: one column per displayed lens type (two
-// side-by-side when mode is DIFF). Mounted only while hovered.
+// The hovered-token popup body: one layer strip over one readout per shown lens.
 export default function JlensTokenPopup({
   token,
   layersByType,
-  layerRange = null,
 }: {
   token: LensTokenMessage;
   layersByType: Record<string, number[]>;
-  // The selected layer range, shown in the static header.
-  layerRange?: LayerRange | null;
 }) {
-  const mode = useContext(LensModeContext);
+  const chosen = useContext(LensColumnsContext);
+  const oracle = useContext(OracleContext);
+  const jppAvailable = hasJppLens(layersByType);
+  const columns = useMemo(() => resolveLensColumns(chosen, jppAvailable), [chosen, jppAvailable]);
   const byType = useMemo(() => new Map(token.results.map((r) => [r.type, r] as const)), [token.results]);
-  const displayedTypes = useMemo(() => lensTypesForMode(mode).filter((t) => byType.has(t)), [mode, byType]);
+  const slices = useMemo(
+    () => lensTypesOf(columns).flatMap((t) => (byType.has(t) ? [byType.get(t) as LensTypeSlice] : [])),
+    [columns, byType],
+  );
+  const showOracle = oracle?.available ?? false;
 
-  if (displayedTypes.length === 0) {
+  if (slices.length === 0 && !showOracle) {
     return null;
   }
 
-  const twoColumn = mode === LensMode.DIFF;
-  const lensLabel = twoColumn ? 'J-Space & Logit Lens' : mode === LensMode.JACOBIAN_LENS ? 'J-Space' : 'Logit Lens';
+  const labels = [...slices.map((sl) => LENS_TYPE_SPACE_LABELS[sl.type]), ...(showOracle ? ['Oracle'] : [])];
 
   return (
     <div className="flex w-full flex-col">
-      {/* Static 3-column header: lens / layer(s) / position (no controls). */}
+      {/* Static header: the token and position, and the shown lenses. */}
       <div className="flex h-10 w-full flex-row items-stretch border-b border-slate-200 bg-white text-[12px] leading-none text-slate-600">
         <div className="flex flex-1 items-center justify-center gap-x-2 px-3 text-center">
           <span className="rounded bg-slate-200 px-1.5 py-1 font-mono text-slate-700">{displayToken(token.token)}</span>
@@ -1101,41 +1102,11 @@ export default function JlensTokenPopup({
             Position <span className="font-semibold text-slate-700">{token.position}</span>
           </span>
         </div>
-        <div className="flex hidden flex-1 items-center justify-center border-l border-slate-200 px-3 text-center">
-          <span>
-            {layerRange ? (
-              layerRange[0] === layerRange[1] ? (
-                <>
-                  Layer <span className="font-semibold text-slate-700">{layerRange[0]}</span>
-                </>
-              ) : (
-                <>
-                  Layers <span className="font-semibold text-slate-700">{layerRange[0]}</span> to{' '}
-                  <span className="font-semibold text-slate-700">{layerRange[1]}</span>
-                </>
-              )
-            ) : (
-              'All layers'
-            )}
-          </span>
-        </div>
         <div className="hidden flex-1 items-center justify-center border-l border-slate-200 px-3 text-center sm:flex">
-          <strong className="text-slate-600">{lensLabel}</strong>
+          <strong className="text-slate-600">{labels.join(' · ')}</strong>
         </div>
       </div>
-      {twoColumn ? (
-        <CombinedLensColumns
-          slices={displayedTypes.map((t) => byType.get(t)).filter((s): s is LensTypeSlice => s != null)}
-          layersByType={layersByType}
-        />
-      ) : (
-        <div className="flex w-full flex-row gap-x-0 divide-x divide-slate-200 px-0 py-0">
-          {displayedTypes.map((t) => {
-            const slice = byType.get(t);
-            return slice ? <LensColumn key={t} slice={slice} layersByType={layersByType} /> : null;
-          })}
-        </div>
-      )}
+      <SharedStripColumns token={token} slices={slices} layersByType={layersByType} showOracle={showOracle} />
     </div>
   );
 }

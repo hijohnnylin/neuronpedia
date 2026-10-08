@@ -6,8 +6,12 @@ convention we keep. The engine speaks in canonical names (``resid_pre``, ``resid
 ``mlp_in``, ...). This module is the single place that maps between the two and produces the
 ``{hook_name: tensor}`` dicts the existing activation/DFA post-processing consumes.
 
-The per-backend branches below survive the engine's ``InterpModel`` protocol on purpose,
-because they are not redundant dispatch:
+**Whether a backend can serve a point is asked of the model**, through the protocol's ``refuses`` /
+``serves`` (see :func:`_assert_points_served`). Nothing here restates it. Two things that did have
+both gone stale in their own direction, and each shipped a refusal naming the wrong component.
+
+The per-backend branches below survive the engine's ``InterpModel`` protocol on purpose, because
+they are not capability questions and so not redundant dispatch:
 
 - **Capture** could go through ``model.capture`` for both, but that protocol method returns
   CPU tensors (vLLM ships them back over ``collective_rpc``, so it has no choice). Eager can
@@ -28,17 +32,15 @@ routing it through both capture paths and refusing a model whose norms are not R
 
 from __future__ import annotations
 
-from typing import NamedTuple, TypedDict
+from typing import Any, NamedTuple, TypedDict, cast
 
 import einops
 import torch
 from interp_engine import (
-    HOOK_CAPTURE_POINTS,
     Address,
     EagerModel,
-    Tokenize,
+    InterpModel,
     UnmappedHook,
-    VLLMModel,
     per_head_value,
     point_to_tlens_hook,
     pre_gain_normalized,
@@ -47,73 +49,24 @@ from interp_engine import (
     tlens_normalized_hook,
 )
 from interp_engine import tlens_hook_to_point as engine_tlens_hook_to_point
-from interp_engine.points import refusal_reasons, tp_sharded
+from interp_engine.api import DirectionSet
+from interp_engine.directions import apply_directions
 
 
 class BackendUnsupported(ValueError):
     """Raised when the loaded backend cannot serve a requested capture point.
 
-    Endpoints catch this to return a clear 4xx instead of a 500. What vLLM serves is
-    ``interp_engine``'s ``HOOK_CAPTURE_POINTS`` (see :data:`_VLLM_CAPTURE_OK`) narrowed by this
-    pod's sharding; ``attn_probs`` is served by the off-kernel recompute rather than by capture,
-    and the eager-only points are listed with their reasons in the engine's point table.
+    Endpoints catch this to return a clear 4xx instead of a 500. What a backend serves is the
+    backend's own answer, asked through ``refuses`` (see :func:`_assert_points_served`);
+    ``attn_probs`` is reached through capture_attention rather than by capture.
     """
 
 
-# Points the engine-owned vLLM worker-hook capture serves. **Derived, not restated**: the engine's
-# point table is what both the client-side validation and the worker's hook dispatch answer from,
-# so a copy here can only ever be a second opinion -- and was one, having been frozen at the five
-# points scripts/vllm_capture_points_check.py happens to validate while the engine grew `attn_out`,
-# `attn_out_post`, `mlp_out_post`, `resid_mid` and `value`. Attention-output SAEs read `attn_out`,
-# so the stale copy turned them into a 400 that blamed the paged-attention kernel.
-#
-# `attn_probs` is deliberately absent: it is a recompute rather than a capture, and callers reach
-# it through capture_attention / vllm_attention_unsupported_reason below.
-_VLLM_CAPTURE_OK = set(HOOK_CAPTURE_POINTS)
-
-# Of those, the ones tensor parallelism splits across ranks -- asked of the same table rather than
-# derived from a proxy here. `z` (the output projection's input), `value` (the qkv projection's
-# output), the QK-norm points and `mlp_act` are head- or neuron-sharded, so rank 0 -- the only
-# payload the capture path reads -- holds 1/tp of the width, and there is no cheap way to
-# reassemble them from here (the ranks would have to be concatenated in order).
-#
-# This used to be `_VLLM_CAPTURE_OK - d_model_wide()`, i.e. "anything not `hidden_size` wide is a
-# shard". That proxy holds for the points above and breaks on `router_logits`, which is
-# `n_experts` wide off a *replicated* gate: every rank computes the whole thing, so refusing it on a
-# multi-GPU pod would be refusing a point that works.
-_TP_SHARDED_POINTS = _VLLM_CAPTURE_OK & tp_sharded()
-
-
-def vllm_served_capture_points(model: object) -> set[str]:
-    """Capture points this vLLM instance can serve, narrowed by its GPU sharding."""
-    declared = getattr(model, "static_points", ()) or ()
-    if declared:
-        names = {getattr(a, "name", str(a).split(".", 1)[0]) for a in declared}
-        if int(getattr(model, "tensor_parallel_size", 1) or 1) > 1:
-            return names - _TP_SHARDED_POINTS
-        return names
-    if not getattr(model, "hooks_available", True):
-        return set()
-    if int(getattr(model, "tensor_parallel_size", 1) or 1) > 1:
-        return _VLLM_CAPTURE_OK - _TP_SHARDED_POINTS
-    return set(_VLLM_CAPTURE_OK)
-
-
-def vllm_attention_unsupported_reason(model: object) -> str | None:
-    """Why this vLLM instance cannot produce attention patterns, or None if it can.
-
-    Separate from the ``unsupported`` list on ``_attn_dims``, which records config terms
-    the off-kernel recompute cannot reproduce: this is about how the pod is deployed, not
-    about the model. The recompute reshapes rank 0's q/k/v with whole-model head counts,
-    which only holds when there is one rank.
-    """
-    tp_size = int(getattr(model, "tensor_parallel_size", 1) or 1)
-    if tp_size > 1:
-        return (
-            f"the model is sharded across {tp_size} GPUs, which splits attention heads "
-            "across ranks; the pattern recompute needs all heads on one rank"
-        )
-    return None
+def backend_name(model: InterpModel) -> str:
+    """What to call this backend in a message to a caller: the engine's own label, the same one
+    ``/capabilities`` reports. Error text is read by someone deciding whether to change their
+    request or their pod, so it has to say which backend refused."""
+    return model.describe().backend
 
 
 def assert_hooks_available(model: object, what: str = "This endpoint") -> None:
@@ -317,7 +270,7 @@ def assert_steer_layers_declared(
     )
 
 
-def _vllm_points_use_native_resid(model: object, points: list[_CapturePoint]) -> bool:
+def _points_use_native_resid(model: object, points: list[_CapturePoint]) -> bool:
     """True when these resid_post reads should go through native extract, not static/hooks."""
     if not points or not all(p.address.name == "resid_post" and p.address.layer is not None for p in points):
         return False
@@ -414,58 +367,25 @@ def sae_static_addresses(sae_manager: object) -> tuple[list[Address], list[Addre
     return reads, writes
 
 
-def _why_unserved(model: object, unserved: list[str]) -> str:
-    """Why *these* points are refused -- this pod's sharding, or the points' own table entries.
+def _assert_points_served(model: InterpModel, points: list[_CapturePoint]) -> None:
+    """Raise :class:`BackendUnsupported` for any point this model cannot serve.
 
-    Two different questions, and printing the wrong one sends the reader after the wrong fix: a
-    sharded `z` is a deployment fact that a single-GPU pod would not have, while `attn_probs` is a
-    property of the point that no pod serves through capture. This used to print the latter
-    unconditionally, so a refusal of `attn_out` -- an ordinary module output, and at the time merely
-    missing from a stale allowlist -- blamed the fused paged-attention kernel.
-    """
-    parts = []
-    sharded = sorted(n for n in unserved if n in _TP_SHARDED_POINTS)
-    if sharded:
-        tp_size = int(getattr(model, "tensor_parallel_size", 1) or 1)
-        parts.append(f"sharded across {tp_size} GPUs, which splits {sharded} across ranks")
-    rest = [n for n in unserved if n not in _TP_SHARDED_POINTS]
-    if rest:
-        parts.append(f"per the engine's point table:\n{refusal_reasons(rest)}")
-    return "; ".join(parts)
-
-
-def _assert_vllm_points_supported(model: object, points: list[_CapturePoint]) -> None:
-    """Raise :class:`BackendUnsupported` for any point this instance cannot serve.
+    **Asked of the model, not worked out here.** ``refuses`` dry-runs the resolver the backend's own
+    capture path calls, so the verdict is the capture's verdict; anything this module derived instead
+    would be a second opinion, and the two that used to live here had both drifted. One froze the
+    vLLM set at five points while the engine grew five more, which turned attention-output SAEs into
+    a 400 blaming the paged-attention kernel. The other narrowed by tensor-parallel shard width,
+    refusing points the worker gathers at collect.
 
     Checked against what is actually captured, which for the ``hook_normalized`` hooks is the norm's
     input rather than the hook itself -- while the message names the hooks the caller asked for.
     """
     assert_hooks_available(model, "Activation capture")
-    served = vllm_served_capture_points(model)
-    bad = [point.hook for point in points if point.address.name not in served]
-    if not bad:
+    refused = {point.hook: why for point in points if (why := model.refuses(point.address))}
+    if not refused:
         return
-    unserved = sorted({point.address.name for point in points if point.address.name not in served})
-    raise BackendUnsupported(
-        f"vLLM backend cannot capture {bad} on this instance ({_why_unserved(model, unserved)}). "
-        f"Serving: {sorted(served)}."
-    )
-
-
-def get_tokenize(model: object) -> Tokenize:
-    """Return an engine ``Tokenize`` for the loaded model, regardless of backend.
-
-    Both engine backends build one in their constructor and expose it as ``.tok``. The
-    fallback covers anything else that turns up holding only a ``.tokenizer``, since
-    message-span computation needs nothing more than that.
-    """
-    tok = getattr(model, "tok", None)
-    if tok is not None:
-        return tok
-    tokenizer = getattr(model, "tokenizer", None)
-    if tokenizer is None:
-        raise ValueError("Loaded model does not expose a tokenizer for chat templating")
-    return Tokenize(tokenizer, default_prepend_bos=True, device="cpu")
+    detail = "\n".join(f"  {hook}: {why}" for hook, why in sorted(refused.items()))
+    raise BackendUnsupported(f"{backend_name(model)} cannot capture {sorted(refused)} on this instance:\n{detail}")
 
 
 # The raw sublayer output each block-level TransformerLens hook is the *contribution* twin of. Both
@@ -583,7 +503,7 @@ def _capture_points(hook_names: list[str]) -> list[_CapturePoint]:
 
 
 def _native_resid_layers(points: list[_CapturePoint]) -> list[int]:
-    """The layer of each point, for a set :func:`_vllm_points_use_native_resid` has accepted.
+    """The layer of each point, for a set :func:`_points_use_native_resid` has accepted.
 
     That guard already requires a layer on every point, but it returns a bool, so the narrowing
     does not survive the call and ``Address.layer`` stays ``int | None`` at each use. Restating
@@ -635,12 +555,30 @@ def _as_batched(tokens: torch.Tensor) -> torch.Tensor:
     return tokens if tokens.ndim == 2 else tokens.unsqueeze(0)
 
 
-async def capture_cache_async(model: object, tokens: torch.Tensor, hook_names: list[str]) -> dict[str, torch.Tensor]:
-    """Backend-aware capture -> ``{hook_name: tensor[1, seq, d]}`` for any loaded backend.
+async def _capture_one(
+    model: InterpModel, token_ids: list[int], points: list[_CapturePoint]
+) -> dict[Address, torch.Tensor]:
+    """One prompt's raw captures through the protocol -> ``{address: tensor[seq, d]}``.
 
-    EagerModel captures eagerly via ``run_with_cache``; ``VLLMModel`` captures via the
-    engine-owned worker forward-hooks (``model.capture``). vLLM points that are not yet at
-    eager parity raise :class:`BackendUnsupported`. The returned dict matches exactly what the
+    A ``vllm-static`` pod with native extract on serves an undeclared ``resid_post`` through
+    ``capture_resid_post`` instead; everything else is the model's own ``capture``, which every
+    backend has and whose refusals are asked for first so they arrive as a 400.
+    """
+    if _points_use_native_resid(model, points):
+        layers = _native_resid_layers(points)
+        resid = await cast(Any, model).capture_resid_post(token_ids, layers)
+        return {p.address: resid[layer] for p, layer in zip(points, layers, strict=True)}
+    _assert_points_served(model, points)
+    return await model.capture(token_ids, [point.address for point in points])
+
+
+async def capture_cache_async(
+    model: InterpModel, tokens: torch.Tensor, hook_names: list[str]
+) -> dict[str, torch.Tensor]:
+    """Capture -> ``{hook_name: tensor[1, seq, d]}`` on whichever backend is loaded.
+
+    Eager captures in-process via ``run_with_cache``; every other backend goes through the
+    protocol's ``capture`` (see :func:`_capture_one`). The returned dict matches exactly what the
     existing ``process_*_activations`` helpers consume, so endpoints stay backend-agnostic.
     """
     points = _capture_points(hook_names)
@@ -648,73 +586,68 @@ async def capture_cache_async(model: object, tokens: torch.Tensor, hook_names: l
         cache = run_with_cache(model, _as_batched(tokens), [point.address for point in points])
         return {point.hook: _finish(point, cache[point.address], model) for point in points}
 
-    if isinstance(model, VLLMModel):
-        if _vllm_points_use_native_resid(model, points):
-            token_ids = _as_batched(tokens)[0].tolist()
-            layers = _native_resid_layers(points)
-            resid = await model.capture_resid_post(token_ids, layers)
-            return {
-                p.hook: _finish(p, resid[layer].unsqueeze(0), model) for p, layer in zip(points, layers, strict=True)
-            }
-        _assert_vllm_points_supported(model, points)
-        token_ids = _as_batched(tokens)[0].tolist()
-        raw = await model.capture(token_ids, [point.address for point in points])
-        return {point.hook: _finish(point, raw[point.address].unsqueeze(0), model) for point in points}
-
-    raise BackendUnsupported(f"Unsupported model backend for capture: {type(model).__name__}")
+    raw = await _capture_one(model, _as_batched(tokens)[0].tolist(), points)
+    return {point.hook: _finish(point, raw[point.address].unsqueeze(0), model) for point in points}
 
 
-async def capture_activation_async(model: object, tokens: torch.Tensor, hook_name: str) -> torch.Tensor:
-    """Single-point backend-aware capture -> tensor ``[1, seq, d]`` (see :func:`capture_cache_async`)."""
+async def capture_activation_async(model: InterpModel, tokens: torch.Tensor, hook_name: str) -> torch.Tensor:
+    """Single-point capture -> tensor ``[1, seq, d]`` (see :func:`capture_cache_async`)."""
     cache = await capture_cache_async(model, tokens, [hook_name])
     return cache[hook_name]
 
 
+async def project_vector_async(
+    model: InterpModel, tokens: torch.Tensor, hook_name: str, vector: torch.Tensor
+) -> torch.Tensor:
+    """One direction read at ``hook_name`` over one prompt -> ``[seq]`` float32.
+
+    The engine's ``project`` runs where the forward runs, so on vLLM only the values cross. A
+    point this module derives after the capture (``hook_normalized``, a native resid read) is
+    captured, then projected here with the same arithmetic.
+    """
+    point = _capture_points([hook_name])[0]
+    token_ids = _as_batched(tokens)[0].tolist()
+    direction = vector.reshape(1, -1)
+    if point.normalize or _points_use_native_resid(model, [point]):
+        rows = (await capture_activation_async(model, tokens, hook_name))[0]
+        return apply_directions(rows, direction)[:, 0]
+    _assert_points_served(model, [point])
+    (values,) = await model.project(token_ids, [DirectionSet(point.address, direction)])
+    return values[:, 0]
+
+
 async def capture_padded_cache_async(
-    model: object,
+    model: InterpModel,
     padded_tokens: torch.Tensor,
     original_lengths: list[int],
     hook_names: list[str],
 ) -> dict[str, torch.Tensor]:
-    """Backend-aware batched capture -> ``{hook_name: tensor[batch, max_len, d]}`` (right-padded).
+    """Batched capture -> ``{hook_name: tensor[batch, max_len, d]}`` (right-padded).
 
-    EagerModel captures the padded batch in one eager forward (pads are causally harmless and
-    the caller slices to ``original_lengths``). ``VLLMModel`` has no batched worker
-    capture, so it captures each prompt at its true length and scatters into the padded tensor.
+    Eager captures the padded batch in one forward (pads are causally harmless and the caller
+    slices to ``original_lengths``). The protocol's ``capture`` takes one prompt, so every other
+    backend captures each prompt at its true length and scatters into the padded tensor.
     """
     points = _capture_points(hook_names)
     if isinstance(model, EagerModel):
         cache = run_with_cache(model, padded_tokens, [point.address for point in points])
         return {point.hook: _finish(point, cache[point.address], model) for point in points}
 
-    if isinstance(model, VLLMModel):
-        native = _vllm_points_use_native_resid(model, points)
-        if not native:
-            _assert_vllm_points_supported(model, points)
-        batch, max_len = int(padded_tokens.shape[0]), int(padded_tokens.shape[1])
-        # Hoisted: the points are the same for every prompt in the batch.
-        layers = _native_resid_layers(points) if native else []
-        per_prompt = []
+    batch, max_len = int(padded_tokens.shape[0]), int(padded_tokens.shape[1])
+    per_prompt = [
+        await _capture_one(model, padded_tokens[i, : original_lengths[i]].tolist(), points) for i in range(batch)
+    ]
+    out: dict[str, torch.Tensor] = {}
+    for point in points:
+        sample = per_prompt[0][point.address]
+        t = torch.zeros(batch, max_len, sample.shape[-1], dtype=sample.dtype)
         for i in range(batch):
-            ids = padded_tokens[i, : original_lengths[i]].tolist()
-            if native:
-                resid = await model.capture_resid_post(ids, layers)
-                per_prompt.append({p.address: resid[layer] for p, layer in zip(points, layers, strict=True)})
-            else:
-                per_prompt.append(await model.capture(ids, [point.address for point in points]))
-        out: dict[str, torch.Tensor] = {}
-        for point in points:
-            sample = per_prompt[0][point.address]
-            t = torch.zeros(batch, max_len, sample.shape[-1], dtype=sample.dtype)
-            for i in range(batch):
-                cap = per_prompt[i][point.address]
-                t[i, : cap.shape[0]] = cap
-            # Normalized after the scatter, not before: the padded rows are zeros, and a norm of a
-            # zero row is 0/sqrt(eps) = 0, so they stay the pads the callers slice away.
-            out[point.hook] = _finish(point, t, model)
-        return out
-
-    raise BackendUnsupported(f"Unsupported model backend for capture: {type(model).__name__}")
+            cap = per_prompt[i][point.address]
+            t[i, : cap.shape[0]] = cap
+        # Normalized after the scatter, not before: the padded rows are zeros, and a norm of a
+        # zero row is 0/sqrt(eps) = 0, so they stay the pads the callers slice away.
+        out[point.hook] = _finish(point, t, model)
+    return out
 
 
 def _get_safe_dtype(dtype: torch.dtype) -> torch.dtype:
@@ -820,13 +753,13 @@ def dfa_from_v_and_probs(
     }
 
 
-async def capture_dfa_inputs(model: object, tokens: torch.Tensor, layer_num: int) -> DfaInputs:
-    """Backend-aware ``(value, attn_probs, dims)`` for DFA at ``layer_num``.
+async def capture_dfa_inputs(model: InterpModel, tokens: torch.Tensor, layer_num: int) -> DfaInputs:
+    """``(value, attn_probs, dims)`` for DFA at ``layer_num``.
 
     Returns ``value [1, src, n_kv, head_dim]``, ``attn_probs [1, n_heads, dest, src]`` and a
-    ``dims`` dict (n_heads/n_kv_heads/head_dim). EagerModel captures eagerly (value + attn_probs);
-    the vLLM backend uses the off-kernel ``capture_attention`` recompute. Callers memoize this
-    per layer and reuse across features (:func:`dfa_from_v_and_probs`).
+    ``dims`` dict (n_heads/n_kv_heads/head_dim). Eager captures the two points directly; every
+    other backend recomputes the pair off-kernel through ``capture_attention``. Callers memoize
+    this per layer and reuse across features (:func:`dfa_from_v_and_probs`).
     """
     if isinstance(model, EagerModel):
         cache = run_with_cache(
@@ -843,35 +776,34 @@ async def capture_dfa_inputs(model: object, tokens: torch.Tensor, layer_num: int
         }
         return v, attn, dims
 
-    if isinstance(model, VLLMModel):
-        assert_hooks_available(model, "DFA")
-        reason = vllm_attention_unsupported_reason(model)
-        if reason is not None:
-            raise BackendUnsupported(f"DFA is not available on this instance: {reason}.")
-        ids = _as_batched(tokens)[0].tolist()
-        res = await model.capture_attention(ids, [layer_num])
-        v = res[layer_num]["value"].unsqueeze(0)  # [1, src, n_kv, head_dim]
-        attn = res[layer_num]["probs"].unsqueeze(0)  # [1, n_heads, dest, src]
-        ad = model._attn_dims  # type: ignore[attr-defined]
-        dims = {
-            "n_heads": ad["n_heads"],
-            "n_kv_heads": ad["n_kv_heads"],
-            "head_dim": ad["head_dim"],
-        }
-        return v, attn, dims
-
-    raise BackendUnsupported(f"DFA not supported on backend {type(model).__name__}")
+    # Every other backend through the protocol: one `capture_attention` returns the triple DFA
+    # needs, and the engine says whether it can. Nothing here is named after a backend, so a
+    # backend the engine grows serves DFA without this function changing.
+    assert_hooks_available(model, "DFA")
+    refusal = model.refuses(Address("attn_probs", layer_num))
+    if refusal is not None:
+        raise BackendUnsupported(f"DFA is not available on this instance: {refusal}.")
+    ids = _as_batched(tokens)[0].tolist()
+    res = await model.capture_attention(ids, [layer_num])
+    v = res[layer_num]["value"].unsqueeze(0)  # [1, src, n_kv, head_dim]
+    attn = res[layer_num]["probs"].unsqueeze(0)  # [1, n_heads, dest, src]
+    dims = {
+        "n_heads": model.n_heads,
+        "n_kv_heads": model.n_kv_heads,
+        "head_dim": model.head_dim,
+    }
+    return v, attn, dims
 
 
 async def calculate_dfa(
-    model: object,
+    model: InterpModel,
     sae: object,
     layer_num: int,
     index: int,
     max_value_index: int,
     tokens: torch.Tensor,
 ) -> DfaResult:
-    """Backend-aware DFA (EagerModel or vLLM off-kernel recompute).
+    """DFA at ``layer_num``, by whatever route the backend serves attention.
 
     Both indices are in the coordinates of ``tokens`` -- position 0 is whatever position 0 of
     the forward pass was, BOS included. An endpoint that trims its response arrays wants
@@ -889,7 +821,7 @@ async def calculate_dfa(
 
 
 async def calculate_dfa_for_values(
-    model: object,
+    model: InterpModel,
     sae: object,
     layer_num: int,
     index: int,

@@ -30,6 +30,11 @@ export const DEFAULT_MODELID = process.env.NEXT_PUBLIC_DEFAULT_MODELID || '';
 export const DEFAULT_SOURCESET = process.env.NEXT_PUBLIC_DEFAULT_SOURCESET || '';
 export const DEFAULT_SOURCE = process.env.NEXT_PUBLIC_DEFAULT_SOURCE || '';
 export const DEFAULT_STEER_MODEL = process.env.NEXT_PUBLIC_DEFAULT_STEER_MODEL || '';
+// Models whose inference servers load the J++ Lens (JPP_LENS=true). Comma-separated.
+export const JPP_LENS_MODEL_IDS =
+  process.env.NEXT_PUBLIC_JPP_LENS_MODEL_IDS?.split(',')
+    .map((m) => m.trim())
+    .filter((m) => m) || [];
 export const STEER_FORCE_ALLOW_INSTRUCT_MODELS =
   process.env.NEXT_PUBLIC_STEER_FORCE_ALLOW_INSTRUCT_MODELS?.split(',').map((m) => m.trim()) || [];
 
@@ -97,6 +102,21 @@ export const EMBEDDING_PROVIDER = EmbeddingProviderSchema.parse(process.env.EMBE
 // config. Autointerp and sparsity are still single-server env vars.
 
 // Inference Server
+// For local development: send all inference to one server and skip the ComputeHost table.
+// Ignored when NODE_ENV is production.
+export const USE_LOCALHOST_INFERENCE =
+  process.env.USE_LOCALHOST_INFERENCE === 'true' && process.env.NODE_ENV !== 'production';
+export const LOCALHOST_INFERENCE_HOST = process.env.LOCALHOST_INFERENCE_HOST_OVERRIDE || 'http://127.0.0.1:5002';
+// Per-model inference hosts that replace the ComputeHost table, also in
+// production: "modelId=https://host,modelId2=https://host2".
+export const INFERENCE_HOST_OVERRIDES: Record<string, string> = Object.fromEntries(
+  (process.env.INFERENCE_HOST_OVERRIDES || '')
+    .split(',')
+    .filter((entry) => entry.includes('='))
+    .map((entry) => [entry.slice(0, entry.indexOf('=')).trim(), entry.slice(entry.indexOf('=') + 1).trim()])
+    .filter(([modelId, url]) => modelId && url)
+    .map(([modelId, url]) => [modelId, url.replace(/\/+$/, '')]),
+);
 export const INFERENCE_SERVER_SECRET = process.env.INFERENCE_SERVER_SECRET || '';
 
 export const NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH = process.env.NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH

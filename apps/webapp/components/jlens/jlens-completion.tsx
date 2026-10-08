@@ -7,13 +7,12 @@ import {
   DEFAULT_LENS_COMPLETION_TOKENS_COMPLETION,
   DEFAULT_LENS_TEMPERATURE,
   DEFAULT_LENS_TOP_N,
-  LENS_TYPE_ORDER,
   LensMetaMessage,
-  LensMode,
   LensTokenMessage,
   LensType,
   MAX_LENS_COMPLETION_PROMPT_CHARS,
   MAX_LENS_COMPLETION_TOKENS_COMPLETION,
+  requestLensTypes,
 } from '@/lib/utils/lens';
 import { ArrowUp, Check, Copy, Download, Settings, Share2, Trash2, X } from 'lucide-react';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
@@ -25,12 +24,13 @@ import { tokensToText } from './jlens-chat-format';
 import { JlensCommentary, useSharedCommentary } from './jlens-commentary';
 import {
   buildSteerShareBody,
+  clampLayerRange,
   defaultExportFilename,
   downloadJson,
   JlensExportCompletion,
   JlensExportSteer,
 } from './jlens-export';
-import { LensModeSetContext } from './jlens-lens-mode';
+import { LensColumnsSetContext } from './jlens-lens-mode';
 import { JlensShareDialog } from './jlens-share-dialog';
 import { DefaultOutputHeader, SteerOutputHeader } from './jlens-steer-panel';
 import { runLensStream as baseRunLensStream, LensUnknownTokenError, RunLensStreamParams } from './jlens-stream';
@@ -115,7 +115,7 @@ export default function JlensCompletion({
   const [steerMeta, setSteerMeta] = useState<LensMetaMessage | null>(null);
 
   const { user } = useGlobalContext();
-  const setLensMode = useContext(LensModeSetContext);
+  const setLensColumns = useContext(LensColumnsSetContext);
 
   // The shared-commentary banner state, lifted here so the mobile banner (above
   // the run) and the desktop banner (in the analysis panel) share one dismiss.
@@ -137,9 +137,10 @@ export default function JlensCompletion({
     meta: steerMeta,
     modelId,
     busy: analysis.steerStreaming,
+    oracleEnabled: false,
   });
   const {
-    lensMode,
+    columns: lensColumns,
     layersByType,
     effectiveRange,
     hideNonWordTokens,
@@ -168,6 +169,9 @@ export default function JlensCompletion({
   // A steered run restored from a shared link, applied once the main tokens have
   // been hydrated (so the steer panel's per-layer counts compute correctly).
   const pendingSteerRef = useRef<JlensExportSteer | null>(null);
+  // A shared run's layer range (null = default). It is set after the tokens
+  // render, because new layers reset the range. Undefined = nothing to set.
+  const pendingLayerRangeRef = useRef<[number, number] | null | undefined>(undefined);
   // The readout to highlight in the steered transcript, snapshotted when a
   // steered run is started (or restored). Editing the swap token afterwards does
   // NOT change it — the highlight only updates on a new steered run.
@@ -225,7 +229,7 @@ export default function JlensCompletion({
         await runLensStream({
           modelId,
           prompt: promptValue,
-          type: LENS_TYPE_ORDER,
+          type: requestLensTypes(modelId),
           topN,
           temperature,
           numCompletionTokens,
@@ -314,7 +318,7 @@ export default function JlensCompletion({
         await runLensStream({
           modelId,
           prompt: promptValue,
-          type: LENS_TYPE_ORDER,
+          type: requestLensTypes(modelId),
           topN,
           temperature,
           numCompletionTokens,
@@ -390,7 +394,7 @@ export default function JlensCompletion({
         await runLensStream({
           modelId,
           inputTokenIds: ids as number[],
-          type: LENS_TYPE_ORDER,
+          type: requestLensTypes(modelId),
           topN,
           temperature,
           numCompletionTokens: 0,
@@ -438,7 +442,7 @@ export default function JlensCompletion({
           await runLensStream({
             modelId,
             inputTokenIds: steerIds as number[],
-            type: LENS_TYPE_ORDER,
+            type: requestLensTypes(modelId),
             topN,
             temperature,
             numCompletionTokens: 0,
@@ -615,6 +619,8 @@ export default function JlensCompletion({
     const restoreGenerated = (t: LensTokenMessage, i: number): LensTokenMessage =>
       typeof numPromptTokens === 'number' ? { ...t, is_generated: i >= numPromptTokens } : t;
     setTokens((loadedData.tokens ?? []).map(restoreGenerated));
+    pendingLayerRangeRef.current = loadedData.layerRange ?? null;
+    analysis.oracle.seed(loadedData.oracle, loadedData.tokens ?? [], loadedData.meta ?? null);
     // Restore a saved steered run (if any). The steered results are applied
     // immediately; entering steer mode is deferred to the effect below so the
     // per-layer counts compute against the just-set main tokens.
@@ -642,19 +648,13 @@ export default function JlensCompletion({
       setTemperature(ui.temperature);
       setNumCompletionTokens(ui.numCompletionTokens);
       pendingScrollSelectionRef.current = ui.selectedPositions.length > 0 ? ui.selectedPositions : null;
-      if (
-        ui.activeLensModeTab === LensMode.JACOBIAN_LENS ||
-        ui.activeLensModeTab === LensMode.LOGIT_LENS ||
-        ui.activeLensModeTab === LensMode.DIFF
-      ) {
-        setLensMode(ui.activeLensModeTab);
-      }
+      setLensColumns(ui.lensColumns);
     } else {
       setSelectedPositions(new Set());
       pendingScrollSelectionRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedData, setLensMode]);
+  }, [loadedData, setLensColumns]);
 
   // Once a shared run's tokens have rendered, bring its restored selection into
   // view by scrolling ONLY the transcript container (never the page). Re-runs
@@ -672,6 +672,15 @@ export default function JlensCompletion({
     const raf = requestAnimationFrame(() => scrollContainerToTokenPositions(el, positions));
     return () => cancelAnimationFrame(raf);
   }, [tokens, steerTokens]);
+
+  useEffect(() => {
+    const range = pendingLayerRangeRef.current;
+    if (range !== undefined && tokens.length > 0) {
+      pendingLayerRangeRef.current = undefined;
+      analysis.setLayerRange(clampLayerRange(range, analysis.layerBounds));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokens]);
 
   // Enter steer mode for a restored share once the main tokens are in place.
   useEffect(() => {
@@ -696,11 +705,13 @@ export default function JlensCompletion({
         analysis.steer && steerTokens.length > 0
           ? { config: analysis.steer, meta: steerMeta, tokens: steerTokens }
           : undefined,
+      oracle: analysis.oracle.sharedReads(),
     };
     downloadJson(data, defaultExportFilename('completion', modelId));
   }
 
   const canShare = tokens.length > 0 && tokens.every((t) => typeof t.id === 'number');
+  const shareLabel = 'Share';
   const hasRun = tokens.length > 0;
 
   const defaultOutput = (
@@ -751,7 +762,7 @@ export default function JlensCompletion({
             type="button"
             onClick={() => setShareOpen(true)}
             disabled={!canShare || streaming}
-            title="Share"
+            title={shareLabel}
             aria-label="Share"
             className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -892,12 +903,14 @@ export default function JlensCompletion({
               const firstGen = tokens.findIndex((t) => t.is_generated);
               return firstGen === -1 ? tokens.length : firstGen;
             })(),
-            activeLensModeTab: lensMode,
+            lensColumns,
             hideNonWordTokens,
+            layerRange: analysis.layerRange ?? undefined,
             lockedTokens: selected.map((s) => ({ key: s.key, type: s.type })),
             selectedPositions: Array.from(selectedPositions),
             description: description || undefined,
             steer: buildSteerShareBody(analysis.steer, steerTokens),
+            oracle: analysis.oracle.sharedReads(),
           })}
         />
 
@@ -1017,7 +1030,7 @@ export default function JlensCompletion({
           onShare={() => setShareOpen(true)}
           canShare={canShare}
           shareDisabled={streaming}
-          shareLabel="Share"
+          shareLabel={shareLabel}
           onExport={handleExport}
           exportDisabled={tokens.length === 0}
           exportLabel="Export this run to JSON"

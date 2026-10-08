@@ -12,7 +12,7 @@ import json
 
 from interp_engine import SamplingSettings
 
-from neuronpedia_inference.endpoints.steer.completion import _vllm_run_batched_generate
+from neuronpedia_inference.endpoints.steer.completion import _run_batched_generate
 from neuronpedia_inference.inference_utils.steering import (
     SteeringSettings,
     remove_sse_formatting,
@@ -29,21 +29,20 @@ class StubBackend:
         self.deltas_by_call = deltas_by_call
         self.calls = 0
 
-    async def generate(self, _prompt, _sampling_params, **_kwargs):
+    def to_tokens(self, _prompt, **_kwargs):
+        return [[1, 2]]
+
+    async def generate_stream(self, _prompt_token_ids, **_kwargs):
         deltas = self.deltas_by_call[self.calls]
         self.calls += 1
-
-        async def stream():
-            for delta in deltas:
-                yield delta
-
-        return stream()
+        for delta in deltas:
+            yield delta
 
 
 async def _frames(model: StubBackend, steer_types: list[NPSteerType]) -> list[dict]:
     return [
         json.loads(remove_sse_formatting(sse))
-        async for sse in _vllm_run_batched_generate(
+        async for sse in _run_batched_generate(
             model=model,  # type: ignore[arg-type]
             prompt="Hi",
             settings=SteeringSettings(

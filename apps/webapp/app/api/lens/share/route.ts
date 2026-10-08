@@ -1,5 +1,5 @@
 import { NP_GRAPH_BUCKET } from '@/app/[modelId]/graph/utils';
-import { JlensExport, JlensExportSteer } from '@/components/jlens/jlens-export';
+import { JlensExport, JlensExportOracle, JlensExportSteer } from '@/components/jlens/jlens-export';
 import { prisma } from '@/lib/db';
 import { lensPromptStream } from '@/lib/utils/inference';
 import {
@@ -11,16 +11,23 @@ import {
   MAX_JLENS_SHARE_UPLOAD_SIZE_BYTES,
 } from '@/lib/utils/jlens-share';
 import {
+  LENS_COLUMN_ORDER,
   LENS_MODES,
-  LENS_TYPE_ORDER,
   LENS_TYPES,
   LensChatMessage,
+  LensChatToolCall,
   LensMetaMessage,
+  lensTabFromColumns,
   LensTokenMessage,
   LensType,
   MAX_LENS_STEER_STRENGTH,
+  MAX_ORACLE_BULLETS,
   maxLensCompletionTokens,
+  requestLensTypes,
+  shareLensColumns,
 } from '@/lib/utils/lens';
+import { lensChatMessageSchema, lensChatToolsSchema } from '@/lib/utils/lens-chat-schema';
+import { verifySharedOracleReads } from '@/lib/utils/oracle-signature';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import cuid from 'cuid';
@@ -42,11 +49,12 @@ const MAX_LOCKED_TOKEN_KEY_CHARS = 256;
 const MAX_SELECTED_POSITIONS = 4096;
 const MAX_STEER_LAYERS = 512;
 const MAX_MODEL_ID_CHARS = 128;
+// About 370 positions at 11 oracle layers.
+const MAX_SHARE_ORACLE_READS = 4096;
+const MAX_ORACLE_READ_CHARS = 4096;
+const MAX_ORACLE_ADAPTER_CHARS = 256;
 
-const chatMessageSchema = yup.object({
-  role: yup.string().oneOf(['user', 'assistant', 'system']).required(),
-  content: yup.string().max(MAX_MESSAGE_CHARS).required(),
-});
+const chatMessageSchema = lensChatMessageSchema(MAX_MESSAGE_CHARS);
 
 // Per-token chat-span metadata (parallel to the token-id sequence). Shares are
 // re-run server-side over exact ids with generation disabled, which returns no
@@ -89,6 +97,22 @@ const shareSteerSchema = yup.object({
   spans: yup.array().of(tokenSpanSchema).max(MAX_TOKEN_IDS).optional(),
 });
 
+// Oracle reads of the main run, each with the `sig` that `/api/lens/oracle` gave it.
+const shareOracleReadSchema = yup.object({
+  position: yup.number().integer().min(0).required(),
+  layer: yup.number().integer().min(0).required(),
+  adapter: yup.string().max(MAX_ORACLE_ADAPTER_CHARS).default(''),
+  bullets: yup.array().of(yup.string().max(MAX_ORACLE_READ_CHARS).defined()).max(MAX_ORACLE_BULLETS).required(),
+  text: yup.string().max(MAX_ORACLE_READ_CHARS).default(''),
+  finish: yup.string().max(16).required(),
+  sig: yup.string().max(128).required(),
+});
+
+const shareOracleSchema = yup.object({
+  maxBullets: yup.number().integer().min(1).max(MAX_ORACLE_BULLETS).required(),
+  reads: yup.array().of(shareOracleReadSchema).max(MAX_SHARE_ORACLE_READS).required(),
+});
+
 const shareRequestSchema = yup.object({
   modelId: yup.string().min(1).max(MAX_MODEL_ID_CHARS).required(),
   kind: yup.string().oneOf(['chat', 'completion']).default('chat'),
@@ -106,6 +130,9 @@ const shareRequestSchema = yup.object({
   // the raw prompt text. For the `inputTokenIds` path these are display data;
   // for the `chat` generation path the turns come from `chat` instead.
   messages: yup.array().of(chatMessageSchema).max(MAX_CHAT_MESSAGES).default([]),
+  // Tool definitions for the chat. The `chat` path renders them into the prompt;
+  // both paths store them, so a reloaded share renders the same prompt again.
+  tools: lensChatToolsSchema,
   prompt: yup.string().max(MAX_SHARE_PROMPT_CHARS).default(''),
   topN: yup.number().integer().min(1).max(10).required(),
   temperature: yup.number().min(0).max(2).required(),
@@ -121,10 +148,22 @@ const shareRequestSchema = yup.object({
   // a reloaded share can mark the prompt→generated boundary; optional for
   // backward-compat.
   numPromptTokens: yup.number().integer().min(0).optional(),
+  // Give `lensColumns`; `activeLensModeTab` is the older form of the same choice.
+  lensColumns: yup
+    .array()
+    .of(
+      yup
+        .string()
+        .oneOf(LENS_COLUMN_ORDER as string[])
+        .required(),
+    )
+    .min(1)
+    .max(LENS_COLUMN_ORDER.length)
+    .optional(),
   activeLensModeTab: yup
     .string()
     .oneOf(LENS_MODES as unknown as string[])
-    .required(),
+    .optional(),
   hideNonWordTokens: yup.boolean().required(),
   lockedTokens: yup.array().of(lockedTokenSchema).max(MAX_LOCKED_TOKENS).default([]),
   selectedPositions: yup.array().of(yup.number().integer().min(0).required()).max(MAX_SELECTED_POSITIONS).default([]),
@@ -133,6 +172,15 @@ const shareRequestSchema = yup.object({
   // recomputed tokens so a reloaded chat run groups into message bubbles.
   spans: yup.array().of(tokenSpanSchema).max(MAX_TOKEN_IDS).optional(),
   steer: shareSteerSchema.default(undefined),
+  oracle: shareOracleSchema.default(undefined),
+  // The sidebar layer range [first, last]. Omit it for the default range.
+  layerRange: yup
+    .array()
+    .of(yup.number().integer().min(0).required())
+    .length(2)
+    .test('ordered', 'layerRange must be [first, last] with first <= last', (v) => !v || v[0] <= v[1])
+    .optional()
+    .default(undefined),
 });
 
 // Overlay caller-supplied chat spans onto server-recomputed tokens by position
@@ -193,6 +241,8 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *
  *       _Advanced:_ instead of `prompt`/`chat` you may supply `inputTokenIds` to reproduce an exact, pre-tokenized run verbatim (a forced decode, no generation). This is what the JLens UI uses to share exactly the run being viewed. When `inputTokenIds` is present it takes precedence, and `prompt`/`messages` are stored only as display metadata.
  *
+ *       To read out over an existing transcript (no new tokens), send `chat` with `numCompletionTokens: 0`. Tool calls go in `toolCalls` on assistant messages, tool results in `tool` messages, and tool definitions in `tools`.
+ *
  *       Authentication is optional: authenticated shares are attributed to the user, anonymous shares are attributed to an anonymous owner. Requests are rate-limited per IP address per day.
  *     tags:
  *       - Jacobian Lens
@@ -207,7 +257,6 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *               - topN
  *               - temperature
  *               - numCompletionTokens
- *               - activeLensModeTab
  *               - hideNonWordTokens
  *             properties:
  *               modelId:
@@ -232,10 +281,26 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                   properties:
  *                     role:
  *                       type: string
- *                       enum: [user, assistant, system]
+ *                       enum: [user, assistant, system, tool]
  *                     content:
  *                       type: string
  *                       maxLength: 10000
+ *                       description: May be empty for an assistant message that only calls tools.
+ *                     toolCalls:
+ *                       type: array
+ *                       description: Assistant only. The tools this message calls, as `{ name, arguments?, id? }`.
+ *                       maxItems: 64
+ *                       items:
+ *                         type: object
+ *                     toolCallId:
+ *                       type: string
+ *                       description: Tool only. The id of the call this message answers.
+ *               tools:
+ *                 type: array
+ *                 description: Tool definitions for the chat, in the OpenAI function-schema shape. The chat template writes them into the prompt. Stored with the share.
+ *                 maxItems: 128
+ *                 items:
+ *                   type: object
  *               kind:
  *                 type: string
  *                 description: "Advanced. Explicit run kind for the `inputTokenIds` path. For the `prompt`/`chat` path the kind is inferred from the input given."
@@ -253,10 +318,20 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                   properties:
  *                     role:
  *                       type: string
- *                       enum: [user, assistant, system]
+ *                       enum: [user, assistant, system, tool]
  *                     content:
  *                       type: string
  *                       maxLength: 10000
+ *                       description: May be empty for an assistant message that only calls tools.
+ *                     toolCalls:
+ *                       type: array
+ *                       description: Assistant only. The tools this message calls, as `{ name, arguments?, id? }`.
+ *                       maxItems: 64
+ *                       items:
+ *                         type: object
+ *                     toolCallId:
+ *                       type: string
+ *                       description: Tool only. The id of the call this message answers.
  *               topN:
  *                 type: integer
  *                 description: Number of top read-out tokens returned per layer per position.
@@ -272,9 +347,18 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                 description: Number of generated tokens in the run. The maximum depends on the model — 2048 for deepseek-v4-flash, 1024 for every other model.
  *                 minimum: 0
  *                 maximum: 2048
+ *               lensColumns:
+ *                 type: array
+ *                 description: "The lens columns shown when the share opens. Give this or `activeLensModeTab`."
+ *                 minItems: 1
+ *                 maxItems: 3
+ *                 items:
+ *                   type: string
+ *                   enum: [JACOBIAN_LENS, ORACLE_LENS, LOGIT_LENS]
  *               activeLensModeTab:
  *                 type: string
- *                 description: The lens display mode tab that was active when sharing.
+ *                 deprecated: true
+ *                 description: "The older form of `lensColumns`, used when `lensColumns` is absent. `DIFF` shows the Jacobian and Logit columns."
  *                 enum: [JACOBIAN_LENS, LOGIT_LENS, DIFF]
  *               hideNonWordTokens:
  *                 type: boolean
@@ -366,14 +450,73 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                     maxItems: 4096
  *                     items:
  *                       type: integer
+ *               oracle:
+ *                 type: object
+ *                 description: "Advanced. Oracle reads of the run, stored as they are. Needs `inputTokenIds`. Send each read from `/api/lens/oracle` for the same `inputTokenIds`, with its `sig`. A read without a valid `sig` is dropped."
+ *                 required:
+ *                   - maxBullets
+ *                   - reads
+ *                 properties:
+ *                   maxBullets:
+ *                     type: integer
+ *                     description: The `maxBullets` of the reads.
+ *                     minimum: 1
+ *                     maximum: 5
+ *                   reads:
+ *                     type: array
+ *                     maxItems: 4096
+ *                     items:
+ *                       type: object
+ *                       required:
+ *                         - position
+ *                         - layer
+ *                         - bullets
+ *                         - finish
+ *                         - sig
+ *                       properties:
+ *                         position:
+ *                           type: integer
+ *                         layer:
+ *                           type: integer
+ *                         adapter:
+ *                           type: string
+ *                           description: The `adapter` of the read's `meta` message.
+ *                         bullets:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ *                         text:
+ *                           type: string
+ *                         finish:
+ *                           type: string
+ *                         sig:
+ *                           type: string
+ *               layerRange:
+ *                 type: array
+ *                 description: The sidebar layer range, as [first, last]. Omit it for the default range.
+ *                 minItems: 2
+ *                 maxItems: 2
+ *                 items:
+ *                   type: integer
+ *                   minimum: 0
+ *                 example: [0, 21]
  *           example:
  *             modelId: gemma-3-12b
  *             prompt: "The capital of France is"
  *             topN: 8
  *             temperature: 0
  *             numCompletionTokens: 3
- *             activeLensModeTab: JACOBIAN_LENS
+ *             lensColumns: [JACOBIAN_LENS]
  *             hideNonWordTokens: true
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - share
+ *             properties:
+ *               share:
+ *                 type: string
+ *                 description: The JSON body above, as a string. For a browser form. The share is anonymous.
  *     responses:
  *       200:
  *         description: The shared run was created successfully.
@@ -391,8 +534,10 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *                 url:
  *                   type: string
  *                   description: The S3 url of the stored run data.
+ *       303:
+ *         description: Form posts only. Redirects to the share page. A form post that fails gets an HTML error page with the status below.
  *       400:
- *         description: Invalid JSON body or validation error.
+ *         description: Invalid JSON body or a validation error.
  *       413:
  *         description: The shared run exceeds the maximum upload size.
  *       429:
@@ -401,13 +546,56 @@ async function parseLensNdjson(body: string): Promise<{ meta: LensMetaMessage | 
  *         description: Lens re-run failed, or uploading/saving the share failed.
  */
 export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
+  if (isFormPost(request)) {
+    return formPost(request);
+  }
   let bodyJson;
   try {
     bodyJson = await request.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+  return createShare(bodyJson, request.user?.id ?? null);
+});
 
+// A browser form can post the same JSON as a `share` field. A form post is a page load, so another
+// site can open a share in a new tab without pop-up or CORS rules. The reply is the share page.
+const SHARE_FORM_FIELD = 'share';
+
+function isFormPost(request: Request) {
+  const type = request.headers.get('content-type') ?? '';
+  return type.startsWith('application/x-www-form-urlencoded') || type.startsWith('multipart/form-data');
+}
+
+async function formPost(request: Request): Promise<NextResponse> {
+  let bodyJson;
+  try {
+    const field = (await request.formData()).get(SHARE_FORM_FIELD);
+    bodyJson = JSON.parse(typeof field === 'string' ? field : '');
+  } catch {
+    return formErrorPage(400, `The form has no valid JSON in its '${SHARE_FORM_FIELD}' field.`);
+  }
+  // Anonymous, because any site can post this form.
+  const response = await createShare(bodyJson, null);
+  const reply = await response.json().catch(() => ({}));
+  if (response.ok && typeof reply.path === 'string') {
+    return new NextResponse(null, { status: 303, headers: { Location: reply.path } });
+  }
+  const details = Array.isArray(reply.details) ? ` ${reply.details.join('; ')}` : '';
+  return formErrorPage(response.status, `${reply.error ?? 'The share failed.'}${details}`);
+}
+
+function formErrorPage(status: number, message: string) {
+  const text = message.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const html =
+    '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">' +
+    '<title>J-Lens share failed</title>' +
+    '<body style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem">' +
+    `<h1 style="font-size:1.25rem">J-Lens share failed</h1><p>${text}</p></body>`;
+  return new NextResponse(html, { status, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+}
+
+async function createShare(bodyJson: unknown, userId: string | null): Promise<NextResponse> {
   let body;
   try {
     body = await shareRequestSchema.validate(bodyJson);
@@ -417,8 +605,6 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
     return NextResponse.json({ error: 'Validation error' }, { status: 400 });
   }
-
-  const userId = request.user?.id ?? null;
 
   // Determine the run source. `inputTokenIds` (the UI's faithful-reproduction
   // path) takes precedence; otherwise the server generates from `prompt`/`chat`
@@ -437,6 +623,23 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     : hasChat
       ? 'chat'
       : 'completion';
+
+  if (!body.lensColumns && !body.activeLensModeTab) {
+    return NextResponse.json({ error: "Provide 'lensColumns'" }, { status: 400 });
+  }
+  const lensColumns = shareLensColumns(body.lensColumns, body.activeLensModeTab);
+
+  // Oracle reads are stored as the sharer saw them. Only reads with the
+  // signature this server gave them, over the same token ids, are kept.
+  let oracleExport: JlensExportOracle | undefined;
+  if (body.oracle && body.oracle.reads.length > 0 && hasInputTokenIds) {
+    oracleExport = verifySharedOracleReads(
+      body.modelId,
+      body.inputTokenIds as number[],
+      body.oracle.maxBullets,
+      body.oracle.reads,
+    );
+  }
 
   // Per-IP/day rate limit (mirrors the graph put-request limit).
   const headersList = await headers();
@@ -467,7 +670,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       body.modelId,
       hasInputTokenIds
         ? {
-            type: LENS_TYPE_ORDER,
+            type: requestLensTypes(body.modelId),
             inputTokenIds: body.inputTokenIds,
             topN: body.topN,
             temperature: body.temperature,
@@ -478,9 +681,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
             filterNonWordTokens: body.hideNonWordTokens,
           }
         : {
-            type: LENS_TYPE_ORDER,
+            type: requestLensTypes(body.modelId),
             prompt: hasChat ? undefined : body.prompt,
             chat: hasChat ? (body.chat as LensChatMessage[]) : undefined,
+            tools: hasChat && body.tools?.length ? body.tools : undefined,
             topN: body.topN,
             temperature: body.temperature,
             numCompletionTokens: body.numCompletionTokens,
@@ -519,7 +723,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     try {
       const isSwap = body.steer.mode === 'swap' && !!body.steer.swapToken.trim();
       const steerResponse = await lensPromptStream(body.modelId, {
-        type: LENS_TYPE_ORDER,
+        type: requestLensTypes(body.modelId),
         inputTokenIds: body.steer.inputTokenIds,
         topN: body.topN,
         // Not used for sampling (forced decode), but recorded in the meta.
@@ -572,6 +776,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // For the generation path the prompt-token boundary is known from the run's
   // meta; for the reproduction path honor the caller-supplied value.
   const resolvedNumPromptTokens = hasInputTokenIds ? (body.numPromptTokens ?? null) : (meta.prompt_len ?? null);
+  const layerRange = body.layerRange
+    ? { layerRange: [body.layerRange[0], body.layerRange[1]] as [number, number] }
+    : {};
 
   // Assemble the heavy S3 blob (compact, not pretty-printed). The shape depends
   // on the run kind: chat carries the conversation turns, completion the prompt.
@@ -586,16 +793,26 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           meta,
           tokens,
           steer: steerExport,
+          oracle: oracleExport,
+          ...layerRange,
         }
       : {
           version: 1,
           kind: 'chat',
           modelId: body.modelId,
           exportedAt: new Date().toISOString(),
-          messages: chatTurns.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+          messages: chatTurns.map((m) => ({
+            role: m.role,
+            content: m.content,
+            ...(m.toolCalls?.length ? { toolCalls: m.toolCalls as LensChatToolCall[] } : {}),
+            ...(m.toolCallId ? { toolCallId: m.toolCallId } : {}),
+          })),
+          ...(body.tools?.length ? { tools: body.tools } : {}),
           meta,
           tokens,
           steer: steerExport,
+          oracle: oracleExport,
+          ...layerRange,
         };
   const json = JSON.stringify(blob);
   const uncompressedBytes = Buffer.byteLength(json, 'utf8');
@@ -650,7 +867,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         description: body.description || null,
         lockedTokens: body.lockedTokens,
         selectedPositions: body.selectedPositions,
-        activeLensModeTab: body.activeLensModeTab,
+        lensColumns,
+        activeLensModeTab: lensTabFromColumns(lensColumns),
         topN: body.topN,
         hideNonWordTokens: body.hideNonWordTokens,
         temperature: body.temperature,
@@ -676,4 +894,4 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   }
 
   return NextResponse.json({ id: shareId, path: makeJlensSharePath(shareId), url });
-});
+}

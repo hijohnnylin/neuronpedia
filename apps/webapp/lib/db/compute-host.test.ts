@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // vi.mock is hoisted above the imports, so its factory can only close over
 // values created by vi.hoisted.
-const { findMany, userCanAccessModelAndSourceSet } = vi.hoisted(() => ({
+const { findMany, userCanAccessModelAndSourceSet, envState } = vi.hoisted(() => ({
   findMany: vi.fn(),
   userCanAccessModelAndSourceSet: vi.fn(),
+  envState: { useLocalhostInference: false },
 }));
 
 vi.mock('@/lib/db', () => ({ prisma: { computeHost: { findMany } } }));
@@ -17,6 +18,11 @@ vi.mock('../env', () => ({
   NLA_SERVER_SECRET: '',
   AUTOINTERP_SERVER_SECRET: '',
   SPARSITY_SERVER_SECRET: '',
+  LOCALHOST_INFERENCE_HOST: 'https://local-inference',
+  INFERENCE_HOST_OVERRIDES: { 'override-model': 'https://override' },
+  get USE_LOCALHOST_INFERENCE() {
+    return envState.useLocalhostInference;
+  },
 }));
 
 import { computeFetch, resolveHosts } from './compute-host';
@@ -34,9 +40,38 @@ const freshModel = () => {
 beforeEach(() => {
   findMany.mockReset();
   userCanAccessModelAndSourceSet.mockReset().mockResolvedValue(true);
+  envState.useLocalhostInference = false;
 });
 
 describe('resolveHosts', () => {
+  it('sends inference to the localhost host, and only inference, when USE_LOCALHOST_INFERENCE is on', async () => {
+    envState.useLocalhostInference = true;
+    findMany.mockResolvedValue([host('https://registered')]);
+
+    expect(await resolveHosts({ service: ComputeService.INFERENCE, modelId: freshModel() })).toEqual([
+      'https://local-inference',
+    ]);
+    expect(findMany).not.toHaveBeenCalled();
+    expect(await resolveHosts({ service: ComputeService.GRAPH, modelId: freshModel() })).toEqual([
+      'https://registered',
+    ]);
+  });
+
+  it('sends inference for an overridden model to its override host, and only inference', async () => {
+    findMany.mockResolvedValue([host('https://registered')]);
+
+    expect(await resolveHosts({ service: ComputeService.INFERENCE, modelId: 'override-model' })).toEqual([
+      'https://override',
+    ]);
+    expect(findMany).not.toHaveBeenCalled();
+    expect(await resolveHosts({ service: ComputeService.INFERENCE, modelId: freshModel() })).toEqual([
+      'https://registered',
+    ]);
+    expect(await resolveHosts({ service: ComputeService.GRAPH, modelId: 'override-model' })).toEqual([
+      'https://registered',
+    ]);
+  });
+
   it('offers every registered host, deduplicated', async () => {
     findMany.mockResolvedValue([host('https://a'), host('https://b'), host('https://a')]);
 

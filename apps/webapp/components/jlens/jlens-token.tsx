@@ -1,6 +1,6 @@
 'use client';
 
-import { LensMode, LensTokenMessage, LensType, LensTypeSlice } from '@/lib/utils/lens';
+import { LensTokenMessage, LensType, LensTypeSlice } from '@/lib/utils/lens';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import {
   createContext,
@@ -14,7 +14,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { LensModeContext } from './jlens-lens-mode';
+import { hasJppLens, LensColumnsContext, resolveLensColumns } from './jlens-lens-mode';
+import { OracleContext, useOracleSweepStatus } from './jlens-oracle';
 import { START_LAYER_FRACTION } from './jlens-panel';
 import JlensTokenPopup, { displayToken, LayerRange, PopupSteerContext, PopupSteerHandler } from './jlens-token-popup';
 
@@ -118,28 +119,31 @@ type JlensPopupActive = { token: LensTokenMessage; anchor: HTMLElement };
 // the popup reads from the matching analysis state.
 export function JlensPopupHost({
   layersByType,
-  layerRange,
   onTokenHover,
   children,
 }: {
   layersByType: Record<string, number[]>;
-  layerRange: LayerRange | null;
   // Notified with the popup's current token so the sidebar can show that
   // position's readout while it's open (and clear it when the popup closes).
   onTokenHover?: (token: LensTokenMessage, open: boolean) => void;
   children: ReactNode;
 }) {
-  const mode = useContext(LensModeContext);
+  const chosenColumns = useContext(LensColumnsContext);
+  const oracle = useContext(OracleContext);
+  const numColumns = resolveLensColumns(chosenColumns, hasJppLens(layersByType)).length + (oracle?.available ? 1 : 0);
   const isMobile = useIsLensMobile();
   // Ref to the popup's content so an outside tap (mobile) can be distinguished
   // from a tap inside the popup (which must not dismiss it).
   const contentRef = useRef<HTMLDivElement | null>(null);
-  // The popup shows two lens columns side by side in DIFF mode, so it needs
-  // double the width.
-  const popupWidthClass =
-    mode === LensMode.DIFF
-      ? 'w-[320px] min-w-[320px] max-w-[320px] sm:w-[960px] sm:min-w-[960px] sm:max-w-[960px]'
-      : 'w-[280px] min-w-[280px] max-w-[280px] sm:w-[540px] sm:min-w-[540px] sm:max-w-[540px]';
+  // Each shown lens adds a column to the popup, so it needs more width. On
+  // mobile the popup spans the screen, less the 8px collision padding per side.
+  const popupWidthClass = `w-[calc(100vw-16px)] min-w-[calc(100vw-16px)] max-w-[calc(100vw-16px)] ${
+    numColumns >= 3
+      ? 'sm:w-[min(1320px,96vw)] sm:min-w-[min(1320px,96vw)] sm:max-w-[min(1320px,96vw)]'
+      : numColumns === 2
+        ? 'sm:w-[960px] sm:min-w-[960px] sm:max-w-[960px]'
+        : 'sm:w-[540px] sm:min-w-[540px] sm:max-w-[540px]'
+  }`;
 
   const [active, setActive] = useState<JlensPopupActive | null>(null);
   const activeRef = useRef<JlensPopupActive | null>(null);
@@ -364,11 +368,11 @@ export function JlensPopupHost({
           >
             <div
               ref={contentRef}
-              className="-ml-4 h-full w-full overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg"
+              className="h-full w-full overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg sm:-ml-4"
             >
               {active && (
                 <PopupSteerContext.Provider value={upstreamSteer ? handlePopupSteer : null}>
-                  <JlensTokenPopup token={active.token} layersByType={layersByType} layerRange={layerRange} />
+                  <JlensTokenPopup token={active.token} layersByType={layersByType} />
                 </PopupSteerContext.Provider>
               )}
             </div>
@@ -561,8 +565,13 @@ function JlensTokenChipInner({
     [actions, hasLens],
   );
 
+  // Lighter until the oracle sweep has read this position.
+  const sweepStatus = useOracleSweepStatus(token.position);
+  const unswept = sweepStatus === 'queued' || sweepStatus === 'loading';
   const colorClass =
-    variant === 'special' ? 'text-slate-400 text-[7px] sm:text-[9px]' : 'text-slate-700 text-[10px] sm:text-[13px]';
+    variant === 'special'
+      ? `${unswept ? 'text-slate-300' : 'text-slate-400'} text-[7px] sm:text-[9px]`
+      : `${unswept ? 'text-slate-400' : 'text-slate-700'} text-[10px] sm:text-[13px]`;
 
   const bg = bandsGradient(bands);
   // Hovering a NON-selected sidebar token previews it as a full-opacity border
@@ -634,6 +643,18 @@ function JlensTokenChipInner({
       }`}
     >
       {renderGlyph(token.token)}
+      {sweepStatus === 'loading' && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 z-10 h-[1.5px] rounded-full bg-slate-500 [animation:chip-loading-sweep_1.6s_linear_infinite]"
+        />
+      )}
+      {sweepStatus === 'done' && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-[1px] right-[1px] h-[1.5px] bg-sky-500"
+        />
+      )}
     </span>
   );
 

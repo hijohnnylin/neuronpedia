@@ -26,7 +26,7 @@ import * as Sentry from '@sentry/nextjs';
 import createClient from 'openapi-fetch';
 import { NoComputeHostError, resolveHost, resolveHosts } from '../db/compute-host';
 import { INFERENCE_SERVER_SECRET } from '../env';
-import { LensPromptRequest } from './lens';
+import { LensOracleRequest, LensPromptRequest } from './lens';
 import { NeuronIdentifier } from './neuron-identifier';
 
 // Every lookup in this file is for the inference service; the rest of the
@@ -1121,5 +1121,32 @@ export const lensPromptStream = async (
       ),
     signal,
     'lens request',
+  );
+};
+
+// One oracle-lens read (`/v1/lens/oracle`), with the same host failover as
+// `lensPromptStream`. Any host with the oracle serves any read; a host without
+// it answers 404, which the caller shows as "oracle unavailable".
+export const lensOracleStream = async (
+  modelId: string,
+  request: Omit<LensOracleRequest, 'model'>,
+  signal?: AbortSignal,
+): Promise<Response> => {
+  const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
+  const hosts = await resolveHosts(inferenceTarget(modelId));
+  if (hosts.length === 0) {
+    throw new Error('No server host found');
+  }
+  return streamWithFailover(
+    hosts,
+    (host, failIfBusy) =>
+      postInferenceStreaming(
+        host,
+        '/v1/lens/oracle',
+        { ...request, model: transformerLensModelId, stream: true, failIfBusy },
+        { signal, headersTimeoutMs: failIfBusy ? HEADERS_TIMEOUT_MS : 0 },
+      ),
+    signal,
+    'oracle request',
   );
 };

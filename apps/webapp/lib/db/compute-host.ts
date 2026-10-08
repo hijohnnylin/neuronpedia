@@ -3,9 +3,12 @@ import { ComputeService, Prisma } from '@prisma/client';
 import {
   AUTOINTERP_SERVER_SECRET,
   GRAPH_SERVER_SECRET,
+  INFERENCE_HOST_OVERRIDES,
   INFERENCE_SERVER_SECRET,
+  LOCALHOST_INFERENCE_HOST,
   NLA_SERVER_SECRET,
   SPARSITY_SERVER_SECRET,
+  USE_LOCALHOST_INFERENCE,
 } from '../env';
 import { getSourceSetNameFromSource } from '../utils/source';
 import { AuthenticatedUser } from '../with-user';
@@ -187,6 +190,13 @@ async function assertCanAccess(target: ResolveTarget): Promise<boolean> {
 export async function resolveHosts(target: ResolveTarget): Promise<string[]> {
   if (!(await assertCanAccess(target))) {
     return [];
+  }
+  if (target.service === ComputeService.INFERENCE && USE_LOCALHOST_INFERENCE) {
+    return [LOCALHOST_INFERENCE_HOST];
+  }
+  const override = target.service === ComputeService.INFERENCE ? INFERENCE_HOST_OVERRIDES[target.modelId] : undefined;
+  if (override) {
+    return [override];
   }
 
   const key = cacheKey(target);

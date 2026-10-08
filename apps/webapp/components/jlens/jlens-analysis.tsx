@@ -8,12 +8,19 @@
 import { JLENS_JACOBIAN_SPACE_ID, JLENS_STEER_SPIDER_ID } from '@/app/[modelId]/jlens/jlens-tour-constants';
 import { useJlensTourStep } from '@/app/[modelId]/jlens/jlens-tour-context';
 import { useChineseTranslation } from '@/lib/utils/chinese-translations';
-import { LENS_TYPE_ORDER, LensMode, LensTokenMessage, LensType } from '@/lib/utils/lens';
+import {
+  LENS_TYPE_ORDER,
+  LENS_TYPE_READOUT_LABELS,
+  LENS_TYPE_SHORT_LABELS,
+  LENS_TYPE_SPACE_LABELS,
+  LensTokenMessage,
+  LensType,
+} from '@/lib/utils/lens';
 import { Search, X } from 'lucide-react';
-import { useContext, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LayerWeight } from './jlens-layer-slider';
-import { LensModeContext } from './jlens-lens-mode';
+import { useIsLensMobile } from './jlens-token';
 import {
   DEDUPE_SIMILAR_TOKENS,
   displayToken,
@@ -99,19 +106,7 @@ export type TypeSidebar = {
   canonicalOf: Map<string, string>;
   // Per-key prominence-by-layer over ALL layers, used for the row mini heatmap.
   layerStatsByKey: Map<string, LayerStat[]>;
-  // DIFF mode only: the "thisLens:otherLens" count label shown for EVERY key in
-  // place of a single count (e.g. "8:0"). Undefined in the other modes.
-  countLabelByKey?: Map<string, string>;
-  // DIFF mode only: the FULL search pool for this column — every token known to
-  // EITHER lens (not just the top-diff `allItems`), so search can surface any
-  // known result. Undefined in single-lens modes (which search `allItems`).
-  searchItems?: CommonToken[];
 };
-
-// Additive smoothing (pseudocount) for the DIFF-mode ratio score. Added to both
-// sides before dividing so all-or-nothing tokens with tiny support (e.g. 1 vs 0)
-// stay near the neutral ratio of 1 instead of dominating the top.
-export const DIFF_RATIO_ALPHA = 2;
 
 // Base "r, g, b" for the per-row prominence stripes before a token is assigned
 // a color (matches the slider's unselected slate).
@@ -123,8 +118,22 @@ export const SIDEBAR_TOP_K = 100;
 // Max number of rows to render for an active token search.
 export const SIDEBAR_SEARCH_CAP = 100;
 
+// The label an empty sidebar shows for each lens type.
+const EMPTY_SIDEBAR_LABELS: Record<LensType, string> = {
+  [LensType.JACOBIAN_LENS]: 'Jacobian Space',
+  [LensType.JPP_LENS]: 'J++ Space',
+  [LensType.LOGIT_LENS]: 'Logit Lens',
+};
+
 // Fixed row height (px) for sidebar token rows.
 export const SIDEBAR_ROW_H = 32;
+
+// Mobile rows are two lines: the token, then the steer/swap buttons.
+const SIDEBAR_ROW_H_MOBILE = 44;
+
+function sidebarRowH(mobile: boolean): number {
+  return mobile ? SIDEBAR_ROW_H_MOBILE : SIDEBAR_ROW_H;
+}
 
 // Height (px) of the sticky column header row.
 export const SIDEBAR_HEADER_H = 24;
@@ -395,87 +404,6 @@ export function buildSidebarWithOutputTokens(
   return base;
 }
 
-// Transform a per-type sidebar (built by `buildSidebar` /
-// `buildSidebarWithOutputTokens`) into the DIFF view. Each lens-type column
-// surfaces the tokens its lens leads on, ranked by how DISPROPORTIONATELY this
-// lens predicts them vs the other — a smoothed ratio
-// `(this count + α) / (other count + α)` (α = DIFF_RATIO_ALPHA). The smoothing
-// keeps low-support edge cases (e.g. 1 vs 0) near the neutral ratio of 1 so
-// genuinely lopsided, well-supported tokens rise to the top. The displayed
-// value is the raw `thisLens:otherLens` count pair. Per-layer stripes are
-// passed through UNCHANGED from the per-type sidebar (this lens's own counts).
-export function buildDiffSidebar(
-  base: Record<string, TypeSidebar>,
-  hideAngleBracketTokens = false,
-): Record<string, TypeSidebar> {
-  const jSb = base[LensType.JACOBIAN_LENS];
-  const logitSb = base[LensType.LOGIT_LENS];
-  if (!jSb || !logitSb) {
-    return base;
-  }
-
-  const out: Record<string, TypeSidebar> = {};
-  for (const type of LENS_TYPE_ORDER) {
-    const self = base[type];
-    const other = type === LensType.JACOBIAN_LENS ? logitSb : jSb;
-
-    // Token display strings, preferring this column's form then the other's.
-    const tokenOf = new Map<string, string>();
-    for (const it of self.allItems) {
-      tokenOf.set(it.key, it.token);
-    }
-    for (const it of other.allItems) {
-      if (!tokenOf.has(it.key)) {
-        tokenOf.set(it.key, it.token);
-      }
-    }
-
-    const allKeys = new Set<string>([...self.countByKey.keys(), ...other.countByKey.keys()]);
-    // `countByKey` keeps this lens's own count (used for fallback rows);
-    // `countLabelByKey` carries the displayed "self:other" pair for every key.
-    const selfCountByKey = new Map<string, number>();
-    const countLabelByKey = new Map<string, string>();
-    for (const k of allKeys) {
-      const cSelf = self.countByKey.get(k) ?? 0;
-      const cOther = other.countByKey.get(k) ?? 0;
-      selfCountByKey.set(k, cSelf);
-      countLabelByKey.set(k, `${cSelf}:${cOther}`);
-    }
-
-    const favoredUnfiltered: CommonToken[] = [...allKeys]
-      .map((k) => {
-        const cSelf = self.countByKey.get(k) ?? 0;
-        const cOther = other.countByKey.get(k) ?? 0;
-        const score = (cSelf + DIFF_RATIO_ALPHA) / (cOther + DIFF_RATIO_ALPHA);
-        return { key: k, token: tokenOf.get(k) ?? k, count: cSelf, cOther, score };
-      })
-      // Only tokens this lens leads on, ranked purely by the smoothed ratio.
-      .filter((it) => it.count > it.cOther)
-      .sort((a, b) => b.score - a.score)
-      .map(({ key, token, count }) => ({ key, token, count }));
-    const favored = hideAngleBracketTokens ? dropAngleBracketItems(favoredUnfiltered) : favoredUnfiltered;
-
-    // Full search pool: every key known to EITHER lens (with this lens's own
-    // count), so search isn't limited to the top-diff `favored` list.
-    const searchItemsUnfiltered: CommonToken[] = [...allKeys]
-      .map((k) => ({ key: k, token: tokenOf.get(k) ?? k, count: self.countByKey.get(k) ?? 0 }))
-      .sort((a, b) => b.count - a.count);
-    const searchItems = hideAngleBracketTokens ? dropAngleBracketItems(searchItemsUnfiltered) : searchItemsUnfiltered;
-
-    out[type] = {
-      items: favored.slice(0, SIDEBAR_TOP_K),
-      allItems: favored,
-      countByKey: selfCountByKey,
-      canonicalOf: self.canonicalOf,
-      // Stripes show this lens's own per-layer counts, for every key.
-      layerStatsByKey: self.layerStatsByKey,
-      countLabelByKey,
-      searchItems,
-    };
-  }
-  return out;
-}
-
 // For the active sidebar token, count how many times it (canonicalized) appears
 // in each position's top-n grid within the layer range, then scale to opacity.
 export function computeHighlightOpacities(
@@ -718,6 +646,7 @@ function SidebarTokenRow({
   onLayerHover,
   onToggle,
   onSteer,
+  mobile = false,
 }: {
   id?: string;
   tokenKey: string;
@@ -741,6 +670,8 @@ function SidebarTokenRow({
   // Open the steer/swap flow for this readout in the given mode, anchored at the
   // click coordinates.
   onSteer?: (key: string, mode: 'steer' | 'swap', anchor: { x: number; y: number }) => void;
+  // Two lines: the steer/swap buttons show below the token, not on hover.
+  mobile?: boolean;
 }) {
   const selected = color !== null;
   const blockColor = selected ? color : nextColor;
@@ -754,6 +685,45 @@ function SidebarTokenRow({
     id === JLENS_STEER_SPIDER_ID &&
     typeof tourStep?.element === 'string' &&
     tourStep.element === `#${JLENS_STEER_SPIDER_ID}`;
+  const modes = isSpiderTourStep ? (['swap'] as const) : (['steer', 'swap'] as const);
+  const steerButtons = onSteer
+    ? modes.map((m) => (
+        <span
+          key={m}
+          role="button"
+          tabIndex={0}
+          title={`${m === 'swap' ? 'Swap' : 'Steer'} '${token}'`}
+          aria-label={`${m === 'swap' ? 'Swap' : 'Steer'} '${token}'`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSteer(tokenKey, m, { x: e.clientX, y: e.clientY });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.stopPropagation();
+              e.preventDefault();
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              onSteer(tokenKey, m, { x: r.left, y: r.bottom });
+            }
+          }}
+          style={
+            {
+              '--steer-bg': 'rgb(255, 255, 255)',
+              '--steer-bg-hover': `rgb(${COLOR_RGB[blockColor]})`,
+              '--steer-text': `rgb(${COLOR_RGB[blockColor]})`,
+              '--steer-border': `rgb(${COLOR_PILL[blockColor].ring})`,
+            } as React.CSSProperties
+          }
+          className={`flex items-center justify-center whitespace-nowrap rounded-full border bg-[var(--steer-bg)] px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none shadow-sm transition hover:bg-[var(--steer-bg-hover)] hover:text-white ${
+            selected
+              ? 'border-[color:var(--steer-border)] text-[color:var(--steer-text)]'
+              : 'border-slate-300 text-slate-500 sm:border-[color:var(--steer-border)] sm:text-[color:var(--steer-text)]'
+          }`}
+        >
+          {m}
+        </span>
+      ))
+    : null;
   return (
     <button
       id={id}
@@ -769,8 +739,10 @@ function SidebarTokenRow({
         }
         onToggle(tokenKey);
       }}
-      style={{ height: SIDEBAR_ROW_H, ...(sticky ? { top: sticky.top, bottom: sticky.bottom } : {}) }}
-      className={`group relative flex h-7 max-h-7 min-h-7 shrink-0 flex-row items-center gap-x-2.5 rounded border-slate-100 px-2 text-left font-mono transition-colors last:border-b-0 ${
+      style={{ height: sidebarRowH(mobile), ...(sticky ? { top: sticky.top, bottom: sticky.bottom } : {}) }}
+      className={`group relative flex shrink-0 rounded border-slate-100 px-2 text-left font-mono transition-colors last:border-b-0 ${
+        mobile ? 'flex-col justify-center gap-y-0.5' : 'h-7 max-h-7 min-h-7 flex-row items-center gap-x-2.5'
+      } ${
         selected
           ? `sticky z-10 ${COLOR_SIDEBAR[color]}`
           : pinned
@@ -778,100 +750,73 @@ function SidebarTokenRow({
             : `z-0 ${COLOR_SIDEBAR_HOVER[nextColor]}`
       }`}
     >
-      <span className="relative flex min-w-0 flex-1 flex-row items-center justify-between gap-x-1">
-        <span className="flex min-w-0 flex-1 flex-row items-center gap-x-1.5">
-          {selected ? (
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-sm"
-              style={{ backgroundColor: `rgb(${COLOR_RGB[blockColor]})` }}
-              aria-hidden
-            />
-          ) : (
-            <span className="relative h-2.5 w-2.5 shrink-0" aria-hidden>
-              <span className="absolute inset-0 rounded-sm border border-slate-400 opacity-70 transition-opacity group-hover:opacity-0" />
+      <span className={mobile ? 'flex w-full min-w-0 flex-row items-center gap-x-2.5' : 'contents'}>
+        <span className="relative flex min-w-0 flex-1 flex-row items-center justify-between gap-x-1">
+          <span className="flex min-w-0 flex-1 flex-row items-center gap-x-1.5">
+            {selected ? (
               <span
-                className="absolute inset-0 rounded-sm border opacity-0 transition-opacity group-hover:opacity-100"
-                style={{ borderColor: `rgb(${COLOR_RGB[blockColor]})` }}
+                className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                style={{ backgroundColor: `rgb(${COLOR_RGB[blockColor]})` }}
+                aria-hidden
               />
+            ) : (
+              <span className="relative h-2.5 w-2.5 shrink-0" aria-hidden>
+                <span className="absolute inset-0 rounded-sm border border-slate-400 opacity-70 transition-opacity group-hover:opacity-0" />
+                <span
+                  className="absolute inset-0 rounded-sm border opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{ borderColor: `rgb(${COLOR_RGB[blockColor]})` }}
+                />
+              </span>
+            )}
+            <span className="shrink-0 truncate text-[11px] text-slate-700" title={token}>
+              <TokenText token={token} />
             </span>
-          )}
-          <span className="shrink-0 truncate text-[11px] text-slate-700" title={token}>
-            <TokenText token={token} />
+            {translation && (
+              <span
+                className="min-w-0 flex-1 truncate whitespace-nowrap font-sans text-[10px] text-slate-400"
+                title={translation}
+              >
+                {translation}
+              </span>
+            )}
           </span>
-          {translation && (
+          {steerButtons && !mobile && (
             <span
-              className="min-w-0 flex-1 truncate whitespace-nowrap font-sans text-[10px] text-slate-400"
-              title={translation}
+              className={`absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-row items-center gap-x-1 transition ${
+                isSpiderTourStep ? 'opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
+              }`}
             >
-              {translation}
+              {steerButtons}
             </span>
           )}
         </span>
-        {onSteer && (
-          <span
-            className={`absolute right-0 top-1/2 z-20 flex -translate-y-1/2 flex-row items-center gap-x-1 transition ${
-              isSpiderTourStep ? 'opacity-100' : 'opacity-100 sm:opacity-0 sm:group-hover:opacity-100'
-            }`}
-          >
-            {(isSpiderTourStep ? (['swap'] as const) : (['steer', 'swap'] as const)).map((m) => (
-              <span
-                key={m}
-                role="button"
-                tabIndex={0}
-                title={`${m === 'swap' ? 'Swap' : 'Steer'} '${token}'`}
-                aria-label={`${m === 'swap' ? 'Swap' : 'Steer'} '${token}'`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSteer(tokenKey, m, { x: e.clientX, y: e.clientY });
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    onSteer(tokenKey, m, { x: r.left, y: r.bottom });
-                  }
-                }}
-                style={
-                  {
-                    '--steer-bg': 'rgb(255, 255, 255)',
-                    '--steer-bg-hover': `rgb(${COLOR_RGB[blockColor]})`,
-                    '--steer-text': `rgb(${COLOR_RGB[blockColor]})`,
-                    '--steer-border': `rgb(${COLOR_PILL[blockColor].ring})`,
-                  } as React.CSSProperties
-                }
-                className={`flex items-center justify-center whitespace-nowrap rounded-full border bg-[var(--steer-bg)] px-1.5 py-0.5 text-[9px] font-medium uppercase leading-none shadow-sm transition hover:bg-[var(--steer-bg-hover)] hover:text-white ${
-                  selected
-                    ? 'border-[color:var(--steer-border)] text-[color:var(--steer-text)]'
-                    : 'border-slate-300 text-slate-500 sm:border-[color:var(--steer-border)] sm:text-[color:var(--steer-text)]'
-                }`}
-              >
-                {m}
-              </span>
-            ))}
-          </span>
-        )}
+        <span className={`w-5 shrink-0 text-right text-[10px] tabular-nums text-slate-400`}>{count}</span>
+        {showBar ? (
+          // Always render the bar box (even for 0-count rows with no per-layer
+          // stats): `LayerProminenceBar` handles empty stats by showing the empty
+          // bordered box with no filled stripes, and its `hidden sm:flex` keeps it
+          // off mobile so no phantom column is reserved there.
+          <LayerProminenceBar
+            stats={layerStats}
+            tokenLabel={token}
+            colorRgb={color !== null ? COLOR_RGB[color] : PROMINENCE_SLATE_RGB}
+            hoverColorRgb={color !== null ? undefined : COLOR_RGB[nextColor]}
+            range={layerRange}
+            scopeLabel={scopeLabel}
+            lensLabel={lensLabel}
+            onLayerHover={onLayerHover}
+            disableHover={isSpiderTourStep}
+            className={`h-4 shrink-0 ${barWidthClass}`}
+          />
+        ) : null}
       </span>
-      <span className={`w-5 shrink-0 text-right text-[10px] tabular-nums text-slate-400`}>{count}</span>
-      {showBar ? (
-        // Always render the bar box (even for 0-count rows with no per-layer
-        // stats): `LayerProminenceBar` handles empty stats by showing the empty
-        // bordered box with no filled stripes, and its `hidden sm:flex` keeps it
-        // off mobile so no phantom column is reserved there.
-        <LayerProminenceBar
-          stats={layerStats}
-          tokenLabel={token}
-          colorRgb={color !== null ? COLOR_RGB[color] : PROMINENCE_SLATE_RGB}
-          hoverColorRgb={color !== null ? undefined : COLOR_RGB[nextColor]}
-          range={layerRange}
-          scopeLabel={scopeLabel}
-          lensLabel={lensLabel}
-          onLayerHover={onLayerHover}
-          disableHover={isSpiderTourStep}
-          className={`h-4 shrink-0 ${barWidthClass}`}
-        />
-      ) : (
-        <span className={`hidden shrink-0 sm:block ${barWidthClass}`} aria-hidden />
+      {steerButtons && mobile && (
+        // Equal grid columns give each button the width of the widest ("steer").
+        <span className="flex justify-end">
+          <span className={`inline-grid gap-x-1 ${modes.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {steerButtons}
+          </span>
+        </span>
       )}
     </button>
   );
@@ -934,19 +879,18 @@ export function SidebarSearchControl({
 // transcript / slider; clicking toggles its selection (up to MAX_SELECT).
 export function LensCommonColumn({
   type,
+  compact = false,
+  showLayers = true,
   items,
   allItems,
   countByKey,
-  pinnedKeyOrder,
   selectedKeys,
-  crossPinnedKeys,
+  compareTokens = [],
   colorOf,
   nextColor,
   layerStatsByKey,
   layerRange,
   scopeLabel,
-  combinedQuery,
-  searchItems,
   searchOpen,
   searchQuery,
   onSearchToggle,
@@ -958,34 +902,29 @@ export function LensCommonColumn({
   onSteer,
 }: {
   type: LensType;
+  // More than one column is shown: use the narrow layout.
+  compact?: boolean;
+  // False hides the per-layer bar column.
+  showLayers?: boolean;
   items: CommonToken[];
   allItems: CommonToken[];
-  // DIFF mode only: the full search pool (all tokens known to either lens). When
-  // set, search filters this instead of `allItems` (the top-diff list).
-  searchItems?: CommonToken[];
-  // Single-lens modes only: the per-column search box state, controlled by the
-  // panel (so it lives in the shared analysis state and can be reset on clear).
-  // Ignored in DIFF mode, which uses the panel's combined "Search Both" row.
+  // The search box state, controlled by the panel (so it lives in the shared
+  // analysis state and can be reset on clear).
   searchOpen: boolean;
   searchQuery: string;
   onSearchToggle: () => void;
   onSearchQueryChange: (value: string) => void;
   onSearchOpen: () => void;
   countByKey: Map<string, number>;
-  // DIFF mode only: a shared, column-independent order of all selected keys so
-  // both columns pin them in the same rows (side-by-side comparable).
-  pinnedKeyOrder?: string[];
   selectedKeys: string[];
-  crossPinnedKeys: string[];
+  // Tokens selected in the other lens columns. They go to the top under this
+  // column's own picks (count 0 when this lens has none), for comparison.
+  compareTokens?: { key: string; token: string }[];
   colorOf: (key: string) => SelectColor | null;
   nextColor: SelectColor;
   layerStatsByKey: Map<string, LayerStat[]>;
   layerRange: LayerRange | null;
   scopeLabel: string;
-  // DIFF mode only: the shared "Search Both" query, applied to both columns at
-  // once. When set (DIFF), the column hides its own header/search and filters by
-  // this instead. Ignored in single-lens modes, which use their own search.
-  combinedQuery?: string;
   onHover: (key: string | null) => void;
   onLayerHover: (key: string, layer: number | null) => void;
   onToggle: (key: string) => void;
@@ -994,14 +933,10 @@ export function LensCommonColumn({
   onSteer?: (key: string, type: LensType, mode: 'steer' | 'swap', anchor: { x: number; y: number }) => void;
 }) {
   const translate = useChineseTranslation();
-  const mode = useContext(LensModeContext);
-  // DIFF is the two-column mode; its search + count headers are replaced by a
-  // single shared "Search Both" row rendered above both columns by the panel.
-  const diffMode = mode === LensMode.DIFF;
-  const showBar = true;
-  // Narrower Count-by-Layer bar in the cramped two-column DIFF mode, which frees
-  // up room for the wider Diff count cell and the token translation.
-  const barWidthClass = diffMode ? 'w-1/4' : 'w-1/2';
+  const isMobile = useIsLensMobile();
+  const showBar = showLayers;
+  // A narrower Count-by-Layer bar when columns share the panel.
+  const barWidthClass = compact ? 'w-1/4' : 'w-1/2';
 
   // Toggling a token reorders the list so the selection jumps to the top. That
   // reflow slides a DIFFERENT row under a stationary cursor, and the browser
@@ -1022,56 +957,33 @@ export function LensCommonColumn({
     onHover(key);
   };
 
-  // The pool searched when a query is active: the full both-lens set in DIFF
-  // mode, or this column's own full list otherwise.
-  const searchPool = searchItems ?? allItems;
-
   const selectedSet = new Set(selectedKeys);
   const itemByKey = new Map(items.map((it) => [it.key, it] as const));
-  // Include `searchPool` so rows surfaced by search (outside the top-diff list)
-  // still resolve their display token/count.
-  const allItemByKey = new Map([...allItems, ...searchPool].map((it) => [it.key, it] as const));
+  const allItemByKey = new Map(allItems.map((it) => [it.key, it] as const));
+  const compareTokenOf = new Map(compareTokens.map((c) => [c.key, c.token] as const));
   const rowFor = (k: string): CommonToken =>
-    itemByKey.get(k) ?? allItemByKey.get(k) ?? { key: k, token: k, count: countByKey.get(k) ?? 0 };
+    itemByKey.get(k) ??
+    allItemByKey.get(k) ?? { key: k, token: compareTokenOf.get(k) ?? k, count: countByKey.get(k) ?? 0 };
   const selectedInList = items.filter((it) => selectedSet.has(it.key)).map((it) => it.key);
   const selectedOutOfList = selectedKeys.filter((k) => !itemByKey.has(k));
+  const compareKeys = [...compareTokenOf.keys()].filter((k) => !selectedSet.has(k));
 
-  const headerOffset = diffMode ? 0 : SIDEBAR_HEADER_H;
+  const twoLine = isMobile && onSteer !== undefined;
+  const rowH = sidebarRowH(twoLine);
+  const headerOffset = SIDEBAR_HEADER_H;
+  const selectedDomOrder = [...selectedInList, ...selectedOutOfList, ...compareKeys];
+  const pinnedSet = new Set(selectedDomOrder);
+  const orderedKeys = [...selectedDomOrder, ...items.filter((it) => !pinnedSet.has(it.key)).map((it) => it.key)];
 
-  const crossKeys = diffMode ? crossPinnedKeys.filter((k) => !selectedSet.has(k)) : [];
-  // DIFF: both columns pin the SAME selected keys in the SAME (shared) order so
-  // each selected token sits in the same row across columns, side by side. The
-  // shared order already includes cross-pinned keys, so `crossKeys` isn't
-  // appended separately here.
-  const pinnedOrder = diffMode ? (pinnedKeyOrder ?? []).filter((k) => selectedSet.has(k) || crossKeys.includes(k)) : [];
-  const pinnedSet = new Set(pinnedOrder);
-  const restItems = diffMode ? items.filter((it) => !pinnedSet.has(it.key)) : [];
-  const selectedDomOrder = [...selectedInList, ...selectedOutOfList];
-
-  const orderedKeys = diffMode
-    ? [...pinnedOrder, ...restItems.map((it) => it.key)]
-    : [...selectedDomOrder, ...items.filter((it) => !selectedSet.has(it.key)).map((it) => it.key)];
-
-  const numPinned = pinnedOrder.length;
   const numSelected = selectedDomOrder.length;
   const stickyFor = (key: string): { top: number; bottom: number } | null => {
-    if (diffMode) {
-      const i = pinnedOrder.indexOf(key);
-      if (i < 0) {
-        return null;
-      }
-      return {
-        top: headerOffset + i * SIDEBAR_ROW_H,
-        bottom: (numPinned - 1 - i) * SIDEBAR_ROW_H + SIDEBAR_STICKY_BOTTOM,
-      };
-    }
     const i = selectedDomOrder.indexOf(key);
     if (i < 0) {
       return null;
     }
     return {
-      top: headerOffset + i * SIDEBAR_ROW_H,
-      bottom: (numSelected - 1 - i) * SIDEBAR_ROW_H + SIDEBAR_STICKY_BOTTOM,
+      top: headerOffset + i * rowH,
+      bottom: (numSelected - 1 - i) * rowH + SIDEBAR_STICKY_BOTTOM,
     };
   };
 
@@ -1079,15 +991,11 @@ export function LensCommonColumn({
   const firstLayer = headerStats?.[0]?.layer;
   const lastLayer = headerStats?.[headerStats.length - 1]?.layer;
 
-  const query = diffMode
-    ? (combinedQuery ?? '').trim().toLowerCase()
-    : searchOpen
-      ? searchQuery.trim().toLowerCase()
-      : '';
+  const query = searchOpen ? searchQuery.trim().toLowerCase() : '';
   const filteredKeys =
     query === ''
       ? orderedKeys
-      : searchPool
+      : allItems
           .filter((it) => {
             const translation = translate(it.token) ?? '';
             return (
@@ -1099,13 +1007,11 @@ export function LensCommonColumn({
           .slice(0, SIDEBAR_SEARCH_CAP)
           .map((it) => it.key);
 
-  const labelText = diffMode
-    ? type === LensType.JACOBIAN_LENS
-      ? 'J-Lens Top'
-      : 'Logit Lens Top'
-    : type === LensType.JACOBIAN_LENS
-      ? 'J-Lens Readout'
-      : 'Logit Lens Token';
+  const labelText = compact
+    ? LENS_TYPE_SHORT_LABELS[type]
+    : type === LensType.LOGIT_LENS
+      ? 'Logit Lens Token'
+      : LENS_TYPE_READOUT_LABELS[type];
   const headerLabel = (
     <SidebarSearchControl
       open={searchOpen}
@@ -1120,7 +1026,7 @@ export function LensCommonColumn({
   return (
     <div
       id={JLENS_JACOBIAN_SPACE_ID}
-      className={`flex min-h-0 min-w-0 flex-1 flex-col text-[11px] ${diffMode ? 'px-1' : 'px-2 sm:px-3'}`}
+      className={`flex min-h-0 min-w-0 flex-1 flex-col text-[11px] ${compact ? 'px-1' : 'px-2 sm:px-3'}`}
     >
       <div
         className={`flex max-h-full min-h-0 flex-1 flex-col gap-y-0.5 overflow-y-auto`}
@@ -1131,25 +1037,23 @@ export function LensCommonColumn({
       >
         {orderedKeys.length === 0 ? (
           <div className="flex max-w-[180px] flex-1 flex-col items-center justify-center self-center px-1 py-2 text-center text-xl font-semibold leading-normal text-slate-400">
-            {type === LensType.JACOBIAN_LENS ? (
-              <div className="-mt-32 flex flex-row items-center justify-center gap-x-1 whitespace-nowrap">
-                Jacobian Space
-              </div>
-            ) : (
-              <div className="-mt-32 flex flex-row items-center justify-center gap-x-1 whitespace-nowrap">
-                Logit Lens
-              </div>
-            )}
+            <div className="-mt-32 flex flex-row items-center justify-center gap-x-1 whitespace-nowrap">
+              {EMPTY_SIDEBAR_LABELS[type]}
+            </div>
           </div>
         ) : (
           <>
-            {!diffMode && (
-              <div
-                style={{ height: SIDEBAR_HEADER_H }}
-                className="sticky top-0 z-20 mb-1 flex w-full shrink-0 flex-row items-center gap-x-2.5 border-b border-slate-100 bg-white pb-0.5 text-[10px] text-slate-400"
-              >
-                <div className="flex flex-1 flex-row items-center justify-between">{headerLabel}</div>
-                <div className="w-8 shrink-0 text-right text-[10px] text-slate-400">Count</div>
+            <div
+              style={{ height: SIDEBAR_HEADER_H }}
+              className="sticky top-0 z-20 mb-1 flex w-full shrink-0 flex-row items-center gap-x-2.5 border-b border-slate-100 bg-white pb-0.5 text-[10px] text-slate-400"
+            >
+              <div className="flex min-w-0 flex-1 flex-row items-center justify-between">{headerLabel}</div>
+              <div className="w-8 shrink-0 text-right text-[10px] text-slate-400">Count</div>
+              {!showBar ? null : compact ? (
+                <div className="hidden w-1/4 min-w-[25%] max-w-[25%] justify-center text-[10px] text-slate-400 sm:flex">
+                  Layers
+                </div>
+              ) : (
                 <div className="hidden w-[50%] min-w-[50%] max-w-[50%] flex-row items-center justify-between sm:flex">
                   <div className="text-[8px] uppercase text-slate-300">
                     {firstLayer != null ? `Layer ${firstLayer}` : ''}
@@ -1159,8 +1063,8 @@ export function LensCommonColumn({
                     {lastLayer != null ? `Layer ${lastLayer}` : ''}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             {filteredKeys.map((k, i) => {
               const it = rowFor(k);
               return (
@@ -1179,11 +1083,12 @@ export function LensCommonColumn({
                   showBar={showBar}
                   layerRange={layerRange}
                   scopeLabel={scopeLabel}
-                  lensLabel={type === LensType.JACOBIAN_LENS ? 'J-Space' : 'Logit Lens'}
+                  lensLabel={LENS_TYPE_SPACE_LABELS[type]}
                   onHover={handleHover}
                   onLayerHover={(layer) => onLayerHover(k, layer)}
                   onToggle={handleToggle}
                   onSteer={onSteer ? (key, mode, anchor) => onSteer(key, type, mode, anchor) : undefined}
+                  mobile={twoLine}
                 />
               );
             })}

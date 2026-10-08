@@ -1,8 +1,7 @@
-"""The sampling knobs of a steer request: decided by the engine, applied on vLLM, reported once.
+"""The sampling knobs of a steer request: decided by the engine, applied by it, reported once.
 
-The vLLM stream is exercised through the real generator with a stub backend that records the
-``SamplingParams`` it was handed, so what the request asked for is checked at the point vLLM
-would read it.
+The stream is exercised through the real generator with a stub backend that records the
+keywords ``generate_stream`` was handed, which each backend maps to its own sampler.
 """
 
 from __future__ import annotations
@@ -14,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from interp_engine import RecommendedSampling, SamplingSettings, resolve_sampling
 
-from neuronpedia_inference.endpoints.steer.completion import _vllm_run_batched_generate
+from neuronpedia_inference.endpoints.steer.completion import _run_batched_generate
 from neuronpedia_inference.inference_utils.sampling import (
     resolve_request_sampling,
     sampling_report,
@@ -29,7 +28,6 @@ from neuronpedia_inference.schemas import (
     SteerCompletionRequest,
     SteerCompletionResponse,
 )
-from neuronpedia_inference.vllm_optional import VLLM_AVAILABLE
 
 GEMMA_LIKE = RecommendedSampling(temperature=1.0, top_k=64, top_p=0.95, do_sample=True, source="x")
 
@@ -127,29 +125,27 @@ def test_the_report_keeps_null_filters_and_drops_nothing_else():
     assert NPSamplingSettings.model_validate(wire["sampling"]).top_k is None
 
 
-# --- what reaches vLLM ------------------------------------------------------------
+# --- what reaches the engine ------------------------------------------------------------
 
 
 class _RecordingBackend:
     def __init__(self) -> None:
-        self.sampling_params = []
+        self.calls: list[dict] = []
 
-    async def generate(self, _prompt, sampling_params, **_kwargs):
-        self.sampling_params.append(sampling_params)
+    def to_tokens(self, _prompt, **_kwargs):
+        return [[1, 2]]
 
-        async def stream():
-            yield "ok"
+    async def generate_stream(self, _prompt_token_ids, **kwargs):
+        self.calls.append(kwargs)
+        yield "ok"
 
-        return stream()
 
-
-@pytest.mark.skipif(not VLLM_AVAILABLE, reason="vLLM's SamplingParams is the thing under test")
-def test_the_resolved_settings_reach_vllm_as_its_own_keywords():
+def test_the_resolved_settings_reach_the_engine_as_its_own_keywords():
     backend = _RecordingBackend()
     settings = SamplingSettings(temperature=0.6, top_k=None, top_p=0.95, presence_penalty=1.5)
 
     async def run():
-        async for _ in _vllm_run_batched_generate(
+        async for _ in _run_batched_generate(
             model=backend,  # type: ignore[arg-type]
             prompt="Hi",
             settings=SteeringSettings(features=[], strength_multiplier=1.0),
@@ -161,14 +157,14 @@ def test_the_resolved_settings_reach_vllm_as_its_own_keywords():
             pass
 
     asyncio.run(run())
-    (params,) = backend.sampling_params
-    assert (params.temperature, params.top_k, params.top_p, params.presence_penalty, params.seed) == (
-        0.6,
-        -1,
-        0.95,
-        1.5,
-        7,
-    )
+    (call,) = backend.calls
+    assert {k: call[k] for k in ("temperature", "top_k", "top_p", "presence_penalty", "seed")} == {
+        "temperature": 0.6,
+        "top_k": None,
+        "top_p": 0.95,
+        "presence_penalty": 1.5,
+        "seed": 7,
+    }
 
 
 def test_the_wire_shape_of_the_eager_report_matches_the_vllm_one():

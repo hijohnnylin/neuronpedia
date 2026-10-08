@@ -1344,7 +1344,7 @@
         "type": "object"
       },
       "LensChatMessage": {
-        "description": "One message of a chat-formatted lens prompt.",
+        "description": "One message of a chat-formatted lens prompt.\n\n``role`` is ``system``, ``user``, ``assistant`` or ``tool``. The model's chat template\nrenders ``tool_calls`` (assistant only) and ``tool_call_id`` (tool only, the call it answers).",
         "properties": {
           "content": {
             "title": "Content",
@@ -1353,6 +1353,31 @@
           "role": {
             "title": "Role",
             "type": "string"
+          },
+          "toolCallId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolcallid"
+          },
+          "toolCalls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LensChatToolCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toolcalls"
           }
         },
         "required": [
@@ -1360,6 +1385,43 @@
           "content"
         ],
         "title": "LensChatMessage",
+        "type": "object"
+      },
+      "LensChatToolCall": {
+        "description": "A tool call in an assistant message. ``arguments`` is the call's JSON object.",
+        "properties": {
+          "arguments": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "LensChatToolCall",
         "type": "object"
       },
       "LensErrorResponse": {
@@ -1396,6 +1458,74 @@
           "error"
         ],
         "title": "LensErrorResponse",
+        "type": "object"
+      },
+      "LensOracleRequest": {
+        "description": "One oracle-lens read: the activation at ``position``, in words, at each layer.",
+        "properties": {
+          "failIfBusy": {
+            "default": false,
+            "title": "Failifbusy",
+            "type": "boolean"
+          },
+          "layers": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "maxBullets": {
+            "default": 2,
+            "title": "Maxbullets",
+            "type": "integer"
+          },
+          "maxTokens": {
+            "default": 96,
+            "title": "Maxtokens",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "positions": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "stream": {
+            "default": true,
+            "title": "Stream",
+            "type": "boolean"
+          },
+          "tokenIds": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Tokenids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "model",
+          "tokenIds",
+          "position"
+        ],
+        "title": "LensOracleRequest",
         "type": "object"
       },
       "LensPromptRequest": {
@@ -1546,6 +1676,21 @@
             "title": "Temperature",
             "type": "number"
           },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
+          },
           "topN": {
             "default": 10,
             "title": "Topn",
@@ -1567,7 +1712,7 @@
         "type": "object"
       },
       "LensSteerToken": {
-        "description": "A single readout to steer on.\n\n``token`` is the EXACT decoded token string (whitespace preserved, e.g.\n``\" cat\"``) as it appeared in a read-out slice; the server resolves it back\nto a vocab id via a cached reverse-decode map. ``type`` selects which lens's\nreadout direction to use: ``JACOBIAN_LENS`` uses the J-lens direction\n``J_bar_l^T @ w_t`` at each fitted layer (the residual-space direction whose\nJ-lens readout is this token), ``LOGIT_LENS`` uses the plain unembedding\ndirection ``w_t``.",
+        "description": "A single readout to steer on.\n\n``token`` is the EXACT decoded token string (whitespace preserved, e.g.\n``\" cat\"``) as it appeared in a read-out slice; the server resolves it back\nto a vocab id via a cached reverse-decode map. ``type`` selects which lens's\nreadout direction to use: ``JACOBIAN_LENS`` uses the J-lens direction\n``J_bar_l^T @ w_t`` at each fitted layer (the residual-space direction whose\nJ-lens readout is this token), ``JPP_LENS`` the same with the J++ Lens's\n``J_bar_l``, and ``LOGIT_LENS`` the plain unembedding direction ``w_t``.",
         "properties": {
           "token": {
             "title": "Token",
@@ -1588,7 +1733,8 @@
         "description": "Which lens's readout direction to use.",
         "enum": [
           "LOGIT_LENS",
-          "JACOBIAN_LENS"
+          "JACOBIAN_LENS",
+          "JPP_LENS"
         ],
         "title": "LensType",
         "type": "string"
@@ -3781,6 +3927,42 @@
         "summary": "Capabilities"
       }
     },
+    "/v1/lens/oracle": {
+      "post": {
+        "operationId": "lensOraclePost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LensOracleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lens Oracle"
+      }
+    },
     "/v1/lens/prompt": {
       "post": {
         "operationId": "lensPromptPost",
@@ -3905,7 +4087,7 @@
     },
     "/v1/steer/health": {
       "get": {
-        "description": "Get health stats for the vLLM engine.\n\nReturns GPU memory usage, system RAM, active requests, threads, etc.\nUseful for debugging hanging requests.",
+        "description": "Get health stats for the loaded engine.\n\nReturns GPU memory usage, system RAM, active requests, threads, etc.\nUseful for debugging hanging requests.",
         "operationId": "steerHealthGet",
         "responses": {
           "200": {

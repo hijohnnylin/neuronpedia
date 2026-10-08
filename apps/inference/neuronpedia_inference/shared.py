@@ -5,18 +5,18 @@ from contextlib import asynccontextmanager
 from functools import wraps
 
 import torch
-from interp_engine import EagerModel, VLLMModel
+from interp_engine.protocol import InterpModel
 
 from neuronpedia_inference.resilience import is_allocator_oom, reclaim_after_oom
 from neuronpedia_inference.sae_cache import sae_cache
 
 logger = logging.getLogger(__name__)
 
-# The backend actually loaded at startup: the eager engine model or the vLLM async backend.
-# Helpers that reach into backend attributes (``.tokenizer``, ``.cfg``) take this instead of
-# ``object``; the backend-agnostic capture helpers in ``engine_adapter`` keep ``object`` because
-# they isinstance-narrow and accept any duck-typed backend.
-LoadedModel = VLLMModel | EagerModel
+# Whatever backend was loaded at startup, named by the engine's contract rather than by a list of
+# the ones that exist today: a backend the engine grows is served by every helper typed this way,
+# and the ones that genuinely cannot serve it fail to typecheck instead of failing at runtime.
+# A helper that narrows to a concrete backend does so for a stated reason, never by default.
+LoadedModel = InterpModel
 
 # Timeout for acquiring a request slot (seconds). 0 = no timeout
 REQUEST_LOCK_TIMEOUT = float(os.environ.get("REQUEST_LOCK_TIMEOUT", "300"))  # 5 min default

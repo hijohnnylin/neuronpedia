@@ -5,7 +5,7 @@
 // the `JlensShare` DB row. Loading a share fetches the DB row (server-side) for
 // the S3 url + UI state, then the browser downloads + decompresses the S3 blob.
 
-import { LensType } from '@/lib/utils/lens';
+import { LensColumn, LensType } from '@/lib/utils/lens';
 
 // We reuse the existing graph S3 bucket, under a `jlens/` subdirectory.
 export const JLENS_S3_DIR = 'jlens';
@@ -58,8 +58,7 @@ export interface JlensShareSteer {
 export interface JlensShareUiState {
   lockedTokens: JlensShareLockedToken[];
   selectedPositions: number[];
-  // 'JACOBIAN_LENS' | 'LOGIT_LENS' | 'DIFF'
-  activeLensModeTab: string;
+  lensColumns: LensColumn[];
   topN: number;
   hideNonWordTokens: boolean;
   // Run settings restored on load (also drive any new steer the viewer runs).

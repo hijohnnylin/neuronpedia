@@ -1,24 +1,18 @@
 'use client';
 
-// The shared left-hand analysis panel for both jlens interfaces: the lens-mode
+// The shared analysis panel for both jlens interfaces: the lens-column
 // toggle, the layer-range slider, the status row (lens / layer / position
-// filter), and the per-lens "most common token" columns. Driven entirely by a
+// filter), and one column per shown lens. Driven entirely by a
 // `JlensAnalysis` (see `useJlensAnalysis`); both chat and completion render this
 // identically.
 
-import { LensMode, LensTokenMessage, LensType } from '@/lib/utils/lens';
+import { LENS_TYPE_READOUT_LABELS, LensTokenMessage, LensType } from '@/lib/utils/lens';
 import { Share2 } from 'lucide-react';
 import { useContext, useMemo } from 'react';
-import {
-  COLOR_PILL,
-  COLOR_RGB,
-  LensCommonColumn,
-  MAX_SELECT,
-  SELECT_COLORS,
-  SidebarSearchControl,
-} from './jlens-analysis';
+import { COLOR_PILL, COLOR_RGB, LensCommonColumn, MAX_SELECT, SELECT_COLORS } from './jlens-analysis';
 import { LayerRangeSlider } from './jlens-layer-slider';
-import { LensModeSetContext, LensModeToggle } from './jlens-lens-mode';
+import { hasJppLens, LensColumnsSetContext, LensColumnsToggle } from './jlens-lens-mode';
+import { OracleContext, OracleSweepContext } from './jlens-oracle';
 import { JlensPositionFilter } from './jlens-position-filter';
 import { JlensSteerPanel, SteerModeBanner } from './jlens-steer-panel';
 import { JlensPopupHost } from './jlens-token';
@@ -74,27 +68,27 @@ export function JlensProviders({
     [steering, analysis.sliderControls],
   );
   return (
-    <PillColorContext.Provider value={analysis.pillColorResolver}>
-      <LensSliderContext.Provider value={sliderControls}>
-        <LayerStatsContext.Provider value={analysis.layerStatsResolver}>
-          {/* Non-word filtering is now server-side; the popup displays every
+    <OracleContext.Provider value={analysis.oracle}>
+      <OracleSweepContext.Provider value={analysis.oracle.sweepStore}>
+        <PillColorContext.Provider value={analysis.pillColorResolver}>
+          <LensSliderContext.Provider value={sliderControls}>
+            <LayerStatsContext.Provider value={analysis.layerStatsResolver}>
+              {/* Non-word filtering is now server-side; the popup displays every
               token the server returned (so this is always false). */}
-          <HideNonWordContext.Provider value={false}>
-            <SteerActiveContext.Provider value={steerActive}>
-              <PopupSteerContext.Provider value={steering ? null : analysis.beginSteer}>
-                <JlensPopupHost
-                  layersByType={analysis.layersByType}
-                  layerRange={analysis.effectiveRange}
-                  onTokenHover={analysis.handleTokenHover}
-                >
-                  {children}
-                </JlensPopupHost>
-              </PopupSteerContext.Provider>
-            </SteerActiveContext.Provider>
-          </HideNonWordContext.Provider>
-        </LayerStatsContext.Provider>
-      </LensSliderContext.Provider>
-    </PillColorContext.Provider>
+              <HideNonWordContext.Provider value={false}>
+                <SteerActiveContext.Provider value={steerActive}>
+                  <PopupSteerContext.Provider value={steering ? null : analysis.beginSteer}>
+                    <JlensPopupHost layersByType={analysis.layersByType} onTokenHover={analysis.handleTokenHover}>
+                      {children}
+                    </JlensPopupHost>
+                  </PopupSteerContext.Provider>
+                </SteerActiveContext.Provider>
+              </HideNonWordContext.Provider>
+            </LayerStatsContext.Provider>
+          </LensSliderContext.Provider>
+        </PillColorContext.Provider>
+      </OracleSweepContext.Provider>
+    </OracleContext.Provider>
   );
 }
 
@@ -114,9 +108,7 @@ export function JlensHoverInfo({ analysis }: { analysis: JlensAnalysis }) {
         border: `1px solid rgb(${COLOR_PILL[hoverInfo.color].ring})`,
       }}
     >
-      <div className="mb-1 text-[13px] font-bold text-slate-600">
-        {hoverInfo.type === LensType.JACOBIAN_LENS ? 'J-Lens Readout' : 'Logit Lens'}
-      </div>
+      <div className="mb-1 text-[13px] font-bold text-slate-600">{LENS_TYPE_READOUT_LABELS[hoverInfo.type]}</div>
       <div className="flex flex-row items-center justify-center gap-x-1.5 text-base">
         <div className="flex flex-row items-center gap-x-1.5">
           <span
@@ -173,9 +165,9 @@ export function JlensAnalysisPanel({
   exportDisabled?: boolean;
   exportLabel?: string;
 }) {
-  const setLensMode = useContext(LensModeSetContext);
+  const setColumns = useContext(LensColumnsSetContext);
   const {
-    lensMode,
+    columns,
     sidebarTypes,
     layersByType,
     layerBounds,
@@ -197,11 +189,11 @@ export function JlensAnalysisPanel({
     setSidebarSearchQuery,
   } = analysis;
 
-  // DIFF mode replaces the two per-column searches with a single "Search Both"
-  // row that filters both columns at once. The search box state is shared for
-  // both (lives in the analysis state) so it survives a mode swap and can be
-  // reset on clear.
-  const diffMode = lensMode === LensMode.DIFF;
+  // One search state backs every lens column, so it survives a column change
+  // and can be reset on clear.
+  const compact = columns.length > 1;
+  // Three columns leave no room for the per-layer bars.
+  const showLayers = columns.filter((c) => sidebarTypes.includes(c as LensType)).length < 3;
   const onSearchToggle = () => {
     if (sidebarSearchOpen) {
       setSidebarSearchQuery('');
@@ -209,7 +201,6 @@ export function JlensAnalysisPanel({
     setSidebarSearchOpen(!sidebarSearchOpen);
   };
   const onSearchOpen = () => setSidebarSearchOpen(true);
-  const combinedQuery = sidebarSearchOpen ? sidebarSearchQuery : '';
 
   // Warn (above the token list) when the J-Lens is displayed and the layer being
   // hovered in the layer selector — or the start of the currently selected range
@@ -229,7 +220,9 @@ export function JlensAnalysisPanel({
     // card instead of squeezing the chat. The split is driven by flex-grow with
     // an absolute `basis-0`: the parent's height is indefinite, so a *percentage*
     // basis (or max-height) falls back to `auto`/content and the panel balloons.
-    <div className="relative flex min-h-0 w-full grow-[3] basis-0 flex-col gap-y-0 sm:w-auto sm:min-w-[40%] sm:max-w-[40%] sm:flex-none sm:shrink-0 sm:basis-auto">
+    <div
+      className={`relative flex min-h-0 w-full grow-[3] basis-0 flex-col gap-y-0 sm:w-auto sm:min-w-[40%] sm:max-w-[40%] sm:flex-none sm:shrink-0 sm:basis-auto`}
+    >
       {/* Analysis content stays mounted while steering so the steer panel can
           float over a blurred copy of it (see the overlay below). */}
       <div
@@ -241,7 +234,7 @@ export function JlensAnalysisPanel({
           {/* Mode toggle + layer range slider — only once there are results. */}
           {tokens.length > 0 && (
             <div className="flex flex-row items-center justify-center gap-x-2 px-2.5 pb-0 pt-2.5 sm:px-4 sm:pt-3.5">
-              <LensModeToggle mode={lensMode} setMode={setLensMode} />
+              <LensColumnsToggle columns={columns} setColumns={setColumns} jppAvailable={hasJppLens(layersByType)} />
               {layerBounds && effectiveRange ? (
                 <LayerRangeSlider
                   bounds={layerBounds}
@@ -287,58 +280,45 @@ export function JlensAnalysisPanel({
 
         {/* Most-common token list. */}
         <div className="flex min-h-0 flex-1 flex-col gap-y-2">
-          {/* DIFF mode: a single search spanning both columns, filtering them at
-              once (replaces the per-column search + count headers). */}
-          {diffMode && tokens.length > 0 && (
-            <div className="flex flex-row items-center justify-between gap-x-2 border-b border-slate-100 px-3 pb-1 pt-1 text-[10px] font-normal text-slate-400">
-              <span className="shrink-0 font-medium text-slate-300">J-Lens Readouts</span>
-              <span className="-ml-3 flex min-w-0 max-w-36 flex-1 flex-row items-center justify-center">
-                <SidebarSearchControl
-                  open={sidebarSearchOpen}
-                  query={sidebarSearchQuery}
-                  label="Search J-lens and Logits"
-                  onToggle={onSearchToggle}
-                  onQueryChange={setSidebarSearchQuery}
-                  onOpen={onSearchOpen}
-                />
-              </span>
-              <span className="shrink-0 font-medium text-slate-300">Logit Lens</span>
-            </div>
-          )}
           {showJlensDegenerateWarning && (
             <div className="mx-2 -mb-1 shrink-0 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-snug text-amber-700 sm:mx-3">
               {JLENS_DEGENERATE_DISCLAIMER}
             </div>
           )}
-          <div className={`flex min-h-0 flex-1 flex-row px-0 sm:px-1 ${diffMode ? 'divide-x divide-slate-100' : ''}`}>
-            {sidebarTypes.map((type) => {
-              const t = type as LensType;
-              const thisSelectedKeys = selected.filter((s) => s.type === t).map((s) => s.key);
-              // Shared (column-independent) order of every selected key, so DIFF
-              // pins them in the same rows across both columns for easy compare.
-              const pinnedKeyOrder = Array.from(new Set(selected.map((s) => s.key)));
-              const otherType: LensType = t === LensType.JACOBIAN_LENS ? LensType.LOGIT_LENS : LensType.JACOBIAN_LENS;
-              const crossPinnedKeys =
-                lensMode === LensMode.DIFF
-                  ? Array.from(
-                      new Set(
-                        selected
-                          .filter((s) => s.type === otherType && !thisSelectedKeys.includes(s.key))
-                          .map((s) => s.key),
-                      ),
-                    )
-                  : [];
+          <div className={`flex min-h-0 flex-1 flex-row px-0 sm:px-1 ${compact ? 'divide-x divide-slate-100' : ''}`}>
+            {columns.map((column) => {
+              if (!sidebarTypes.includes(column as LensType)) {
+                return null;
+              }
+              const t = column as LensType;
+              const ownKey = (key: string) => activeSidebar[t]?.canonicalOf.get(key) ?? key;
+              // In the order the picks show in their own column.
+              const compareTokens = sidebarTypes
+                .filter((other) => other !== t)
+                .flatMap((other) => {
+                  const keys = selected.filter((s) => s.type === other).map((s) => s.key);
+                  const listed = (activeSidebar[other]?.items ?? []).filter((it) => keys.includes(it.key));
+                  const unlisted = keys.filter((k) => !listed.some((it) => it.key === k));
+                  return [
+                    ...listed,
+                    ...unlisted.map((k) => ({
+                      key: k,
+                      token: activeSidebar[other]?.allItems.find((it) => it.key === k)?.token ?? k,
+                    })),
+                  ];
+                })
+                .map((c) => ({ key: ownKey(c.key), token: c.token }));
               return (
                 <LensCommonColumn
-                  key={type}
+                  key={t}
                   type={t}
+                  compact={compact}
+                  showLayers={showLayers}
                   items={activeSidebar[t]?.items ?? []}
                   allItems={activeSidebar[t]?.allItems ?? []}
-                  searchItems={activeSidebar[t]?.searchItems}
                   countByKey={activeSidebar[t]?.countByKey ?? new Map()}
-                  pinnedKeyOrder={pinnedKeyOrder}
-                  selectedKeys={thisSelectedKeys}
-                  crossPinnedKeys={crossPinnedKeys}
+                  selectedKeys={selected.filter((s) => s.type === t).map((s) => s.key)}
+                  compareTokens={compareTokens}
                   searchOpen={sidebarSearchOpen}
                   searchQuery={sidebarSearchQuery}
                   onSearchToggle={onSearchToggle}
@@ -352,7 +332,6 @@ export function JlensAnalysisPanel({
                   layerStatsByKey={activeSidebar[t]?.layerStatsByKey ?? new Map()}
                   layerRange={effectiveRange}
                   scopeLabel={positionScopeLabel}
-                  combinedQuery={diffMode ? combinedQuery : undefined}
                   onHover={(key) => setHover(key ? { key, type: t } : null)}
                   onLayerHover={(key, layer) => setBarHover(layer == null ? null : { key, type: t, layer })}
                   onToggle={(key) => toggleSelect(key, t)}

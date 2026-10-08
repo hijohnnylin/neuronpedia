@@ -3,12 +3,13 @@
 import JlensChat from '@/components/jlens/jlens-chat';
 import JlensCompletion from '@/components/jlens/jlens-completion';
 import { JlensExport, JlensExportChat, JlensExportCompletion, parseFixture } from '@/components/jlens/jlens-export';
-import { LensMode, LensModeContext, LensModeSetContext } from '@/components/jlens/jlens-lens-mode';
+import { LensColumnsContext, LensColumnsSetContext, orderLensColumns } from '@/components/jlens/jlens-lens-mode';
 import JlensPanel from '@/components/jlens/jlens-panel';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { ChineseTranslationsProvider } from '@/lib/utils/chinese-translations';
 import { JlensShareLockedToken, JlensShareUiState } from '@/lib/utils/jlens-share';
+import { jppLensAvailable, LensColumn } from '@/lib/utils/lens';
 import { QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { BookOpenIcon, GithubIcon, MailIcon, Newspaper, Scale, YoutubeIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -35,12 +36,17 @@ export interface JlensShareData {
   descriptionAttribution: string | null;
   lockedTokens: JlensShareLockedToken[];
   selectedPositions: number[];
-  activeLensModeTab: string;
+  lensColumns: LensColumn[];
   topN: number;
   hideNonWordTokens: boolean;
   temperature: number;
   numCompletionTokens: number;
   numPromptTokens: number | null;
+}
+
+// Free chat shows the Jacobian lens, and the J++ Lens too where the model has it.
+function freeChatLensColumns(modelId: string): LensColumn[] {
+  return jppLensAvailable(modelId) ? [LensColumn.JACOBIAN_LENS, LensColumn.JPP_LENS] : [LensColumn.JACOBIAN_LENS];
 }
 
 export default function JlensPageClient({
@@ -80,31 +86,30 @@ export default function JlensPageClient({
     const query = params.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
   }, []);
-  const [lensMode, setLensMode] = useState<LensMode>(
-    share && (share.activeLensModeTab === LensMode.LOGIT_LENS || share.activeLensModeTab === LensMode.DIFF)
-      ? (share.activeLensModeTab as LensMode)
-      : LensMode.JACOBIAN_LENS,
-  );
-
-  // Leaving a shared run for free chat (e.g. the model selector's "Free Chat"
-  // button, or advancing past the last demo) resets the lens mode back to
-  // Jacobian. Without this, a demo that pinned Logit-Lens/Diff (this component
-  // stays mounted across the same-route navigation, so `lensMode` persists)
-  // would leave free chat stuck on that mode. Loading a share instead restores
-  // its own mode via the child's loaded-data effect, so we only reset here.
-  const isShareActive = share != null;
-  useEffect(() => {
-    if (!isShareActive) {
-      setLensMode(LensMode.JACOBIAN_LENS);
-    }
-  }, [isShareActive]);
-
   // `modelId`/`inferenceAvailable` come from the server component. We mirror
   // them into state so a model swap can happen client-side (no server round
   // trip / page flash) while still keeping the URL in sync. The effect re-syncs
   // whenever a real navigation occurs (loading a share, back/forward, demos).
   const [activeModelId, setActiveModelId] = useState(modelId);
   const [activeInferenceAvailable, setActiveInferenceAvailable] = useState(inferenceAvailable);
+
+  const [lensColumns, setLensColumnsState] = useState<LensColumn[]>(
+    () => share?.lensColumns ?? freeChatLensColumns(modelId),
+  );
+  const setLensColumns = useCallback((c: LensColumn[]) => setLensColumnsState(orderLensColumns(c)), []);
+
+  // Leaving a shared run for free chat (e.g. the model selector's "Free Chat"
+  // button, or advancing past the last demo) resets the columns to the free
+  // chat default, as does a model change in free chat. This component stays
+  // mounted across the same-route navigation, so without this a demo's columns
+  // would stay on in free chat. Loading a share restores its own columns via
+  // the child's loaded-data effect, so we only reset here.
+  const isShareActive = share != null;
+  useEffect(() => {
+    if (!isShareActive) {
+      setLensColumnsState(freeChatLensColumns(activeModelId));
+    }
+  }, [isShareActive, activeModelId]);
 
   // Demo / free-chat / cross-model-share navigations are real server round trips
   // (they change `?shareId=` on the same pathname, so no route loading boundary
@@ -178,6 +183,11 @@ export default function JlensPageClient({
   const [isIntroVideoOpen, setIsIntroVideoOpen] = useState(false);
 
   const { startTour, activeStep: activeTourStep } = useJlensTour({ navigate });
+  // The tutorial shows no J++ Lens, whatever the share's columns are.
+  const shownLensColumns = useMemo(
+    () => (activeTourStep ? lensColumns.filter((c) => c !== LensColumn.JPP_LENS) : lensColumns),
+    [activeTourStep, lensColumns],
+  );
 
   // Defaults to `true` so the "new" dot on the Tutorial button doesn't flash
   // before the localStorage check runs on mount.
@@ -218,8 +228,8 @@ export default function JlensPageClient({
 
   return (
     <JlensTourStepContext.Provider value={activeTourStep}>
-      <LensModeContext.Provider value={lensMode}>
-        <LensModeSetContext.Provider value={setLensMode}>
+      <LensColumnsContext.Provider value={shownLensColumns}>
+        <LensColumnsSetContext.Provider value={setLensColumns}>
           <div className="mx-auto flex max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] w-full flex-col sm:max-h-[calc(100dvh-75px)] sm:min-h-[calc(100dvh-75px)]">
             <div className="flex w-full items-center justify-center bg-slate-100 px-3 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
               <div className="relative flex min-h-20 w-full max-w-screen-2xl flex-row items-center justify-between gap-0 sm:min-h-0">
@@ -261,7 +271,7 @@ export default function JlensPageClient({
                     <button
                       type="button"
                       onClick={() => setIsIntroVideoOpen(true)}
-                      className="flex w-20 items-center justify-center gap-x-1.5 rounded-md border border-slate-400 bg-white px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                      className="hidden w-20 items-center justify-center gap-x-1.5 rounded-md border border-slate-400 bg-white px-3 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-50 min-[1440px]:flex"
                     >
                       <YoutubeIcon className="h-3 w-3" />
                       Video
@@ -353,8 +363,8 @@ export default function JlensPageClient({
             </div>
           </div>
           <JlensIntroVideoModal open={isIntroVideoOpen} onOpenChange={setIsIntroVideoOpen} />
-        </LensModeSetContext.Provider>
-      </LensModeContext.Provider>
+        </LensColumnsSetContext.Provider>
+      </LensColumnsContext.Provider>
     </JlensTourStepContext.Provider>
   );
 }
@@ -419,7 +429,7 @@ function JlensShareView({
     () => ({
       lockedTokens: share.lockedTokens,
       selectedPositions: share.selectedPositions,
-      activeLensModeTab: share.activeLensModeTab,
+      lensColumns: share.lensColumns,
       topN: share.topN,
       hideNonWordTokens: share.hideNonWordTokens,
       temperature: share.temperature,

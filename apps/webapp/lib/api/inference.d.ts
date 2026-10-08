@@ -234,6 +234,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/lens/oracle': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Lens Oracle */
+    post: operations['lensOraclePost'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/v1/lens/prompt': {
     parameters: {
       query?: never;
@@ -294,7 +311,7 @@ export interface paths {
     };
     /**
      * Health Check
-     * @description Get health stats for the vLLM engine.
+     * @description Get health stats for the loaded engine.
      *
      *     Returns GPU memory usage, system RAM, active requests, threads, etc.
      *     Useful for debugging hanging requests.
@@ -1014,12 +1031,33 @@ export interface components {
     /**
      * LensChatMessage
      * @description One message of a chat-formatted lens prompt.
+     *
+     *     ``role`` is ``system``, ``user``, ``assistant`` or ``tool``. The model's chat template
+     *     renders ``tool_calls`` (assistant only) and ``tool_call_id`` (tool only, the call it answers).
      */
     LensChatMessage: {
       /** Content */
       content: string;
       /** Role */
       role: string;
+      /** Toolcallid */
+      toolCallId?: string | null;
+      /** Toolcalls */
+      toolCalls?: components['schemas']['LensChatToolCall'][] | null;
+    };
+    /**
+     * LensChatToolCall
+     * @description A tool call in an assistant message. ``arguments`` is the call's JSON object.
+     */
+    LensChatToolCall: {
+      /** Arguments */
+      arguments?: {
+        [key: string]: unknown;
+      } | null;
+      /** Id */
+      id?: string | null;
+      /** Name */
+      name: string;
     };
     /**
      * LensErrorResponse
@@ -1035,6 +1073,53 @@ export interface components {
       suggestedToken?: string | null;
       /** Token */
       token?: string | null;
+    };
+    /**
+     * LensOracleRequest
+     * @description One oracle-lens read: the activation at ``position``, in words, at each layer.
+     */
+    LensOracleRequest: {
+      /**
+       * Failifbusy
+       * @default false
+       */
+      failIfBusy: boolean;
+      /**
+       * Layers
+       * @default []
+       */
+      layers: number[];
+      /**
+       * Maxbullets
+       * @default 2
+       */
+      maxBullets: number;
+      /**
+       * Maxtokens
+       * @default 96
+       */
+      maxTokens: number;
+      /** Model */
+      model: string;
+      /**
+       * Partial
+       * @default false
+       */
+      partial: boolean;
+      /** Position */
+      position: number;
+      /**
+       * Positions
+       * @default []
+       */
+      positions: number[];
+      /**
+       * Stream
+       * @default true
+       */
+      stream: boolean;
+      /** Tokenids */
+      tokenIds: number[];
     };
     /**
      * LensPromptRequest
@@ -1130,6 +1215,12 @@ export interface components {
        * @default 1
        */
       temperature: number;
+      /** Tools */
+      tools?:
+        | {
+            [key: string]: unknown;
+          }[]
+        | null;
       /**
        * Topn
        * @default 10
@@ -1147,8 +1238,8 @@ export interface components {
      *     to a vocab id via a cached reverse-decode map. ``type`` selects which lens's
      *     readout direction to use: ``JACOBIAN_LENS`` uses the J-lens direction
      *     ``J_bar_l^T @ w_t`` at each fitted layer (the residual-space direction whose
-     *     J-lens readout is this token), ``LOGIT_LENS`` uses the plain unembedding
-     *     direction ``w_t``.
+     *     J-lens readout is this token), ``JPP_LENS`` the same with the J++ Lens's
+     *     ``J_bar_l``, and ``LOGIT_LENS`` the plain unembedding direction ``w_t``.
      */
     LensSteerToken: {
       /** Token */
@@ -1160,7 +1251,7 @@ export interface components {
      * @description Which lens's readout direction to use.
      * @enum {string}
      */
-    LensType: 'LOGIT_LENS' | 'JACOBIAN_LENS';
+    LensType: 'LOGIT_LENS' | 'JACOBIAN_LENS' | 'JPP_LENS';
     /**
      * NPCapturePoint
      * @description Where in a layer an activation is read: an interp-engine point name, spelled as the engine spells it.
@@ -2417,6 +2508,39 @@ export interface operations {
         };
         content: {
           'application/json': unknown;
+        };
+      };
+    };
+  };
+  lensOraclePost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LensOracleRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
         };
       };
     };

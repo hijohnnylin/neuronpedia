@@ -66,7 +66,7 @@ export const GraphMetadataScalarFieldEnumSchema = z.enum(['id','modelId','source
 
 export const GraphMetadataDataPutRequestScalarFieldEnumSchema = z.enum(['id','ipAddress','filename','url','userId','createdAt']);
 
-export const JlensShareScalarFieldEnumSchema = z.enum(['id','kind','modelId','url','description','lockedTokens','selectedPositions','activeLensModeTab','topN','hideNonWordTokens','temperature','numCompletionTokens','steerToken','steerType','steerLayers','steerStrength','steerAblate','steerMode','swapToken','steerGenerated','numPromptTokens','userId','createdAt','updatedAt']);
+export const JlensShareScalarFieldEnumSchema = z.enum(['id','kind','modelId','url','description','lockedTokens','selectedPositions','lensColumns','activeLensModeTab','topN','hideNonWordTokens','temperature','numCompletionTokens','steerToken','steerType','steerLayers','steerStrength','steerAblate','steerMode','swapToken','steerGenerated','numPromptTokens','userId','createdAt','updatedAt']);
 
 export const JlensSharePutRequestScalarFieldEnumSchema = z.enum(['id','ipAddress','filename','url','userId','createdAt']);
 
@@ -861,6 +861,7 @@ export const JlensShareSchema = z.object({
   description: z.string().nullable(),
   lockedTokens: InputJsonValue,
   selectedPositions: z.number().int().array(),
+  lensColumns: z.string().array(),
   activeLensModeTab: z.string(),
   topN: z.number().int(),
   hideNonWordTokens: z.boolean(),

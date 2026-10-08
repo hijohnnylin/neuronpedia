@@ -58,7 +58,7 @@ torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
 # Temporarily a branch, for its `interp_engine` backend (`--model_backend`), which the v0.5.1 tag
 # does not have. Swap back to the tag below once that branch merges to main and is tagged.
 # circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", tag = "v0.5.1" }
-circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", rev = "3f0965b6701f96ca498128c7226cb3e13d3c0d5e" }
+circuit-tracer = { git = "https://github.com/decoderesearch/circuit-tracer.git", rev = "405db9a5881ecb1591f28b1e25b7fb16baa9a75a" }
 llamascopium = { git = "https://github.com/OpenMOSS/Language-Model-SAEs.git", rev = "cfd202b18b22007f3a293670b7bbac972bd62093" }
 [[tool.uv.index]]
 name = "pytorch-cu128"

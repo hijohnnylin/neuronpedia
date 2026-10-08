@@ -14,9 +14,11 @@ Synthetic: `calculate_dfa` is stubbed, so this is about the coordinate change al
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 import pytest
 import torch
+from interp_engine.protocol import InterpModel
 
 from neuronpedia_inference import engine_adapter
 from neuronpedia_inference.engine_adapter import DfaResult, calculate_dfa_for_values
@@ -44,7 +46,7 @@ def _stub_calculate_dfa(monkeypatch: pytest.MonkeyPatch, values: list[float]) ->
 def _call(max_value_index: int, n_values: int) -> DfaResult:
     return asyncio.run(
         calculate_dfa_for_values(
-            object(),
+            cast("InterpModel", object()),  # `calculate_dfa` is patched out; the model is never read
             object(),
             0,
             0,

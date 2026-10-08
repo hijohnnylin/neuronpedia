@@ -8,6 +8,9 @@ const RATE_LIMIT_WINDOW = '60 m';
 
 const NO_LIMIT_ENDPOINTS = ['/api/steer-load'];
 
+// Temporary: the /qwen3 embed goes to this J-Lens share, with no query string added.
+const QWEN3_EMBED_REDIRECT = 'https://www.neuronpedia.org/qwen3.6-27b/jlens?shareId=cmuyz763o0001182xcprl8ar8';
+
 // Rate-limit entry. `exact: true` requires path-component matching (pathname
 // === endpoint OR pathname.startsWith(endpoint + '/')) so the bucket isn't
 // shared with hyphen-suffixed siblings — e.g. `/api/nla/explain` with
@@ -30,6 +33,7 @@ const NORMAL_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api/search-all', limit: 1600 },
   { endpoint: '/api/graph/generate', limit: 30 },
   { endpoint: '/api/lens/prompt', limit: 240, exact: true },
+  { endpoint: '/api/lens/oracle', limit: 600, exact: true },
   { endpoint: '/api/lens/share', limit: 30, exact: true },
   { endpoint: '/api/features/upload-batch', limit: 1000 },
   { endpoint: '/api/model/new', limit: 5 },
@@ -77,6 +81,7 @@ const HIGHER_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api/search-all', limit: 1600 },
   { endpoint: '/api/graph/generate', limit: 320 }, // higher
   { endpoint: '/api/lens/prompt', limit: 480, exact: true }, // higher
+  { endpoint: '/api/lens/oracle', limit: 1200, exact: true }, // higher
   { endpoint: '/api/lens/share', limit: 100, exact: true }, // higher
   { endpoint: '/api/features/upload-batch', limit: 1000 },
   { endpoint: '/api/model/new', limit: 5 },
@@ -134,6 +139,9 @@ export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname.toLowerCase();
 
   const isEmbedSearchParam = request.nextUrl.searchParams.get('embed');
+  if (pathname === '/qwen3' && isEmbedSearchParam === 'true') {
+    return NextResponse.redirect(QWEN3_EMBED_REDIRECT, 307);
+  }
   const isEmbed = isEmbedSearchParam === 'true' || pathname.startsWith('/embed/');
   requestHeaders.set('x-is-embed', isEmbed ? 'true' : 'false');
 

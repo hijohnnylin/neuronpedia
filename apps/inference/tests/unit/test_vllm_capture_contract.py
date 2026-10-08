@@ -65,13 +65,9 @@ def test_prefix_caching_is_enabled_for_an_ordinary_activation_pod():
     assert build_kwargs()["enable_prefix_caching"] is True
 
 
-def test_prefix_caching_is_disabled_for_the_prompt_embeds_backend():
-    """The NLA path gives it up for a reason a salt cannot address.
-
-    Prefix caching keys on token ids and an embeds prompt has none, which hangs engine init.
-    Unlike the capture hazard, there is nothing to opt out OF -- so this whole engine goes without.
-    """
-    assert build_kwargs(enable_prompt_embeds=True)["enable_prefix_caching"] is False
+def test_prefix_caching_is_enabled_for_the_prompt_embeds_backend():
+    """On for the NLA and oracle engines too: vLLM hashes each block's embeds rows into its key."""
+    assert build_kwargs(enable_prompt_embeds=True)["enable_prefix_caching"] is True
 
 
 @pytest.mark.parametrize("wanted", [True, False])
@@ -141,12 +137,17 @@ class TestCaptureWidth:
         vllm_backend._assert_full_width_captured(captured, 0)
 
 
-class TestAttentionRecomputeSharding:
-    def test_tensor_parallelism_is_accepted(self):
-        # The worker all-gathers q/k/v across ranks at collect, so rank 0's payload holds every
-        # head at any TP size and the recompute no longer refuses on the argument alone. The pod-level
-        # gate for sharded attention is inference's own (`vllm_attention_unsupported_reason`).
-        assert vllm_backend.recompute_attn_from_payloads({}, [], {}, 4) == {}
+class TestAttentionRecomputeUnderTensorParallelism:
+    """The recompute used to refuse a sharded pod: it reshaped rank 0's q/k/v with whole-model head
+    counts, which only held on one rank. The worker now gathers the heads before they leave the
+    device, so shard width is no longer a reason -- and this app must not keep one of its own.
+    """
+
+    def test_shard_width_is_not_consulted(self):
+        # The same missing payload either way, so nothing is refused on width before the lookup.
+        for tp_size in (1, 4):
+            with pytest.raises(KeyError, match="q.0"):
+                vllm_backend.recompute_attn_from_payloads({}, [0], {}, tp_size)
 
     def test_a_shard_that_gets_through_is_named(self):
         # `dims` describes the whole model, so a head-sharded capture is not a whole number of heads

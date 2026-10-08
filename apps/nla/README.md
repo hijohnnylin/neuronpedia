@@ -31,28 +31,27 @@ NLA_RECONSTRUCTOR_MODEL="" NLA_SOURCE_MODEL="" uv run server.py
 
 Server starts on **port 5009**.
 
-### Verbalizer backend (engine-owned vLLM by default)
+### Verbalizer backend (one class, any engine backend)
 
-The CUDA verbalizer runs on **[`interp-engine`](https://github.com/decoderesearch/interp-engine)**'s vLLM backend,
-serving concept injection through vLLM **`prompt_embeds`** (`VLLMModel` +
-`vllm_verbalizer.VLLMVerbalizer`). NLA imports the engine as a path dependency
-(`interp-engine[vllm]` in `pyproject.toml`) — the same way `apps/inference`
-does — so the separate SGLang stack is no longer installed by default.
+The verbalizer runs on **[`interp-engine`](https://github.com/decoderesearch/interp-engine)**'s
+model protocol: `verbalizer.Verbalizer` splices the activation into the prompt embeddings and
+generates through `InterpModel.generate_steps_from_embeds`, which every engine backend
+implements. `NLA_VERBALIZER_BACKEND` picks the library:
 
-- **CUDA** → `VLLMVerbalizer` (engine vLLM `prompt_embeds`). **Default.**
-- **no CUDA (MPS / CPU)** → `EagerVerbalizer` (plain `transformers`
-  `generate(inputs_embeds=...)`; dev/test parity, not production throughput).
-- **legacy sglang** → set `NLA_VERBALIZER_BACKEND=sglang` to restore the in-process
-  `sgl.Engine` path (`NLAClient`). You must install `sglang` yourself in a
-  compatible env — it pins `transformers<5` and conflicts with vLLM 0.25 / the
-  engine, so it is intentionally **not** in `pyproject.toml`.
+- **`auto`** (default) → `vllm` on a CUDA device, `eager` everywhere else.
+- **`vllm`** → the engine's graph-replaying vLLM engine with `prompt_embeds` on. CUDA only.
+- **`eager`** → plain `transformers` on CUDA, MPS or CPU (dev/test parity, not production throughput).
+- **`mlx`** → Apple's MLX through mlx-lm, on a Mac's GPU. Named only, never chosen by `auto`.
+- **`sglang`** → the legacy in-process `sgl.Engine` path (`NLAClient`). You must install `sglang`
+  yourself in a compatible env — it pins `transformers<5` and conflicts with vLLM / the engine, so
+  it is intentionally **not** in `pyproject.toml`.
 
 The **reconstructor** and **source** models stay on plain `transformers`: they are
 single-forward encoders/extractors (not autoregressive generators), so vLLM adds no
 benefit.
 
 > ⚠️ Many of the tuning / quantization / multi-GPU sections below describe the
-> **legacy sglang** verbalizer. On the default vLLM path the verbalizer runs
+> **legacy sglang** verbalizer. On the vLLM backend the verbalizer runs
 > **non-eager, so CUDA graphs + inductor `torch.compile` are ON by default** (vLLM
 > bundles both). Env mapping:
 > - `NLA_MEM_FRACTION` → vLLM `gpu_memory_utilization`

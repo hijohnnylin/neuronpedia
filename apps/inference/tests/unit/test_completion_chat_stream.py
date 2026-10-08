@@ -2,8 +2,8 @@
 
 The composed ``chat_template`` is only recoverable if the stream still carries the special
 tokens that mark chat structure (harmony's ``<|channel|>``/``<|message|>``, turn-end markers).
-vLLM's detokenizer drops them by default, which silently produced a response with no assistant
-turn at all, so that setting is asserted here rather than left to review.
+The engine's ``generate_stream`` keeps them on every backend; these frames compose whatever it
+yields, and strip what the client should not see.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import torch
 from interp_engine import SamplingSettings
 
 from neuronpedia_inference.endpoints.steer.completion_chat import (
-    _vllm_chat_generate,
+    _run_chat_generate,
     messages_for_render,
 )
 from neuronpedia_inference.inference_utils.steering import (
@@ -49,25 +49,19 @@ class StubBackend:
 
     def __init__(self, deltas: list[str] = DELTAS):
         self.tokenizer = StubTokenizer()
-        self.sampling_params = None
         self.prompt_token_ids = None
         self.deltas = deltas
 
-    async def generate_steered(self, prompt_token_ids, sampling_params, **_kwargs):
-        self.sampling_params = sampling_params
-        self.prompt_token_ids = prompt_token_ids
-
-        async def stream():
-            for delta in self.deltas:
-                yield delta
-
-        return stream()
+    async def generate_stream(self, prompt_token_ids, **_kwargs):
+        self.prompt_token_ids = list(prompt_token_ids)
+        for delta in self.deltas:
+            yield delta
 
 
 async def _frames(model: StubBackend, steer_types: list[NPSteerType] | None = None) -> list[dict]:
     return [
         json.loads(remove_sse_formatting(sse))
-        async for sse in _vllm_chat_generate(
+        async for sse in _run_chat_generate(
             model=model,  # type: ignore[arg-type]
             promptTokenized=torch.tensor([1, 2, 3]),
             inputPrompt=[NPSteerChatMessage(role="user", content="Hi")],
@@ -105,14 +99,6 @@ def test_empty_generation_still_emits_one_frame_per_type():
 def _messages(frame: dict) -> list[dict]:
     # camelCase because these are wire frames, not python attribute names.
     return frame["outputs"][0]["chatTemplate"]
-
-
-def test_stream_keeps_special_tokens():
-    """Dropping these makes the assistant turn unrecoverable — see module docstring."""
-    model = StubBackend()
-    asyncio.run(_frames(model))
-    assert model.sampling_params is not None
-    assert model.sampling_params.skip_special_tokens is False
 
 
 def test_generation_uses_the_endpoints_own_token_ids():

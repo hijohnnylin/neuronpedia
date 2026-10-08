@@ -11,16 +11,10 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter
-from interp_engine import HOOK_CAPTURE_POINTS, EagerModel, VLLMModel
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.activation.all import MAX_NUM_RESULTS
-from neuronpedia_inference.endpoints.lens.lens_loader import JacobianLensStore
-from neuronpedia_inference.engine_adapter import (
-    native_resid_available,
-    vllm_attention_unsupported_reason,
-    vllm_served_capture_points,
-)
+from neuronpedia_inference.endpoints.lens.lens_loader import JacobianLensStore, JppLensStore
 from neuronpedia_inference.sae_cache import sae_cache
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, budget, limiter
@@ -35,37 +29,19 @@ async def capabilities():
     """Report the loaded model, backend, concurrency/token limits, and feature support."""
     config = Config.get_instance()
     model = Model.get_instance()
-    is_vllm = isinstance(model, VLLMModel)
-    is_eager = isinstance(model, EagerModel)
 
-    # Capture points available for SAE reads, from the engine's point table rather than restated
-    # here -- a hand-written copy of this list is what let the webapp be told `attn_out` was
-    # unavailable for a year after the engine started serving it. Eager serves every hookable point
-    # (and more besides, but the rest are not SAE sites); vLLM serves the same set less whatever its
-    # GPU sharding splits across ranks. DFA/attention need eager attn or the vLLM recompute (both
-    # wired, the latter only unsharded).
-    #
-    # A GENERATION_ONLY pod serves none of them: it keeps vLLM's CUDA graphs, which never call the
-    # Python forward the hooks are attached to. That is the whole reason this flag is advertised
-    # rather than merely enforced -- a router that reads /capabilities can route capture traffic
-    # elsewhere, where one that only sees 400s can only retry.
-    hooks = model.hooks_available
-    declared = tuple(getattr(model, "static_points", ()) or ())
-    writes = tuple(getattr(model, "static_writes", ()) or ())
-    graph_replay = bool(getattr(model, "graph_replay", False))
-    can_capture = bool(hooks or declared)
-    declared_names = {getattr(a, "name", str(a).split(".", 1)[0]) for a in declared}
-    can_residual = bool(hooks or "resid_post" in declared_names or native_resid_available(model))
-    if not can_capture:
-        capture_points = []
-    elif is_eager:
-        capture_points = sorted(HOOK_CAPTURE_POINTS)
-    else:
-        capture_points = sorted(vllm_served_capture_points(model))
-
-    attention = (hooks or "attn" in declared_names) and (is_eager or vllm_attention_unsupported_reason(model) is None)
+    # What the pod can serve is the model's answer, for this backend, build and checkpoint at once.
+    # A GENERATION_ONLY pod serves no capture point: it keeps vLLM's CUDA graphs, which never call
+    # the Python forward the hooks are attached to. A router that reads this can send capture
+    # traffic elsewhere; one that only sees 400s can only retry.
+    described = model.describe()
+    hooks = described.hooks_available
+    can_capture = hooks or bool(described.static_points)
+    can_residual = described.residual_readable
+    attention = described.attention
 
     lens_jacobian = can_residual and JacobianLensStore.get() is not None
+    lens_jpp = can_residual and JppLensStore.get() is not None
 
     # Gradient support as a fact rather than as an inference from the backend name: eager serves
     # gradients only when loaded with requires_grad=True (serving does not), and vLLM cannot serve
@@ -89,7 +65,7 @@ async def capabilities():
 
     return {
         "model": config.custom_hf_model_id or config.override_model_id or config.model_id,
-        "backend": "vllm" if is_vllm else "eager",
+        "backend": described.backend,
         "device": config.device,
         "max_concurrent_requests": limiter.max_concurrent,
         "max_tokens": config.max_tokens,
@@ -108,21 +84,21 @@ async def capabilities():
         # budget is too small for the traffic and requests are paying stage-in latency.
         "sae_cache": sae_cache.stats(),
         "max_num_results": MAX_NUM_RESULTS,
-        "capture_points": capture_points,
+        "capture_points": described.capture_points,
         "grad_support": grad_support,
         "recommended_sampling": recommended_sampling,
         # False only on a GENERATION_ONLY pod. Reported next to the endpoint map rather than in place
         # of it, so a client sees both which endpoints are off and the one reason they are.
         "hooks_available": hooks,
-        "graph_replay": graph_replay,
-        "static_points": [str(a) for a in declared],
-        "static_writes": [str(a) for a in writes],
+        "graph_replay": described.graph_replay,
+        "static_points": [str(a) for a in described.static_points],
+        "static_writes": [str(a) for a in described.static_writes],
         # Their pre-1.3 names. Nothing in this repo reads them, but they shipped to origin/main
         # before the rename, and a router that keys off them would read a missing list as "this pod
         # captures nothing" and stop sending it traffic -- a silent routing change, not an error.
         # Delete both once no deployed caller reads them.
-        "frozen_points": [str(a) for a in declared],
-        "writes_available": [str(a) for a in writes],
+        "frozen_points": [str(a) for a in described.static_points],
+        "writes_available": [str(a) for a in described.static_writes],
         "generation_only": config.generation_only,
         # Layers /activation/raw will return when the request does not name any.
         "num_layers": config.num_layers,
@@ -146,6 +122,7 @@ async def capabilities():
             "steer_completion_chat": True,
             "lens_logit": can_residual,
             "lens_jacobian": lens_jacobian,
+            "lens_jpp": lens_jpp,
             "neurons": False,  # mlp.hook_post not served by the engine backends
         },
     }

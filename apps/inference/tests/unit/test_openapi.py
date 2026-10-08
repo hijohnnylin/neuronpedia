@@ -20,6 +20,8 @@ UNDOCUMENTED_BY_DESIGN = {
     # Emits NDJSON, one frame per line, so there is no single response body. The frame
     # models live in endpoints/lens/prompt.py.
     "POST /v1/lens/prompt",
+    # NDJSON too; its frame models live in endpoints/lens/oracle.py.
+    "POST /v1/lens/oracle",
     # Operational introspection whose shape tracks the backend rather than a wire contract:
     # both splice in whatever the loaded engine reports.
     "GET /v1/capabilities",

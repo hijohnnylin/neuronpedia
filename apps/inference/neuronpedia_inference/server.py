@@ -62,10 +62,14 @@ from neuronpedia_inference.endpoints.chat_template import (
     router as chat_template_router,
 )
 from neuronpedia_inference.endpoints.lens.lens_loader import (
+    LENS_KINDS,
+    install_named_lens,
     load_jacobian_lens_at_startup,
     place_jacobian_lens_on_device,
     place_jacobian_lens_on_worker,
 )
+from neuronpedia_inference.endpoints.lens.oracle import prepare_oracle
+from neuronpedia_inference.endpoints.lens.oracle import router as lens_oracle_router
 from neuronpedia_inference.endpoints.lens.prompt import (
     router as lens_prompt_router,
 )
@@ -448,8 +452,8 @@ def _resolve_generation_only(args: Any) -> bool:
             f"GENERATION_ONLY=true is only meaningful on the vLLM backend, but this pod resolved to "
             f"{args.backend!r}. It selects backend='vllm-generate', which trades vLLM's capture "
             "hooks for the CUDA graphs they rule out; there is no such tradeoff to make on eager, "
-            "which hooks the module tree in-process. Unset GENERATION_ONLY, or force vLLM with "
-            "--force-vllm."
+            "which hooks the module tree in-process. Unset GENERATION_ONLY, or name the backend "
+            "with --backend vllm."
         )
     if args.sae_sets:
         raise ValueError(
@@ -582,11 +586,10 @@ def _declared_taps_line() -> str:
     pod missing the layer a vector reads is visible at startup rather than on the first request that
     needs it.
     """
-    model = Model.get_instance()
-    reads = tuple(getattr(model, "static_points", ()) or ())
-    writes = tuple(getattr(model, "static_writes", ()) or ())
+    described = Model.get_instance().describe()
+    reads, writes = tuple(described.static_points), tuple(described.static_writes)
     if not reads and not writes:
-        if getattr(model, "hooks_available", True):
+        if described.hooks_available:
             return "none declared (hooked backend: every point reachable)"
         return "none declared (graphs on, nothing capturable)"
     return f"read {_format_address_ranges(reads)} | write {_format_address_ranges(writes)}"
@@ -839,6 +842,7 @@ v1_router.include_router(similarity_matrix_pred_router)
 v1_router.include_router(activation_source_router)
 v1_router.include_router(activation_raw_router)
 v1_router.include_router(lens_prompt_router)
+v1_router.include_router(lens_oracle_router)
 app.include_router(v1_router)
 
 
@@ -921,9 +925,9 @@ async def initialize(
 
         SECRET = os.getenv("SECRET")
 
-        # Auto-select backend (vLLM vs EagerModel) + device + dtype from what
-        # the box can do and what the model needs. Explicit DEVICE / MODEL_DTYPE and
-        # the backend force (--force-vllm / --force-eager -> FORCE_BACKEND) override.
+        # Select backend + device + dtype from what the box can do and what the model needs.
+        # Explicit DEVICE / MODEL_DTYPE and a named backend (--backend -> FORCE_BACKEND) override;
+        # a named backend this machine cannot run is refused here, before any weights move.
         # ``--model_id`` is the Hugging Face repo id (override/custom_hf still win when set).
         probe_hf_model_id = custom_hf_model_id or args.override_model_id or args.model_id
         selection = select_backend(
@@ -936,14 +940,14 @@ async def initialize(
         logger.info("Backend selection for %s: %s", probe_hf_model_id, selection.reason)
         args.device = selection.device
         args.model_dtype = selection.dtype
-        args.backend = "vllm" if selection.use_vllm else "eager"
+        args.backend = selection.backend
         static_mode = _parse_static_points(getattr(args, "static_points", None))
         if static_mode is not None and args.backend != "vllm":
             raise ValueError(
                 f"STATIC_POINTS selects backend='vllm-static', but this pod resolved to "
                 f"{args.backend!r}. The eager backend hooks the module tree in-process, so every "
                 "site is already reachable and there is nothing to declare. Omit STATIC_POINTS, or "
-                "force vLLM with --force-vllm."
+                "name the backend with --backend vllm."
             )
         if static_mode in _SAE_RESOLVED_MODES and not args_sae_sets:
             raise ValueError(
@@ -1032,6 +1036,13 @@ async def initialize(
                     "STATIC_POINTS=%s: will bind static wraps after SAE load, before engine warmup.",
                     static_mode,
                 )
+        elif args.backend == "mlx":
+            engine_backend = "mlx"
+            logger.info("Loading model with interp-engine (MLX, Apple silicon)...")
+            # MLX takes none of eager's knobs: attention is read off its own modules, and the
+            # model lives on the one GPU there is. args.device stays "mps" for the memory sizing
+            # below, which is about that GPU; only the load call leaves it out.
+            backend_kwargs = {}
         else:
             engine_backend = "eager"
             logger.info("Loading model with interp-engine (raw HF, eager PyTorch)...")
@@ -1048,10 +1059,12 @@ async def initialize(
         precision_kwargs = _load_precision_kwargs(config.quantization, config.kv_cache_dtype)
         if precision_kwargs:
             logger.info("Load precision: %s", precision_kwargs)
+        backend_kwargs.update(prepare_oracle(args, hf_model_id, engine_backend))
         model = load_model(
             hf_model_id,
             backend=engine_backend,
-            device=args.device,
+            # The engine refuses a device= for MLX, which has nowhere else to go.
+            device=None if engine_backend == "mlx" else args.device,
             dtype=config.model_dtype,
             num_gpus=num_gpus,
             **precision_kwargs,
@@ -1064,24 +1077,15 @@ async def initialize(
 
         # Memory-derived serving limits: how many concurrent requests to admit and
         # the per-request token budget. On vLLM we admit up to max_concurrent (vLLM
-        # batches); off vLLM (eager) we serve one at a time. See startup_memory.py.
-        is_vllm = isinstance(model, VLLMModel)
+        # batches); off vLLM we serve one at a time. See startup_memory.py.
+        is_vllm = args.backend == "vllm"
         kv_dtype = _kv_cache_dtype_for_sizing(config.model_dtype, config.kv_cache_dtype)
-        if is_vllm:
-            attn = model._attn_dims  # type: ignore[attr-defined]
-            model_info = ModelMemoryInfo(
-                n_layers=num_layers,
-                n_kv_heads=attn["n_kv_heads"],
-                head_dim=attn["head_dim"],
-                dtype=kv_dtype,
-            )
-        else:
-            model_info = ModelMemoryInfo(
-                n_layers=num_layers,
-                n_kv_heads=model.n_kv_heads,  # type: ignore[attr-defined]
-                head_dim=model.head_dim,  # type: ignore[attr-defined]
-                dtype=kv_dtype,
-            )
+        model_info = ModelMemoryInfo(
+            n_layers=num_layers,
+            n_kv_heads=model.n_kv_heads,
+            head_dim=model.head_dim,
+            dtype=kv_dtype,
+        )
         serving_limits = compute_serving_limits(device=args.device, is_vllm=is_vllm, model_info=model_info)
         config.set_max_tokens(serving_limits.max_tokens)
         # Bound the prompt caps by the memory-safe sequence budget (never raise them).
@@ -1126,7 +1130,9 @@ async def initialize(
         )
         SAEManager._instance.load_saes()
 
-        if is_vllm and static_mode in _SAE_RESOLVED_MODES:
+        # Static taps are the vLLM worker's mechanism, not a capability another
+        # backend could answer for; STATIC_POINTS off vLLM was refused above.
+        if isinstance(model, VLLMModel) and static_mode in _SAE_RESOLVED_MODES:
             from neuronpedia_inference.engine_adapter import sae_static_addresses
 
             reads, writes = sae_static_addresses(SAEManager._instance)
@@ -1146,7 +1152,8 @@ async def initialize(
         # Load the fitted Jacobian lens (best-effort; never fatal). LOGIT_LENS
         # requests work regardless; JACOBIAN_LENS requests error if this fails.
         logger.info("Loading Jacobian lens (if available)...")
-        load_jacobian_lens_at_startup(config, args)
+        for kind in LENS_KINDS:
+            load_jacobian_lens_at_startup(config, args, kind)
 
         # If a Jacobian lens loaded, run a 1-token pass through the real lens
         # code now so any one-time initialization happens at startup.
@@ -1190,14 +1197,14 @@ async def initialize(
     # After the model is loaded, preload the vLLM engine (vLLM backend only). Nothing is loaded
     # here for vector readouts: they are database rows that travel with the request, so there is no
     # per-model asset for startup to find.
+    # Pays any deferred load now: on vLLM it builds the engine, compiles decode kernels, and --
+    # when static taps exist -- runs a sentinel capture/write, so a dead copy_/add_ raises here
+    # and we refuse to serve rather than return fluent unsteered text. MLX loads its weights.
+    # Eager already did, so this is a no-op there.
     model = Model.get_instance()
-    if isinstance(model, VLLMModel):
-        # warmup() builds the engine, compiles decode kernels, and — when static taps
-        # exist — runs a sentinel capture/write. A dead copy_/add_ raises here so we
-        # refuse to serve rather than return fluent unsteered text.
-        logger.info("Warming up vLLM engine...")
-        await model.warmup()
-        logger.info("vLLM engine ready")
+    logger.info("Warming up the %s backend...", args.backend)
+    await model.warmup()
+    logger.info("%s backend ready", args.backend)
 
     config = Config.get_instance()
 
@@ -1205,9 +1212,12 @@ async def initialize(
     # is measured against what is really left) and before the transient budget below counts
     # the rest as free. On vLLM it goes into the worker, beside the weights and the residuals
     # it will be applied to; anywhere else, onto this process's device. Both land on the same
-    # card, so either way the measurement below sees what the lens took.
-    if not await place_jacobian_lens_on_worker(config, args, model):
-        place_jacobian_lens_on_device(config, args)
+    # card, so either way the measurement below sees what the lens took. One kind after the
+    # other, so the second is measured against what the first left.
+    for kind in LENS_KINDS:
+        if not await place_jacobian_lens_on_worker(config, args, model, kind):
+            place_jacobian_lens_on_device(config, args, kind)
+            await install_named_lens(model, kind)
 
     # ---- size the request working-set budget, LAST ----
     # Deliberately the final step of startup. compute_serving_limits() above runs before the

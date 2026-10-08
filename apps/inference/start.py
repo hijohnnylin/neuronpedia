@@ -173,23 +173,21 @@ def parse_args():
         default="neuronpedia_inference",
         help="Directory to watch for changes when reload is enabled",
     )
-    # Backend force override (mutually exclusive). When neither is passed the backend
-    # is auto-selected (vLLM on CUDA for vLLM-supported archs, else EagerModel).
+    # One flag names the backend; the engine checks the name against the machine at startup and
+    # refuses, with the fix, one it cannot run. "auto" (the default) lets the engine choose: vLLM
+    # on CUDA for a vLLM-supported arch, else eager. It never chooses mlx, which is asked for.
     backend_group = parser.add_mutually_exclusive_group()
     backend_group.add_argument(
-        "--force-vllm",
-        dest="force_vllm",
-        action="store_true",
-        default=False,
-        help="Force the engine-owned vLLM backend (fast serving). Overrides auto-select.",
+        "--backend",
+        dest="backend",
+        choices=("auto", "eager", "vllm", "mlx"),
+        default=None,
+        help="Which engine backend to load: eager (PyTorch, any device), vllm (CUDA), or mlx (Apple "
+        "silicon). Default auto. A backend this machine cannot run fails at startup with the reason.",
     )
-    backend_group.add_argument(
-        "--force-eager",
-        dest="force_eager",
-        action="store_true",
-        default=False,
-        help="Force the interp-engine EagerModel backend (raw transformers, eager PyTorch). Overrides auto-select.",
-    )
+    # The two flags this replaced, kept so a pods.yaml entry written for them still starts.
+    backend_group.add_argument("--force-vllm", dest="force_vllm", action="store_true", help=argparse.SUPPRESS)
+    backend_group.add_argument("--force-eager", dest="force_eager", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument(
         "--vllm_gpu_memory_utilization",
         type=gpu_memory_fraction,
@@ -257,6 +255,31 @@ def parse_args():
         help="Optional exact path (within the HF repo) to the lens .pt file. When set, used verbatim instead of deriving it from the model id / dataset.",
     )
     parser.add_argument(
+        "--jpp_lens",
+        action="store_true",
+        help="Also load the J++ Lens (JPP_LENS requests), from '<np_model_id>/jpp/<dataset>/<slug>_jpp_lens.pt' in --jpp_hf_repo.",
+    )
+    parser.add_argument(
+        "--jpp_source",
+        default=None,
+        help="Optional local directory holding a *_jpp_lens.pt, used instead of the download.",
+    )
+    parser.add_argument(
+        "--jpp_dataset",
+        default="Salesforce-wikitext",
+        help="Dataset folder of the J++ Lens (in its HF path), apart from --jlens_dataset.",
+    )
+    parser.add_argument(
+        "--jpp_hf_repo",
+        default="neuronpedia/jacobian-lens",
+        help="Hugging Face model repo holding J++ Lenses.",
+    )
+    parser.add_argument(
+        "--jpp_hf_path",
+        default=None,
+        help="Optional exact path (within the HF repo) to the J++ Lens .pt file.",
+    )
+    parser.add_argument(
         "--jlens_gpu_budget_gib",
         default=None,
         help=(
@@ -311,14 +334,15 @@ def main():
         os.environ["SAE_PINNED_HOST_GIB"] = str(args.sae_pinned_host_gib)
     if "CUSTOM_HF_MODEL_ID" not in os.environ and args.custom_hf_model_id is not None:
         os.environ["CUSTOM_HF_MODEL_ID"] = str(args.custom_hf_model_id)
-    # Backend force override -> FORCE_BACKEND (only when a flag was passed; leaving it
-    # unset lets the server auto-select). --force-vllm / --force-eager are mutually
-    # exclusive (argparse-enforced).
+    # --backend -> FORCE_BACKEND, set only when a backend was named: unset or "auto" leaves the
+    # choice to the engine. The old flags map onto the same variable.
     if "FORCE_BACKEND" not in os.environ:
-        if args.force_vllm:
-            os.environ["FORCE_BACKEND"] = "vllm"
-        elif args.force_eager:
-            os.environ["FORCE_BACKEND"] = "eager"
+        named = args.backend
+        if args.force_vllm or args.force_eager:
+            named = "vllm" if args.force_vllm else "eager"
+            print(f"--force-{named} is deprecated; use --backend {named}", file=sys.stderr)
+        if named and named != "auto":
+            os.environ["FORCE_BACKEND"] = named
     if "NUM_GPUS" not in os.environ and args.num_gpus is not None:
         os.environ["NUM_GPUS"] = str(args.num_gpus)
     if "STATIC_POINTS" not in os.environ and args.static_points is not None:
@@ -337,6 +361,16 @@ def main():
         os.environ["JLENS_HF_REPO"] = args.jlens_hf_repo
     if "JLENS_HF_PATH" not in os.environ and args.jlens_hf_path is not None:
         os.environ["JLENS_HF_PATH"] = args.jlens_hf_path
+    if "JPP_LENS" not in os.environ:
+        os.environ["JPP_LENS"] = "true" if args.jpp_lens else "false"
+    if "JPP_SOURCE" not in os.environ and args.jpp_source is not None:
+        os.environ["JPP_SOURCE"] = args.jpp_source
+    if "JPP_DATASET" not in os.environ:
+        os.environ["JPP_DATASET"] = args.jpp_dataset
+    if "JPP_HF_REPO" not in os.environ:
+        os.environ["JPP_HF_REPO"] = args.jpp_hf_repo
+    if "JPP_HF_PATH" not in os.environ and args.jpp_hf_path is not None:
+        os.environ["JPP_HF_PATH"] = args.jpp_hf_path
     if "JLENS_GPU_BUDGET_GIB" not in os.environ and args.jlens_gpu_budget_gib is not None:
         os.environ["JLENS_GPU_BUDGET_GIB"] = str(args.jlens_gpu_budget_gib)
     if "NEURONPEDIA_MODEL_ID" not in os.environ and args.neuronpedia_model_id is not None:

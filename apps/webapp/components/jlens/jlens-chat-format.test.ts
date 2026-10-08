@@ -1,6 +1,12 @@
 import { LensTokenMessage } from '@/lib/utils/lens';
 import { describe, expect, it } from 'vitest';
-import { extractAssistantText, groupTokensBySpans, messageIndicesForGroups, tokensToText } from './jlens-chat-format';
+import {
+  extractAssistantText,
+  groupTokensBySpans,
+  messageIndicesForGroups,
+  toChatPayload,
+  tokensToText,
+} from './jlens-chat-format';
 
 // The generated half of an assistant turn, as the stream delivers it: one token
 // per position, spanned by the server as message content.
@@ -167,5 +173,36 @@ describe('groupTokensBySpans', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].role).toBe('user');
     expect(groups[0].headerTokens).toHaveLength(4);
+  });
+
+  it('puts a tool result on the assistant side, mapped to its own message', () => {
+    const tokens = spanned([
+      ['<tool_call>', { role: 'assistant', message_index: 0, section: 'footer' }],
+      ['<tool_response>', { role: 'tool', message_index: 1, section: 'header' }],
+      ['Sunny', { role: 'tool', message_index: 1, section: 'content' }],
+      ['It', { role: 'assistant', message_index: 2, section: 'content' }],
+    ]);
+    const { messages: groups } = groupTokensBySpans(tokens);
+    expect(groups.map((g) => g.role)).toEqual(['assistant', 'assistant', 'assistant']);
+    expect(messageIndicesForGroups(groups, [{ role: 'assistant' }, { role: 'tool' }, { role: 'assistant' }])).toEqual([
+      0, 1, 2,
+    ]);
+  });
+});
+
+describe('toChatPayload', () => {
+  it('keeps tool calls and call ids, and drops empty tool fields', () => {
+    const call = { name: 'get_weather', arguments: { city: 'Paris' }, id: 'call_1' };
+    expect(
+      toChatPayload([
+        { role: 'user', content: 'Hi', toolCalls: [] },
+        { role: 'assistant', content: '', toolCalls: [call] },
+        { role: 'tool', content: 'Sunny', toolCallId: 'call_1' },
+      ]),
+    ).toEqual([
+      { role: 'user', content: 'Hi' },
+      { role: 'assistant', content: '', toolCalls: [call] },
+      { role: 'tool', content: 'Sunny', toolCallId: 'call_1' },
+    ]);
   });
 });

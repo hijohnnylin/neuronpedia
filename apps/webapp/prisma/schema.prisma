@@ -235,7 +235,9 @@ model JlensShare {
   lockedTokens        Json    @default("[]")
   // Selected chat token positions (indices into the token stream).
   selectedPositions   Int[]   @default([])
-  // Active lens mode tab: 'JACOBIAN_LENS' | 'LOGIT_LENS' | 'DIFF'.
+  // Lens columns shown on load, in display order: 'JACOBIAN_LENS' | 'ORACLE_LENS' | 'LOGIT_LENS'.
+  lensColumns         String[] @default([])
+  // Legacy lens tab: 'JACOBIAN_LENS' | 'LOGIT_LENS' | 'DIFF'. Read only when `lensColumns` is empty.
   activeLensModeTab   String
   topN                Int
   hideNonWordTokens   Boolean @default(true)

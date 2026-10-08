@@ -7,7 +7,7 @@
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
 import { MAX_JLENS_SHARE_DESCRIPTION_LENGTH } from '@/lib/utils/jlens-share';
-import { Check, Copy, Link2, Loader2, Share2 } from 'lucide-react';
+import { Check, Copy, ExternalLink, Link2, Loader2, Share2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 
@@ -120,6 +120,15 @@ export function JlensShareDialog({
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-row items-center justify-center gap-x-1.5 rounded-md border border-sky-700 px-3 py-2 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open Shared Link
+            </a>
           </div>
         ) : (
           <div className="flex flex-col gap-y-3">

@@ -13,6 +13,7 @@ import {
   Computer,
   Folder,
   Github,
+  Glasses,
   Lightbulb,
   Map,
   MessagesSquare,
@@ -37,7 +38,7 @@ import Link from 'next/link';
 import FeatureSelector from '../components/feature-selector/feature-selector';
 import InferenceSearcher from '../components/inference-searcher/inference-searcher';
 import { CAP_BLOG_URL, CAP_PAPER_URL } from './[modelId]/assistant-axis/shared';
-import { JLENS_BLOG_URL, JLENS_PAPER_URL } from './[modelId]/jlens/jlens-urls';
+import { JLENS_BLOG_URL, JLENS_PAPER_URL, JLENS_PLUS_PLUS_EXAMPLE_URL } from './[modelId]/jlens/jlens-urls';
 import { NLA_BLOG_URL, NLA_PAPER_URL } from './[modelId]/nla/nla-urls';
 import { getBlogDateString, getPostsMetaData, PostMetaData } from './blog/blog-util';
 import HomeDemoVideo from './home/home-demo-video';
@@ -215,11 +216,11 @@ export default async function Page() {
                     <div className="mt-1 text-[26px] font-bold leading-tight tracking-tight text-[#666663] sm:mt-1 sm:mt-4 sm:whitespace-nowrap sm:px-10 sm:text-[32px] sm:leading-normal">
                       Jacobian Lens
                     </div>
-                    <div className="mt-1.5 text-sm font-medium leading-none text-[#666663] sm:mt-0.5 sm:whitespace-nowrap sm:text-[13.5px]">
+                    <div className="mt-1.5 text-sm font-medium leading-snug text-[#666663] sm:mt-0.5 sm:whitespace-nowrap sm:text-[13.5px] sm:leading-none">
                       Revealing a Global Workspace in Language Models
                     </div>
 
-                    <Link href="/qwen3.6-27b/jlens" className="">
+                    <Link href="/qwen3.6-27b/jlens" className="flex flex-row items-center justify-center gap-x-2">
                       <button
                         type="button"
                         className="mt-3.5 h-16 min-h-16 w-[190px] min-w-[190px] transition-all sm:mb-0 sm:mb-2.5 sm:w-auto sm:min-w-0"
@@ -239,7 +240,7 @@ export default async function Page() {
                           type="button"
                           className="mt-1 h-11 max-h-11 min-h-11 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
                         >
-                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-5">
+                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-4">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               fill="none"
@@ -247,7 +248,7 @@ export default async function Page() {
                               id="Anthropic-Icon--Streamline-Svg-Logos"
                               height="24"
                               width="24"
-                              className="flex-shrink-0"
+                              className="h-5 min-h-5 w-5 min-w-5 flex-shrink-0"
                             >
                               <desc>Anthropic Icon Streamline Icon: https://streamlinehq.com</desc>
                               <path
@@ -269,10 +270,10 @@ export default async function Page() {
                       <Link href={JLENS_PAPER_URL} target="_blank" rel="noreferrer noopener" className="">
                         <button
                           type="button"
-                          className="mt-1 h-11 max-h-11 min-h-11 w-[136px] min-w-[136px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
+                          className="mt-1 h-11 max-h-11 min-h-11 w-[130px] min-w-[130px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
                         >
-                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-5">
-                            <Newspaper className="h-5 w-5" />
+                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:px-4">
+                            <Newspaper className="h-5 min-h-5 w-5 min-w-5" />
                             <div className="text-[12px] font-semibold leading-tight">Paper</div>
                           </div>
                         </button>
@@ -299,6 +300,22 @@ export default async function Page() {
                           </div>
                         </button>
                       </Link> */}
+                      <Link href={JLENS_PLUS_PLUS_EXAMPLE_URL} target="_blank" rel="noreferrer noopener" className="">
+                        <button
+                          type="button"
+                          className="relative mt-1 h-11 max-h-11 min-h-11 w-[130px] min-w-[130px] transition-all hover:scale-105 sm:mt-0 sm:w-auto sm:min-w-0"
+                        >
+                          <span className="absolute -right-1.5 -top-1.5 z-10 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-red-600 px-1.5 text-[8px] font-bold text-white">
+                            OCT &apos;26
+                          </span>
+                          <div className="flex h-11 max-h-11 min-h-11 flex-row items-center justify-center gap-x-1.5 rounded-xl bg-[#D4A274] px-2 py-2 text-[#262625] shadow-sm shadow-[#666663]/60 sm:gap-x-1 sm:px-4">
+                            <Glasses className="h-5 min-h-5 w-5 min-w-5" />
+                            <div className="text-[12px] font-semibold leading-tight sm:text-[11px] sm:leading-[12px]">
+                              J++ Lens
+                            </div>
+                          </div>
+                        </button>
+                      </Link>
                     </div>
                   </div>
                   <div className="order-1 h-full w-full overflow-hidden py-2 sm:order-2">

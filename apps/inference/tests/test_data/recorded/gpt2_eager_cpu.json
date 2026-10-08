@@ -1,0 +1,8917 @@
+{
+ "activation_all": {
+  "digest": "162a3db43e280a35",
+  "response": {
+   "activations": [
+    {
+     "dfaMaxValue": null,
+     "dfaTargetIndex": null,
+     "dfaValues": null,
+     "index": 9758,
+     "maxValue": 53.25,
+     "maxValueIndex": 2,
+     "source": "7-res-jb",
+     "sumValues": 0.0,
+     "values": [
+      0.0,
+      0.0,
+      53.25,
+      3.75,
+      0.0,
+      5.59375
+     ]
+    },
+    {
+     "dfaMaxValue": null,
+     "dfaTargetIndex": null,
+     "dfaValues": null,
+     "index": 1049,
+     "maxValue": 46.25,
+     "maxValueIndex": 4,
+     "source": "7-res-jb",
+     "sumValues": 0.0,
+     "values": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      46.25,
+      0.0
+     ]
+    },
+    {
+     "dfaMaxValue": null,
+     "dfaTargetIndex": null,
+     "dfaValues": null,
+     "index": 5556,
+     "maxValue": 39.25,
+     "maxValueIndex": 1,
+     "source": "7-res-jb",
+     "sumValues": 0.0,
+     "values": [
+      0.0,
+      39.25,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "dfaMaxValue": null,
+     "dfaTargetIndex": null,
+     "dfaValues": null,
+     "index": 16387,
+     "maxValue": 25.75,
+     "maxValueIndex": 2,
+     "source": "7-res-jb",
+     "sumValues": 0.0,
+     "values": [
+      0.0,
+      0.0,
+      25.75,
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "dfaMaxValue": null,
+     "dfaTargetIndex": null,
+     "dfaValues": null,
+     "index": 20750,
+     "maxValue": 25.625,
+     "maxValueIndex": 1,
+     "source": "7-res-jb",
+     "sumValues": 0.0,
+     "values": [
+      0.0,
+      25.625,
+      6.1875,
+      0.0,
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "counts": null,
+   "tokens": [
+    "<|endoftext|>",
+    "The",
+    " capital",
+    " of",
+    " France",
+    " is"
+   ]
+  }
+ },
+ "activation_single_feature": {
+  "digest": "e75e98fdcd6a8dd3",
+  "response": {
+   "activation": {
+    "dfaMaxValue": null,
+    "dfaTargetIndex": null,
+    "dfaValues": null,
+    "maxValue": 53.25,
+    "maxValueIndex": 1,
+    "values": [
+     0.0,
+     53.25,
+     3.75,
+     0.0,
+     5.59375
+    ]
+   },
+   "tokens": [
+    "The",
+    " capital",
+    " of",
+    " France",
+    " is"
+   ],
+   "tokensIsSpecial": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  }
+ },
+ "activation_single_vector": {
+  "digest": "93ecd854c4aadd47",
+  "response": {
+   "activation": {
+    "dfaMaxValue": null,
+    "dfaTargetIndex": null,
+    "dfaValues": null,
+    "maxValue": 160.44924926757812,
+    "maxValueIndex": 0,
+    "values": [
+     160.44924926757812,
+     7.140931129455566,
+     4.574522018432617,
+     5.424594879150391,
+     10.526300430297852
+    ]
+   },
+   "tokens": [
+    "The",
+    " capital",
+    " of",
+    " France",
+    " is"
+   ],
+   "tokensIsSpecial": [
+    false,
+    false,
+    false,
+    false,
+    false
+   ]
+  }
+ },
+ "capabilities": {
+  "digest": "befda762e8f80a03",
+  "response": {
+   "activation_token_limit": 500,
+   "backend": "eager",
+   "capture_points": [
+    "attn_in",
+    "attn_out",
+    "attn_out_post",
+    "attn_probs",
+    "attn_scores",
+    "embeddings",
+    "final_norm",
+    "lm_head",
+    "mlp_act",
+    "mlp_in",
+    "mlp_out",
+    "mlp_out_post",
+    "mlp_pre",
+    "resid_mid",
+    "resid_post",
+    "resid_pre",
+    "value",
+    "z"
+   ],
+   "device": "cpu",
+   "endpoints": {
+    "activation_all": true,
+    "activation_attention": true,
+    "activation_raw": true,
+    "activation_single": true,
+    "activation_source": true,
+    "activation_topk_by_token": true,
+    "dfa": true,
+    "lens_jacobian": true,
+    "lens_logit": true,
+    "neurons": false,
+    "steer_completion": true,
+    "steer_completion_chat": true,
+    "tokenize": true
+   },
+   "frozen_points": [],
+   "generation_only": false,
+   "grad_support": {
+    "backend": "eager",
+    "blockers": [
+     "model loaded with requires_grad=False (the serving default)"
+    ],
+    "caveats": [],
+    "downstream": true,
+    "per_layer": null,
+    "remedy": "Reload with EagerModel(..., requires_grad=True) to get a differentiable forward.",
+    "through_forward": false
+   },
+   "graph_replay": false,
+   "hooks_available": true,
+   "lens_token_limit": 1024,
+   "max_num_results": 1000,
+   "max_tokens": 4096,
+   "model": "openai-community/gpt2",
+   "num_layers": 12,
+   "recommended_sampling": null,
+   "sae_sets": [
+    "res-jb"
+   ],
+   "static_points": [],
+   "static_writes": [],
+   "token_limit": 500,
+   "writes_available": []
+  }
+ },
+ "lens_jacobian": {
+  "digest": "9625d9b308020008",
+  "response": {
+   "done": {
+    "completion": " now home to",
+    "kind": "done",
+    "prompt_len": 6,
+    "seq_len": 9,
+    "vocab_size": 50257
+   },
+   "meta": {
+    "kind": "meta",
+    "layers_by_type": {
+     "JACOBIAN_LENS": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ],
+     "LOGIT_LENS": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ]
+    },
+    "model": "openai-community/gpt2",
+    "num_completion_tokens": 3,
+    "oracle_layers": [],
+    "prepend_bos": true,
+    "prompt_len": 6,
+    "reuse_len": 0,
+    "temperature": 0.0,
+    "top_n": 5,
+    "types": [
+     "LOGIT_LENS",
+     "JACOBIAN_LENS"
+    ]
+   },
+   "tokens": [
+    {
+     "channel": null,
+     "id": 50256,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 0,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0206,
+         0.0069,
+         0.0065,
+         0.0065,
+         0.0065
+        ],
+        [
+         0.0387,
+         0.0281,
+         0.0173,
+         0.0169,
+         0.0152
+        ],
+        [
+         0.0256,
+         0.018,
+         0.0133,
+         0.013,
+         0.0107
+        ],
+        [
+         0.0258,
+         0.0181,
+         0.0134,
+         0.0131,
+         0.0108
+        ],
+        [
+         0.0257,
+         0.0179,
+         0.0134,
+         0.013,
+         0.0107
+        ],
+        [
+         0.0252,
+         0.0177,
+         0.0132,
+         0.0128,
+         0.0106
+        ],
+        [
+         0.025,
+         0.0176,
+         0.0131,
+         0.0127,
+         0.0105
+        ],
+        [
+         0.0249,
+         0.0176,
+         0.0131,
+         0.0127,
+         0.0105
+        ],
+        [
+         0.0248,
+         0.0177,
+         0.0131,
+         0.0128,
+         0.0106
+        ],
+        [
+         0.0249,
+         0.0178,
+         0.0131,
+         0.0129,
+         0.0106
+        ],
+        [
+         0.025,
+         0.0181,
+         0.0132,
+         0.0131,
+         0.0107
+        ],
+        [
+         0.0623,
+         0.0377,
+         0.0194,
+         0.0183,
+         0.0116
+        ]
+       ],
+       "top_tokens": [
+        [
+         "The",
+         "Share",
+         "This",
+         "G",
+         "I"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         "\n",
+         "The",
+         "A",
+         "I",
+         "In"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.0425,
+         0.0156,
+         0.0151,
+         0.0134,
+         0.0116
+        ],
+        [
+         0.1064,
+         0.0504,
+         0.026,
+         0.0244,
+         0.0152
+        ],
+        [
+         0.052,
+         0.0451,
+         0.0154,
+         0.0132,
+         0.0126
+        ],
+        [
+         0.0028,
+         0.0024,
+         0.0023,
+         0.002,
+         0.0019
+        ],
+        [
+         0.0082,
+         0.0036,
+         0.0035,
+         0.0028,
+         0.0028
+        ],
+        [
+         0.0072,
+         0.0058,
+         0.0036,
+         0.003,
+         0.0024
+        ],
+        [
+         0.0106,
+         0.0098,
+         0.007,
+         0.0053,
+         0.005
+        ],
+        [
+         0.0103,
+         0.0092,
+         0.0053,
+         0.0047,
+         0.0044
+        ],
+        [
+         0.0103,
+         0.0091,
+         0.0056,
+         0.0052,
+         0.0043
+        ],
+        [
+         0.0092,
+         0.0066,
+         0.0055,
+         0.0051,
+         0.0038
+        ],
+        [
+         0.0086,
+         0.0074,
+         0.0055,
+         0.0053,
+         0.0045
+        ],
+        [
+         0.0623,
+         0.0377,
+         0.0194,
+         0.0183,
+         0.0116
+        ]
+       ],
+       "top_tokens": [
+        [
+         "pherd",
+         "neau",
+         "aan",
+         "upiter",
+         "aretz"
+        ],
+        [
+         " Inquis",
+         " Inquisitor",
+         " Morty",
+         " Benz",
+         "Money"
+        ],
+        [
+         "erenn",
+         "ischer",
+         "ometimes",
+         "wagen",
+         " Journals"
+        ],
+        [
+         " Period",
+         "\u00c3",
+         " Univ",
+         " Evangel",
+         " Bulg"
+        ],
+        [
+         " and",
+         " the",
+         " of",
+         " a",
+         " II"
+        ],
+        [
+         " and",
+         " the",
+         " a",
+         " of",
+         " A"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " that",
+         " in"
+        ],
+        [
+         " and",
+         " the",
+         " a",
+         " in",
+         " that"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " of"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         "\n",
+         "The",
+         "A",
+         "I",
+         "In"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "<|endoftext|>"
+    },
+    {
+     "channel": null,
+     "id": 464,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 1,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0634,
+         0.0312,
+         0.0201,
+         0.018,
+         0.0115
+        ],
+        [
+         0.1391,
+         0.0446,
+         0.0231,
+         0.0225,
+         0.0171
+        ],
+        [
+         0.2209,
+         0.0479,
+         0.0272,
+         0.024,
+         0.0214
+        ],
+        [
+         0.1754,
+         0.0509,
+         0.0454,
+         0.0353,
+         0.0237
+        ],
+        [
+         0.1625,
+         0.1015,
+         0.0776,
+         0.0236,
+         0.0228
+        ],
+        [
+         0.4677,
+         0.1773,
+         0.0475,
+         0.0387,
+         0.0173
+        ],
+        [
+         0.5889,
+         0.0753,
+         0.0627,
+         0.0579,
+         0.0241
+        ],
+        [
+         0.5737,
+         0.0971,
+         0.0495,
+         0.0393,
+         0.0371
+        ],
+        [
+         0.3951,
+         0.0772,
+         0.07,
+         0.0419,
+         0.0391
+        ],
+        [
+         0.3175,
+         0.0503,
+         0.0474,
+         0.0157,
+         0.0142
+        ],
+        [
+         0.0179,
+         0.0155,
+         0.0141,
+         0.0122,
+         0.0109
+        ],
+        [
+         0.01,
+         0.0087,
+         0.0081,
+         0.0063,
+         0.0055
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ories",
+         " first",
+         " world",
+         " latest",
+         " most"
+        ],
+        [
+         " latest",
+         " first",
+         "ories",
+         " Last",
+         " following"
+        ],
+        [
+         " latest",
+         "ories",
+         " Week",
+         " Official",
+         " Latest"
+        ],
+        [
+         " latest",
+         " Latest",
+         "resa",
+         " Week",
+         "ories"
+        ],
+        [
+         "resa",
+         " Latest",
+         " latest",
+         " Bottom",
+         " Last"
+        ],
+        [
+         "resa",
+         " Latest",
+         " latest",
+         "oret",
+         " following"
+        ],
+        [
+         "resa",
+         " Latest",
+         " following",
+         " latest",
+         "oret"
+        ],
+        [
+         "resa",
+         " following",
+         " Latest",
+         "oret",
+         " latest"
+        ],
+        [
+         "resa",
+         " following",
+         " latest",
+         " Latest",
+         "oret"
+        ],
+        [
+         "resa",
+         " latest",
+         " following",
+         "oret",
+         " Latest"
+        ],
+        [
+         " following",
+         " first",
+         " latest",
+         "resa",
+         " U"
+        ],
+        [
+         " first",
+         " U",
+         " following",
+         " United",
+         " US"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.1218,
+         0.0822,
+         0.0339,
+         0.031,
+         0.0125
+        ],
+        [
+         0.6072,
+         0.1825,
+         0.075,
+         0.0417,
+         0.0227
+        ],
+        [
+         0.2865,
+         0.0898,
+         0.0462,
+         0.0299,
+         0.0261
+        ],
+        [
+         0.1236,
+         0.0828,
+         0.0375,
+         0.0298,
+         0.0201
+        ],
+        [
+         0.292,
+         0.139,
+         0.0788,
+         0.0736,
+         0.0114
+        ],
+        [
+         0.2338,
+         0.1459,
+         0.1325,
+         0.0207,
+         0.0127
+        ],
+        [
+         0.924,
+         0.0116,
+         0.0086,
+         0.0061,
+         0.0052
+        ],
+        [
+         0.6342,
+         0.1636,
+         0.0937,
+         0.0157,
+         0.0079
+        ],
+        [
+         0.656,
+         0.0603,
+         0.0577,
+         0.0326,
+         0.0128
+        ],
+        [
+         0.513,
+         0.1195,
+         0.098,
+         0.0911,
+         0.0385
+        ],
+        [
+         0.288,
+         0.0122,
+         0.0114,
+         0.0049,
+         0.0044
+        ],
+        [
+         0.01,
+         0.0087,
+         0.0081,
+         0.0063,
+         0.0055
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ESCO",
+         "CLASSIFIED",
+         " FANT",
+         "DragonMagazine",
+         "ITED"
+        ],
+        [
+         "ModLoader",
+         "DragonMagazine",
+         " enthusi",
+         "channelAvailability",
+         " encount"
+        ],
+        [
+         "ModLoader",
+         "DragonMagazine",
+         " quir",
+         "rpm",
+         "Reloaded"
+        ],
+        [
+         "ModLoader",
+         "Reloaded",
+         " quir",
+         " tyres",
+         "DragonMagazine"
+        ],
+        [
+         "ModLoader",
+         "DragonMagazine",
+         "senal",
+         "Reloaded",
+         "ThumbnailImage"
+        ],
+        [
+         "DragonMagazine",
+         "ModLoader",
+         "ccording",
+         "odore",
+         "uyomi"
+        ],
+        [
+         "ModLoader",
+         "ccording",
+         " Collider",
+         "ThumbnailImage",
+         "odore"
+        ],
+        [
+         "ModLoader",
+         "odore",
+         "ccording",
+         "resa",
+         "ThumbnailImage"
+        ],
+        [
+         "ModLoader",
+         "ccording",
+         "ThumbnailImage",
+         "senal",
+         "Nitrome"
+        ],
+        [
+         "resa",
+         "odore",
+         " mosqu",
+         "ModLoader",
+         " Palestin"
+        ],
+        [
+         "resa",
+         " latest",
+         "odore",
+         " Latest",
+         " Department"
+        ],
+        [
+         " first",
+         " U",
+         " following",
+         " United",
+         " US"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "The"
+    },
+    {
+     "channel": null,
+     "id": 3139,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 2,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.9985,
+         0.0002,
+         0.0001,
+         0.0001,
+         0.0001
+        ],
+        [
+         0.9985,
+         0.0006,
+         0.0002,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.9962,
+         0.0018,
+         0.0008,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.9592,
+         0.0308,
+         0.0054,
+         0.0015,
+         0.0003
+        ],
+        [
+         0.4366,
+         0.248,
+         0.1835,
+         0.0105,
+         0.0097
+        ],
+        [
+         0.5411,
+         0.172,
+         0.1114,
+         0.0196,
+         0.0178
+        ],
+        [
+         0.8343,
+         0.0803,
+         0.0206,
+         0.0083,
+         0.0067
+        ],
+        [
+         0.8643,
+         0.0435,
+         0.0242,
+         0.0108,
+         0.007
+        ],
+        [
+         0.901,
+         0.0172,
+         0.0105,
+         0.0073,
+         0.0062
+        ],
+        [
+         0.925,
+         0.018,
+         0.0097,
+         0.0061,
+         0.0028
+        ],
+        [
+         0.7604,
+         0.0273,
+         0.0272,
+         0.0178,
+         0.0164
+        ],
+        [
+         0.1779,
+         0.1401,
+         0.0948,
+         0.0558,
+         0.0385
+        ]
+       ],
+       "top_tokens": [
+        [
+         " capital",
+         " city",
+         " claw",
+         " capitals",
+         " punishment"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " penalty",
+         " attack"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " penalty",
+         " reward"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " ship",
+         " attack"
+        ],
+        [
+         " capital",
+         " city",
+         " punishment",
+         " planning",
+         " ship"
+        ],
+        [
+         " city",
+         " capital",
+         " punishment",
+         " planning",
+         " cities"
+        ],
+        [
+         " city",
+         " capital",
+         " cities",
+         " metropolitan",
+         " punishment"
+        ],
+        [
+         " city",
+         " capital",
+         " cities",
+         " of",
+         " markets"
+        ],
+        [
+         " city",
+         " cities",
+         " of",
+         " capital",
+         "ised"
+        ],
+        [
+         " city",
+         " cities",
+         " is",
+         " has",
+         " of"
+        ],
+        [
+         " city",
+         " of",
+         " has",
+         " cities",
+         " is"
+        ],
+        [
+         " of",
+         " city",
+         " has",
+         " is",
+         " was"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.4799,
+         0.2582,
+         0.1776,
+         0.0622,
+         0.0222
+        ],
+        [
+         0.4312,
+         0.2396,
+         0.2097,
+         0.0609,
+         0.0586
+        ],
+        [
+         0.5215,
+         0.4607,
+         0.0073,
+         0.0053,
+         0.0052
+        ],
+        [
+         0.5,
+         0.4934,
+         0.0032,
+         0.0027,
+         0.0008
+        ],
+        [
+         0.7355,
+         0.2632,
+         0.0006,
+         0.0004,
+         0.0003
+        ],
+        [
+         0.6784,
+         0.3207,
+         0.0006,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.8394,
+         0.1606,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.7325,
+         0.2675,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.8523,
+         0.145,
+         0.0022,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.8594,
+         0.0533,
+         0.0334,
+         0.0237,
+         0.0195
+        ],
+        [
+         0.9725,
+         0.0108,
+         0.0023,
+         0.0019,
+         0.0012
+        ],
+        [
+         0.1779,
+         0.1401,
+         0.0948,
+         0.0558,
+         0.0385
+        ]
+       ],
+       "top_tokens": [
+        [
+         " capital",
+         " capitals",
+         " Capital",
+         "Capital",
+         "capital"
+        ],
+        [
+         "Capital",
+         " capital",
+         " capitals",
+         "capital",
+         " Capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         " Capital",
+         "Capital",
+         "capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         " Capital",
+         "Capital",
+         "capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         "capital",
+         " Capital",
+         "Capital"
+        ],
+        [
+         " capital",
+         " capitals",
+         " Capital",
+         "capital",
+         "Capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         " Kabul",
+         " Capital",
+         "capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         " Kabul",
+         " city",
+         " Capital"
+        ],
+        [
+         " capital",
+         " capitals",
+         " city",
+         " Capital",
+         " cities"
+        ],
+        [
+         " city",
+         " capital",
+         " cities",
+         " capitals",
+         " Kabul"
+        ],
+        [
+         " city",
+         " cities",
+         " capital",
+         " Manila",
+         " mayor"
+        ],
+        [
+         " of",
+         " city",
+         " has",
+         " is",
+         " was"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " capital"
+    },
+    {
+     "channel": null,
+     "id": 286,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 3,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.7551,
+         0.0327,
+         0.0289,
+         0.0128,
+         0.0118
+        ],
+        [
+         0.8368,
+         0.0468,
+         0.0129,
+         0.0086,
+         0.0083
+        ],
+        [
+         0.7091,
+         0.1863,
+         0.0118,
+         0.0102,
+         0.0056
+        ],
+        [
+         0.8135,
+         0.0541,
+         0.0182,
+         0.0123,
+         0.0051
+        ],
+        [
+         0.8465,
+         0.0311,
+         0.0122,
+         0.0122,
+         0.0052
+        ],
+        [
+         0.5862,
+         0.0342,
+         0.028,
+         0.0171,
+         0.0154
+        ],
+        [
+         0.163,
+         0.1471,
+         0.0707,
+         0.052,
+         0.0481
+        ],
+        [
+         0.1679,
+         0.1532,
+         0.0933,
+         0.091,
+         0.0391
+        ],
+        [
+         0.1501,
+         0.1213,
+         0.0843,
+         0.064,
+         0.047
+        ],
+        [
+         0.1093,
+         0.0615,
+         0.0594,
+         0.0522,
+         0.0478
+        ],
+        [
+         0.1027,
+         0.0384,
+         0.0318,
+         0.0302,
+         0.0289
+        ],
+        [
+         0.1302,
+         0.0208,
+         0.0175,
+         0.0173,
+         0.0155
+        ]
+       ],
+       "top_tokens": [
+        [
+         " the",
+         " course",
+         " a",
+         " our",
+         " this"
+        ],
+        [
+         " the",
+         " course",
+         " a",
+         " its",
+         " our"
+        ],
+        [
+         " the",
+         " course",
+         " our",
+         " a",
+         " its"
+        ],
+        [
+         " the",
+         " course",
+         " our",
+         " Hope",
+         " China"
+        ],
+        [
+         " the",
+         " our",
+         " its",
+         " popular",
+         " a"
+        ],
+        [
+         " the",
+         " British",
+         " Pennsylvania",
+         " our",
+         " Texas"
+        ],
+        [
+         " Pennsylvania",
+         " the",
+         " Georgia",
+         " South",
+         " Texas"
+        ],
+        [
+         " British",
+         " the",
+         " South",
+         " North",
+         " China"
+        ],
+        [
+         " South",
+         " North",
+         " the",
+         " China",
+         " Canada"
+        ],
+        [
+         " China",
+         " India",
+         " South",
+         " Germany",
+         " Ukraine"
+        ],
+        [
+         " the",
+         " India",
+         " Israel",
+         " Ukraine",
+         " Romania"
+        ],
+        [
+         " the",
+         " Ukraine",
+         " Kazakhstan",
+         " India",
+         " Israel"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.4621,
+         0.2188,
+         0.1094,
+         0.0104,
+         0.0066
+        ],
+        [
+         0.7603,
+         0.1946,
+         0.0148,
+         0.0056,
+         0.0033
+        ],
+        [
+         0.4873,
+         0.1368,
+         0.0733,
+         0.0317,
+         0.0181
+        ],
+        [
+         0.2935,
+         0.08,
+         0.0425,
+         0.0312,
+         0.0275
+        ],
+        [
+         0.1962,
+         0.1517,
+         0.1124,
+         0.0574,
+         0.0434
+        ],
+        [
+         0.1576,
+         0.1453,
+         0.1262,
+         0.1046,
+         0.075
+        ],
+        [
+         0.7106,
+         0.0729,
+         0.028,
+         0.0161,
+         0.0138
+        ],
+        [
+         0.6576,
+         0.0562,
+         0.0511,
+         0.0302,
+         0.0262
+        ],
+        [
+         0.3728,
+         0.3386,
+         0.0854,
+         0.0283,
+         0.024
+        ],
+        [
+         0.3251,
+         0.1139,
+         0.1036,
+         0.0706,
+         0.0663
+        ],
+        [
+         0.3019,
+         0.1095,
+         0.0824,
+         0.0741,
+         0.063
+        ],
+        [
+         0.1302,
+         0.0208,
+         0.0175,
+         0.0173,
+         0.0155
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ModLoader",
+         "senal",
+         " enthusi",
+         "ESCO",
+         " conduc"
+        ],
+        [
+         "ModLoader",
+         " enthusi",
+         " mathemat",
+         " tremend",
+         " ingred"
+        ],
+        [
+         "ModLoader",
+         " mathemat",
+         " enthusi",
+         " tremend",
+         " metic"
+        ],
+        [
+         " tremend",
+         " mathemat",
+         " enthusi",
+         " Constantinople",
+         " metic"
+        ],
+        [
+         " Bulgar",
+         " Palestin",
+         " mathemat",
+         " tremend",
+         " proport"
+        ],
+        [
+         " mathemat",
+         " Bulgar",
+         " metic",
+         " tremend",
+         " Palestin"
+        ],
+        [
+         " Bulgar",
+         " Palestin",
+         " Assy",
+         " Rohing",
+         " Catalonia"
+        ],
+        [
+         " Yugoslavia",
+         " Belarus",
+         " Catalonia",
+         " Ukrain",
+         " Assy"
+        ],
+        [
+         " Leban",
+         " Yugoslavia",
+         " Belarus",
+         " Kurdistan",
+         " Catalonia"
+        ],
+        [
+         " Kazakhstan",
+         " Azerbaijan",
+         " Uzbek",
+         " Belarus",
+         " Armenia"
+        ],
+        [
+         " Kazakhstan",
+         " Azerbaijan",
+         " Armenia",
+         " Romania",
+         " Lithuania"
+        ],
+        [
+         " the",
+         " Ukraine",
+         " Kazakhstan",
+         " India",
+         " Israel"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " of"
+    },
+    {
+     "channel": null,
+     "id": 4881,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 4,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.1733,
+         0.0829,
+         0.0393,
+         0.026,
+         0.022
+        ],
+        [
+         0.0914,
+         0.063,
+         0.0617,
+         0.0176,
+         0.0146
+        ],
+        [
+         0.0541,
+         0.0296,
+         0.0161,
+         0.013,
+         0.0119
+        ],
+        [
+         0.0143,
+         0.0099,
+         0.0083,
+         0.0064,
+         0.0061
+        ],
+        [
+         0.0113,
+         0.0062,
+         0.0048,
+         0.0047,
+         0.003
+        ],
+        [
+         0.0293,
+         0.0057,
+         0.0055,
+         0.0034,
+         0.0025
+        ],
+        [
+         0.0226,
+         0.006,
+         0.0054,
+         0.002,
+         0.0017
+        ],
+        [
+         0.0511,
+         0.0442,
+         0.0362,
+         0.0032,
+         0.0018
+        ],
+        [
+         0.0767,
+         0.0533,
+         0.0366,
+         0.0056,
+         0.005
+        ],
+        [
+         0.1718,
+         0.1297,
+         0.0122,
+         0.0076,
+         0.0028
+        ],
+        [
+         0.4521,
+         0.2546,
+         0.0142,
+         0.0105,
+         0.0103
+        ],
+        [
+         0.196,
+         0.192,
+         0.1918,
+         0.0351,
+         0.0339
+        ]
+       ],
+       "top_tokens": [
+        [
+         " France",
+         " Marse",
+         " Connection",
+         " Press",
+         " and"
+        ],
+        [
+         " Connection",
+         " France",
+         " Press",
+         " Marse",
+         " Telecom"
+        ],
+        [
+         " Press",
+         " Connection",
+         " and",
+         " Telecom",
+         " Boss"
+        ],
+        [
+         " Alps",
+         " Press",
+         " Ant",
+         " L",
+         " National"
+        ],
+        [
+         " and",
+         " Press",
+         " Alps",
+         " Telecom",
+         " National"
+        ],
+        [
+         " and",
+         " Press",
+         " has",
+         " is",
+         " Telecom"
+        ],
+        [
+         " and",
+         " has",
+         " is",
+         " today",
+         "men"
+        ],
+        [
+         " has",
+         " is",
+         " and",
+         " was",
+         " today"
+        ],
+        [
+         " is",
+         " has",
+         " and",
+         " France",
+         " today"
+        ],
+        [
+         " is",
+         " has",
+         " and",
+         " was",
+         " will"
+        ],
+        [
+         " has",
+         " is",
+         " was",
+         " and",
+         " will"
+        ],
+        [
+         ",",
+         " has",
+         " is",
+         " and",
+         " was"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.8242,
+         0.1735,
+         0.0018,
+         0.0004,
+         0.0
+        ],
+        [
+         0.8547,
+         0.1273,
+         0.0111,
+         0.005,
+         0.0011
+        ],
+        [
+         0.8841,
+         0.1041,
+         0.0058,
+         0.0057,
+         0.0001
+        ],
+        [
+         0.5405,
+         0.4327,
+         0.0178,
+         0.0079,
+         0.0004
+        ],
+        [
+         0.6146,
+         0.3709,
+         0.0093,
+         0.0029,
+         0.0017
+        ],
+        [
+         0.4912,
+         0.4883,
+         0.0161,
+         0.0022,
+         0.0013
+        ],
+        [
+         0.6625,
+         0.3292,
+         0.0035,
+         0.0034,
+         0.0007
+        ],
+        [
+         0.8492,
+         0.1095,
+         0.0314,
+         0.0087,
+         0.0009
+        ],
+        [
+         0.6985,
+         0.2184,
+         0.0814,
+         0.0009,
+         0.0006
+        ],
+        [
+         0.4559,
+         0.3199,
+         0.2209,
+         0.0011,
+         0.0008
+        ],
+        [
+         0.4191,
+         0.0623,
+         0.0316,
+         0.0284,
+         0.0247
+        ],
+        [
+         0.196,
+         0.192,
+         0.1918,
+         0.0351,
+         0.0339
+        ]
+       ],
+       "top_tokens": [
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Marse"
+        ],
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         "France",
+         " France",
+         "French",
+         " French",
+         " Marse"
+        ],
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         " France",
+         "France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         "France",
+         " France",
+         " Hollande",
+         " French",
+         "French"
+        ],
+        [
+         " France",
+         "France",
+         " Hollande",
+         " French",
+         " Fran\u00e7ois"
+        ],
+        [
+         " France",
+         "France",
+         " Hollande",
+         " Fran\u00e7ois",
+         " French"
+        ],
+        [
+         " France",
+         "France",
+         " Hollande",
+         " Fran\u00e7ois",
+         " Marse"
+        ],
+        [
+         " has",
+         " celebrates",
+         " consists",
+         " intends",
+         " is"
+        ],
+        [
+         ",",
+         " has",
+         " is",
+         " and",
+         " was"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " France"
+    },
+    {
+     "channel": null,
+     "id": 318,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 5,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.3841,
+         0.1401,
+         0.08,
+         0.0783,
+         0.0306
+        ],
+        [
+         0.3371,
+         0.2925,
+         0.1156,
+         0.0604,
+         0.028
+        ],
+        [
+         0.4714,
+         0.1763,
+         0.0733,
+         0.0681,
+         0.0658
+        ],
+        [
+         0.5579,
+         0.1333,
+         0.098,
+         0.0723,
+         0.0256
+        ],
+        [
+         0.6532,
+         0.0975,
+         0.0442,
+         0.0339,
+         0.033
+        ],
+        [
+         0.6724,
+         0.1144,
+         0.0468,
+         0.0329,
+         0.0258
+        ],
+        [
+         0.5502,
+         0.1843,
+         0.0616,
+         0.0311,
+         0.0175
+        ],
+        [
+         0.7409,
+         0.0485,
+         0.0424,
+         0.041,
+         0.0245
+        ],
+        [
+         0.5739,
+         0.0491,
+         0.0467,
+         0.0423,
+         0.0346
+        ],
+        [
+         0.333,
+         0.0406,
+         0.0315,
+         0.0303,
+         0.0274
+        ],
+        [
+         0.2035,
+         0.0271,
+         0.0248,
+         0.0246,
+         0.024
+        ],
+        [
+         0.0475,
+         0.0374,
+         0.0355,
+         0.0309,
+         0.027
+        ]
+       ],
+       "top_tokens": [
+        [
+         " not",
+         " now",
+         " still",
+         " also",
+         " a"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " currently",
+         " still"
+        ],
+        [
+         " now",
+         " not",
+         " currently",
+         " also",
+         " still"
+        ],
+        [
+         " now",
+         " not",
+         " still",
+         " currently",
+         " also"
+        ],
+        [
+         " now",
+         " not",
+         " officially",
+         " still",
+         " also"
+        ],
+        [
+         " now",
+         " not",
+         " still",
+         " officially",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " officially",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " still",
+         " currently",
+         " facing",
+         " set"
+        ],
+        [
+         " now",
+         " still",
+         " facing",
+         " a",
+         " currently"
+        ],
+        [
+         " now",
+         " the",
+         " a",
+         " home",
+         " in"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.6012,
+         0.235,
+         0.0377,
+         0.0203,
+         0.0203
+        ],
+        [
+         0.9651,
+         0.0176,
+         0.0059,
+         0.0045,
+         0.001
+        ],
+        [
+         0.599,
+         0.1378,
+         0.0839,
+         0.0183,
+         0.0099
+        ],
+        [
+         0.1618,
+         0.0464,
+         0.045,
+         0.0346,
+         0.0208
+        ],
+        [
+         0.072,
+         0.0715,
+         0.0503,
+         0.0494,
+         0.04
+        ],
+        [
+         0.0473,
+         0.0393,
+         0.0281,
+         0.0272,
+         0.0159
+        ],
+        [
+         0.0985,
+         0.0521,
+         0.0403,
+         0.0399,
+         0.0329
+        ],
+        [
+         0.1174,
+         0.1052,
+         0.0457,
+         0.0382,
+         0.0348
+        ],
+        [
+         0.3534,
+         0.1761,
+         0.1613,
+         0.0554,
+         0.0209
+        ],
+        [
+         0.1393,
+         0.1287,
+         0.1244,
+         0.1158,
+         0.1053
+        ],
+        [
+         0.1019,
+         0.0829,
+         0.0814,
+         0.062,
+         0.0489
+        ],
+        [
+         0.0475,
+         0.0374,
+         0.0355,
+         0.0309,
+         0.027
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ModLoader",
+         "RIP",
+         "senal",
+         "ahime",
+         "ESCO"
+        ],
+        [
+         "ModLoader",
+         " mathemat",
+         "senal",
+         " enthusi",
+         " ingred"
+        ],
+        [
+         "ModLoader",
+         "senal",
+         " nomine",
+         " mathemat",
+         " oun"
+        ],
+        [
+         "ModLoader",
+         " confir",
+         " Palestin",
+         "senal",
+         " nomine"
+        ],
+        [
+         " ingred",
+         " confir",
+         " spons",
+         "senal",
+         " tyr"
+        ],
+        [
+         " tyr",
+         "ModLoader",
+         " nomine",
+         " condem",
+         " pestic"
+        ],
+        [
+         "ModLoader",
+         " civilisation",
+         " Sultan",
+         " nomine",
+         " ancest"
+        ],
+        [
+         " suburb",
+         " suburbs",
+         " UNESCO",
+         " lush",
+         " sprawling"
+        ],
+        [
+         "ModLoader",
+         "senal",
+         " UNESCO",
+         " bustling",
+         " challeng"
+        ],
+        [
+         " besieged",
+         " France",
+         " Marse",
+         " mosqu",
+         " Hollande"
+        ],
+        [
+         " undergoing",
+         " experiencing",
+         " embroiled",
+         " reeling",
+         " France"
+        ],
+        [
+         " now",
+         " the",
+         " a",
+         " home",
+         " in"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " is"
+    },
+    {
+     "channel": null,
+     "id": 783,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 6,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.5585,
+         0.0821,
+         0.042,
+         0.0169,
+         0.0146
+        ],
+        [
+         0.9021,
+         0.0358,
+         0.0298,
+         0.0036,
+         0.0031
+        ],
+        [
+         0.7237,
+         0.1458,
+         0.0536,
+         0.0142,
+         0.0045
+        ],
+        [
+         0.3816,
+         0.3431,
+         0.0929,
+         0.0294,
+         0.0182
+        ],
+        [
+         0.7373,
+         0.1236,
+         0.0202,
+         0.0105,
+         0.0097
+        ],
+        [
+         0.7347,
+         0.1418,
+         0.0145,
+         0.0078,
+         0.0073
+        ],
+        [
+         0.8889,
+         0.0323,
+         0.0064,
+         0.0052,
+         0.0051
+        ],
+        [
+         0.9498,
+         0.0063,
+         0.0038,
+         0.0025,
+         0.0023
+        ],
+        [
+         0.7833,
+         0.0682,
+         0.0134,
+         0.0084,
+         0.0083
+        ],
+        [
+         0.3447,
+         0.1132,
+         0.0452,
+         0.0407,
+         0.0378
+        ],
+        [
+         0.0823,
+         0.0716,
+         0.0513,
+         0.0392,
+         0.0325
+        ],
+        [
+         0.1114,
+         0.0642,
+         0.0549,
+         0.0357,
+         0.0345
+        ]
+       ],
+       "top_tokens": [
+        [
+         "adays",
+         " known",
+         " officially",
+         " now",
+         " obsolete"
+        ],
+        [
+         "adays",
+         " known",
+         " officially",
+         " heading",
+         " obsolete"
+        ],
+        [
+         "adays",
+         " officially",
+         " known",
+         " heading",
+         " firmly"
+        ],
+        [
+         " officially",
+         " known",
+         "adays",
+         " available",
+         " heading"
+        ],
+        [
+         " officially",
+         " known",
+         "adays",
+         " called",
+         "here"
+        ],
+        [
+         " officially",
+         " known",
+         " called",
+         " firmly",
+         "here"
+        ],
+        [
+         " officially",
+         " known",
+         " largely",
+         " part",
+         " ruled"
+        ],
+        [
+         " officially",
+         " known",
+         " firmly",
+         " ruled",
+         " a"
+        ],
+        [
+         " officially",
+         " known",
+         " a",
+         " firmly",
+         " embroiled"
+        ],
+        [
+         " officially",
+         " known",
+         " a",
+         " occupied",
+         " facing"
+        ],
+        [
+         " home",
+         " a",
+         " the",
+         " known",
+         " facing"
+        ],
+        [
+         " home",
+         " the",
+         " a",
+         " in",
+         " under"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.55,
+         0.0819,
+         0.0711,
+         0.0452,
+         0.0255
+        ],
+        [
+         0.3337,
+         0.1518,
+         0.0925,
+         0.0342,
+         0.0341
+        ],
+        [
+         0.3742,
+         0.0866,
+         0.0745,
+         0.0278,
+         0.0216
+        ],
+        [
+         0.2025,
+         0.1523,
+         0.0719,
+         0.0447,
+         0.0228
+        ],
+        [
+         0.1829,
+         0.1186,
+         0.0895,
+         0.0822,
+         0.0679
+        ],
+        [
+         0.2236,
+         0.1403,
+         0.0598,
+         0.058,
+         0.0408
+        ],
+        [
+         0.4006,
+         0.1705,
+         0.1343,
+         0.0673,
+         0.0386
+        ],
+        [
+         0.5034,
+         0.0751,
+         0.0303,
+         0.0227,
+         0.0185
+        ],
+        [
+         0.4602,
+         0.1118,
+         0.1051,
+         0.0657,
+         0.0358
+        ],
+        [
+         0.2139,
+         0.1753,
+         0.1235,
+         0.1137,
+         0.0838
+        ],
+        [
+         0.2519,
+         0.1013,
+         0.0679,
+         0.048,
+         0.0465
+        ],
+        [
+         0.1114,
+         0.0642,
+         0.0549,
+         0.0357,
+         0.0345
+        ]
+       ],
+       "top_tokens": [
+        [
+         "Ireland",
+         "Scotland",
+         " realise",
+         " awa",
+         "grave"
+        ],
+        [
+         " awa",
+         "ModLoader",
+         "Ireland",
+         "grave",
+         "Scotland"
+        ],
+        [
+         " awa",
+         "adays",
+         " confir",
+         "ModLoader",
+         " realise"
+        ],
+        [
+         " awa",
+         "adays",
+         "ModLoader",
+         "terday",
+         " realise"
+        ],
+        [
+         "adays",
+         " awa",
+         " confir",
+         " realise",
+         "ModLoader"
+        ],
+        [
+         " realise",
+         "adays",
+         " realised",
+         " apologised",
+         " apologise"
+        ],
+        [
+         " realise",
+         " apologised",
+         " realised",
+         "adays",
+         " apologise"
+        ],
+        [
+         " apologised",
+         " UNESCO",
+         " Chennai",
+         " realised",
+         " realise"
+        ],
+        [
+         " UNESCO",
+         " vacant",
+         "ModLoader",
+         " habitable",
+         " apologised"
+        ],
+        [
+         " embroiled",
+         " UNESCO",
+         " besieged",
+         " overcrowd",
+         " suing"
+        ],
+        [
+         " embroiled",
+         " engulfed",
+         " undergoing",
+         " gripped",
+         " experiencing"
+        ],
+        [
+         " home",
+         " the",
+         " a",
+         " in",
+         " under"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " now"
+    },
+    {
+     "channel": null,
+     "id": 1363,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 7,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.2589,
+         0.2374,
+         0.1706,
+         0.0371,
+         0.0185
+        ],
+        [
+         0.2758,
+         0.2125,
+         0.2031,
+         0.121,
+         0.0216
+        ],
+        [
+         0.7932,
+         0.0824,
+         0.0195,
+         0.0179,
+         0.0158
+        ],
+        [
+         0.942,
+         0.0165,
+         0.0045,
+         0.0036,
+         0.0029
+        ],
+        [
+         0.6331,
+         0.2368,
+         0.0135,
+         0.012,
+         0.0105
+        ],
+        [
+         0.799,
+         0.0742,
+         0.0189,
+         0.0068,
+         0.0052
+        ],
+        [
+         0.6529,
+         0.2538,
+         0.023,
+         0.0042,
+         0.0029
+        ],
+        [
+         0.4703,
+         0.4065,
+         0.0306,
+         0.0143,
+         0.0056
+        ],
+        [
+         0.9574,
+         0.0158,
+         0.0075,
+         0.0059,
+         0.002
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9992,
+         0.0003,
+         0.0002,
+         0.0,
+         0.0
+        ],
+        [
+         0.9976,
+         0.0009,
+         0.0002,
+         0.0001,
+         0.0001
+        ]
+       ],
+       "top_tokens": [
+        [
+         " home",
+         "home",
+         " Home",
+         " speaker",
+         " computer"
+        ],
+        [
+         " Home",
+         "coming",
+         " home",
+         "home",
+         "brew"
+        ],
+        [
+         "coming",
+         "brew",
+         " Home",
+         "grown",
+         "home"
+        ],
+        [
+         "coming",
+         "grown",
+         "brew",
+         "ported",
+         " Home"
+        ],
+        [
+         "grown",
+         "coming",
+         " home",
+         " Home",
+         "minist"
+        ],
+        [
+         "grown",
+         "coming",
+         " home",
+         "brew",
+         " Home"
+        ],
+        [
+         "grown",
+         "coming",
+         "brew",
+         "bed",
+         " home"
+        ],
+        [
+         "grown",
+         "coming",
+         "brew",
+         " to",
+         "rox"
+        ],
+        [
+         " to",
+         "grown",
+         "coming",
+         "ported",
+         " for"
+        ],
+        [
+         " to",
+         "to",
+         " for",
+         " of",
+         " again"
+        ],
+        [
+         " to",
+         " of",
+         " for",
+         " again",
+         " in"
+        ],
+        [
+         " to",
+         " of",
+         " for",
+         " not",
+         " again"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.6473,
+         0.2835,
+         0.0501,
+         0.0112,
+         0.0049
+        ],
+        [
+         0.5739,
+         0.3701,
+         0.0245,
+         0.0165,
+         0.0086
+        ],
+        [
+         0.6901,
+         0.2263,
+         0.0423,
+         0.0205,
+         0.0088
+        ],
+        [
+         0.5328,
+         0.2256,
+         0.1197,
+         0.0673,
+         0.0203
+        ],
+        [
+         0.3135,
+         0.26,
+         0.227,
+         0.0903,
+         0.0529
+        ],
+        [
+         0.5278,
+         0.1357,
+         0.1182,
+         0.109,
+         0.0302
+        ],
+        [
+         0.3594,
+         0.2799,
+         0.09,
+         0.0764,
+         0.061
+        ],
+        [
+         0.4887,
+         0.1976,
+         0.1071,
+         0.0684,
+         0.0653
+        ],
+        [
+         0.4293,
+         0.0537,
+         0.045,
+         0.0417,
+         0.0404
+        ],
+        [
+         0.1955,
+         0.0691,
+         0.0242,
+         0.015,
+         0.0115
+        ],
+        [
+         0.6968,
+         0.0193,
+         0.0102,
+         0.0068,
+         0.0065
+        ],
+        [
+         0.9976,
+         0.0009,
+         0.0002,
+         0.0001,
+         0.0001
+        ]
+       ],
+       "top_tokens": [
+        [
+         " Homes",
+         "Home",
+         " Home",
+         " HOME",
+         "home"
+        ],
+        [
+         "Home",
+         " Homes",
+         " Home",
+         " HOME",
+         "HOME"
+        ],
+        [
+         " Homes",
+         "Home",
+         " Home",
+         " HOME",
+         "HOME"
+        ],
+        [
+         " Homes",
+         "Home",
+         " Home",
+         "home",
+         " HOME"
+        ],
+        [
+         " Homes",
+         "Home",
+         "home",
+         " Home",
+         " bedrooms"
+        ],
+        [
+         "home",
+         " home",
+         "Home",
+         " Home",
+         " Homes"
+        ],
+        [
+         " Tud",
+         "home",
+         "Home",
+         " Home",
+         " neighb"
+        ],
+        [
+         "home",
+         " Home",
+         " home",
+         "Home",
+         " Tud"
+        ],
+        [
+         "home",
+         "Home",
+         "eworld",
+         "\u30b4\u30f3",
+         " teasp"
+        ],
+        [
+         " teasp",
+         " to",
+         "llah",
+         "\u30b4\u30f3",
+         " pione"
+        ],
+        [
+         " to",
+         "ported",
+         "llah",
+         "ogyn",
+         " again"
+        ],
+        [
+         " to",
+         " of",
+         " for",
+         " not",
+         " again"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " home"
+    },
+    {
+     "channel": null,
+     "id": 284,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 8,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0958,
+         0.0692,
+         0.0635,
+         0.0435,
+         0.0413
+        ],
+        [
+         0.0884,
+         0.0689,
+         0.0677,
+         0.0646,
+         0.0467
+        ],
+        [
+         0.0676,
+         0.0616,
+         0.0486,
+         0.0475,
+         0.0464
+        ],
+        [
+         0.3598,
+         0.0552,
+         0.0292,
+         0.0268,
+         0.0158
+        ],
+        [
+         0.382,
+         0.1667,
+         0.0535,
+         0.0449,
+         0.0432
+        ],
+        [
+         0.2162,
+         0.2142,
+         0.0979,
+         0.0752,
+         0.0332
+        ],
+        [
+         0.2801,
+         0.1562,
+         0.1185,
+         0.0615,
+         0.047
+        ],
+        [
+         0.3444,
+         0.1456,
+         0.1011,
+         0.094,
+         0.0656
+        ],
+        [
+         0.2948,
+         0.1732,
+         0.1223,
+         0.1079,
+         0.0687
+        ],
+        [
+         0.167,
+         0.166,
+         0.1462,
+         0.1182,
+         0.1022
+        ],
+        [
+         0.3047,
+         0.1218,
+         0.0747,
+         0.0522,
+         0.0474
+        ],
+        [
+         0.1425,
+         0.1366,
+         0.0627,
+         0.047,
+         0.0332
+        ]
+       ],
+       "top_tokens": [
+        [
+         " get",
+         " be",
+         " make",
+         " give",
+         " keep"
+        ],
+        [
+         " get",
+         " make",
+         " be",
+         " avoid",
+         " keep"
+        ],
+        [
+         " collect",
+         " be",
+         " celebrate",
+         " get",
+         " avoid"
+        ],
+        [
+         " the",
+         " a",
+         " collect",
+         " many",
+         " keep"
+        ],
+        [
+         " the",
+         " a",
+         " many",
+         " several",
+         " an"
+        ],
+        [
+         " many",
+         " the",
+         " a",
+         " several",
+         " two"
+        ],
+        [
+         " a",
+         " the",
+         " many",
+         " an",
+         " several"
+        ],
+        [
+         " a",
+         " the",
+         " many",
+         " several",
+         " an"
+        ],
+        [
+         " a",
+         " the",
+         " many",
+         " several",
+         " some"
+        ],
+        [
+         " a",
+         " dozens",
+         " several",
+         " many",
+         " thousands"
+        ],
+        [
+         " a",
+         " the",
+         " some",
+         " hundreds",
+         " thousands"
+        ],
+        [
+         " the",
+         " a",
+         " more",
+         " some",
+         " one"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      },
+      {
+       "top_probs": [
+        [
+         0.4859,
+         0.1139,
+         0.0571,
+         0.0325,
+         0.0194
+        ],
+        [
+         0.4863,
+         0.356,
+         0.0361,
+         0.0332,
+         0.0158
+        ],
+        [
+         0.1954,
+         0.1416,
+         0.1,
+         0.0405,
+         0.0337
+        ],
+        [
+         0.037,
+         0.0339,
+         0.0238,
+         0.0167,
+         0.016
+        ],
+        [
+         0.2325,
+         0.1187,
+         0.1069,
+         0.0408,
+         0.037
+        ],
+        [
+         0.1466,
+         0.1091,
+         0.0655,
+         0.0538,
+         0.0308
+        ],
+        [
+         0.3432,
+         0.1092,
+         0.0298,
+         0.0237,
+         0.0182
+        ],
+        [
+         0.1605,
+         0.0914,
+         0.0575,
+         0.0529,
+         0.051
+        ],
+        [
+         0.4546,
+         0.0822,
+         0.0691,
+         0.0639,
+         0.0447
+        ],
+        [
+         0.5713,
+         0.141,
+         0.0966,
+         0.0389,
+         0.0355
+        ],
+        [
+         0.3037,
+         0.2035,
+         0.1622,
+         0.0334,
+         0.0299
+        ],
+        [
+         0.1425,
+         0.1366,
+         0.0627,
+         0.047,
+         0.0332
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ModLoader",
+         " enthusi",
+         "WAYS",
+         " FANT",
+         "Ireland"
+        ],
+        [
+         " enthusi",
+         "ModLoader",
+         " tremend",
+         " misunder",
+         " ingred"
+        ],
+        [
+         "ModLoader",
+         " lapt",
+         " tremend",
+         "avorite",
+         " cryst"
+        ],
+        [
+         " vibrant",
+         " lush",
+         "ModLoader",
+         " mathemat",
+         " ensu"
+        ],
+        [
+         " tremend",
+         " ensu",
+         " lush",
+         " cryst",
+         " majestic"
+        ],
+        [
+         " majestic",
+         " sprawling",
+         " birthplace",
+         " tremend",
+         " towering"
+        ],
+        [
+         " birthplace",
+         " Celt",
+         " bustling",
+         " UNESCO",
+         " attractions"
+        ],
+        [
+         " breathtaking",
+         " vibrant",
+         " famed",
+         " towering",
+         " magnificent"
+        ],
+        [
+         " tremend",
+         " UNESCO",
+         " giants",
+         " mammoth",
+         " magnificent"
+        ],
+        [
+         " UNESCO",
+         " thousands",
+         " dozens",
+         " legions",
+         " Auschwitz"
+        ],
+        [
+         " thousands",
+         " hundreds",
+         " dozens",
+         " France",
+         " millions"
+        ],
+        [
+         " the",
+         " a",
+         " more",
+         " some",
+         " one"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " to"
+    }
+   ]
+  }
+ },
+ "lens_jacobian_steered": {
+  "digest": "ec6722c80c466e4c",
+  "response": {
+   "done": {
+    "completion": " the world's",
+    "kind": "done",
+    "prompt_len": 6,
+    "seq_len": 9,
+    "vocab_size": 50257
+   },
+   "meta": {
+    "kind": "meta",
+    "layers_by_type": {
+     "JACOBIAN_LENS": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ]
+    },
+    "model": "openai-community/gpt2",
+    "num_completion_tokens": 3,
+    "oracle_layers": [],
+    "prepend_bos": true,
+    "prompt_len": 6,
+    "reuse_len": 0,
+    "temperature": 0.0,
+    "top_n": 5,
+    "types": [
+     "JACOBIAN_LENS"
+    ]
+   },
+   "tokens": [
+    {
+     "channel": null,
+     "id": 50256,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 0,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0425,
+         0.0156,
+         0.0151,
+         0.0134,
+         0.0116
+        ],
+        [
+         0.1064,
+         0.0504,
+         0.026,
+         0.0244,
+         0.0152
+        ],
+        [
+         0.052,
+         0.0451,
+         0.0154,
+         0.0132,
+         0.0126
+        ],
+        [
+         0.0028,
+         0.0024,
+         0.0023,
+         0.002,
+         0.0019
+        ],
+        [
+         0.0082,
+         0.0036,
+         0.0035,
+         0.0028,
+         0.0028
+        ],
+        [
+         0.0072,
+         0.0058,
+         0.0036,
+         0.003,
+         0.0024
+        ],
+        [
+         0.0106,
+         0.0098,
+         0.007,
+         0.0053,
+         0.005
+        ],
+        [
+         0.0103,
+         0.0092,
+         0.0053,
+         0.0047,
+         0.0044
+        ],
+        [
+         0.0103,
+         0.0091,
+         0.0056,
+         0.0052,
+         0.0043
+        ],
+        [
+         0.0092,
+         0.0066,
+         0.0055,
+         0.0051,
+         0.0038
+        ],
+        [
+         0.0086,
+         0.0074,
+         0.0055,
+         0.0053,
+         0.0045
+        ],
+        [
+         0.0623,
+         0.0377,
+         0.0194,
+         0.0183,
+         0.0116
+        ]
+       ],
+       "top_tokens": [
+        [
+         "pherd",
+         "neau",
+         "aan",
+         "upiter",
+         "aretz"
+        ],
+        [
+         " Inquis",
+         " Inquisitor",
+         " Morty",
+         " Benz",
+         "Money"
+        ],
+        [
+         "erenn",
+         "ischer",
+         "ometimes",
+         "wagen",
+         " Journals"
+        ],
+        [
+         " Period",
+         "\u00c3",
+         " Univ",
+         " Evangel",
+         " Bulg"
+        ],
+        [
+         " and",
+         " the",
+         " of",
+         " a",
+         " II"
+        ],
+        [
+         " and",
+         " the",
+         " a",
+         " of",
+         " A"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " that",
+         " in"
+        ],
+        [
+         " and",
+         " the",
+         " a",
+         " in",
+         " that"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " of"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         "\n",
+         "The",
+         "A",
+         "I",
+         "In"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "<|endoftext|>"
+    },
+    {
+     "channel": null,
+     "id": 464,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 1,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.1218,
+         0.0822,
+         0.0339,
+         0.031,
+         0.0125
+        ],
+        [
+         0.6072,
+         0.1825,
+         0.075,
+         0.0417,
+         0.0227
+        ],
+        [
+         0.2865,
+         0.0898,
+         0.0462,
+         0.0299,
+         0.0261
+        ],
+        [
+         0.1236,
+         0.0828,
+         0.0375,
+         0.0298,
+         0.0201
+        ],
+        [
+         0.292,
+         0.139,
+         0.0788,
+         0.0736,
+         0.0114
+        ],
+        [
+         0.2338,
+         0.1459,
+         0.1325,
+         0.0207,
+         0.0127
+        ],
+        [
+         0.7038,
+         0.05,
+         0.0067,
+         0.0051,
+         0.0027
+        ],
+        [
+         0.8345,
+         0.0418,
+         0.0082,
+         0.0035,
+         0.0033
+        ],
+        [
+         0.8287,
+         0.0349,
+         0.0058,
+         0.0052,
+         0.003
+        ],
+        [
+         0.5554,
+         0.0539,
+         0.0138,
+         0.0084,
+         0.0065
+        ],
+        [
+         0.1431,
+         0.0318,
+         0.007,
+         0.0052,
+         0.005
+        ],
+        [
+         0.0285,
+         0.016,
+         0.0092,
+         0.0085,
+         0.0075
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ESCO",
+         "CLASSIFIED",
+         " FANT",
+         "DragonMagazine",
+         "ITED"
+        ],
+        [
+         "ModLoader",
+         "DragonMagazine",
+         " enthusi",
+         "channelAvailability",
+         " encount"
+        ],
+        [
+         "ModLoader",
+         "DragonMagazine",
+         " quir",
+         "rpm",
+         "Reloaded"
+        ],
+        [
+         "ModLoader",
+         "Reloaded",
+         " quir",
+         " tyres",
+         "DragonMagazine"
+        ],
+        [
+         "ModLoader",
+         "DragonMagazine",
+         "senal",
+         "Reloaded",
+         "ThumbnailImage"
+        ],
+        [
+         "DragonMagazine",
+         "ModLoader",
+         "ccording",
+         "odore",
+         "uyomi"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         "London",
+         "Brexit"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         "French",
+         "elaide"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "French",
+         "France",
+         " Cannes"
+        ],
+        [
+         "Paris",
+         " Paris",
+         " mosqu",
+         "French",
+         "isoft"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "French",
+         "isoft",
+         "imize"
+        ],
+        [
+         " Paris",
+         "or",
+         "ory",
+         " French",
+         "Paris"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "The"
+    },
+    {
+     "channel": null,
+     "id": 3139,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 2,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.4799,
+         0.2582,
+         0.1776,
+         0.0622,
+         0.0222
+        ],
+        [
+         0.4312,
+         0.2396,
+         0.2097,
+         0.0609,
+         0.0586
+        ],
+        [
+         0.5215,
+         0.4607,
+         0.0073,
+         0.0053,
+         0.0052
+        ],
+        [
+         0.5,
+         0.4934,
+         0.0032,
+         0.0027,
+         0.0008
+        ],
+        [
+         0.7355,
+         0.2632,
+         0.0006,
+         0.0004,
+         0.0003
+        ],
+        [
+         0.6784,
+         0.3207,
+         0.0006,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.8029,
+         0.0724,
+         0.0271,
+         0.0034,
+         0.0015
+        ],
+        [
+         0.8585,
+         0.0822,
+         0.0077,
+         0.003,
+         0.0022
+        ],
+        [
+         0.9313,
+         0.0315,
+         0.0042,
+         0.0034,
+         0.0015
+        ],
+        [
+         0.8224,
+         0.0515,
+         0.0088,
+         0.0042,
+         0.0027
+        ],
+        [
+         0.1333,
+         0.034,
+         0.0079,
+         0.0061,
+         0.006
+        ],
+        [
+         0.0464,
+         0.0216,
+         0.0213,
+         0.0154,
+         0.0122
+        ]
+       ],
+       "top_tokens": [
+        [
+         " capital",
+         " capitals",
+         " Capital",
+         "Capital",
+         "capital"
+        ],
+        [
+         "Capital",
+         " capital",
+         " capitals",
+         "capital",
+         " Capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         " Capital",
+         "Capital",
+         "capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         " Capital",
+         "Capital",
+         "capital"
+        ],
+        [
+         " capitals",
+         " capital",
+         "capital",
+         " Capital",
+         "Capital"
+        ],
+        [
+         " capital",
+         " capitals",
+         " Capital",
+         "capital",
+         "Capital"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "London",
+         "France",
+         " London"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "London",
+         "France",
+         "ropolis"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "London",
+         "France",
+         "French"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "London",
+         "France",
+         "ropolis"
+        ],
+        [
+         "Paris",
+         " Paris",
+         " city",
+         " France",
+         "France"
+        ],
+        [
+         " and",
+         " city",
+         " Paris",
+         " the",
+         "Paris"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " capital"
+    },
+    {
+     "channel": null,
+     "id": 286,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 3,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.4621,
+         0.2188,
+         0.1094,
+         0.0104,
+         0.0066
+        ],
+        [
+         0.7603,
+         0.1946,
+         0.0148,
+         0.0056,
+         0.0033
+        ],
+        [
+         0.4873,
+         0.1368,
+         0.0733,
+         0.0317,
+         0.0181
+        ],
+        [
+         0.2935,
+         0.08,
+         0.0425,
+         0.0312,
+         0.0275
+        ],
+        [
+         0.1962,
+         0.1517,
+         0.1124,
+         0.0574,
+         0.0434
+        ],
+        [
+         0.1576,
+         0.1453,
+         0.1262,
+         0.1046,
+         0.075
+        ],
+        [
+         0.7655,
+         0.0698,
+         0.0087,
+         0.0064,
+         0.0019
+        ],
+        [
+         0.743,
+         0.0827,
+         0.0238,
+         0.0044,
+         0.0031
+        ],
+        [
+         0.7681,
+         0.0601,
+         0.0127,
+         0.0047,
+         0.0034
+        ],
+        [
+         0.5276,
+         0.0862,
+         0.0171,
+         0.0127,
+         0.0087
+        ],
+        [
+         0.1395,
+         0.0568,
+         0.0298,
+         0.0168,
+         0.0131
+        ],
+        [
+         0.032,
+         0.0275,
+         0.0198,
+         0.0107,
+         0.0094
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ModLoader",
+         "senal",
+         " enthusi",
+         "ESCO",
+         " conduc"
+        ],
+        [
+         "ModLoader",
+         " enthusi",
+         " mathemat",
+         " tremend",
+         " ingred"
+        ],
+        [
+         "ModLoader",
+         " mathemat",
+         " enthusi",
+         " tremend",
+         " metic"
+        ],
+        [
+         " tremend",
+         " mathemat",
+         " enthusi",
+         " Constantinople",
+         " metic"
+        ],
+        [
+         " Bulgar",
+         " Palestin",
+         " mathemat",
+         " tremend",
+         " proport"
+        ],
+        [
+         " mathemat",
+         " Bulgar",
+         " metic",
+         " tremend",
+         " Palestin"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         "London",
+         "Europe"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         " France",
+         "Brazil"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         " unbeliev",
+         " Cannes"
+        ],
+        [
+         "Paris",
+         " Paris",
+         " Cannes",
+         " unbeliev",
+         "France"
+        ],
+        [
+         "Paris",
+         " Paris",
+         " Marse",
+         " France",
+         "France"
+        ],
+        [
+         " in",
+         " the",
+         " Paris",
+         " In",
+         " France"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " of"
+    },
+    {
+     "channel": null,
+     "id": 4881,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 4,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.8242,
+         0.1735,
+         0.0018,
+         0.0004,
+         0.0
+        ],
+        [
+         0.8547,
+         0.1273,
+         0.0111,
+         0.005,
+         0.0011
+        ],
+        [
+         0.8841,
+         0.1041,
+         0.0058,
+         0.0057,
+         0.0001
+        ],
+        [
+         0.5405,
+         0.4327,
+         0.0178,
+         0.0079,
+         0.0004
+        ],
+        [
+         0.6146,
+         0.3709,
+         0.0093,
+         0.0029,
+         0.0017
+        ],
+        [
+         0.4912,
+         0.4883,
+         0.0161,
+         0.0022,
+         0.0013
+        ],
+        [
+         0.8464,
+         0.0842,
+         0.0368,
+         0.0076,
+         0.0069
+        ],
+        [
+         0.8479,
+         0.0751,
+         0.0483,
+         0.0121,
+         0.0072
+        ],
+        [
+         0.8522,
+         0.0616,
+         0.0473,
+         0.0203,
+         0.0098
+        ],
+        [
+         0.7992,
+         0.0933,
+         0.0423,
+         0.019,
+         0.0144
+        ],
+        [
+         0.2385,
+         0.0858,
+         0.0286,
+         0.0219,
+         0.0069
+        ],
+        [
+         0.1047,
+         0.0259,
+         0.0154,
+         0.0141,
+         0.0131
+        ]
+       ],
+       "top_tokens": [
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Marse"
+        ],
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         "France",
+         " France",
+         "French",
+         " French",
+         " Marse"
+        ],
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         "France",
+         " France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         " France",
+         "France",
+         " French",
+         "French",
+         " Hollande"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         " France",
+         "French"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         " France",
+         "French"
+        ],
+        [
+         "Paris",
+         "France",
+         " Paris",
+         "French",
+         " France"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         " France",
+         "French"
+        ],
+        [
+         "Paris",
+         " Paris",
+         " France",
+         "France",
+         "French"
+        ],
+        [
+         " and",
+         " Paris",
+         " at",
+         " in",
+         "Paris"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " France"
+    },
+    {
+     "channel": null,
+     "id": 318,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 5,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.6012,
+         0.235,
+         0.0377,
+         0.0203,
+         0.0203
+        ],
+        [
+         0.9651,
+         0.0176,
+         0.0059,
+         0.0045,
+         0.001
+        ],
+        [
+         0.599,
+         0.1378,
+         0.0839,
+         0.0183,
+         0.0099
+        ],
+        [
+         0.1618,
+         0.0464,
+         0.045,
+         0.0346,
+         0.0208
+        ],
+        [
+         0.072,
+         0.0715,
+         0.0503,
+         0.0494,
+         0.04
+        ],
+        [
+         0.0473,
+         0.0393,
+         0.0281,
+         0.0272,
+         0.0159
+        ],
+        [
+         0.8608,
+         0.0537,
+         0.0089,
+         0.0036,
+         0.0017
+        ],
+        [
+         0.8848,
+         0.0592,
+         0.0189,
+         0.0027,
+         0.0015
+        ],
+        [
+         0.9045,
+         0.0479,
+         0.015,
+         0.0029,
+         0.0021
+        ],
+        [
+         0.7735,
+         0.099,
+         0.014,
+         0.0073,
+         0.0055
+        ],
+        [
+         0.1952,
+         0.0659,
+         0.0318,
+         0.0248,
+         0.0221
+        ],
+        [
+         0.028,
+         0.0185,
+         0.0178,
+         0.0157,
+         0.0116
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ModLoader",
+         "RIP",
+         "senal",
+         "ahime",
+         "ESCO"
+        ],
+        [
+         "ModLoader",
+         " mathemat",
+         "senal",
+         " enthusi",
+         " ingred"
+        ],
+        [
+         "ModLoader",
+         "senal",
+         " nomine",
+         " mathemat",
+         " oun"
+        ],
+        [
+         "ModLoader",
+         " confir",
+         " Palestin",
+         "senal",
+         " nomine"
+        ],
+        [
+         " ingred",
+         " confir",
+         " spons",
+         "senal",
+         " tyr"
+        ],
+        [
+         " tyr",
+         "ModLoader",
+         " nomine",
+         " condem",
+         " pestic"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         "London",
+         "Brexit"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         " France",
+         " Hollande"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         "French",
+         " France"
+        ],
+        [
+         "Paris",
+         " Paris",
+         "France",
+         " France",
+         " Cannes"
+        ],
+        [
+         "Paris",
+         " Paris",
+         " France",
+         " Marse",
+         "France"
+        ],
+        [
+         " the",
+         " Paris",
+         " in",
+         " to",
+         " France"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " is"
+    },
+    {
+     "channel": null,
+     "id": 262,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 6,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.1428,
+         0.1231,
+         0.1094,
+         0.0968,
+         0.0352
+        ],
+        [
+         0.447,
+         0.3544,
+         0.0543,
+         0.0217,
+         0.0176
+        ],
+        [
+         0.2045,
+         0.1857,
+         0.1648,
+         0.0508,
+         0.0342
+        ],
+        [
+         0.0669,
+         0.0563,
+         0.0461,
+         0.045,
+         0.0339
+        ],
+        [
+         0.1845,
+         0.1664,
+         0.1588,
+         0.112,
+         0.097
+        ],
+        [
+         0.5018,
+         0.1242,
+         0.0938,
+         0.0169,
+         0.0144
+        ],
+        [
+         0.3693,
+         0.1336,
+         0.0705,
+         0.0438,
+         0.0409
+        ],
+        [
+         0.6111,
+         0.139,
+         0.0612,
+         0.0552,
+         0.0154
+        ],
+        [
+         0.4065,
+         0.4024,
+         0.0288,
+         0.0274,
+         0.0216
+        ],
+        [
+         0.7322,
+         0.0688,
+         0.0587,
+         0.0397,
+         0.038
+        ],
+        [
+         0.9471,
+         0.0157,
+         0.0054,
+         0.0034,
+         0.003
+        ],
+        [
+         0.2261,
+         0.0393,
+         0.0351,
+         0.0295,
+         0.0265
+        ]
+       ],
+       "top_tokens": [
+        [
+         "senal",
+         " tremend",
+         "ModLoader",
+         " enthusi",
+         " misunder"
+        ],
+        [
+         " enthusi",
+         "ModLoader",
+         " mathemat",
+         " misunder",
+         " enthus"
+        ],
+        [
+         "ModLoader",
+         " mathemat",
+         " enthusi",
+         " misunder",
+         " nomine"
+        ],
+        [
+         " encount",
+         " mathemat",
+         " misunder",
+         " tremend",
+         " proport"
+        ],
+        [
+         " mathemat",
+         " princ",
+         " tremend",
+         " proport",
+         " misunder"
+        ],
+        [
+         " mathemat",
+         " princ",
+         " tremend",
+         " gobl",
+         " cryst"
+        ],
+        [
+         " mathemat",
+         " princ",
+         " holiest",
+         " Bulgar",
+         " Palest"
+        ],
+        [
+         " Senegal",
+         " mathemat",
+         " holiest",
+         " superpower",
+         " Netherlands"
+        ],
+        [
+         " birthplace",
+         "ModLoader",
+         " holiest",
+         "senal",
+         " mathemat"
+        ],
+        [
+         " birthplace",
+         " holiest",
+         " mosqu",
+         " richest",
+         " Netherlands"
+        ],
+        [
+         " birthplace",
+         " cradle",
+         " world",
+         " richest",
+         " poorest"
+        ],
+        [
+         " world",
+         " birthplace",
+         " latest",
+         " most",
+         " biggest"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " the"
+    },
+    {
+     "channel": null,
+     "id": 995,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 7,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.6579,
+         0.148,
+         0.0827,
+         0.0641,
+         0.0132
+        ],
+        [
+         0.7234,
+         0.0843,
+         0.0656,
+         0.058,
+         0.0285
+        ],
+        [
+         0.522,
+         0.2098,
+         0.1193,
+         0.0671,
+         0.0437
+        ],
+        [
+         0.5309,
+         0.2805,
+         0.0772,
+         0.028,
+         0.0218
+        ],
+        [
+         0.5593,
+         0.3182,
+         0.0312,
+         0.0224,
+         0.021
+        ],
+        [
+         0.3142,
+         0.2775,
+         0.1382,
+         0.0541,
+         0.0419
+        ],
+        [
+         0.41,
+         0.3645,
+         0.0912,
+         0.0538,
+         0.0178
+        ],
+        [
+         0.9577,
+         0.0145,
+         0.0111,
+         0.0095,
+         0.0023
+        ],
+        [
+         0.9981,
+         0.0013,
+         0.0001,
+         0.0001,
+         0.0001
+        ],
+        [
+         0.9763,
+         0.0066,
+         0.0041,
+         0.002,
+         0.0012
+        ],
+        [
+         0.2741,
+         0.0521,
+         0.0273,
+         0.0132,
+         0.0064
+        ],
+        [
+         0.992,
+         0.0033,
+         0.0006,
+         0.0003,
+         0.0002
+        ]
+       ],
+       "top_tokens": [
+        [
+         " WORLD",
+         "World",
+         "world",
+         " worlds",
+         " global"
+        ],
+        [
+         " WORLD",
+         "world",
+         " worlds",
+         "World",
+         " continents"
+        ],
+        [
+         " globe",
+         " WORLD",
+         " continents",
+         " worlds",
+         " nations"
+        ],
+        [
+         " globe",
+         " continents",
+         " WORLD",
+         " globally",
+         " global"
+        ],
+        [
+         " globe",
+         " continents",
+         " superpower",
+         " countries",
+         " nations"
+        ],
+        [
+         " continents",
+         " globe",
+         " superpower",
+         " world",
+         " worlds"
+        ],
+        [
+         " superpower",
+         " globe",
+         " continents",
+         " global",
+         " worldwide"
+        ],
+        [
+         " superpower",
+         " worldwide",
+         " global",
+         " globally",
+         " globe"
+        ],
+        [
+         " superpower",
+         " globe",
+         " renowned",
+         " world",
+         " superstar"
+        ],
+        [
+         " superpower",
+         " champion",
+         " nation",
+         " renowned",
+         " country"
+        ],
+        [
+         " superpower",
+         " leader",
+         " champion",
+         " famous",
+         " capitals"
+        ],
+        [
+         "'s",
+         " leader",
+         " capital",
+         " headquarters",
+         " champion"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " world"
+    },
+    {
+     "channel": null,
+     "id": 338,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 8,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.1294,
+         0.1016,
+         0.0894,
+         0.0712,
+         0.0581
+        ],
+        [
+         0.7421,
+         0.0695,
+         0.0369,
+         0.0278,
+         0.0212
+        ],
+        [
+         0.2322,
+         0.2107,
+         0.0655,
+         0.0564,
+         0.0561
+        ],
+        [
+         0.5154,
+         0.046,
+         0.0255,
+         0.0216,
+         0.0211
+        ],
+        [
+         0.3877,
+         0.175,
+         0.053,
+         0.0401,
+         0.0374
+        ],
+        [
+         0.3013,
+         0.1672,
+         0.1284,
+         0.0609,
+         0.0554
+        ],
+        [
+         0.5883,
+         0.2203,
+         0.0349,
+         0.0283,
+         0.0221
+        ],
+        [
+         0.9191,
+         0.073,
+         0.0025,
+         0.0015,
+         0.0011
+        ],
+        [
+         0.896,
+         0.0612,
+         0.0145,
+         0.014,
+         0.0045
+        ],
+        [
+         0.4155,
+         0.1569,
+         0.1518,
+         0.0786,
+         0.0683
+        ],
+        [
+         0.71,
+         0.0703,
+         0.0648,
+         0.0315,
+         0.0298
+        ],
+        [
+         0.3509,
+         0.1547,
+         0.1253,
+         0.0633,
+         0.0245
+        ]
+       ],
+       "top_tokens": [
+        [
+         " tremend",
+         "avorite",
+         "ModLoader",
+         " FANT",
+         " enthusi"
+        ],
+        [
+         " glim",
+         " enthusi",
+         "ModLoader",
+         " ingred",
+         " mathemat"
+        ],
+        [
+         " glim",
+         "Scroll",
+         "ometimes",
+         "ModLoader",
+         " tremend"
+        ],
+        [
+         " continents",
+         " globally",
+         " showc",
+         " internationally",
+         " globe"
+        ],
+        [
+         " continents",
+         " showc",
+         " continent",
+         " nodd",
+         " fastest"
+        ],
+        [
+         " fastest",
+         " continents",
+         " superpower",
+         " continent",
+         " industrialized"
+        ],
+        [
+         " superpower",
+         " tallest",
+         " oceans",
+         " continents",
+         " fastest"
+        ],
+        [
+         " superpower",
+         " tallest",
+         " fastest",
+         " largest",
+         " globally"
+        ],
+        [
+         " superpower",
+         " tallest",
+         " largest",
+         " richest",
+         " hottest"
+        ],
+        [
+         " largest",
+         " richest",
+         " deadliest",
+         " tallest",
+         " superpower"
+        ],
+        [
+         " largest",
+         " busiest",
+         " richest",
+         " biggest",
+         " oldest"
+        ],
+        [
+         " largest",
+         " biggest",
+         " most",
+         " second",
+         " oldest"
+        ]
+       ],
+       "type": "JACOBIAN_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": "'s"
+    }
+   ]
+  }
+ },
+ "lens_logit": {
+  "digest": "e0ef7b6cebcb2626",
+  "response": {
+   "done": {
+    "completion": " now home to",
+    "kind": "done",
+    "prompt_len": 6,
+    "seq_len": 9,
+    "vocab_size": 50257
+   },
+   "meta": {
+    "kind": "meta",
+    "layers_by_type": {
+     "LOGIT_LENS": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ]
+    },
+    "model": "openai-community/gpt2",
+    "num_completion_tokens": 3,
+    "oracle_layers": [],
+    "prepend_bos": true,
+    "prompt_len": 6,
+    "reuse_len": 0,
+    "temperature": 0.0,
+    "top_n": 5,
+    "types": [
+     "LOGIT_LENS"
+    ]
+   },
+   "tokens": [
+    {
+     "channel": null,
+     "id": 50256,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 0,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0206,
+         0.0069,
+         0.0065,
+         0.0065,
+         0.0065
+        ],
+        [
+         0.0387,
+         0.0281,
+         0.0173,
+         0.0169,
+         0.0152
+        ],
+        [
+         0.0256,
+         0.018,
+         0.0133,
+         0.013,
+         0.0107
+        ],
+        [
+         0.0258,
+         0.0181,
+         0.0134,
+         0.0131,
+         0.0108
+        ],
+        [
+         0.0257,
+         0.0179,
+         0.0134,
+         0.013,
+         0.0107
+        ],
+        [
+         0.0252,
+         0.0177,
+         0.0132,
+         0.0128,
+         0.0106
+        ],
+        [
+         0.025,
+         0.0176,
+         0.0131,
+         0.0127,
+         0.0105
+        ],
+        [
+         0.0249,
+         0.0176,
+         0.0131,
+         0.0127,
+         0.0105
+        ],
+        [
+         0.0248,
+         0.0177,
+         0.0131,
+         0.0128,
+         0.0106
+        ],
+        [
+         0.0249,
+         0.0178,
+         0.0131,
+         0.0129,
+         0.0106
+        ],
+        [
+         0.025,
+         0.0181,
+         0.0132,
+         0.0131,
+         0.0107
+        ],
+        [
+         0.0623,
+         0.0377,
+         0.0194,
+         0.0183,
+         0.0116
+        ]
+       ],
+       "top_tokens": [
+        [
+         "The",
+         "Share",
+         "This",
+         "G",
+         "I"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         "\n",
+         "The",
+         "A",
+         "I",
+         "In"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "<|endoftext|>"
+    },
+    {
+     "channel": null,
+     "id": 464,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 1,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0634,
+         0.0312,
+         0.0201,
+         0.018,
+         0.0115
+        ],
+        [
+         0.1391,
+         0.0446,
+         0.0231,
+         0.0225,
+         0.0171
+        ],
+        [
+         0.2209,
+         0.0479,
+         0.0272,
+         0.024,
+         0.0214
+        ],
+        [
+         0.1754,
+         0.0509,
+         0.0454,
+         0.0353,
+         0.0237
+        ],
+        [
+         0.1625,
+         0.1015,
+         0.0776,
+         0.0236,
+         0.0228
+        ],
+        [
+         0.4677,
+         0.1773,
+         0.0475,
+         0.0387,
+         0.0173
+        ],
+        [
+         0.5889,
+         0.0753,
+         0.0627,
+         0.0579,
+         0.0241
+        ],
+        [
+         0.5737,
+         0.0971,
+         0.0495,
+         0.0393,
+         0.0371
+        ],
+        [
+         0.3951,
+         0.0772,
+         0.07,
+         0.0419,
+         0.0391
+        ],
+        [
+         0.3175,
+         0.0503,
+         0.0474,
+         0.0157,
+         0.0142
+        ],
+        [
+         0.0179,
+         0.0155,
+         0.0141,
+         0.0122,
+         0.0109
+        ],
+        [
+         0.01,
+         0.0087,
+         0.0081,
+         0.0063,
+         0.0055
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ories",
+         " first",
+         " world",
+         " latest",
+         " most"
+        ],
+        [
+         " latest",
+         " first",
+         "ories",
+         " Last",
+         " following"
+        ],
+        [
+         " latest",
+         "ories",
+         " Week",
+         " Official",
+         " Latest"
+        ],
+        [
+         " latest",
+         " Latest",
+         "resa",
+         " Week",
+         "ories"
+        ],
+        [
+         "resa",
+         " Latest",
+         " latest",
+         " Bottom",
+         " Last"
+        ],
+        [
+         "resa",
+         " Latest",
+         " latest",
+         "oret",
+         " following"
+        ],
+        [
+         "resa",
+         " Latest",
+         " following",
+         " latest",
+         "oret"
+        ],
+        [
+         "resa",
+         " following",
+         " Latest",
+         "oret",
+         " latest"
+        ],
+        [
+         "resa",
+         " following",
+         " latest",
+         " Latest",
+         "oret"
+        ],
+        [
+         "resa",
+         " latest",
+         " following",
+         "oret",
+         " Latest"
+        ],
+        [
+         " following",
+         " first",
+         " latest",
+         "resa",
+         " U"
+        ],
+        [
+         " first",
+         " U",
+         " following",
+         " United",
+         " US"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "The"
+    },
+    {
+     "channel": null,
+     "id": 3139,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 2,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.9985,
+         0.0002,
+         0.0001,
+         0.0001,
+         0.0001
+        ],
+        [
+         0.9985,
+         0.0006,
+         0.0002,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.9962,
+         0.0018,
+         0.0008,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.9592,
+         0.0308,
+         0.0054,
+         0.0015,
+         0.0003
+        ],
+        [
+         0.4366,
+         0.248,
+         0.1835,
+         0.0105,
+         0.0097
+        ],
+        [
+         0.5411,
+         0.172,
+         0.1114,
+         0.0196,
+         0.0178
+        ],
+        [
+         0.8343,
+         0.0803,
+         0.0206,
+         0.0083,
+         0.0067
+        ],
+        [
+         0.8643,
+         0.0435,
+         0.0242,
+         0.0108,
+         0.007
+        ],
+        [
+         0.901,
+         0.0172,
+         0.0105,
+         0.0073,
+         0.0062
+        ],
+        [
+         0.925,
+         0.018,
+         0.0097,
+         0.0061,
+         0.0028
+        ],
+        [
+         0.7604,
+         0.0273,
+         0.0272,
+         0.0178,
+         0.0164
+        ],
+        [
+         0.1779,
+         0.1401,
+         0.0948,
+         0.0558,
+         0.0385
+        ]
+       ],
+       "top_tokens": [
+        [
+         " capital",
+         " city",
+         " claw",
+         " capitals",
+         " punishment"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " penalty",
+         " attack"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " penalty",
+         " reward"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " ship",
+         " attack"
+        ],
+        [
+         " capital",
+         " city",
+         " punishment",
+         " planning",
+         " ship"
+        ],
+        [
+         " city",
+         " capital",
+         " punishment",
+         " planning",
+         " cities"
+        ],
+        [
+         " city",
+         " capital",
+         " cities",
+         " metropolitan",
+         " punishment"
+        ],
+        [
+         " city",
+         " capital",
+         " cities",
+         " of",
+         " markets"
+        ],
+        [
+         " city",
+         " cities",
+         " of",
+         " capital",
+         "ised"
+        ],
+        [
+         " city",
+         " cities",
+         " is",
+         " has",
+         " of"
+        ],
+        [
+         " city",
+         " of",
+         " has",
+         " cities",
+         " is"
+        ],
+        [
+         " of",
+         " city",
+         " has",
+         " is",
+         " was"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " capital"
+    },
+    {
+     "channel": null,
+     "id": 286,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 3,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.7551,
+         0.0327,
+         0.0289,
+         0.0128,
+         0.0118
+        ],
+        [
+         0.8368,
+         0.0468,
+         0.0129,
+         0.0086,
+         0.0083
+        ],
+        [
+         0.7091,
+         0.1863,
+         0.0118,
+         0.0102,
+         0.0056
+        ],
+        [
+         0.8135,
+         0.0541,
+         0.0182,
+         0.0123,
+         0.0051
+        ],
+        [
+         0.8465,
+         0.0311,
+         0.0122,
+         0.0122,
+         0.0052
+        ],
+        [
+         0.5862,
+         0.0342,
+         0.028,
+         0.0171,
+         0.0154
+        ],
+        [
+         0.163,
+         0.1471,
+         0.0707,
+         0.052,
+         0.0481
+        ],
+        [
+         0.1679,
+         0.1532,
+         0.0933,
+         0.091,
+         0.0391
+        ],
+        [
+         0.1501,
+         0.1213,
+         0.0843,
+         0.064,
+         0.047
+        ],
+        [
+         0.1093,
+         0.0615,
+         0.0594,
+         0.0522,
+         0.0478
+        ],
+        [
+         0.1027,
+         0.0384,
+         0.0318,
+         0.0302,
+         0.0289
+        ],
+        [
+         0.1302,
+         0.0208,
+         0.0175,
+         0.0173,
+         0.0155
+        ]
+       ],
+       "top_tokens": [
+        [
+         " the",
+         " course",
+         " a",
+         " our",
+         " this"
+        ],
+        [
+         " the",
+         " course",
+         " a",
+         " its",
+         " our"
+        ],
+        [
+         " the",
+         " course",
+         " our",
+         " a",
+         " its"
+        ],
+        [
+         " the",
+         " course",
+         " our",
+         " Hope",
+         " China"
+        ],
+        [
+         " the",
+         " our",
+         " its",
+         " popular",
+         " a"
+        ],
+        [
+         " the",
+         " British",
+         " Pennsylvania",
+         " our",
+         " Texas"
+        ],
+        [
+         " Pennsylvania",
+         " the",
+         " Georgia",
+         " South",
+         " Texas"
+        ],
+        [
+         " British",
+         " the",
+         " South",
+         " North",
+         " China"
+        ],
+        [
+         " South",
+         " North",
+         " the",
+         " China",
+         " Canada"
+        ],
+        [
+         " China",
+         " India",
+         " South",
+         " Germany",
+         " Ukraine"
+        ],
+        [
+         " the",
+         " India",
+         " Israel",
+         " Ukraine",
+         " Romania"
+        ],
+        [
+         " the",
+         " Ukraine",
+         " Kazakhstan",
+         " India",
+         " Israel"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " of"
+    },
+    {
+     "channel": null,
+     "id": 4881,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 4,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.1733,
+         0.0829,
+         0.0393,
+         0.026,
+         0.022
+        ],
+        [
+         0.0914,
+         0.063,
+         0.0617,
+         0.0176,
+         0.0146
+        ],
+        [
+         0.0541,
+         0.0296,
+         0.0161,
+         0.013,
+         0.0119
+        ],
+        [
+         0.0143,
+         0.0099,
+         0.0083,
+         0.0064,
+         0.0061
+        ],
+        [
+         0.0113,
+         0.0062,
+         0.0048,
+         0.0047,
+         0.003
+        ],
+        [
+         0.0293,
+         0.0057,
+         0.0055,
+         0.0034,
+         0.0025
+        ],
+        [
+         0.0226,
+         0.006,
+         0.0054,
+         0.002,
+         0.0017
+        ],
+        [
+         0.0511,
+         0.0442,
+         0.0362,
+         0.0032,
+         0.0018
+        ],
+        [
+         0.0767,
+         0.0533,
+         0.0366,
+         0.0056,
+         0.005
+        ],
+        [
+         0.1718,
+         0.1297,
+         0.0122,
+         0.0076,
+         0.0028
+        ],
+        [
+         0.4521,
+         0.2546,
+         0.0142,
+         0.0105,
+         0.0103
+        ],
+        [
+         0.196,
+         0.192,
+         0.1918,
+         0.0351,
+         0.0339
+        ]
+       ],
+       "top_tokens": [
+        [
+         " France",
+         " Marse",
+         " Connection",
+         " Press",
+         " and"
+        ],
+        [
+         " Connection",
+         " France",
+         " Press",
+         " Marse",
+         " Telecom"
+        ],
+        [
+         " Press",
+         " Connection",
+         " and",
+         " Telecom",
+         " Boss"
+        ],
+        [
+         " Alps",
+         " Press",
+         " Ant",
+         " L",
+         " National"
+        ],
+        [
+         " and",
+         " Press",
+         " Alps",
+         " Telecom",
+         " National"
+        ],
+        [
+         " and",
+         " Press",
+         " has",
+         " is",
+         " Telecom"
+        ],
+        [
+         " and",
+         " has",
+         " is",
+         " today",
+         "men"
+        ],
+        [
+         " has",
+         " is",
+         " and",
+         " was",
+         " today"
+        ],
+        [
+         " is",
+         " has",
+         " and",
+         " France",
+         " today"
+        ],
+        [
+         " is",
+         " has",
+         " and",
+         " was",
+         " will"
+        ],
+        [
+         " has",
+         " is",
+         " was",
+         " and",
+         " will"
+        ],
+        [
+         ",",
+         " has",
+         " is",
+         " and",
+         " was"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " France"
+    },
+    {
+     "channel": null,
+     "id": 318,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 5,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.3841,
+         0.1401,
+         0.08,
+         0.0783,
+         0.0306
+        ],
+        [
+         0.3371,
+         0.2925,
+         0.1156,
+         0.0604,
+         0.028
+        ],
+        [
+         0.4714,
+         0.1763,
+         0.0733,
+         0.0681,
+         0.0658
+        ],
+        [
+         0.5579,
+         0.1333,
+         0.098,
+         0.0723,
+         0.0256
+        ],
+        [
+         0.6532,
+         0.0975,
+         0.0442,
+         0.0339,
+         0.033
+        ],
+        [
+         0.6724,
+         0.1144,
+         0.0468,
+         0.0329,
+         0.0258
+        ],
+        [
+         0.5502,
+         0.1843,
+         0.0616,
+         0.0311,
+         0.0175
+        ],
+        [
+         0.7409,
+         0.0485,
+         0.0424,
+         0.041,
+         0.0245
+        ],
+        [
+         0.5739,
+         0.0491,
+         0.0467,
+         0.0423,
+         0.0346
+        ],
+        [
+         0.333,
+         0.0406,
+         0.0315,
+         0.0303,
+         0.0274
+        ],
+        [
+         0.2035,
+         0.0271,
+         0.0248,
+         0.0246,
+         0.024
+        ],
+        [
+         0.0475,
+         0.0374,
+         0.0355,
+         0.0309,
+         0.027
+        ]
+       ],
+       "top_tokens": [
+        [
+         " not",
+         " now",
+         " still",
+         " also",
+         " a"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " currently",
+         " still"
+        ],
+        [
+         " now",
+         " not",
+         " currently",
+         " also",
+         " still"
+        ],
+        [
+         " now",
+         " not",
+         " still",
+         " currently",
+         " also"
+        ],
+        [
+         " now",
+         " not",
+         " officially",
+         " still",
+         " also"
+        ],
+        [
+         " now",
+         " not",
+         " still",
+         " officially",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " officially",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " still",
+         " currently",
+         " facing",
+         " set"
+        ],
+        [
+         " now",
+         " still",
+         " facing",
+         " a",
+         " currently"
+        ],
+        [
+         " now",
+         " the",
+         " a",
+         " home",
+         " in"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " is"
+    },
+    {
+     "channel": null,
+     "id": 783,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 6,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.5585,
+         0.0821,
+         0.042,
+         0.0169,
+         0.0146
+        ],
+        [
+         0.9021,
+         0.0358,
+         0.0298,
+         0.0036,
+         0.0031
+        ],
+        [
+         0.7237,
+         0.1458,
+         0.0536,
+         0.0142,
+         0.0045
+        ],
+        [
+         0.3816,
+         0.3431,
+         0.0929,
+         0.0294,
+         0.0182
+        ],
+        [
+         0.7373,
+         0.1236,
+         0.0202,
+         0.0105,
+         0.0097
+        ],
+        [
+         0.7347,
+         0.1418,
+         0.0145,
+         0.0078,
+         0.0073
+        ],
+        [
+         0.8889,
+         0.0323,
+         0.0064,
+         0.0052,
+         0.0051
+        ],
+        [
+         0.9498,
+         0.0063,
+         0.0038,
+         0.0025,
+         0.0023
+        ],
+        [
+         0.7833,
+         0.0682,
+         0.0134,
+         0.0084,
+         0.0083
+        ],
+        [
+         0.3447,
+         0.1132,
+         0.0452,
+         0.0407,
+         0.0378
+        ],
+        [
+         0.0823,
+         0.0716,
+         0.0513,
+         0.0392,
+         0.0325
+        ],
+        [
+         0.1114,
+         0.0642,
+         0.0549,
+         0.0357,
+         0.0345
+        ]
+       ],
+       "top_tokens": [
+        [
+         "adays",
+         " known",
+         " officially",
+         " now",
+         " obsolete"
+        ],
+        [
+         "adays",
+         " known",
+         " officially",
+         " heading",
+         " obsolete"
+        ],
+        [
+         "adays",
+         " officially",
+         " known",
+         " heading",
+         " firmly"
+        ],
+        [
+         " officially",
+         " known",
+         "adays",
+         " available",
+         " heading"
+        ],
+        [
+         " officially",
+         " known",
+         "adays",
+         " called",
+         "here"
+        ],
+        [
+         " officially",
+         " known",
+         " called",
+         " firmly",
+         "here"
+        ],
+        [
+         " officially",
+         " known",
+         " largely",
+         " part",
+         " ruled"
+        ],
+        [
+         " officially",
+         " known",
+         " firmly",
+         " ruled",
+         " a"
+        ],
+        [
+         " officially",
+         " known",
+         " a",
+         " firmly",
+         " embroiled"
+        ],
+        [
+         " officially",
+         " known",
+         " a",
+         " occupied",
+         " facing"
+        ],
+        [
+         " home",
+         " a",
+         " the",
+         " known",
+         " facing"
+        ],
+        [
+         " home",
+         " the",
+         " a",
+         " in",
+         " under"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " now"
+    },
+    {
+     "channel": null,
+     "id": 1363,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 7,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.2589,
+         0.2374,
+         0.1706,
+         0.0371,
+         0.0185
+        ],
+        [
+         0.2758,
+         0.2125,
+         0.2031,
+         0.121,
+         0.0216
+        ],
+        [
+         0.7932,
+         0.0824,
+         0.0195,
+         0.0179,
+         0.0158
+        ],
+        [
+         0.942,
+         0.0165,
+         0.0045,
+         0.0036,
+         0.0029
+        ],
+        [
+         0.6331,
+         0.2368,
+         0.0135,
+         0.012,
+         0.0105
+        ],
+        [
+         0.799,
+         0.0742,
+         0.0189,
+         0.0068,
+         0.0052
+        ],
+        [
+         0.6529,
+         0.2538,
+         0.023,
+         0.0042,
+         0.0029
+        ],
+        [
+         0.4703,
+         0.4065,
+         0.0306,
+         0.0143,
+         0.0056
+        ],
+        [
+         0.9574,
+         0.0158,
+         0.0075,
+         0.0059,
+         0.002
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9992,
+         0.0003,
+         0.0002,
+         0.0,
+         0.0
+        ],
+        [
+         0.9976,
+         0.0009,
+         0.0002,
+         0.0001,
+         0.0001
+        ]
+       ],
+       "top_tokens": [
+        [
+         " home",
+         "home",
+         " Home",
+         " speaker",
+         " computer"
+        ],
+        [
+         " Home",
+         "coming",
+         " home",
+         "home",
+         "brew"
+        ],
+        [
+         "coming",
+         "brew",
+         " Home",
+         "grown",
+         "home"
+        ],
+        [
+         "coming",
+         "grown",
+         "brew",
+         "ported",
+         " Home"
+        ],
+        [
+         "grown",
+         "coming",
+         " home",
+         " Home",
+         "minist"
+        ],
+        [
+         "grown",
+         "coming",
+         " home",
+         "brew",
+         " Home"
+        ],
+        [
+         "grown",
+         "coming",
+         "brew",
+         "bed",
+         " home"
+        ],
+        [
+         "grown",
+         "coming",
+         "brew",
+         " to",
+         "rox"
+        ],
+        [
+         " to",
+         "grown",
+         "coming",
+         "ported",
+         " for"
+        ],
+        [
+         " to",
+         "to",
+         " for",
+         " of",
+         " again"
+        ],
+        [
+         " to",
+         " of",
+         " for",
+         " again",
+         " in"
+        ],
+        [
+         " to",
+         " of",
+         " for",
+         " not",
+         " again"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " home"
+    },
+    {
+     "channel": null,
+     "id": 284,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 8,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0958,
+         0.0692,
+         0.0635,
+         0.0435,
+         0.0413
+        ],
+        [
+         0.0884,
+         0.0689,
+         0.0677,
+         0.0646,
+         0.0467
+        ],
+        [
+         0.0676,
+         0.0616,
+         0.0486,
+         0.0475,
+         0.0464
+        ],
+        [
+         0.3598,
+         0.0552,
+         0.0292,
+         0.0268,
+         0.0158
+        ],
+        [
+         0.382,
+         0.1667,
+         0.0535,
+         0.0449,
+         0.0432
+        ],
+        [
+         0.2162,
+         0.2142,
+         0.0979,
+         0.0752,
+         0.0332
+        ],
+        [
+         0.2801,
+         0.1562,
+         0.1185,
+         0.0615,
+         0.047
+        ],
+        [
+         0.3444,
+         0.1456,
+         0.1011,
+         0.094,
+         0.0656
+        ],
+        [
+         0.2948,
+         0.1732,
+         0.1223,
+         0.1079,
+         0.0687
+        ],
+        [
+         0.167,
+         0.166,
+         0.1462,
+         0.1182,
+         0.1022
+        ],
+        [
+         0.3047,
+         0.1218,
+         0.0747,
+         0.0522,
+         0.0474
+        ],
+        [
+         0.1425,
+         0.1366,
+         0.0627,
+         0.047,
+         0.0332
+        ]
+       ],
+       "top_tokens": [
+        [
+         " get",
+         " be",
+         " make",
+         " give",
+         " keep"
+        ],
+        [
+         " get",
+         " make",
+         " be",
+         " avoid",
+         " keep"
+        ],
+        [
+         " collect",
+         " be",
+         " celebrate",
+         " get",
+         " avoid"
+        ],
+        [
+         " the",
+         " a",
+         " collect",
+         " many",
+         " keep"
+        ],
+        [
+         " the",
+         " a",
+         " many",
+         " several",
+         " an"
+        ],
+        [
+         " many",
+         " the",
+         " a",
+         " several",
+         " two"
+        ],
+        [
+         " a",
+         " the",
+         " many",
+         " an",
+         " several"
+        ],
+        [
+         " a",
+         " the",
+         " many",
+         " several",
+         " an"
+        ],
+        [
+         " a",
+         " the",
+         " many",
+         " several",
+         " some"
+        ],
+        [
+         " a",
+         " dozens",
+         " several",
+         " many",
+         " thousands"
+        ],
+        [
+         " a",
+         " the",
+         " some",
+         " hundreds",
+         " thousands"
+        ],
+        [
+         " the",
+         " a",
+         " more",
+         " some",
+         " one"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " to"
+    }
+   ]
+  }
+ },
+ "lens_logit_steered": {
+  "digest": "138f9b28fdb9b20d",
+  "response": {
+   "done": {
+    "completion": " Paris, and",
+    "kind": "done",
+    "prompt_len": 6,
+    "seq_len": 9,
+    "vocab_size": 50257
+   },
+   "meta": {
+    "kind": "meta",
+    "layers_by_type": {
+     "LOGIT_LENS": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+     ]
+    },
+    "model": "openai-community/gpt2",
+    "num_completion_tokens": 3,
+    "oracle_layers": [],
+    "prepend_bos": true,
+    "prompt_len": 6,
+    "reuse_len": 0,
+    "temperature": 0.0,
+    "top_n": 5,
+    "types": [
+     "LOGIT_LENS"
+    ]
+   },
+   "tokens": [
+    {
+     "channel": null,
+     "id": 50256,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 0,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0206,
+         0.0069,
+         0.0065,
+         0.0065,
+         0.0065
+        ],
+        [
+         0.0387,
+         0.0281,
+         0.0173,
+         0.0169,
+         0.0152
+        ],
+        [
+         0.0256,
+         0.018,
+         0.0133,
+         0.013,
+         0.0107
+        ],
+        [
+         0.0258,
+         0.0181,
+         0.0134,
+         0.0131,
+         0.0108
+        ],
+        [
+         0.0257,
+         0.0179,
+         0.0134,
+         0.013,
+         0.0107
+        ],
+        [
+         0.0252,
+         0.0177,
+         0.0132,
+         0.0128,
+         0.0106
+        ],
+        [
+         0.025,
+         0.0176,
+         0.0131,
+         0.0127,
+         0.0105
+        ],
+        [
+         0.0249,
+         0.0176,
+         0.0131,
+         0.0127,
+         0.0105
+        ],
+        [
+         0.0248,
+         0.0177,
+         0.0131,
+         0.0128,
+         0.0106
+        ],
+        [
+         0.0249,
+         0.0178,
+         0.0131,
+         0.0129,
+         0.0106
+        ],
+        [
+         0.025,
+         0.0181,
+         0.0132,
+         0.0131,
+         0.0107
+        ],
+        [
+         0.0623,
+         0.0377,
+         0.0194,
+         0.0183,
+         0.0116
+        ]
+       ],
+       "top_tokens": [
+        [
+         "The",
+         "Share",
+         "This",
+         "G",
+         "I"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         " the",
+         " and",
+         " a",
+         " in",
+         " to"
+        ],
+        [
+         "\n",
+         "The",
+         "A",
+         "I",
+         "In"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "<|endoftext|>"
+    },
+    {
+     "channel": null,
+     "id": 464,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 1,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.0634,
+         0.0312,
+         0.0201,
+         0.018,
+         0.0115
+        ],
+        [
+         0.1391,
+         0.0446,
+         0.0231,
+         0.0225,
+         0.0171
+        ],
+        [
+         0.2209,
+         0.0479,
+         0.0272,
+         0.024,
+         0.0214
+        ],
+        [
+         0.1754,
+         0.0509,
+         0.0454,
+         0.0353,
+         0.0237
+        ],
+        [
+         0.1625,
+         0.1015,
+         0.0776,
+         0.0236,
+         0.0228
+        ],
+        [
+         0.4677,
+         0.1773,
+         0.0475,
+         0.0387,
+         0.0173
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9994,
+         0.0006,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9996,
+         0.0004,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9998,
+         0.0001,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9994,
+         0.0003,
+         0.0002,
+         0.0,
+         0.0
+        ],
+        [
+         0.5589,
+         0.0087,
+         0.0028,
+         0.002,
+         0.002
+        ]
+       ],
+       "top_tokens": [
+        [
+         "ories",
+         " first",
+         " world",
+         " latest",
+         " most"
+        ],
+        [
+         " latest",
+         " first",
+         "ories",
+         " Last",
+         " following"
+        ],
+        [
+         " latest",
+         "ories",
+         " Week",
+         " Official",
+         " Latest"
+        ],
+        [
+         " latest",
+         " Latest",
+         "resa",
+         " Week",
+         "ories"
+        ],
+        [
+         "resa",
+         " Latest",
+         " latest",
+         " Bottom",
+         " Last"
+        ],
+        [
+         "resa",
+         " Latest",
+         " latest",
+         "oret",
+         " following"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " Copenhagen",
+         " Marse",
+         " Geneva"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " Copenhagen",
+         " Berlin",
+         " French"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " Copenhagen",
+         " French",
+         " Berlin"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " French",
+         " Berlin",
+         " Copenhagen"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " French",
+         " France",
+         " Berlin"
+        ],
+        [
+         " Paris",
+         " French",
+         " Tour",
+         " first",
+         " world"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": "The"
+    },
+    {
+     "channel": null,
+     "id": 3139,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 2,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.9985,
+         0.0002,
+         0.0001,
+         0.0001,
+         0.0001
+        ],
+        [
+         0.9985,
+         0.0006,
+         0.0002,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.9962,
+         0.0018,
+         0.0008,
+         0.0002,
+         0.0001
+        ],
+        [
+         0.9592,
+         0.0308,
+         0.0054,
+         0.0015,
+         0.0003
+        ],
+        [
+         0.4366,
+         0.248,
+         0.1835,
+         0.0105,
+         0.0097
+        ],
+        [
+         0.5411,
+         0.172,
+         0.1114,
+         0.0196,
+         0.0178
+        ],
+        [
+         0.9999,
+         0.0001,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9998,
+         0.0002,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9997,
+         0.0003,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9999,
+         0.0001,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9995,
+         0.0005,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.923,
+         0.0415,
+         0.0017,
+         0.0007,
+         0.0006
+        ]
+       ],
+       "top_tokens": [
+        [
+         " capital",
+         " city",
+         " claw",
+         " capitals",
+         " punishment"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " penalty",
+         " attack"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " penalty",
+         " reward"
+        ],
+        [
+         " capital",
+         " punishment",
+         " city",
+         " ship",
+         " attack"
+        ],
+        [
+         " capital",
+         " city",
+         " punishment",
+         " planning",
+         " ship"
+        ],
+        [
+         " city",
+         " capital",
+         " punishment",
+         " planning",
+         " cities"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " Copenhagen",
+         " Lisbon",
+         " Cologne"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " Copenhagen",
+         " France",
+         " Berlin"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Berlin",
+         " Copenhagen"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Brussels",
+         " Berlin"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Brussels",
+         " Berlin"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " of",
+         "y",
+         "an"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " capital"
+    },
+    {
+     "channel": null,
+     "id": 286,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 3,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.7551,
+         0.0327,
+         0.0289,
+         0.0128,
+         0.0118
+        ],
+        [
+         0.8368,
+         0.0468,
+         0.0129,
+         0.0086,
+         0.0083
+        ],
+        [
+         0.7091,
+         0.1863,
+         0.0118,
+         0.0102,
+         0.0056
+        ],
+        [
+         0.8135,
+         0.0541,
+         0.0182,
+         0.0123,
+         0.0051
+        ],
+        [
+         0.8465,
+         0.0311,
+         0.0122,
+         0.0122,
+         0.0052
+        ],
+        [
+         0.5862,
+         0.0342,
+         0.028,
+         0.0171,
+         0.0154
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9999,
+         0.0001,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9515,
+         0.0059,
+         0.0045,
+         0.0036,
+         0.002
+        ]
+       ],
+       "top_tokens": [
+        [
+         " the",
+         " course",
+         " a",
+         " our",
+         " this"
+        ],
+        [
+         " the",
+         " course",
+         " a",
+         " its",
+         " our"
+        ],
+        [
+         " the",
+         " course",
+         " our",
+         " a",
+         " its"
+        ],
+        [
+         " the",
+         " course",
+         " our",
+         " Hope",
+         " China"
+        ],
+        [
+         " the",
+         " our",
+         " its",
+         " popular",
+         " a"
+        ],
+        [
+         " the",
+         " British",
+         " Pennsylvania",
+         " our",
+         " Texas"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " Copenhagen",
+         " France",
+         " Brussels"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Copenhagen",
+         " Berlin"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Berlin",
+         " Copenhagen"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Berlin",
+         " Brussels"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Berlin",
+         " Brussels"
+        ],
+        [
+         " Paris",
+         " Berlin",
+         " France",
+         "Paris",
+         " Marse"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " of"
+    },
+    {
+     "channel": null,
+     "id": 4881,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 4,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.1733,
+         0.0829,
+         0.0393,
+         0.026,
+         0.022
+        ],
+        [
+         0.0914,
+         0.063,
+         0.0617,
+         0.0176,
+         0.0146
+        ],
+        [
+         0.0541,
+         0.0296,
+         0.0161,
+         0.013,
+         0.0119
+        ],
+        [
+         0.0143,
+         0.0099,
+         0.0083,
+         0.0064,
+         0.0061
+        ],
+        [
+         0.0113,
+         0.0062,
+         0.0048,
+         0.0047,
+         0.003
+        ],
+        [
+         0.0293,
+         0.0057,
+         0.0055,
+         0.0034,
+         0.0025
+        ],
+        [
+         1.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9998,
+         0.0002,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9989,
+         0.0011,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9985,
+         0.0015,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9674,
+         0.0326,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.8114,
+         0.013,
+         0.007,
+         0.005,
+         0.0047
+        ]
+       ],
+       "top_tokens": [
+        [
+         " France",
+         " Marse",
+         " Connection",
+         " Press",
+         " and"
+        ],
+        [
+         " Connection",
+         " France",
+         " Press",
+         " Marse",
+         " Telecom"
+        ],
+        [
+         " Press",
+         " Connection",
+         " and",
+         " Telecom",
+         " Boss"
+        ],
+        [
+         " Alps",
+         " Press",
+         " Ant",
+         " L",
+         " National"
+        ],
+        [
+         " and",
+         " Press",
+         " Alps",
+         " Telecom",
+         " National"
+        ],
+        [
+         " and",
+         " Press",
+         " has",
+         " is",
+         " Telecom"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Marse",
+         "France"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         "France",
+         " Marse"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Marse",
+         "France"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Marse",
+         " French"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         "France",
+         " Marse"
+        ],
+        [
+         "Paris",
+         "L",
+         "E",
+         "The",
+         "aut"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " France"
+    },
+    {
+     "channel": null,
+     "id": 318,
+     "is_char_continuation": false,
+     "is_generated": false,
+     "kind": "token",
+     "message_index": null,
+     "position": 5,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.3841,
+         0.1401,
+         0.08,
+         0.0783,
+         0.0306
+        ],
+        [
+         0.3371,
+         0.2925,
+         0.1156,
+         0.0604,
+         0.028
+        ],
+        [
+         0.4714,
+         0.1763,
+         0.0733,
+         0.0681,
+         0.0658
+        ],
+        [
+         0.5579,
+         0.1333,
+         0.098,
+         0.0723,
+         0.0256
+        ],
+        [
+         0.6532,
+         0.0975,
+         0.0442,
+         0.0339,
+         0.033
+        ],
+        [
+         0.6724,
+         0.1144,
+         0.0468,
+         0.0329,
+         0.0258
+        ],
+        [
+         0.9998,
+         0.0002,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9987,
+         0.0013,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9992,
+         0.0008,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9998,
+         0.0002,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9999,
+         0.0,
+         0.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.9871,
+         0.0031,
+         0.0021,
+         0.0004,
+         0.0004
+        ]
+       ],
+       "top_tokens": [
+        [
+         " not",
+         " now",
+         " still",
+         " also",
+         " a"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " still",
+         " currently"
+        ],
+        [
+         " now",
+         " not",
+         " also",
+         " currently",
+         " still"
+        ],
+        [
+         " now",
+         " not",
+         " currently",
+         " also",
+         " still"
+        ],
+        [
+         " now",
+         " not",
+         " still",
+         " currently",
+         " also"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " Copenhagen",
+         " France",
+         " Marse"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Copenhagen",
+         " Berlin"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " French",
+         " Copenhagen"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Marse",
+         " Brussels"
+        ],
+        [
+         " Paris",
+         "Paris",
+         " France",
+         " Marse",
+         " French"
+        ],
+        [
+         " Paris",
+         " to",
+         " France",
+         " Marse",
+         " a"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": null,
+     "section": null,
+     "token": " is"
+    },
+    {
+     "channel": null,
+     "id": 6342,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 6,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.695,
+         0.0876,
+         0.0554,
+         0.0493,
+         0.0091
+        ],
+        [
+         0.6183,
+         0.1236,
+         0.0921,
+         0.0611,
+         0.0154
+        ],
+        [
+         0.8638,
+         0.0572,
+         0.0337,
+         0.009,
+         0.0045
+        ],
+        [
+         0.7942,
+         0.1181,
+         0.0134,
+         0.0114,
+         0.011
+        ],
+        [
+         0.8759,
+         0.01,
+         0.0084,
+         0.0082,
+         0.0041
+        ],
+        [
+         0.6904,
+         0.0334,
+         0.0281,
+         0.0132,
+         0.013
+        ],
+        [
+         0.4316,
+         0.2231,
+         0.0189,
+         0.0151,
+         0.0127
+        ],
+        [
+         0.5102,
+         0.1034,
+         0.0368,
+         0.0115,
+         0.0066
+        ],
+        [
+         0.5287,
+         0.1655,
+         0.1173,
+         0.005,
+         0.0043
+        ],
+        [
+         0.4655,
+         0.288,
+         0.0715,
+         0.0042,
+         0.0037
+        ],
+        [
+         0.225,
+         0.1184,
+         0.0365,
+         0.0102,
+         0.0091
+        ],
+        [
+         0.3708,
+         0.0556,
+         0.0422,
+         0.0322,
+         0.0294
+        ]
+       ],
+       "top_tokens": [
+        [
+         " Paris",
+         " Hilton",
+         "ienne",
+         "mouth",
+         " attacks"
+        ],
+        [
+         " Hilton",
+         "mouth",
+         "ienne",
+         " Paris",
+         " attacks"
+        ],
+        [
+         " Hilton",
+         "mouth",
+         "ienne",
+         " Paris",
+         " Gas"
+        ],
+        [
+         " Hilton",
+         "ienne",
+         " de",
+         " Gas",
+         "mouth"
+        ],
+        [
+         " Hilton",
+         " de",
+         " Gas",
+         "mouth",
+         " City"
+        ],
+        [
+         " Hilton",
+         "ian",
+         " City",
+         "ians",
+         " Gas"
+        ],
+        [
+         " Hilton",
+         "ian",
+         "gard",
+         " City",
+         "ians"
+        ],
+        [
+         "ian",
+         "ians",
+         " Hilton",
+         " and",
+         "ites"
+        ],
+        [
+         "ian",
+         "ians",
+         " Hilton",
+         "ienne",
+         " and"
+        ],
+        [
+         "ian",
+         "ians",
+         " Hilton",
+         " and",
+         " suburbs"
+        ],
+        [
+         "ian",
+         "ians",
+         " and",
+         " has",
+         " is"
+        ],
+        [
+         ",",
+         " and",
+         "ian",
+         " is",
+         "ians"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " Paris"
+    },
+    {
+     "channel": null,
+     "id": 11,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 7,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.2801,
+         0.0551,
+         0.0471,
+         0.0262,
+         0.0238
+        ],
+        [
+         0.4155,
+         0.1025,
+         0.0414,
+         0.0375,
+         0.0331
+        ],
+        [
+         0.6977,
+         0.0505,
+         0.0425,
+         0.035,
+         0.0139
+        ],
+        [
+         0.7162,
+         0.0599,
+         0.0568,
+         0.0393,
+         0.0328
+        ],
+        [
+         0.914,
+         0.0174,
+         0.0125,
+         0.0071,
+         0.0065
+        ],
+        [
+         0.9725,
+         0.0178,
+         0.0046,
+         0.002,
+         0.0006
+        ],
+        [
+         0.9424,
+         0.0281,
+         0.0117,
+         0.0083,
+         0.0028
+        ],
+        [
+         0.4602,
+         0.4143,
+         0.0829,
+         0.01,
+         0.0059
+        ],
+        [
+         0.5726,
+         0.1906,
+         0.1876,
+         0.0105,
+         0.0091
+        ],
+        [
+         0.3694,
+         0.3376,
+         0.2429,
+         0.0106,
+         0.0077
+        ],
+        [
+         0.3009,
+         0.2976,
+         0.1536,
+         0.137,
+         0.025
+        ],
+        [
+         0.1752,
+         0.1116,
+         0.0841,
+         0.0795,
+         0.0642
+        ]
+       ],
+       "top_tokens": [
+        [
+         " which",
+         " and",
+         " although",
+         " the",
+         " but"
+        ],
+        [
+         " which",
+         " although",
+         " including",
+         " especially",
+         " but"
+        ],
+        [
+         " which",
+         " although",
+         " but",
+         " especially",
+         " however"
+        ],
+        [
+         " which",
+         " but",
+         " although",
+         " according",
+         " however"
+        ],
+        [
+         " which",
+         " but",
+         " where",
+         " according",
+         " although"
+        ],
+        [
+         " which",
+         " where",
+         " whose",
+         " but",
+         " according"
+        ],
+        [
+         " which",
+         " where",
+         " but",
+         " whose",
+         " although"
+        ],
+        [
+         " which",
+         " where",
+         " but",
+         " whose",
+         " birthplace"
+        ],
+        [
+         " where",
+         " but",
+         " which",
+         " and",
+         " whose"
+        ],
+        [
+         " which",
+         " but",
+         " where",
+         " and",
+         " whose"
+        ],
+        [
+         " but",
+         " where",
+         " and",
+         " which",
+         " the"
+        ],
+        [
+         " and",
+         " the",
+         " but",
+         " where",
+         " a"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": ","
+    },
+    {
+     "channel": null,
+     "id": 290,
+     "is_char_continuation": false,
+     "is_generated": true,
+     "kind": "token",
+     "message_index": null,
+     "position": 8,
+     "results": [
+      {
+       "top_probs": [
+        [
+         0.6698,
+         0.0559,
+         0.0515,
+         0.0293,
+         0.0188
+        ],
+        [
+         0.7438,
+         0.0563,
+         0.0422,
+         0.0338,
+         0.0152
+        ],
+        [
+         0.7508,
+         0.0825,
+         0.0585,
+         0.017,
+         0.0129
+        ],
+        [
+         0.6068,
+         0.2069,
+         0.0436,
+         0.0333,
+         0.0237
+        ],
+        [
+         0.3816,
+         0.2233,
+         0.0928,
+         0.0413,
+         0.0354
+        ],
+        [
+         0.3685,
+         0.1655,
+         0.1096,
+         0.0742,
+         0.0548
+        ],
+        [
+         0.6423,
+         0.1618,
+         0.0683,
+         0.0261,
+         0.0209
+        ],
+        [
+         0.3854,
+         0.1992,
+         0.1706,
+         0.0817,
+         0.0267
+        ],
+        [
+         0.5105,
+         0.1792,
+         0.0719,
+         0.0497,
+         0.029
+        ],
+        [
+         0.4157,
+         0.3033,
+         0.0628,
+         0.0548,
+         0.0357
+        ],
+        [
+         0.3868,
+         0.1592,
+         0.1145,
+         0.0338,
+         0.0209
+        ],
+        [
+         0.1271,
+         0.1022,
+         0.0631,
+         0.036,
+         0.0233
+        ]
+       ],
+       "top_tokens": [
+        [
+         " then",
+         " thus",
+         " therefore",
+         " possibly",
+         " especially"
+        ],
+        [
+         " then",
+         " possibly",
+         " therefore",
+         " thus",
+         " especially"
+        ],
+        [
+         " then",
+         " therefore",
+         " possibly",
+         " especially",
+         " perhaps"
+        ],
+        [
+         " then",
+         " therefore",
+         " possibly",
+         " consequently",
+         " thus"
+        ],
+        [
+         " then",
+         " therefore",
+         " possibly",
+         " perhaps",
+         " hence"
+        ],
+        [
+         " therefore",
+         " its",
+         " then",
+         " hence",
+         " thus"
+        ],
+        [
+         " its",
+         " therefore",
+         " hence",
+         " thus",
+         " it"
+        ],
+        [
+         " its",
+         " therefore",
+         " hence",
+         " thus",
+         " it"
+        ],
+        [
+         " its",
+         " it",
+         " although",
+         " there",
+         " hence"
+        ],
+        [
+         " its",
+         " it",
+         " there",
+         " although",
+         " the"
+        ],
+        [
+         " it",
+         " its",
+         " the",
+         " there",
+         " while"
+        ],
+        [
+         " the",
+         " it",
+         " its",
+         " Paris",
+         " in"
+        ]
+       ],
+       "type": "LOGIT_LENS"
+      }
+     ],
+     "role": "assistant",
+     "section": "content",
+     "token": " and"
+    }
+   ]
+  }
+ },
+ "steer_feature": {
+  "digest": "3b95b767e94f40e1",
+  "response": {
+   "outputs": [
+    {
+     "output": " now home to the world's largest,",
+     "type": "STEERED"
+    },
+    {
+     "output": " now home to the world's largest concentration",
+     "type": "DEFAULT"
+    }
+   ],
+   "sampling": {
+    "presencePenalty": 0.0,
+    "seed": 42,
+    "temperature": 0.0
+   }
+  }
+ },
+ "steer_vector": {
+  "digest": "8dff8662f54c282e",
+  "response": {
+   "outputs": [
+    {
+     "output": " a good a bad a bad a bad",
+     "type": "STEERED"
+    },
+    {
+     "output": " now home to the world's largest concentration",
+     "type": "DEFAULT"
+    }
+   ],
+   "sampling": {
+    "presencePenalty": 0.0,
+    "seed": 42,
+    "temperature": 0.0
+   }
+  }
+ },
+ "steer_vector_normalized": {
+  "digest": "82f0f4316f7f63f9",
+  "response": {
+   "outputs": [
+    {
+     "output": " a good a bad a bad a bad",
+     "type": "STEERED"
+    },
+    {
+     "output": " now home to the world's largest concentration",
+     "type": "DEFAULT"
+    }
+   ],
+   "sampling": {
+    "presencePenalty": 0.0,
+    "seed": 42,
+    "temperature": 0.0
+   }
+  }
+ },
+ "steer_vector_orthogonal": {
+  "digest": "49f4b9d0db03f266",
+  "response": {
+   "outputs": [
+    {
+     "output": " a must grow and grow and grow and",
+     "type": "STEERED"
+    },
+    {
+     "output": " now home to the world's largest concentration",
+     "type": "DEFAULT"
+    }
+   ],
+   "sampling": {
+    "presencePenalty": 0.0,
+    "seed": 42,
+    "temperature": 0.0
+   }
+  }
+ },
+ "tokenize": {
+  "digest": "f1989920c28c9c54",
+  "response": {
+   "prependBos": true,
+   "tokenStrings": [
+    "<|endoftext|>",
+    "The",
+    " capital",
+    " of",
+    " France",
+    " is"
+   ],
+   "tokens": [
+    50256,
+    464,
+    3139,
+    286,
+    4881,
+    318
+   ]
+  }
+ }
+}

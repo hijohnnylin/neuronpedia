@@ -23,7 +23,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
-from transformers import AutoTokenizer
 
 from neuronpedia_graph.chat_prompt import (
     learn_turn_delimiters,
@@ -187,16 +186,10 @@ if TYPE_CHECKING:
     # It cannot follow an environment variable into an import, so without this every use below --
     # each one already inside a matching `ATTRIBUTION_ENGINE` guard -- reads as possibly unbound.
     # At runtime only one of the two blocks below actually executes.
-    from circuit_tracer import attribute
-    from circuit_tracer.graph import prune_graph
     from circuit_tracer.replacement_model import ReplacementModel
-    from circuit_tracer.utils.create_graph_files import (
-        build_model,
-        create_nodes,
-        create_used_nodes_and_edges,
-    )
     from circuit_tracer.utils.salient_logits import compute_salient_logits
 
+    from neuronpedia_graph.circuit_tracer_graph import build_circuit_tracer_graph
     from neuronpedia_graph.crm_backend import (
         forward_pass_crm,
         generate_graph_crm,
@@ -204,15 +197,10 @@ if TYPE_CHECKING:
     )
 
 if ATTRIBUTION_ENGINE == "circuit-tracer":
-    from circuit_tracer import attribute
-    from circuit_tracer.graph import prune_graph
     from circuit_tracer.replacement_model import ReplacementModel
-    from circuit_tracer.utils.create_graph_files import (
-        build_model,
-        create_nodes,
-        create_used_nodes_and_edges,
-    )
     from circuit_tracer.utils.salient_logits import compute_salient_logits
+
+    from neuronpedia_graph.circuit_tracer_graph import build_circuit_tracer_graph
 elif ATTRIBUTION_ENGINE == "lm-saes-crm":
     from neuronpedia_graph.crm_backend import (
         forward_pass_crm,
@@ -1103,47 +1091,22 @@ async def generate_graph(req_data: GraphGenerationRequest):
 
             ct_prompt = ensure_bos_for_circuit_tracer(prompt)
 
-            attribution_start = time.time()
-            _graph = attribute(
+            _output_model, attribution_time_ms = build_circuit_tracer_graph(
                 ct_prompt,
                 model,
+                np_model_id=hf_model_id_to_np_model_id()[requested_model_id],
+                slug=slug_identifier,
                 max_n_logits=max_n_logits,
                 desired_logit_prob=desired_logit_prob,
                 batch_size=batch_size,
                 max_feature_nodes=req_data.max_feature_nodes,
+                node_threshold=node_threshold,
+                edge_threshold=edge_threshold,
+                device=get_device(),
                 offload=OFFLOAD,
                 update_interval=UPDATE_INTERVAL,
             )
-            attribution_time_ms = (time.time() - attribution_start) * 1000
             print(f"Thread {threading.get_ident()} (worker): Attribution Time: {attribution_time_ms:.2f}ms")
-
-            _graph.to(get_device())
-
-            _node_mask, _edge_mask, _cumulative_scores = (
-                el.cpu() for el in prune_graph(_graph, node_threshold, edge_threshold)
-            )
-            _graph.to("cpu")
-
-            tokenizer = AutoTokenizer.from_pretrained(model.cfg.tokenizer_name)
-
-            _nodes = create_nodes(
-                _graph,
-                _node_mask,
-                tokenizer,
-                _cumulative_scores,
-            )
-            print("nodes created")
-            _used_nodes, _used_edges = create_used_nodes_and_edges(_graph, _nodes, _edge_mask)
-            print("used nodes and edges created")
-            _output_model = build_model(
-                _graph,
-                _used_nodes,
-                _used_edges,
-                slug_identifier,
-                hf_model_id_to_np_model_id()[requested_model_id],
-                node_threshold,
-                tokenizer,
-            )
             print("output model created")
 
             # if signed_url is not provided, we don't upload the file, just return the output model

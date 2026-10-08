@@ -7,6 +7,7 @@ response body FastAPI can document.
 """
 
 from enum import StrEnum
+from typing import Any
 
 from neuronpedia_inference.schemas.common import BaseSchema
 
@@ -16,13 +17,29 @@ class LensType(StrEnum):
 
     LOGIT_LENS = "LOGIT_LENS"
     JACOBIAN_LENS = "JACOBIAN_LENS"
+    # The J++ Lens: the same form as JACOBIAN_LENS, from another fit.
+    JPP_LENS = "JPP_LENS"
+
+
+class LensChatToolCall(BaseSchema):
+    """A tool call in an assistant message. ``arguments`` is the call's JSON object."""
+
+    name: str
+    arguments: dict[str, Any] | None = None
+    id: str | None = None
 
 
 class LensChatMessage(BaseSchema):
-    """One message of a chat-formatted lens prompt."""
+    """One message of a chat-formatted lens prompt.
+
+    ``role`` is ``system``, ``user``, ``assistant`` or ``tool``. The model's chat template
+    renders ``tool_calls`` (assistant only) and ``tool_call_id`` (tool only, the call it answers).
+    """
 
     role: str
     content: str
+    tool_calls: list[LensChatToolCall] | None = None
+    tool_call_id: str | None = None
 
 
 class LensSteerToken(BaseSchema):
@@ -33,8 +50,8 @@ class LensSteerToken(BaseSchema):
     to a vocab id via a cached reverse-decode map. ``type`` selects which lens's
     readout direction to use: ``JACOBIAN_LENS`` uses the J-lens direction
     ``J_bar_l^T @ w_t`` at each fitted layer (the residual-space direction whose
-    J-lens readout is this token), ``LOGIT_LENS`` uses the plain unembedding
-    direction ``w_t``.
+    J-lens readout is this token), ``JPP_LENS`` the same with the J++ Lens's
+    ``J_bar_l``, and ``LOGIT_LENS`` the plain unembedding direction ``w_t``.
     """
 
     token: str
@@ -64,6 +81,9 @@ class LensPromptRequest(BaseSchema):
     # Provide exactly one of `prompt` (raw text) or `chat` (chat-formatted).
     prompt: str | None = None
     chat: list[LensChatMessage] | None = None
+    # Tool definitions for ``chat`` (OpenAI function-schema dicts). The chat template writes
+    # them into the prompt. Refused for a model whose chat renderer does not read ``tools``.
+    tools: list[dict[str, Any]] | None = None
     top_n: int = 10
     # Layers to read out. Empty (default) = all available layers for the lens
     # type. The model's final layer is ALWAYS included (decoded directly as the
@@ -146,4 +166,32 @@ class LensPromptRequest(BaseSchema):
     # waiting for the lock. This lets a client (e.g. the webapp) fail over to a
     # different inference server for this model. Defaults to False, preserving
     # the original behavior of waiting up to REQUEST_LOCK_TIMEOUT for the lock.
+    fail_if_busy: bool = False
+
+
+class LensOracleRequest(BaseSchema):
+    """One oracle-lens read: the activation at ``position``, in words, at each layer."""
+
+    model: str
+    # The exact token ids of the sequence (prompt and generated tokens, as the lens stream
+    # echoed them). Only ``token_ids[: position + 1]`` affects the read.
+    token_ids: list[int]
+    position: int
+    # More positions to read in the same request, after ``position``. They share one capture
+    # pass, and on vLLM all their generations run together. Frames carry their ``position``.
+    positions: list[int] = []
+    # Layers to read. Empty (default) = the server's oracle layers. Each must be one the
+    # adapter was trained on.
+    layers: list[int] = []
+    # The read of a layer stops after this many finished bullets.
+    max_bullets: int = 2
+    # A hard cap on the tokens one layer's read may write.
+    max_tokens: int = 96
+    # Stream NDJSON (one frame per layer, as each read ends). When false, the frames are
+    # buffered into one JSON object.
+    stream: bool = True
+    # With ``stream``: also send a ``partial`` frame with a layer's text so far, per token,
+    # before its ``read`` (vLLM and MLX; eager sends none).
+    partial: bool = False
+    # See ``LensPromptRequest.fail_if_busy``.
     fail_if_busy: bool = False

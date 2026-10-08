@@ -12,6 +12,10 @@ Hugging Face model repo (default ``neuronpedia/jacobian-lens``) at
 ``<np_model_id>/jlens/<dataset>/<slug>_jacobian_lens.pt``. Loading is best-effort:
 a failure never crashes startup, it just makes JACOBIAN_LENS requests return an
 error (LOGIT_LENS does not need a lens).
+
+A J++ Lens (JPP_LENS) has the same form and is loaded the same way, as a second
+:class:`LensKind` with its own store, HF path and engine set. It loads only when
+``JPP_LENS`` is set.
 """
 
 from __future__ import annotations
@@ -157,7 +161,7 @@ class LoadedJacobianLens:
     Jacobians are held at ``dtype`` (the served model's dtype) in host RAM, and
     :meth:`place_on_device` then uploads as many as ``device_budget_bytes`` allows and
     fixes ``transport_device`` as the place the transport runs. That device is a property
-    of the LENS, not of the residual handed to :meth:`transport`: on the vLLM backend the
+    of the LENS, not of the residual it carries: on the vLLM backend the
     residuals arrive from the worker as CPU tensors, and transporting them where they
     landed meant a 396 GFLOP host matmul per read-out batch at d_model=5120 x 63 layers
     (4.3s measured, against 4.8ms for the same sweep on an A100).
@@ -215,6 +219,17 @@ class LoadedJacobianLens:
         # `weights_only=True` still admits the primitives and containers `provenance` is made of,
         # so the declaration below rides along without loosening the unpickler.
         checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        if "J" not in checkpoint and "jacobians" in (checkpoint.get("parameters") or {}):
+            # A J++ Lens file as safety-research/jpp_lens writes it: the same maps, keyed apart.
+            config = checkpoint.get("config") or {}
+            return cls(
+                jacobians=checkpoint["parameters"]["jacobians"],
+                source_layers=list(checkpoint.get("source_layers", [])),
+                n_prompts=int(config.get("num_prompts_trained_on", 0)),
+                d_model=int(config["d_model"]),
+                dtype=dtype,
+                device_budget_bytes=device_budget_bytes,
+            )
         if "J" not in checkpoint:
             raise ValueError(f"{path} is not a Jacobian lens file (keys: {sorted(checkpoint)!r})")
         return cls(
@@ -300,6 +315,14 @@ class LoadedJacobianLens:
         if stale is not None:
             self._device_bytes -= stale.numel() * stale.element_size()
 
+    def placed_jacobians(self) -> dict[int, torch.Tensor]:
+        """Each layer's ``J_bar`` where placement left it: the device copy if resident, else the host one.
+
+        What a read-out in this process is handed. A host copy is moved per batch, one layer at a
+        time, so a lens larger than its budget never has to fit on the device at once.
+        """
+        return {layer: self._device_cache.get(layer, host) for layer, host in self.jacobians.items()}
+
     def jacobian_on(self, layer: int, device: torch.device) -> torch.Tensor:
         device = _normalize_device(device)
         cached = self._device_cache.get(layer)
@@ -319,25 +342,6 @@ class LoadedJacobianLens:
             return moved
         self._admit(layer, moved)
         return moved
-
-    def transport(self, residual: torch.Tensor, layer: int) -> torch.Tensor:
-        """Map a residual at ``layer`` into the readout basis: ``residual @ J_bar.T``.
-
-        Runs on ``transport_device`` when one is set, moving the residual there and the
-        result back, so a caller holding CPU residuals still gets a GPU matmul. Callers
-        staging many layers should move their block once themselves (see
-        ``_stack_chunk_residuals``) rather than paying that round trip per layer.
-
-        The matmul runs at the lens dtype and the result is returned as float32, which is
-        what callers stack (a transported layer and a directly-decoded one have to share a
-        dtype). Casting the residual down rather than ``J_bar`` up is the whole point:
-        this step is bound by re-reading ``J_bar``, so widening it per call would give
-        back both the memory and the bandwidth.
-        """
-        device = self.transport_device or residual.device
-        J_bar = self.jacobian_on(layer, device)
-        out = (residual.to(device=device, dtype=J_bar.dtype) @ J_bar.T).float()
-        return out if out.device == residual.device else out.to(residual.device)
 
 
 class JacobianLensStore:
@@ -380,10 +384,42 @@ class JacobianLensStore:
         return cls._error
 
 
-def _find_local_lens_file(directory: str) -> str:
-    matches = sorted(glob.glob(os.path.join(directory, "*_jacobian_lens.pt")))
+class JppLensStore(JacobianLensStore):
+    """Process-wide holder for the J++ Lens, apart from the Jacobian lens."""
+
+    _instance: LoadedJacobianLens | None = None
+    _status: str = "not_loaded"
+    _error: str | None = None
+    _np_model_id: str | None = None
+
+
+@dataclass(frozen=True)
+class LensKind:
+    """One kind of fitted ``J_bar`` lens: where it is published and where it is held."""
+
+    label: str
+    store: type[JacobianLensStore]
+    # The engine's J_bar set name (`LensSpec.jacobian_set`).
+    engine_set: str
+    # The HF path is `<np_model_id>/<folder>/<dataset>/<slug>_<stem>.pt`.
+    folder: str
+    stem: str
+    # The `args` attributes are `<arg_prefix>_source`, `_dataset`, `_hf_repo` and `_hf_path`.
+    arg_prefix: str
+    default_repo: str
+
+
+JACOBIAN_LENS_KIND = LensKind(
+    "Jacobian lens", JacobianLensStore, "default", "jlens", "jacobian_lens", "jlens", "neuronpedia/jacobian-lens"
+)
+JPP_LENS_KIND = LensKind("J++ lens", JppLensStore, "jpp", "jpp", "jpp_lens", "jpp", "neuronpedia/jacobian-lens")
+LENS_KINDS = (JACOBIAN_LENS_KIND, JPP_LENS_KIND)
+
+
+def _find_local_lens_file(directory: str, stem: str = "jacobian_lens") -> str:
+    matches = sorted(glob.glob(os.path.join(directory, f"*_{stem}.pt")))
     if not matches:
-        raise FileNotFoundError(f"No *_jacobian_lens.pt found in local JLENS_SOURCE directory: {directory}")
+        raise FileNotFoundError(f"No *_{stem}.pt found in local lens source directory: {directory}")
     if len(matches) > 1:
         logger.warning("Multiple lens files in %s, using the first: %s", directory, matches[0])
     return matches[0]
@@ -412,25 +448,28 @@ def _download_lens_from_hf(
     dataset: str,
     hf_model_id: str | None,
     explicit_path: str | None,
+    *,
+    folder: str = "jlens",
+    stem: str = "jacobian_lens",
 ) -> str:
     """Download the lens from a HF model repo and return the local cache path.
 
     When ``explicit_path`` is given it is used verbatim. Otherwise we try the
-    deterministic candidates under ``<np_model_id>/jlens/<dataset>/``:
-    ``<slug>_jacobian_lens.pt`` first, then ``<slug>_jacobian_lens_n1000.pt``,
+    deterministic candidates under ``<np_model_id>/<folder>/<dataset>/``:
+    ``<slug>_<stem>.pt`` first, then ``<slug>_<stem>_n1000.pt``,
     and finally fall back to the first ``.pt`` listed under that directory.
     """
     from huggingface_hub import hf_hub_download
 
-    prefix = f"{np_model_id}/jlens/{dataset}"
+    prefix = f"{np_model_id}/{folder}/{dataset}"
 
     candidate_paths: list[str] = []
     if explicit_path:
         candidate_paths.append(explicit_path)
     else:
         slug = _slug(hf_model_id) if hf_model_id is not None else _slug(np_model_id)
-        candidate_paths.append(f"{prefix}/{slug}_jacobian_lens.pt")
-        candidate_paths.append(f"{prefix}/{slug}_jacobian_lens_n1000.pt")
+        candidate_paths.append(f"{prefix}/{slug}_{stem}.pt")
+        candidate_paths.append(f"{prefix}/{slug}_{stem}_n1000.pt")
 
     last_error: Exception | None = None
     for filename in candidate_paths:
@@ -503,7 +542,9 @@ def _device_budget_bytes(config: object, args: object) -> int:
     )
 
 
-async def place_jacobian_lens_on_worker(config: object, args: object, model: object) -> bool:
+async def place_jacobian_lens_on_worker(
+    config: object, args: object, model: object, kind: LensKind = JACOBIAN_LENS_KIND
+) -> bool:
     """Upload the lens into the vLLM worker(s), where the residuals already are.
 
     The vLLM counterpart of :func:`place_jacobian_lens_on_device`, and the reason the
@@ -519,41 +560,75 @@ async def place_jacobian_lens_on_worker(config: object, args: object, model: obj
     such fallback, so a partial upload would read the missing layers out untransported --
     the wrong distribution, quietly. Not fitting therefore returns False and lets the caller
     fall back to placement here, which is slower but stays correct.
+
+    A lens of any kind but the Jacobian lens has no such fallback on vLLM: a call carries only
+    the default set's matrices, so a named set is read only where the worker holds it. Not
+    fitting marks that lens unavailable.
     """
-    lens = JacobianLensStore.get()
+    from interp_engine import VLLMModel
+
+    lens = kind.store.get()
     if lens is None or not lens.jacobians:
         return False
-    upload = getattr(model, "set_lens_jacobians", None)
-    if upload is None:
+    # Only vLLM reads out in a separate process. Every other backend reads out here, where
+    # `place_jacobian_lens_on_device` decides which layers sit on the device.
+    if not isinstance(model, VLLMModel):
         return False
+
+    def unavailable(reason: str) -> None:
+        if kind is not JACOBIAN_LENS_KIND:
+            kind.store.set_error(reason)
 
     budget = _device_budget_bytes(config, args)
     if lens.resident_bytes > budget:
         logger.warning(
-            "Jacobian lens (%.2f GiB) does not fit the vLLM worker budget (%.2f GiB), so it stays "
+            "%s (%.2f GiB) does not fit the vLLM worker budget (%.2f GiB), so it stays "
             "in this process, where a resident prefix plus host fallback keeps every layer "
             "transported. Raise JLENS_GPU_BUDGET_GIB if the card has room.",
+            kind.label,
             lens.resident_bytes / 1024**3,
             budget / 1024**3,
         )
+        unavailable(f"the {kind.label} does not fit the vLLM worker budget")
         return False
 
     try:
-        nbytes = await upload(lens.jacobians)
+        if kind is JACOBIAN_LENS_KIND:
+            nbytes = await model.set_lens_jacobians(lens.jacobians)
+        else:
+            nbytes = await model.set_lens_jacobians(lens.jacobians, name=kind.engine_set)
     except Exception:  # noqa: BLE001
-        logger.exception("Failed to upload the Jacobian lens to the vLLM worker; falling back to this process")
+        logger.exception("Failed to upload the %s to the vLLM worker; falling back to this process", kind.label)
+        unavailable(f"the {kind.label} failed to upload to the vLLM worker")
         return False
     lens.worker_resident = True
     lens.transport_device = None
     logger.info(
-        "Jacobian lens uploaded to the vLLM worker: %d layers, %.2f GiB per rank",
+        "%s uploaded to the vLLM worker: %d layers, %.2f GiB per rank",
+        kind.label,
         len(lens.jacobians),
         nbytes / 1024**3,
     )
     return True
 
 
-def place_jacobian_lens_on_device(config: object, args: object) -> None:
+async def install_named_lens(model: object, kind: LensKind) -> None:
+    """Give the engine a named lens set by reference, where this process reads out.
+
+    The Jacobian lens rides along with each call instead; a named set has to be installed.
+    Run after :func:`place_jacobian_lens_on_device`, so each layer is where placement left it.
+    """
+    lens = kind.store.get()
+    if kind is JACOBIAN_LENS_KIND or lens is None or lens.worker_resident:
+        return
+    try:
+        await model.set_lens_jacobians(lens.placed_jacobians(), name=kind.engine_set)  # type: ignore[attr-defined]
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to install the %s in the engine", kind.label)
+        kind.store.set_error(str(exc))
+
+
+def place_jacobian_lens_on_device(config: object, args: object, kind: LensKind = JACOBIAN_LENS_KIND) -> None:
     """Upload the loaded lens to the serving device. Call once, late in startup.
 
     Separate from :func:`load_jacobian_lens_at_startup` because of *when* it has to run.
@@ -566,8 +641,8 @@ def place_jacobian_lens_on_device(config: object, args: object) -> None:
     Best-effort, like the load itself: on failure the lens stays in host RAM and the
     read-out still produces correct results, just slowly.
     """
-    lens = JacobianLensStore.get()
-    if lens is None:
+    lens = kind.store.get()
+    if lens is None or lens.worker_resident:
         return
 
     device_str = getattr(config, "device", None) or getattr(args, "device", None)
@@ -577,18 +652,20 @@ def place_jacobian_lens_on_device(config: object, args: object) -> None:
     try:
         lens.place_on_device(torch.device(device_str), device_budget_bytes=_device_budget_bytes(config, args))
     except Exception:  # noqa: BLE001
-        logger.exception("Failed to place the Jacobian lens on %s; it stays in host RAM", device_str)
+        logger.exception("Failed to place the %s on %s; it stays in host RAM", kind.label, device_str)
         return
 
     if lens.transport_device is None:
         logger.info(
-            "Jacobian lens stays in host RAM (budget %.2f GiB): the transport will run on the CPU.",
+            "%s stays in host RAM (budget %.2f GiB): the transport will run on the CPU.",
+            kind.label,
             lens.device_budget_bytes / 1024**3,
         )
         return
 
     logger.info(
-        "Jacobian lens placed on %s: %.2f GiB of %.2f GiB resident (budget %.2f GiB)",
+        "%s placed on %s: %.2f GiB of %.2f GiB resident (budget %.2f GiB)",
+        kind.label,
         lens.transport_device,
         lens.device_resident_bytes / 1024**3,
         lens.resident_bytes / 1024**3,
@@ -598,55 +675,67 @@ def place_jacobian_lens_on_device(config: object, args: object) -> None:
         # Not fatal, but every layer past the resident prefix is re-copied across PCIe on
         # every read-out batch, so say so here rather than leaving it as unexplained latency.
         logger.warning(
-            "Jacobian lens is larger than its device budget (%.2f GiB > %.2f GiB): "
+            "%s is larger than its device budget (%.2f GiB > %.2f GiB): "
             "layers past the resident prefix are re-copied per read-out batch. Raise "
             "JLENS_GPU_BUDGET_GIB if the card has room.",
+            kind.label,
             lens.resident_bytes / 1024**3,
             lens.device_budget_bytes / 1024**3,
         )
 
 
-def load_jacobian_lens_at_startup(config: object, args: object) -> None:
-    """Resolve + load the Jacobian lens, updating :class:`JacobianLensStore`.
+def _lens_kind_wanted(args: object, kind: LensKind) -> bool:
+    """The Jacobian lens loads unless ``JLENS_SKIP``; the J++ lens only with ``JPP_LENS``."""
+    if kind is JACOBIAN_LENS_KIND:
+        return not getattr(args, "jlens_skip", False)
+    return bool(getattr(args, "jpp_lens", False))
 
-    Never raises: failures are recorded as an error status so JACOBIAN_LENS
-    requests return a helpful message while the rest of the server runs normally.
+
+def load_jacobian_lens_at_startup(config: object, args: object, kind: LensKind = JACOBIAN_LENS_KIND) -> None:
+    """Resolve + load one lens kind, updating its store (:class:`JacobianLensStore` by default).
+
+    Never raises: failures are recorded as an error status so requests for that lens
+    return a helpful message while the rest of the server runs normally.
     """
-    if getattr(args, "jlens_skip", False):
-        logger.info("JLENS_SKIP set: not loading the Jacobian lens at startup.")
-        JacobianLensStore.set_skipped()
+    store = kind.store
+    if not _lens_kind_wanted(args, kind):
+        logger.info("Not loading the %s at startup (not enabled).", kind.label)
+        store.set_skipped()
         return
 
     try:
         resolution = resolve_neuronpedia_model_id(config, args)
         np_model_id = resolution.np_model_id
-        JacobianLensStore._np_model_id = np_model_id
+        store._np_model_id = np_model_id
 
-        source = getattr(args, "jlens_source", None)
-        dataset = getattr(args, "jlens_dataset", "Salesforce-wikitext")
+        source = getattr(args, f"{kind.arg_prefix}_source", None)
+        dataset = getattr(args, f"{kind.arg_prefix}_dataset", None) or "Salesforce-wikitext"
 
         if source:
-            logger.info("Loading Jacobian lens from local source: %s", source)
-            lens_path = _find_local_lens_file(source)
+            logger.info("Loading %s from local source: %s", kind.label, source)
+            lens_path = _find_local_lens_file(source, kind.stem)
         else:
-            repo_id = getattr(args, "jlens_hf_repo", "neuronpedia/jacobian-lens")
-            explicit_path = getattr(args, "jlens_hf_path", None)
+            repo_id = getattr(args, f"{kind.arg_prefix}_hf_repo", None) or kind.default_repo
+            explicit_path = getattr(args, f"{kind.arg_prefix}_hf_path", None)
             lens_path = _download_lens_from_hf(
                 repo_id,
                 np_model_id,
                 dataset,
                 resolution.hf_model_id,
                 explicit_path,
+                folder=kind.folder,
+                stem=kind.stem,
             )
 
         # Host RAM only. The device budget cannot be measured yet (see
         # `place_jacobian_lens_on_device`), and a zero budget keeps the lens off the card
         # rather than letting the default ration memory nothing has measured.
         lens = LoadedJacobianLens.load(lens_path, dtype=_lens_dtype(config), device_budget_bytes=0)
-        JacobianLensStore.set_loaded(lens, np_model_id)
+        store.set_loaded(lens, np_model_id)
         logger.info(
-            "Loaded Jacobian lens for %s: %d source layers (%s..%s), d_model=%d, "
+            "Loaded %s for %s: %d source layers (%s..%s), d_model=%d, "
             "n_prompts=%d, dtype=%s, reads %s (%.2f GiB resident)",
+            kind.label,
             np_model_id,
             len(lens.source_layers),
             lens.source_layers[0] if lens.source_layers else "?",
@@ -661,5 +750,5 @@ def load_jacobian_lens_at_startup(config: object, args: object) -> None:
             lens.resident_bytes / 1024**3,
         )
     except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed to load Jacobian lens at startup")
-        JacobianLensStore.set_error(str(exc))
+        logger.exception("Failed to load the %s at startup", kind.label)
+        store.set_error(str(exc))

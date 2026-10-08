@@ -1,4 +1,4 @@
-"""Validate VLLMModel.generate_from_embeds (EmbedsPrompt path for NLA).
+"""Validate VLLMModel.sample_from_embeds (EmbedsPrompt path for NLA).
 
 Feeding ``prompt_embeds = embed_tokens(ids)`` must produce the same greedy generation
 as feeding the token ids directly. We fetch the embeddings from the vLLM worker itself
@@ -8,12 +8,10 @@ Run: .venv/bin/python scripts/vllm_prompt_embeds_check.py
 """
 
 import asyncio
-from typing import cast
 
 import torch
 from interp_engine import VLLMModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from vllm import RequestOutput, SamplingParams
 
 MODEL = "Qwen/Qwen3-0.6B"  # embed_scale = 1.0 (no Gemma sqrt(hidden) pre-scale)
 PROMPT = "The capital of France is"
@@ -51,13 +49,8 @@ async def main() -> int:
         f"[progress] embeds shape={tuple(embeds.shape)} dtype={embeds.dtype}",
         flush=True,
     )
-    # stream=False (the default) returns the final RequestOutput, not the async generator
-    # the streaming form yields.
-    out = cast(
-        RequestOutput,
-        await backend.generate_from_embeds(embeds, SamplingParams(max_tokens=MAX_TOKENS, temperature=0.0)),
-    )
-    emb_text = out.outputs[0].text
+    (out,) = await backend.sample_from_embeds(embeds, n=1, max_tokens=MAX_TOKENS, temperature=0.0)
+    emb_text = out.text
     print("[progress] prompt_embeds generation done", flush=True)
 
     print(f"model={MODEL} prompt={PROMPT!r} max_tokens={MAX_TOKENS}")

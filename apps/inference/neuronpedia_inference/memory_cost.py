@@ -82,7 +82,7 @@ def _lens_capture_bytes(*, capture_positions: int, n_capture_points: int, d_mode
     makes V4 roughly five times more expensive per token than its width alone suggests:
     43 points x 4 streams x 4096 x 2 B is 1376 KiB per token, plus 344 KiB for the reduction.
 
-    The residual-shipping path (``_iter_residuals_vllm``) accumulates the same sequence's rows
+    The residual-shipping path (the engine's ``lens_stream.protocol_rows``) accumulates the same rows
     in the server process instead, already reduced. Charging both at the worker's rate
     over-estimates that path by the stream multiple, which is nothing at ``n_streams`` 1.
     """

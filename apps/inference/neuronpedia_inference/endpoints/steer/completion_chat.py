@@ -1,30 +1,27 @@
 import logging
 import os
 import time
-from collections.abc import AsyncGenerator
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import torch
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from interp_engine import (
-    Address,
-    EagerModel,
+    InterpModel,
     SamplingSettings,
+    SteeringSpec,
     SteerMask,
-    VLLMModel,
     compose_assistant_turns,
     strip_wire_reasoning,
 )
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.steer.completion import (
-    _engine_generate_text,
-    _feature_to_steerspec,
-    features_to_vllm_steering_spec,
+    _generate_text,
+    features_to_steering_specs,
     resolve_max_new_tokens,
-    steer_write_layers,
+    steer_write_targets,
 )
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
@@ -32,7 +29,6 @@ from neuronpedia_inference.engine_adapter import (
     assert_steer_layers_declared,
     assert_steering_available,
     declares_static_taps,
-    get_tokenize,
 )
 from neuronpedia_inference.inference_utils.sampling import (
     resolve_request_sampling,
@@ -58,11 +54,7 @@ from neuronpedia_inference.inference_utils.vectors import (
     resolve_request_reads,
     truncate_content,
 )
-from neuronpedia_inference.inference_utils.vectors.capture_engine import (
-    capture_turn_means_engine,
-    capture_turn_means_vllm,
-    turn_means_from_generation_capture,
-)
+from neuronpedia_inference.inference_utils.vectors.capture_engine import capture_turn_means
 from neuronpedia_inference.inference_utils.vllm_monitor import get_monitor
 from neuronpedia_inference.memory_cost import steer_cost
 from neuronpedia_inference.schemas import (
@@ -76,7 +68,6 @@ from neuronpedia_inference.schemas import (
     SteerVectorReadout,
 )
 from neuronpedia_inference.shared import Model, with_request_lock
-from neuronpedia_inference.vllm_optional import VLLM_AVAILABLE, SamplingParams
 
 logger = logging.getLogger(__name__)
 
@@ -104,17 +95,13 @@ router = APIRouter()
 @router.get("/steer/health")
 async def health_check():
     """
-    Get health stats for the vLLM engine.
+    Get health stats for the loaded engine.
 
     Returns GPU memory usage, system RAM, active requests, threads, etc.
     Useful for debugging hanging requests.
     """
-    model = Model.get_instance()
     monitor = get_monitor()
-
-    # Set the model if it's a VLLMSteerModel
-    if VLLM_AVAILABLE and isinstance(model, VLLMModel):
-        monitor.set_model(model)
+    monitor.set_model(Model.get_instance())
 
     stats = await monitor.get_stats()
     return JSONResponse(
@@ -161,25 +148,17 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
     normalize_steering = request.normalize_steering
     steer_special_tokens = request.steer_special_tokens
 
-    # Start background monitoring if enabled (once) for VLLMSteerModel
-    if ENABLE_BACKGROUND_MONITOR and VLLM_AVAILABLE and isinstance(model, VLLMModel):
+    # Start background monitoring if enabled (once).
+    if ENABLE_BACKGROUND_MONITOR:
         monitor = get_monitor()
         monitor.set_model(model)
         if monitor._background_task is None:
             monitor.start_background_logging(interval=MONITOR_INTERVAL)
 
     # Every vector this request wants read comes with it: this server ships none, so there is
-    # nothing to resolve a name against. The backend check comes first because it is what makes
-    # the model's width and depth readable, and because an artifact should not be fetched for a
-    # backend that could not have read it.
+    # nothing to resolve a name against.
     reads: list[VectorAsset] = []
     if request.reads:
-        vllm_backend = VLLM_AVAILABLE and isinstance(model, VLLMModel)
-        if not (vllm_backend or isinstance(model, EagerModel)):
-            return JSONResponse(
-                content={"error": "Reading a vector requires the vLLM or interp-engine (EagerModel) backend"},
-                status_code=400,
-            )
         try:
             reads = await resolve_request_reads(
                 request.reads,
@@ -258,7 +237,7 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
     if model.tokenizer is None:
         raise ValueError("Tokenizer is not initialized")
 
-    tok = get_tokenize(model)
+    tok = model.tok
     if not tok.has_chat_template():
         return JSONResponse(content={"error": NO_CHAT_TEMPLATE_ERROR}, status_code=400)
 
@@ -315,7 +294,8 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
     # the layer the vector reads -- the 70B pod declared 40 for the readout and was asked to write 32.
     if wants_steering and declares_static_taps(model):
         try:
-            assert_steer_layers_declared(model, steer_write_layers(features))
+            for point, layers in steer_write_targets(features).items():
+                assert_steer_layers_declared(model, layers, point=point)
         except BackendUnsupported as exc:
             return JSONResponse(content={"error": str(exc)}, status_code=400)
 
@@ -426,54 +406,38 @@ def _agreed_render_conditions(reads: list[VectorAsset]) -> tuple[RenderCondition
 
 
 async def _capture_means(
-    model: Any,
+    model: InterpModel,
     conversation: list[NPSteerChatMessage],
     keys: list[CaptureKey],
-    steering_spec: Any,
+    specs: list[SteeringSpec] | None,
     template_kwargs: dict[str, str],
 ) -> dict[CaptureKey, torch.Tensor]:
-    """One capture pass covering every key in ``keys``, steered when a spec is given."""
+    """One capture pass covering every key in ``keys``, steered when specs are given."""
     if not keys:
         return {}
-    if isinstance(model, EagerModel):
-        # steering_spec is a list[SteerSpec] here (engine specs).
-        return capture_turn_means_engine(
-            model, conversation, keys, specs=steering_spec, template_kwargs=template_kwargs
-        )
-    if isinstance(model, VLLMModel):
-        # steering_spec is an engine SteeringSpec here (built from Add/ProjectionCap specs).
-        return await capture_turn_means_vllm(
-            model, conversation, keys, steering_spec=steering_spec, template_kwargs=template_kwargs
-        )
-    raise ValueError(f"vector readouts are unsupported for backend {type(model).__name__}")
+    return await capture_turn_means(model, conversation, keys, specs=specs, template_kwargs=template_kwargs)
 
 
 async def capture_read_means(
-    model: Any,
+    model: InterpModel,
     conversation: list[NPSteerChatMessage],
     keys: list[CaptureKey],
-    steering_spec: Any = None,
-    pre_cap_means: dict[CaptureKey, torch.Tensor] | None = None,
-    post_cap_means: dict[CaptureKey, torch.Tensor] | None = None,
+    steering_specs: list[SteeringSpec] | None = None,
     template_kwargs: dict[str, str] | None = None,
 ) -> tuple[dict[CaptureKey, torch.Tensor], dict[CaptureKey, torch.Tensor] | None]:
     """Per-message pooled activations for every capture the requested reads need.
 
-    At most one forward per condition, whatever the number of reads: the pre-cap read captures every
-    outstanding key at once, and so does the post-cap read. Six vectors across five layers
-    therefore cost what one costs, which is what makes a multi-vector panel affordable. Two
-    keys at one layer are two poolings of one captured tensor, not two forwards.
+    One forward per condition, whatever the number of reads: the pre-cap read captures every key
+    at once, and so does the post-cap read. Six vectors across five layers therefore cost what one
+    costs, which is what makes a multi-vector panel affordable. Two keys at one layer are two
+    poolings of one captured tensor, not two forwards.
 
     Args:
-        model: the loaded model (VLLMModel or EagerModel)
+        model: the loaded model, on any backend
         conversation: the full conversation, including the generated assistant turn
         keys: the distinct captures the requested reads need
-        steering_spec: steering for the post-cap read (engine ``list[SteerSpec]`` for
-            EagerModel, ``SteeringSpec`` for vLLM). None means no post-cap read is wanted.
-        pre_cap_means / post_cap_means: means already captured during generation. Every key
-            supplied is a key not captured again here. An unsteered generation supplies
-            pre-cap; a steered one supplies post-cap and still needs the pre-cap read, because
-            the cap covers the layers being projected at.
+        steering_specs: steering for the post-cap read, one spec per point written. None means
+            no post-cap read is wanted.
         template_kwargs: what the endpoint rendered the generation prompt with. A re-capture
             renders the conversation again, so anything the requested reads pinned about the
             template has to be pinned the same way here or the two renderings diverge.
@@ -485,14 +449,8 @@ async def capture_read_means(
     wanted = sorted(set(keys))
     kwargs = template_kwargs or {}
 
-    pre_cap = dict(pre_cap_means or {})
-    pre_cap.update(await _capture_means(model, conversation, [k for k in wanted if k not in pre_cap], None, kwargs))
-
-    post_cap = dict(post_cap_means or {})
-    if steering_spec is not None:
-        post_cap.update(
-            await _capture_means(model, conversation, [k for k in wanted if k not in post_cap], steering_spec, kwargs)
-        )
+    pre_cap = await _capture_means(model, conversation, wanted, None, kwargs)
+    post_cap = await _capture_means(model, conversation, wanted, steering_specs, kwargs) if steering_specs else {}
 
     logger.debug(
         f"[READ] captured {_describe_keys(pre_cap)} pre-cap / {_describe_keys(post_cap)} post-cap "
@@ -611,37 +569,12 @@ async def run_batched_generate(
     async with await stream_lock(use_stream_lock):
         model = Model.get_instance()
 
-        if seed is not None:
-            torch.manual_seed(seed)
-
         # steer_special_tokens=False -> exclude the model's special tokens (BOS/EOS + chat
         # markers) from steering; the engine resolves the exact positions per model family
-        # (see SteerMask.SPECIAL_TOKENS), replacing the old Gemma-only masking. This applies
-        # to both the eager (EagerModel) and vLLM backends.
+        # (see SteerMask.SPECIAL_TOKENS). A backend that cannot carry a mask refuses it.
         steer_position_mask = None if steer_special_tokens else SteerMask.SPECIAL_TOKENS
 
-        # Both backends stream STEERED/DEFAULT over the chat-templated prompt (eager via
-        # forward write-hooks, vLLM via worker steering) and project the requested reads after
-        # generation; they share the frame + capture helpers below.
-        if isinstance(model, EagerModel):
-            async for msg in _engine_chat_generate(
-                model=model,
-                promptTokenized=promptTokenized,
-                inputPrompt=inputPrompt,
-                settings=settings,
-                steer_types=steer_types,
-                seed=seed,
-                sampling=kwargs["sampling"],
-                max_new_tokens=int(kwargs.get("max_new_tokens") or 0),
-                reads=reads or [],
-                position_mask=steer_position_mask,
-            ):
-                yield msg
-            return
-
-        if not (VLLM_AVAILABLE and isinstance(model, VLLMModel)):
-            raise ValueError("The /steer/completion-chat endpoint only supports the interp-engine and vLLM backends")
-        async for msg in _vllm_chat_generate(
+        async for msg in _run_chat_generate(
             model=model,
             promptTokenized=promptTokenized,
             inputPrompt=inputPrompt,
@@ -660,7 +593,7 @@ def _chat_stream_frame(
     steer_types: list[NPSteerType],
     output_by_type: dict[NPSteerType, str],
     prompt_string: str,
-    model: "VLLMModel | EagerModel",
+    model: InterpModel,
     promptTokenized: torch.Tensor,
     inputPrompt: list[NPSteerChatMessage],
 ) -> str:
@@ -682,76 +615,21 @@ def _chat_stream_frame(
     )
 
 
-def _read_capture_points(reads: list[VectorAsset]) -> dict[CaptureKey, Address]:
-    """The addresses a generation should capture so the requested reads need no extra forward.
-
-    Keyed by capture, so a key's pooling is available where the capture is pooled. Two keys can
-    map to one address -- two reads at a layer that pool differently -- so a caller declaring these
-    to a generation has to deduplicate the values, which `_declared_points` does. Empty when
-    nothing was requested, in which case generation captures nothing at all.
-    """
-    return {key: Address(key.point, key.layer) for key in sorted({vector.capture_key for vector in reads})}
-
-
-def _declared_points(points: dict[CaptureKey, Address]) -> list[Address]:
-    """The distinct addresses in ``points``. Declaring one twice would be a second capture."""
-    return list(dict.fromkeys(points.values()))
-
-
-def _pool_generation_capture(
-    model: "VLLMModel | EagerModel",
-    inputPrompt: list[NPSteerChatMessage],
-    prompt_token_ids: list[int],
-    captures: dict[Address, torch.Tensor],
-    points: dict[CaptureKey, Address],
-    template_kwargs: dict[str, str],
-) -> dict[CaptureKey, torch.Tensor]:
-    """Per-message pooled activations from a generation-time capture, skipping anything unusable.
-
-    A capture that came back short or misaligned is not a degraded result here -- the projection
-    is indexed per message -- so that key is left out and ``capture_read_means`` re-captures
-    it rather than pooling over misaligned positions.
-    """
-    pooled: dict[CaptureKey, torch.Tensor] = {}
-    if not points:
-        return pooled
-    tok = get_tokenize(model)
-    for key, point in points.items():
-        acts = captures.get(point)
-        if acts is None or acts.shape[0] == 0:
-            continue
-        try:
-            means = turn_means_from_generation_capture(
-                tok, list(inputPrompt), prompt_token_ids, acts, template_kwargs, key.pool
-            )
-        except Exception:
-            logger.exception(f"[READ] pooling the generation capture for {_describe_key(key)} failed; will re-capture")
-            continue
-        if means is not None:
-            pooled[key] = means
-    return pooled
-
-
 async def _chat_readout_frame(
     *,
-    model: "VLLMModel | EagerModel",
+    model: InterpModel,
     inputPrompt: list[NPSteerChatMessage],
     output_by_type: dict[NPSteerType, str],
     steer_types: list[NPSteerType],
     prompt_string: str,
     promptTokenized: torch.Tensor,
     reads: list[VectorAsset],
-    steered_spec: Any,
-    gen_means_by_type: dict[NPSteerType, dict[CaptureKey, torch.Tensor]] | None = None,
+    steered_specs: list[SteeringSpec] | None,
 ) -> str:
     """Project every requested vector for every generated type, and build the final frame.
 
-    ``steered_spec`` (engine ``list[SteerSpec]`` for EagerModel, ``SteeringSpec`` for vLLM) is
-    passed only for the STEERED type so post-cap activations are captured under steering.
-
-    ``gen_means_by_type`` holds the means captured during each type's own generation. A
-    STEERED generation steers, so its means are post-cap; a DEFAULT one doesn't, so its means
-    are pre-cap and no further forward is needed at all.
+    ``steered_specs`` is passed only for the STEERED type, so post-cap activations are captured
+    under the same steering the text was generated under.
     """
     keys = sorted({vector.capture_key for vector in reads})
     # Validated to agree back in the endpoint, so any vector's conditions are all of theirs.
@@ -760,14 +638,11 @@ async def _chat_readout_frame(
     for steer_type, output_text in output_by_type.items():
         full_conversation = list(inputPrompt) + [NPSteerChatMessage(role="assistant", content=output_text)]
         is_steered = steer_type == NPSteerType.STEERED
-        gen_means = (gen_means_by_type or {}).get(steer_type) or {}
         pre_cap, post_cap = await capture_read_means(
             model,
             full_conversation,
             keys,
-            steering_spec=steered_spec if is_steered else None,
-            pre_cap_means=None if is_steered else gen_means,
-            post_cap_means=gen_means if is_steered else None,
+            steering_specs=steered_specs if is_steered else None,
             template_kwargs=render.template_kwargs,
         )
         readouts.extend(build_readouts(full_conversation, steer_type, reads, pre_cap, post_cap))
@@ -785,9 +660,9 @@ async def _chat_readout_frame(
     return format_sse_message(to_return.to_wire_json())
 
 
-async def _vllm_chat_generate(
+async def _run_chat_generate(
     *,
-    model: VLLMModel,
+    model: InterpModel,
     promptTokenized: torch.Tensor,
     inputPrompt: list[NPSteerChatMessage],
     settings: SteeringSettings,
@@ -798,139 +673,26 @@ async def _vllm_chat_generate(
     reads: list[VectorAsset] | None = None,
     position_mask: Any = None,
 ):
-    """SSE generator for the vLLM backend over a chat-templated prompt.
+    """SSE generator over a chat-templated prompt, on whichever backend is loaded.
 
-    Mirrors :func:`_engine_chat_generate` but streams via the async vLLM backend. The
-    steering spec is built once (shared with ``/steer/completion`` via
-    ``features_to_vllm_steering_spec``) and reused for STEERED generation and for the
-    post-cap vector read. ``position_mask`` excludes prompt positions (e.g. special tokens)
-    from steering.
+    Mirrors `steer/completion.py`'s STEERED/DEFAULT flow but emits `SteerCompletionChatResponse`
+    frames. The prompt tokens come from the endpoint's `apply_chat_template` output
+    (`promptTokenized`) and go to the backend as ids, so one tokenization is in play. The
+    steering specs are built once (shared with ``/steer/completion``) and reused for STEERED
+    generation and for the post-cap vector read. ``position_mask`` excludes prompt positions
+    (e.g. special tokens) from steering.
 
-    When reads are requested, each generation also captures their layers on its own request, so
-    the activations the readouts need come out of the forwards that produced the text: a DEFAULT
-    turn needs no further pass, and a STEERED one is left with only the unsteered pre-cap read
-    (the cap covers those layers, so its own activations there are clipped).
+    When reads are requested, projects them on the generated conversation after streaming
+    (pre-cap always; post-cap under steering).
     """
     reads = reads or []
-    prompt_string = model.tokenizer.decode(promptTokenized)
-    # Only build the spec if a pass will actually use it. A DEFAULT-only request is
-    # legitimate — the webapp collapses to it when the feature list is empty, and a
-    # readout-only request carries no features at all — and building the spec eagerly turns
-    # that into a 500, since an empty feature list has no steering layers. The engine path
-    # never had this problem: it steers under `if specs`.
-    steering_spec = features_to_vllm_steering_spec(settings) if NPSteerType.STEERED in steer_types else None
-
-    read_points = _read_capture_points(reads)
-    # Validated to agree back in the endpoint, so any vector's conditions are all of theirs. The
-    # pooling below re-renders the prompt to find its message spans, and has to render it the
-    # same way the prompt it is pooling over was rendered.
-    read_render, _conflict = _agreed_render_conditions(reads)
     prompt_token_ids = [int(t) for t in promptTokenized.tolist()]
-
-    output_by_type: dict[NPSteerType, str] = {}
-    gen_means_by_type: dict[NPSteerType, dict[CaptureKey, torch.Tensor]] = {}
-    for flag in steer_types:
-        if seed is not None:
-            torch.manual_seed(seed)
-        active_spec = steering_spec if flag == NPSteerType.STEERED else None
-        captures: dict[Address, torch.Tensor] = {}
-        # With stream=True the backend returns an async generator of text deltas; it only
-        # returns the full string when stream=False. Generating from the endpoint's own
-        # token ids (rather than a string the backend would re-tokenize) keeps one
-        # tokenization in play, which is what lets the pooling below trust that captured
-        # row i is prompt token i.
-        stream_generator = cast(
-            AsyncGenerator[str, None],
-            await model.generate_steered(
-                prompt_token_ids,
-                SamplingParams(
-                    max_tokens=max_new_tokens,
-                    seed=seed,
-                    **sampling.vllm_kwargs(),
-                    # A chat response's structure is carried by special tokens (harmony's
-                    # <|channel|>/<|message|>, turn-end markers). vLLM's detokenizer drops
-                    # them by default, which left the assistant turn unrecoverable on this
-                    # backend; composition strips whatever the client shouldn't see.
-                    skip_special_tokens=False,
-                ),
-                steering_spec=active_spec,
-                position_mask=position_mask if active_spec is not None else None,
-                stream=True,
-                capture_points=_declared_points(read_points) if read_points else None,
-                capture_out=captures if read_points else None,
-            ),
-        )
-        text = ""
-        async for delta in stream_generator:
-            text += delta
-            output_by_type[flag] = text
-            yield _chat_stream_frame(
-                steer_types,
-                output_by_type,
-                prompt_string,
-                model,
-                promptTokenized,
-                inputPrompt,
-            )
-        output_by_type[flag] = text
-        if not text:
-            # No delta arrives when the model samples EOS first. Close the type with a frame
-            # so the completion reads as empty rather than missing: a stream with no frame is
-            # a 500 downstream.
-            yield _chat_stream_frame(
-                steer_types,
-                output_by_type,
-                prompt_string,
-                model,
-                promptTokenized,
-                inputPrompt,
-            )
-        if read_points:
-            gen_means_by_type[flag] = _pool_generation_capture(
-                model, inputPrompt, prompt_token_ids, captures, read_points, read_render.template_kwargs
-            )
-
-    if reads:
-        yield await _chat_readout_frame(
-            model=model,
-            inputPrompt=inputPrompt,
-            output_by_type=output_by_type,
-            steer_types=steer_types,
-            prompt_string=prompt_string,
-            promptTokenized=promptTokenized,
-            reads=reads,
-            steered_spec=steering_spec,
-            gen_means_by_type=gen_means_by_type,
-        )
-
-
-async def _engine_chat_generate(
-    *,
-    model: EagerModel,
-    promptTokenized: torch.Tensor,
-    inputPrompt: list[NPSteerChatMessage],
-    settings: SteeringSettings,
-    steer_types: list[NPSteerType],
-    seed: int | None,
-    sampling: SamplingSettings,
-    max_new_tokens: int,
-    reads: list[VectorAsset] | None = None,
-    position_mask: Any = None,
-):
-    """SSE generator for the eager engine backend over a chat-templated prompt.
-
-    Mirrors `steer/completion.py`'s STEERED/DEFAULT engine flow but emits
-    `SteerCompletionChatResponse` frames. The prompt tokens come from the
-    endpoint's `apply_chat_template` output (`promptTokenized`); generated text
-    is prefixed with the decoded prompt to match the vLLM path's `raw` output.
-    When reads are requested, projects them on the generated conversation after
-    streaming (pre-cap always; post-cap under steering).
-    """
-    reads = reads or []
-    tokens = promptTokenized.to(model.device)
     prompt_string = model.tokenizer.decode(promptTokenized)
-
-    specs = [_feature_to_steerspec(f, settings) for f in settings.features]
+    # Only build the specs if a pass will actually use them. A DEFAULT-only request is
+    # legitimate -- the webapp collapses to it when the feature list is empty, and a
+    # readout-only request carries no features at all -- and building the specs eagerly turns
+    # that into a 500, since an empty feature list has no steering layers.
+    specs = features_to_steering_specs(settings) if NPSteerType.STEERED in steer_types else None
 
     # Track each steer type's generated text so the readouts can analyze the
     # full conversation (prompt + assistant turn) afterwards.
@@ -938,9 +700,9 @@ async def _engine_chat_generate(
     for flag in steer_types:
         active_specs = specs if flag == NPSteerType.STEERED else None
         text = ""
-        for delta in _engine_generate_text(
+        async for delta in _generate_text(
             model,
-            tokens,
+            prompt_token_ids,
             active_specs,
             max_new_tokens=max_new_tokens,
             sampling=sampling,
@@ -959,7 +721,8 @@ async def _engine_chat_generate(
             )
         output_by_type[flag] = text
         if not text:
-            # Same guard as the vLLM path: one frame per type, even for an empty completion.
+            # No delta arrives when the model samples EOS first. One frame per type, even for an
+            # empty completion: a stream with no frame is a 500 downstream.
             yield _chat_stream_frame(
                 steer_types,
                 output_by_type,
@@ -978,7 +741,7 @@ async def _engine_chat_generate(
             prompt_string=prompt_string,
             promptTokenized=promptTokenized,
             reads=reads,
-            steered_spec=specs,
+            steered_specs=specs,
         )
 
 
@@ -987,7 +750,7 @@ def make_steer_completion_chat_response(
     steered_output: str,
     default_output: str,
     prompt_string: str,
-    model: "VLLMModel | EagerModel",
+    model: InterpModel,
     promptTokenized: torch.Tensor,
     promptChat: list[NPSteerChatMessage],
     steered_logprobs: list[NPLogprob] | None = None,
@@ -1026,7 +789,6 @@ def make_steer_completion_chat_response(
         for steer_type in steer_types
     ]
 
-    # Handle token to string conversion for both model types (vLLM + EagerModel).
     prompt_raw = model.tokenizer.decode(promptTokenized) if model.tokenizer is not None else ""
 
     return SteerCompletionChatResponse(

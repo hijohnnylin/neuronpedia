@@ -43,7 +43,7 @@ async def similarity_matrix(request: SimilarityMatrixRequest):
         )
 
     # tokenize the text
-    prepend_bos = model.tok.tokenizer_prepends_bos
+    prepend_bos = model.tokenizer_prepends_bos
     tokens = model.to_tokens(
         request.text,
         prepend_bos=prepend_bos,

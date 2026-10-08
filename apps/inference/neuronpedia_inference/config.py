@@ -119,8 +119,8 @@ class Config:
     # Normalized to `model_id` when not supplied. See __post_init__.
     override_model_id: str | None = None
     max_loaded_saes: int = 100
-    # Active interpretability backend: "vllm" (engine-owned vLLM) or "eager"
-    # (EagerModel core). Resolved by interp_engine.select_backend at startup.
+    # Active backend: "vllm", "eager" or "mlx", as interp_engine.select_backend resolved it at
+    # startup. The family name for vLLM; which vLLM variant loaded is the engine's business.
     backend: str = "eager"
     num_gpus: int = 1
     # Serve completions only, at the cost of everything hook-dependent (capture, steering, lens).

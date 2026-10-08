@@ -5,7 +5,7 @@
 // without hitting the inference server.
 
 import { JlensShareSteer, JlensShareUiState } from '@/lib/utils/jlens-share';
-import { LensMetaMessage, LensTokenMessage, LensTokenSpan } from '@/lib/utils/lens';
+import { LensChatMessage, LensChatTool, LensMetaMessage, LensTokenMessage, LensTokenSpan } from '@/lib/utils/lens';
 
 // Extract the per-token chat-span metadata (parallel to a token stream) so a
 // share can persist grouping. Shares re-run inference server-side over the exact
@@ -32,6 +32,25 @@ export interface JlensExportSteer {
   tokens: LensTokenMessage[];
 }
 
+// One oracle read of the main run, as the sharer saw it, with the signature
+// `/api/lens/oracle` gave it (so a share of a share can store it again).
+export interface JlensExportOracleRead {
+  position: number;
+  layer: number;
+  adapter: string;
+  bullets: string[];
+  text: string;
+  finish: string;
+  sig: string;
+}
+
+// Oracle reads saved with a share. A read is not repeatable, so a share keeps
+// the text instead of reading again. The `/api/lens/share` body sends the same shape.
+export interface JlensExportOracle {
+  maxBullets: number;
+  reads: JlensExportOracleRead[];
+}
+
 interface JlensExportBase {
   // Schema version so we can evolve the format without silently mis-loading.
   version: 1;
@@ -45,6 +64,10 @@ interface JlensExportBase {
   // Optional steered run saved with the share. Absent when the share had no
   // active steered run (and for plain fixture exports).
   steer?: JlensExportSteer;
+  // Absent when the run has no oracle reads.
+  oracle?: JlensExportOracle;
+  // The sidebar layer range [first, last]. Absent when it is the default.
+  layerRange?: [number, number];
 }
 
 export interface JlensExportCompletion extends JlensExportBase {
@@ -54,7 +77,9 @@ export interface JlensExportCompletion extends JlensExportBase {
 
 export interface JlensExportChat extends JlensExportBase {
   kind: 'chat';
-  messages: { role: ChatRole; content: string }[];
+  messages: LensChatMessage[];
+  // Tool definitions the chat template rendered into the prompt, if any.
+  tools?: LensChatTool[];
 }
 
 export type JlensExport = JlensExportCompletion | JlensExportChat;
@@ -159,5 +184,35 @@ export function parseFixture(data: unknown): JlensExport {
   if (!Array.isArray(obj.tokens)) {
     throw new Error('Fixture is missing a "tokens" array.');
   }
-  return data as JlensExport;
+  // A bad oracle or layer range field costs only that field, not the run.
+  const out = { ...obj };
+  const oracle = obj.oracle as Record<string, unknown> | undefined;
+  if (oracle !== undefined && (typeof oracle?.maxBullets !== 'number' || !Array.isArray(oracle?.reads))) {
+    out.oracle = undefined;
+  }
+  if (obj.layerRange !== undefined && !isLayerRange(obj.layerRange)) {
+    out.layerRange = undefined;
+  }
+  return out as unknown as JlensExport;
+}
+
+// Keep a restored layer range inside the model's layers.
+export function clampLayerRange(
+  range: [number, number] | null,
+  bounds: [number, number] | null,
+): [number, number] | null {
+  if (!range || !bounds) {
+    return range;
+  }
+  const first = Math.min(Math.max(range[0], bounds[0]), bounds[1]);
+  return [first, Math.min(Math.max(range[1], first), bounds[1])];
+}
+
+export function isLayerRange(v: unknown): v is [number, number] {
+  return (
+    Array.isArray(v) &&
+    v.length === 2 &&
+    v.every((n) => Number.isInteger(n) && n >= 0) &&
+    (v[0] as number) <= (v[1] as number)
+  );
 }

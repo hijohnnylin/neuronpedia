@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import pytest
 
-# The three the capability report and every refusal are derived from. Reading any of them wrong is
+# What the capability report and every refusal are derived from. Reading any of them wrong is
 # silent, so each is named here rather than covered by a "the class looks about right" check.
-CAPABILITY_ATTRS = ("static_points", "static_writes", "graph_replay", "hooks_available")
+CAPABILITY_ATTRS = ("static_points", "static_writes", "graph_replay", "hooks_available", "describe")
 
 
 @pytest.fixture(scope="module")

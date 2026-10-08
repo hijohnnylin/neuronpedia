@@ -23,6 +23,7 @@ from neuronpedia_inference.schemas import (
     ActivationAllResponse,
 )
 from neuronpedia_inference.shared import (
+    LoadedModel,
     Model,
     RecoverableOutOfMemory,
     recover_from_oom,
@@ -330,7 +331,7 @@ class ActivationProcessor:
     async def _format_result_and_calculate_dfa(
         self,
         sorted_activations: list[list[float]],
-        model: object,
+        model: LoadedModel,
         tokens: torch.Tensor,
         request: ActivationTopKRequest,
     ) -> list[ActivationAllFeature]:
@@ -374,7 +375,7 @@ class ActivationProcessor:
 
         return feature_activations
 
-    async def _dfa_layer_cache(self, model: object, tokens: torch.Tensor, layer_num: int):
+    async def _dfa_layer_cache(self, model: LoadedModel, tokens: torch.Tensor, layer_num: int):
         """Memoized backend-aware (value, attn_probs, dims) for a layer (reused across features)."""
         cached = self._dfa_cache.get(layer_num)
         if cached is None:
@@ -384,7 +385,7 @@ class ActivationProcessor:
 
     async def _calculate_dfa_values(
         self,
-        model: object,
+        model: LoadedModel,
         tokens: torch.Tensor,
         layer_num: int,
         idx: int,

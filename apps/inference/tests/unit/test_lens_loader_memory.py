@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import pytest
 import torch
+from interp_engine import lens_stream
 
 from neuronpedia_inference import startup_memory
 from neuronpedia_inference.endpoints.lens.lens_loader import LoadedJacobianLens
@@ -95,16 +96,21 @@ class TestDtype:
         assert wide.resident_bytes == 2 * narrow.resident_bytes
 
 
+def _carry(lens: LoadedJacobianLens, residual: torch.Tensor, layer: int) -> torch.Tensor:
+    """``residual`` through ``layer``'s J_bar, as the engine stages it from what placement left."""
+    return lens_stream._stage({layer: residual}, [layer], lens.placed_jacobians())
+
+
 class TestTransport:
     def test_returns_float32_whatever_the_lens_dtype(self):
-        # Callers stack a transported layer beside a directly-decoded one, so the
-        # output dtype cannot follow the lens.
+        # A carried layer is stacked beside a directly-decoded one, so the output dtype cannot
+        # follow the lens.
         residual = torch.randn(3, D_MODEL)
-        assert _lens().transport(residual, 0).dtype is torch.float32
-        assert _lens(dtype=torch.float32).transport(residual, 0).dtype is torch.float32
+        assert _carry(_lens(), residual, 0).dtype is torch.float32
+        assert _carry(_lens(dtype=torch.float32), residual, 0).dtype is torch.float32
 
     def test_shape_is_the_readout_basis(self):
-        out = _lens().transport(torch.randn(5, D_MODEL), 0)
+        out = _carry(_lens(), torch.randn(5, D_MODEL), 0)
         assert out.shape == (5, D_MODEL)
 
     def test_matches_a_float32_reference(self):
@@ -113,7 +119,7 @@ class TestTransport:
         lens = _lens()
         residual = torch.randn(4, D_MODEL)
         reference = residual @ lens.jacobians[0].float().T
-        torch.testing.assert_close(lens.transport(residual, 0), reference, rtol=3e-2, atol=3e-2)
+        torch.testing.assert_close(_carry(lens, residual, 0), reference, rtol=3e-2, atol=3e-2)
 
 
 class TestDeviceBudget:
@@ -163,9 +169,9 @@ class TestDeviceBudget:
         # The device copy is a cache, not the storage; a re-read must still be correct.
         lens = _lens(n_layers=6, device_budget_bytes=2 * LAYER_BYTES)
         residual = torch.randn(2, D_MODEL)
-        first = lens.transport(residual, 0)
+        first = _carry(lens, residual, 0)
         _sweep_admitting(lens)
-        torch.testing.assert_close(lens.transport(residual, 0), first)
+        torch.testing.assert_close(_carry(lens, residual, 0), first)
 
     def test_host_storage_is_not_rationed(self):
         # On the vLLM backend the residuals are CPU tensors, so `.to()` hands back the
@@ -261,10 +267,11 @@ class TestDeviceBudgetOnCuda:
         device = torch.device("cuda:0")
         lens = _lens(n_layers=6, device_budget_bytes=2 * LAYER_BYTES)
         residual = torch.randn(2, D_MODEL, device=device)
-        expected = {layer: lens.transport(residual, layer) for layer in lens.source_layers}
+        expected = {layer: _carry(lens, residual, layer) for layer in lens.source_layers}
         for _ in range(2):
+            _sweep(lens, device)
             for layer in lens.source_layers:
-                torch.testing.assert_close(lens.transport(residual, layer), expected[layer])
+                torch.testing.assert_close(_carry(lens, residual, layer), expected[layer])
         assert lens.device_resident_bytes <= lens.device_budget_bytes
 
     def test_placing_uploads_the_whole_lens_up_front(self):
@@ -330,10 +337,9 @@ class TestDeviceBudgetOnCuda:
         reference = residual @ lens.jacobians[0].float().T
 
         lens.place_on_device(torch.device("cuda:0"), device_budget_bytes=4 * LAYER_BYTES)
-        out = lens.transport(residual, 0)
+        out = _carry(lens, residual, 0)
 
         assert lens._device_cache[0].is_cuda
-        # Returned where the caller's residual lives, so callers that have not staged a
-        # whole batch keep working unchanged.
-        assert out.device == residual.device
-        torch.testing.assert_close(out, reference, rtol=3e-2, atol=3e-2)
+        # Staged where the resident J_bar is, not where the residual came from.
+        assert out.is_cuda
+        torch.testing.assert_close(out.cpu(), reference, rtol=3e-2, atol=3e-2)
