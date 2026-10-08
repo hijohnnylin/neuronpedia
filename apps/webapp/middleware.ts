@@ -8,8 +8,8 @@ const RATE_LIMIT_WINDOW = '60 m';
 
 const NO_LIMIT_ENDPOINTS = ['/api/steer-load'];
 
-// Temporary: the /qwen3 embed goes to this J-Lens share, with no query string added.
-const QWEN3_EMBED_REDIRECT = 'https://www.neuronpedia.org/qwen3.6-27b/jlens?shareId=cmuyz763o0001182xcprl8ar8';
+// Temporary: the /qwen3 embed shows this page in place of the model page.
+const QWEN3_EMBED_PAGE = '/embed/open-jpp-lens';
 
 // Rate-limit entry. `exact: true` requires path-component matching (pathname
 // === endpoint OR pathname.startsWith(endpoint + '/')) so the bucket isn't
@@ -139,11 +139,11 @@ export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname.toLowerCase();
 
   const isEmbedSearchParam = request.nextUrl.searchParams.get('embed');
-  if (pathname === '/qwen3' && isEmbedSearchParam === 'true') {
-    return NextResponse.redirect(QWEN3_EMBED_REDIRECT, 307);
-  }
   const isEmbed = isEmbedSearchParam === 'true' || pathname.startsWith('/embed/');
   requestHeaders.set('x-is-embed', isEmbed ? 'true' : 'false');
+  if (pathname === '/qwen3' && isEmbedSearchParam === 'true') {
+    return NextResponse.rewrite(new URL(QWEN3_EMBED_PAGE, request.url), { request: { headers: requestHeaders } });
+  }
 
   if (!ENABLE_RATE_LIMITER) {
     const res = NextResponse.next({
