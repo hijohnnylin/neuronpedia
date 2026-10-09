@@ -81,8 +81,8 @@ async def _forward(model: LoadedModel) -> None:
     if isinstance(model, VLLMModel):
         engine = model.engine
         if engine is None:
-            # ``initialized`` flips before warmup builds the engine, so this is startup, not
-            # a fault.
+            # Not expected: ``initialized`` flips after warmup builds the engine. Read it as
+            # startup, not a fault.
             raise EngineNotReady("vLLM engine is still starting")
         if getattr(engine, "errored", False):
             raise RuntimeError("vLLM engine is dead")

@@ -813,9 +813,13 @@ async def startup_event():
     init_task = asyncio.create_task(initialize(args.custom_hf_model_id))
 
     def _log_init_task_result(task: asyncio.Task[None]) -> None:
+        global initialization_error
         try:
             task.result()
-        except Exception:
+        except Exception as exc:
+            # A failure after the load (warmup, lens upload) sets no error, and /health would
+            # report "starting" forever.
+            initialization_error = initialization_error or str(exc)
             logger.exception("Background initialization task failed")
 
     init_task.add_done_callback(_log_init_task_result)
@@ -896,7 +900,7 @@ async def initialize(
     custom_hf_model_id: str | None = None,
 ):
     logger.info("Initializing...")
-    global initialization_error
+    global initialization_error, initialized
     initialization_error = None
     startup_started_at = time.monotonic()
 
@@ -1160,10 +1164,6 @@ async def initialize(
         logger.info("Warming up lens code path (if Jacobian lens available)...")
         warmup_lens()
 
-        global initialized
-        initialized = True
-        logger.info("Initialized: %s", initialized)
-
     attempt = 0
     while True:
         attempt += 1
@@ -1259,6 +1259,10 @@ async def initialize(
         )
     )
 
+    # Open to traffic only now. Before this, the lens sets are not on the vLLM worker and
+    # the request budget is not measured, so a request would fail or skip admission.
+    initialized = True
+    logger.info("Initialized: %s", initialized)
     _log_ready_banner(time.monotonic() - startup_started_at)
 
 
