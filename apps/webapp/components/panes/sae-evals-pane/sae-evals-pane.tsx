@@ -16,10 +16,15 @@ import { Core, CoreFeatureMetric } from '@/types/eval_output_schema_core';
 import { Prisma } from '@prisma/client';
 import { ExternalLinkIcon, QuestionMarkCircledIcon } from '@radix-ui/react-icons';
 import { JSONSchema } from 'json-schema-to-typescript';
-import Plotly from 'plotly.js-dist-min';
+import dynamic from 'next/dynamic';
 import createPlotlyComponent from 'react-plotly.js/factory';
 import SaeEvalAccordionTrigger from './accordion-trigger';
 import SaeEvalMetricsAccordion from './metrics-accordion';
+
+const Plot = dynamic(
+  () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
+  { ssr: false },
+);
 
 /*
 converting plotly express to plotly graph objects: 
@@ -36,8 +41,6 @@ export default function SAEEvalsPane({
   evals: EvalWithPartialRelations[];
 }) {
   const { setFeatureModalFeature, setFeatureModalOpen } = useGlobalContext();
-
-  const Plot = createPlotlyComponent(Plotly);
 
   return (
     <Card className="w-full bg-white">
