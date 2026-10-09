@@ -1048,7 +1048,7 @@ function SharedStripColumns({
           </div>
         ))}
         {showOracle && (
-          <div className="min-w-[140px] flex-1 sm:min-w-0">
+          <div className="min-w-[140px] flex-1 sm:min-w-0 sm:flex-[0.6]">
             {/* Mirrored only in the by-layer overview, where its rows match the lens rows. */}
             <OracleLayerReadout
               token={token}

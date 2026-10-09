@@ -130,20 +130,31 @@ export function JlensPopupHost({
 }) {
   const chosenColumns = useContext(LensColumnsContext);
   const oracle = useContext(OracleContext);
-  const numColumns = resolveLensColumns(chosenColumns, hasJppLens(layersByType)).length + (oracle?.available ? 1 : 0);
+  const numLenses = resolveLensColumns(chosenColumns, hasJppLens(layersByType)).length;
   const isMobile = useIsLensMobile();
   // Ref to the popup's content so an outside tap (mobile) can be distinguished
   // from a tap inside the popup (which must not dismiss it).
   const contentRef = useRef<HTMLDivElement | null>(null);
-  // Each shown lens adds a column to the popup, so it needs more width. On
-  // mobile the popup spans the screen, less the 8px collision padding per side.
-  const popupWidthClass = `w-[calc(100vw-16px)] min-w-[calc(100vw-16px)] max-w-[calc(100vw-16px)] ${
-    numColumns >= 3
-      ? 'sm:w-[min(1320px,96vw)] sm:min-w-[min(1320px,96vw)] sm:max-w-[min(1320px,96vw)]'
-      : numColumns === 2
-        ? 'sm:w-[960px] sm:min-w-[960px] sm:max-w-[960px]'
-        : 'sm:w-[540px] sm:min-w-[540px] sm:max-w-[540px]'
-  }`;
+  // Each shown lens adds a column to the popup, so it needs more width. The
+  // oracle column is 0.6 of a lens column on desktop. On mobile the popup spans
+  // the screen, less the 8px collision padding per side.
+  let desktopWidthClass: string;
+  if (oracle?.available) {
+    desktopWidthClass =
+      numLenses >= 3
+        ? 'sm:w-[min(1188px,96vw)] sm:min-w-[min(1188px,96vw)] sm:max-w-[min(1188px,96vw)]'
+        : numLenses === 2
+          ? 'sm:w-[min(1144px,96vw)] sm:min-w-[min(1144px,96vw)] sm:max-w-[min(1144px,96vw)]'
+          : 'sm:w-[768px] sm:min-w-[768px] sm:max-w-[768px]';
+  } else {
+    desktopWidthClass =
+      numLenses >= 3
+        ? 'sm:w-[min(1320px,96vw)] sm:min-w-[min(1320px,96vw)] sm:max-w-[min(1320px,96vw)]'
+        : numLenses === 2
+          ? 'sm:w-[960px] sm:min-w-[960px] sm:max-w-[960px]'
+          : 'sm:w-[540px] sm:min-w-[540px] sm:max-w-[540px]';
+  }
+  const popupWidthClass = `w-[calc(100vw-16px)] min-w-[calc(100vw-16px)] max-w-[calc(100vw-16px)] ${desktopWidthClass}`;
 
   const [active, setActive] = useState<JlensPopupActive | null>(null);
   const activeRef = useRef<JlensPopupActive | null>(null);

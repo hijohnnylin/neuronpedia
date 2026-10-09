@@ -755,14 +755,14 @@ export function OracleLayerReadout({
           onClick={() => oracle.request(token.position)}
           disabled={oracle.busy}
           title={oracle.busy ? 'Wait for the run to end.' : undefined}
-          className="rounded-md bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-slate-400 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Load Oracle Lens
         </button>
         {credit && (
           <a
             href={credit.href}
-            className="text-[10px] text-sky-700 underline"
+            className="mt-0.5 text-[10px] text-slate-400 hover:underline"
             target="_blank"
             rel="noopener noreferrer"
           >
