@@ -89,14 +89,38 @@ def _python_sources() -> list[Path]:
     ]
 
 
-def _collective_rpc_first_args() -> list[tuple[Path, int, ast.expr]]:
-    """Every ``*.collective_rpc(first_arg, ...)`` in the repo, as AST (multi-line safe)."""
-    found: list[tuple[Path, int, ast.expr]] = []
+def _rpc_names(arg: ast.expr, scope: ast.AST) -> list[str] | None:
+    """The method names ``arg`` can be: a string, a choice of strings, or a local set to those.
+
+    None when it can be anything else, such as a callable.
+    """
+    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+        return [arg.value]
+    if isinstance(arg, ast.IfExp):
+        body, orelse = _rpc_names(arg.body, scope), _rpc_names(arg.orelse, scope)
+        return body + orelse if body is not None and orelse is not None else None
+    if isinstance(arg, ast.Name):
+        values = [
+            node.value
+            for node in ast.walk(scope)
+            if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == arg.id for t in node.targets)
+        ]
+        resolved = [_rpc_names(v, scope) if not isinstance(v, ast.Name) else None for v in values]
+        if not values or any(r is None for r in resolved):
+            return None
+        return [name for r in resolved if r is not None for name in r]
+    return None
+
+
+def _collective_rpc_first_args() -> list[tuple[Path, int, list[str] | None]]:
+    """Every ``*.collective_rpc(first_arg, ...)`` in the repo, with the method names it can pass."""
+    found: list[tuple[Path, int, list[str] | None]] = []
     for path in _python_sources():
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"))
         except (SyntaxError, UnicodeDecodeError):
             continue
+        parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
         for node in ast.walk(tree):
             if (
                 isinstance(node, ast.Call)
@@ -104,7 +128,10 @@ def _collective_rpc_first_args() -> list[tuple[Path, int, ast.expr]]:
                 and node.func.attr == "collective_rpc"
                 and node.args
             ):
-                found.append((path, node.lineno, node.args[0]))
+                scope: ast.AST = node
+                while scope in parents and not isinstance(scope, ast.FunctionDef | ast.AsyncFunctionDef):
+                    scope = parents[scope]
+                found.append((path, node.lineno, _rpc_names(node.args[0], scope)))
     return found
 
 
@@ -122,8 +149,8 @@ def test_no_collective_rpc_passes_a_callable() -> None:
     """
     offenders = [
         f"{path.name}:{lineno}"
-        for path, lineno, arg in _collective_rpc_first_args()
-        if not (isinstance(arg, ast.Constant) and isinstance(arg.value, str)) and path.name not in _CALLABLE_RPC_ALLOWED
+        for path, lineno, names in _collective_rpc_first_args()
+        if names is None and path.name not in _CALLABLE_RPC_ALLOWED
     ]
     assert not offenders, (
         f"collective_rpc called with a non-string first argument at {offenders}. Pass the "
@@ -141,7 +168,9 @@ def test_every_collective_rpc_name_exists_on_a_worker() -> None:
 
     metal: type | None = None
     if (_ENGINE_ROOT / "vllm_metal_plugin.py").exists():
-        from interp_engine.vllm_metal_plugin import InterpMetalWorkerExtension as metal
+        from interp_engine.vllm_metal_plugin import (  # pyright: ignore[reportMissingImports]
+            InterpMetalWorkerExtension as metal,
+        )
 
     def known(path: Path, name: str) -> bool:
         if hasattr(InterpWorkerExtension, name) or hasattr(Worker, name):
@@ -149,9 +178,10 @@ def test_every_collective_rpc_name_exists_on_a_worker() -> None:
         return metal is not None and path.name.startswith("vllm_metal") and hasattr(metal, name)
 
     unknown = [
-        f"{path.name}:{lineno} -> {arg.value!r}"
-        for path, lineno, arg in _collective_rpc_first_args()
-        if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and not known(path, arg.value)
+        f"{path.name}:{lineno} -> {name!r}"
+        for path, lineno, names in _collective_rpc_first_args()
+        for name in names or []
+        if not known(path, name)
     ]
     assert not unknown, (
         f"collective_rpc names that are neither an InterpWorkerExtension method nor a vLLM "

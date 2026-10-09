@@ -1467,9 +1467,10 @@ wheels = [
 
 [[package]]
 name = "interp-engine"
-version = "1.12.1"
+version = "1.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "accelerate" },
     { name = "einops" },
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'linux'" },
@@ -1477,9 +1478,9 @@ dependencies = [
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a7/1f/1c6e1d458ba8121480cb1d7a090bc26ce057fbc482a9714ed5d06a9dfc9f/interp_engine-1.12.1.tar.gz", hash = "sha256:1d439a5e3873c944a23bc925c8d663ccb67a664a8565c0394b2939bc03e356c2", size = 945150, upload-time = "2026-10-07T04:45:52.174Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/34/56/a6a8cb3a8a069dd5b5173b591cd7b058afd3b155d3fc4425c1c54f3f9f87/interp_engine-1.13.0.tar.gz", hash = "sha256:682da262611b7cf597ca1f869d4028e191ddadf0bb38be8be7a91b3c0839d05f", size = 1049713, upload-time = "2026-10-09T23:36:50.339Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dc/2b/0d8bd3d8f0f29d8e8878aa092cccfdc7fa3775d1fd3871d38178c6de4039/interp_engine-1.12.1-py3-none-any.whl", hash = "sha256:2c8ee7394973e0f118d8f26a3416fdb5b91375b278b1600509ca882fa91f2ae0", size = 472697, upload-time = "2026-10-07T04:45:50.647Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/e6/ee05906f523030056ab5951ab8685bd88c789f14b116e18018ed3f8be8e2/interp_engine-1.13.0-py3-none-any.whl", hash = "sha256:9e73d12612b686c206d52461e4d8e731666d8fbd518d676429f111571dcce388", size = 536068, upload-time = "2026-10-09T23:36:48.57Z" },
 ]
 
 [package.optional-dependencies]
@@ -2065,7 +2066,7 @@ requires-dist = [
     { name = "hf-transfer", specifier = ">=0.1.9,<0.2" },
     { name = "huggingface", specifier = ">=0.0.1,<0.0.2" },
     { name = "huggingface-hub", specifier = ">=1.0" },
-    { name = "interp-engine", extras = ["vllm", "quant"], specifier = "==1.12.1" },
+    { name = "interp-engine", extras = ["vllm", "quant"], specifier = "==1.13.0" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "pandas", specifier = ">=2.2.2,<3" },
     { name = "psutil", specifier = ">=5.9.8,<6" },

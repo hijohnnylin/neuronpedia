@@ -206,6 +206,7 @@
     "activation_topk_by_token": true,
     "dfa": true,
     "lens_jacobian": true,
+    "lens_jpp": false,
     "lens_logit": true,
     "neurons": false,
     "steer_completion": true,

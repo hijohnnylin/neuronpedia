@@ -56,7 +56,8 @@ dependencies = [
   # --quantization / --kv_cache_dtype pass through: FP8 on load is what fits Llama-3.3-70B
   # on one 96 GB card. Nothing else on the surface this service calls changed.
   # 1.12.1: an out-of-memory error in the vLLM worker fails one request, not the engine.
-  "interp-engine[vllm,quant]==1.12.1",
+  # 1.13.0: lens and steering in the engine, LoRA reads, and the protocol this service calls.
+  "interp-engine[vllm,quant]==1.13.0",
 ]
 
 [dependency-groups]
