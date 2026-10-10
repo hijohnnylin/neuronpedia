@@ -59,7 +59,8 @@ dependencies = [
   # 1.13.0: lens and steering in the engine, LoRA reads, and the protocol this service calls.
   # 1.13.1: vllm-static steers decode rows again (they were dropped inside FULL CUDA graphs),
   # and hooked capture and steering work on vLLM's Transformers backend (e.g. OLMo-2).
-  "interp-engine[vllm,quant]==1.13.1",
+  # 1.13.2: vllm-static DeepSeek-V4 starts again (1.13.1 failed its decode graph capture).
+  "interp-engine[vllm,quant]==1.13.2",
 ]
 
 [dependency-groups]
