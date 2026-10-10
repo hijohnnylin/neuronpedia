@@ -204,7 +204,11 @@ class Config:
     def get_instance(cls) -> "Config":
         """Get the global Config instance, creating it if it doesn't exist"""
         if cls._instance is None:
-            cls._instance = Config()
+            # A default takes seconds to build (it scans the SAE directory). If startup sets the
+            # real config in that time, the default must not replace it.
+            default = Config()
+            if cls._instance is None:
+                cls._instance = default
         return cls._instance
 
     def set_num_layers(self, num_layers: int) -> None:

@@ -1369,6 +1369,7 @@ async def lens_prompt(request: LensPromptRequest, http_request: Request):
 
     n_layers = config.num_layers
     if n_layers is None:
+        logger.error("Lens request refused: the config has no layer count (model %s)", config.model_id)
         return JSONResponse(content={"error": "Model layer count not initialized"}, status_code=500)
 
     layers_by_type = {

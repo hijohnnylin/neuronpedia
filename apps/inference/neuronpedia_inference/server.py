@@ -1394,8 +1394,11 @@ class CudaHealthMiddleware:
         finally:
             # If this request poisoned the CUDA context (device-side assert / illegal access /
             # wedged post-OOM), terminate so the supervisor restarts us -- even if the endpoint
-            # swallowed the error into a 500.
-            probe_cuda_or_die(Config.get_instance().device)
+            # swallowed the error into a 500. Not get_instance(): a /health during startup would
+            # build a default config there, which can replace the real one.
+            config = Config._instance
+            if config is not None:
+                probe_cuda_or_die(config.device)
 
 
 def _replay_receive(receive: Any, body: bytes, first: Any = None) -> Any:
