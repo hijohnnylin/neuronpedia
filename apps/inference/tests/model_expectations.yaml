@@ -134,8 +134,8 @@ models:
     # necessarily write that concept, and which concept it writes depends on the prompt.
     steerPrompt: "The best pet to have is a"
     steerPattern: "[Cc]at"
-    # Unsteered: ' pet that is a good fit for your lifestyle and personality.'
-    unsteeredPattern: "[Pp]et"
+    # Unsteered: ' dog. Whether you're looking for a playful companion,'
+    unsteeredPattern: "[Dd]og"
 
   qwen3.5-0.8b:
     # Thinking model, so the CPU job deselects it (`-m "not thinking"`) and the GPU job runs it.
