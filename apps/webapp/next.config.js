@@ -128,42 +128,44 @@ module.exports = withMDX(nextConfig);
 
 const { withSentryConfig } = require('@sentry/nextjs');
 
-module.exports = withSentryConfig(module.exports, {
-  // For all available options, see:
-  // https://github.com/getsentry/sentry-webpack-plugin#options
+if (process.env.SENTRY_AUTH_TOKEN) {
+  module.exports = withSentryConfig(module.exports, {
+    // For all available options, see:
+    // https://github.com/getsentry/sentry-webpack-plugin#options
 
-  org: 'johnny-66',
-  project: 'neuronpedia',
+    org: 'johnny-66',
+    project: 'neuronpedia',
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
+    // Only print logs for uploading source maps in CI
+    silent: !process.env.CI,
 
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
+    // For all available options, see:
+    // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
+    // Upload a larger set of source maps for prettier stack traces (increases build time)
+    widenClientFileUpload: true,
 
-  // Hides source maps from generated client bundles
-  hideSourceMaps: true,
-  telemetry: false,
+    // Hides source maps from generated client bundles
+    hideSourceMaps: true,
+    telemetry: false,
 
-  sourcemaps: {
-    deleteSourcemapsAfterUpload: true,
-  },
-
-  webpack: {
-    // Automatically annotate React components to show their full name in breadcrumbs and session replay
-    reactComponentAnnotation: {
-      enabled: true,
+    sourcemaps: {
+      deleteSourcemapsAfterUpload: true,
     },
 
-    // Automatically tree-shake Sentry logger statements to reduce bundle size
-    treeshake: {
-      removeDebugLogging: true,
-    },
+    webpack: {
+      // Automatically annotate React components to show their full name in breadcrumbs and session replay
+      reactComponentAnnotation: {
+        enabled: true,
+      },
 
-    // Enables automatic instrumentation of Vercel Cron Monitors.
-    automaticVercelMonitors: true,
-  },
-});
+      // Automatically tree-shake Sentry logger statements to reduce bundle size
+      treeshake: {
+        removeDebugLogging: true,
+      },
+
+      // Enables automatic instrumentation of Vercel Cron Monitors.
+      automaticVercelMonitors: true,
+    },
+  });
+}
