@@ -200,10 +200,20 @@ def save_lens(lens: jlens.JacobianLens, path: str, provenance: dict[str, Any]) -
     Same keys and fp16 Jacobians as upstream ``save``, so ``JacobianLens.load``
     reads the file unchanged; it ignores the extra key. Written here rather
     than by patching the vendored library, which stays a verbatim copy.
+    Non-finite fp16 Jacobians raise an error before the file is written.
     """
+    stored_jacobians: dict[int, torch.Tensor] = {}
+    for layer, J in lens.jacobians.items():
+        stored = J.to(torch.float16)
+        if not torch.isfinite(stored).all().item():
+            raise ValueError(
+                f"Cannot save J-lens: layer {layer} has non-finite values after float16 conversion"
+            )
+        stored_jacobians[layer] = stored
+
     torch.save(
         {
-            "J": {layer: J.to(torch.float16) for layer, J in lens.jacobians.items()},
+            "J": stored_jacobians,
             "n_prompts": lens.n_prompts,
             "source_layers": lens.source_layers,
             "d_model": lens.d_model,
