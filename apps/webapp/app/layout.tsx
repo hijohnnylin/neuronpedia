@@ -97,7 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en">
       <body
         className={`flex min-h-[100dvh] flex-col bg-slate-50 bg-fixed ${inter.className} ${
-          isEmbed ? 'overscroll-auto' : 'overscroll-none'
+          isEmbed ? 'embed overscroll-auto' : 'overscroll-none'
         }`}
       >
         <AuthProvider session={session}>

@@ -3,13 +3,11 @@ import { ipAddress } from '@vercel/functions';
 import { kv } from '@vercel/kv';
 import { NextRequest, NextResponse } from 'next/server';
 import { API_KEY_HEADER_NAME, CONTACT_EMAIL_ADDRESS, ENABLE_RATE_LIMITER, HIGHER_LIMIT_API_TOKENS } from './lib/env';
+import { getLegacyModelIdRedirect } from './lib/utils/legacy-model-id';
 
 const RATE_LIMIT_WINDOW = '60 m';
 
 const NO_LIMIT_ENDPOINTS = ['/api/steer-load'];
-
-// Temporary: the /qwen3 embed shows this page in place of the model page.
-const QWEN3_EMBED_PAGE = '/embed/open-jpp-lens';
 
 // Rate-limit entry. `exact: true` requires path-component matching (pathname
 // === endpoint OR pathname.startsWith(endpoint + '/')) so the bucket isn't
@@ -141,8 +139,10 @@ export default async function middleware(request: NextRequest) {
   const isEmbedSearchParam = request.nextUrl.searchParams.get('embed');
   const isEmbed = isEmbedSearchParam === 'true' || pathname.startsWith('/embed/');
   requestHeaders.set('x-is-embed', isEmbed ? 'true' : 'false');
-  if (pathname === '/qwen3' && isEmbedSearchParam === 'true') {
-    return NextResponse.rewrite(new URL(QWEN3_EMBED_PAGE, request.url), { request: { headers: requestHeaders } });
+
+  const legacyModelIdRedirect = getLegacyModelIdRedirect(request.nextUrl.pathname, request.nextUrl.searchParams);
+  if (legacyModelIdRedirect) {
+    return NextResponse.redirect(new URL(legacyModelIdRedirect, request.url));
   }
 
   if (!ENABLE_RATE_LIMITER) {

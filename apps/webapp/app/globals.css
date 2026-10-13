@@ -78,6 +78,19 @@
   }
 }
 
+/* Height of the navbar and footer. An embed shows neither. */
+body {
+  --site-chrome-height: 48px;
+}
+@media (min-width: 640px) {
+  body {
+    --site-chrome-height: 75px;
+  }
+}
+body.embed {
+  --site-chrome-height: 0px;
+}
+
 sub,
 sup {
   font-size: 75%;

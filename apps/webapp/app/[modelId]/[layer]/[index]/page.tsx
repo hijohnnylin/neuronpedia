@@ -1,9 +1,8 @@
-import { REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT } from '@/lib/db/model';
 import { getNeuronOptimized, neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import FeatureDashboard from './feature-dashboard';
 
 export async function generateMetadata(props: {
@@ -41,21 +40,6 @@ export default async function Page(props: {
   const embedSteer = searchParams.embedsteer !== 'false'; // default embed steer
   const embedTestField = searchParams.embedtestfield !== 'false'; // default embed test field
   const defaultTestText = searchParams.defaulttesttext ? (searchParams.defaulttesttext as string) : undefined;
-
-  // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
-  if (params.modelId in REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT) {
-    const redirectToSteer = searchParams.redirectToSteer === 'true';
-    if (redirectToSteer) {
-      const strength = searchParams.strength ? (searchParams.strength as string) : 10;
-      const steerId = searchParams.saved ? (searchParams.saved as string) : null;
-      const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/steer?embed=true&source=${params.layer}&index=${params.index}&hideInitialSettingsOnMobile=true&strength=${strength}${steerId ? `&saved=${steerId}` : ''}`;
-      redirect(redirectUrl);
-    } else {
-      const queryString = new URLSearchParams(searchParams as Record<string, string>).toString();
-      const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/${params.layer}/${params.index}${queryString ? `?${queryString}` : ''}`;
-      redirect(redirectUrl);
-    }
-  }
 
   const { modelId } = params;
   let neuron: NeuronWithPartialRelations | null = null;

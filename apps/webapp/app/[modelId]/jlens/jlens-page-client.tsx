@@ -230,7 +230,7 @@ export default function JlensPageClient({
     <JlensTourStepContext.Provider value={activeTourStep}>
       <LensColumnsContext.Provider value={shownLensColumns}>
         <LensColumnsSetContext.Provider value={setLensColumns}>
-          <div className="mx-auto flex max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] w-full flex-col sm:max-h-[calc(100dvh-75px)] sm:min-h-[calc(100dvh-75px)]">
+          <div className="mx-auto flex max-h-[calc(100dvh_-_var(--site-chrome-height))] min-h-[calc(100dvh_-_var(--site-chrome-height))] w-full flex-col">
             <div className="flex w-full items-center justify-center bg-slate-100 px-3 pt-3 sm:px-6 sm:pb-6 sm:pt-6">
               <div className="relative flex min-h-20 w-full max-w-screen-2xl flex-row items-center justify-between gap-0 sm:min-h-0">
                 <div className="absolute -top-0.5 left-0 flex flex-col items-start justify-center gap-y-0 sm:relative sm:w-full sm:items-start">

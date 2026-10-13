@@ -1,9 +1,8 @@
 import { FEATURE_PRESETS } from '@/app/api/steer/presets/route';
 import { AssistantAxisModalProvider } from '@/components/provider/assistant-axis-modal-provider';
-import { REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT } from '@/lib/db/model';
 import { ASSET_BASE_URL } from '@/lib/env';
 import { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import AssistantAxisSteerer from './assistant-axis-steerer';
 
 const SUPPORTED_MODELS = ['llama3.3-70b-it'];
@@ -39,13 +38,6 @@ export default async function Page(props: {
   const params = await props.params;
   if (!SUPPORTED_MODELS.includes(params.modelId)) {
     notFound();
-  }
-  // TODO: this is a temporary map since there is a bug in our lesswrong plugin that breaks when dots are in modelIds for hoverover links
-  if (params.modelId in REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT) {
-    // redirect to the new model id
-    const queryString = new URLSearchParams(searchParams as Record<string, string>).toString();
-    const redirectUrl = `/${REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT[params.modelId as keyof typeof REPLACE_MODEL_ID_MAP_FOR_LW_TEMPORARY_REDIRECT]}/steer${queryString ? `?${queryString}` : ''}`;
-    redirect(redirectUrl);
   }
   const assistantCapPreset = FEATURE_PRESETS['llama3.3-70b-it'].find((p) => p.alias === ASSISTANT_CAP_PRESET);
   return (
