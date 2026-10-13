@@ -100,7 +100,7 @@ export default async function Page({
     <div
       className={`${isEmbed ? 'bg-slate-50' : 'bg-white'} ${
         isEmbed
-          ? 'h-screen max-h-screen min-h-screen'
+          ? 'h-[calc(100dvh_-_var(--embed-bar-height))] max-h-[calc(100dvh_-_var(--embed-bar-height))] min-h-[calc(100dvh_-_var(--embed-bar-height))]'
           : 'h-[calc(100vh_-_75px)] max-h-[calc(100vh_-_75px)] min-h-[calc(100vh_-_75px)]'
       } flex w-full max-w-full flex-col overflow-x-hidden`}
     >

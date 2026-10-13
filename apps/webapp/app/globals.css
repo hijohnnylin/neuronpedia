@@ -78,9 +78,10 @@
   }
 }
 
-/* Height of the navbar and footer. An embed shows neither. */
+/* Height of the navbar and footer. An embed shows neither, but in an iframe it shows the open-full-page bar. */
 body {
   --site-chrome-height: 48px;
+  --embed-bar-height: 0px;
 }
 @media (min-width: 640px) {
   body {
@@ -88,7 +89,10 @@ body {
   }
 }
 body.embed {
-  --site-chrome-height: 0px;
+  --site-chrome-height: var(--embed-bar-height);
+}
+html.in-iframe body.embed {
+  --embed-bar-height: 28px;
 }
 
 sub,

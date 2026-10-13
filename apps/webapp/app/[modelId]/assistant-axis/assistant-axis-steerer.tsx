@@ -214,7 +214,7 @@ export default function AssistantAxisSteerer({
   }, [initialSavedId]);
 
   return (
-    <div className="relative flex h-[calc(100dvh)] w-full flex-col items-start justify-center overflow-hidden sm:h-full sm:flex-row">
+    <div className="relative flex h-[calc(100dvh_-_var(--embed-bar-height))] w-full flex-col items-start justify-center overflow-hidden sm:h-full sm:flex-row">
       <AssistantAxisChat
         currentSavedId={currentSavedId}
         loadSavedSteerOutput={loadSavedSteerOutput}

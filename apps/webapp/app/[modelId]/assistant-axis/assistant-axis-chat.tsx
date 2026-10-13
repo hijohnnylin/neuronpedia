@@ -424,7 +424,7 @@ export default function AssistantAxisChat({
   }
 
   return (
-    <div className="relative flex h-[calc(100dvh)] w-full min-w-0 flex-col items-center text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh-75px)] sm:min-h-[calc(100dvh-75px)]">
+    <div className="relative flex h-[calc(100dvh_-_var(--embed-bar-height))] w-full min-w-0 flex-col items-center text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh_-_var(--site-chrome-height))] sm:min-h-[calc(100dvh_-_var(--site-chrome-height))]">
       <AssistantAxisWelcomeModal onLoadDemo={loadSavedSteerOutput} onFreeChat={reset} initialSavedId={initialSavedId} />
 
       {/* Share Modal */}
@@ -694,7 +694,7 @@ export default function AssistantAxisChat({
       <div className="relative flex h-full w-full max-w-screen-2xl flex-col px-5 sm:flex-row 2xl:px-0">
         <div
           ref={defaultScrollContainerRef}
-          className="absolute right-2 top-0 order-2 h-[calc(50dvh-140px)] max-h-[calc(50dvh-140px)] w-[calc(100dvw-135px)] max-w-[calc(100dvw-135px)] flex-1 flex-col overflow-y-scroll rounded-xl bg-slate-100 px-2 text-left text-xs text-slate-400 sm:relative sm:right-0 sm:order-1 sm:flex sm:h-full sm:max-h-[calc(100dvh-320px)] sm:min-h-[calc(100dvh-320px)] sm:w-full sm:max-w-full sm:px-5"
+          className="absolute right-2 top-0 order-2 h-[calc(50dvh_-_140px_-_var(--embed-bar-height)/2)] max-h-[calc(50dvh_-_140px_-_var(--embed-bar-height)/2)] w-[calc(100dvw-135px)] max-w-[calc(100dvw-135px)] flex-1 flex-col overflow-y-scroll rounded-xl bg-slate-100 px-2 text-left text-xs text-slate-400 sm:relative sm:right-0 sm:order-1 sm:flex sm:h-full sm:max-h-[calc(100dvh_-_var(--site-chrome-height)_-_245px)] sm:min-h-[calc(100dvh_-_var(--site-chrome-height)_-_245px)] sm:w-full sm:max-w-full sm:px-5"
         >
           <div className="sticky top-0.5 flex w-full flex-row justify-center from-slate-100 via-slate-100 to-transparent pb-2 pt-2 uppercase text-slate-700 sm:top-0 sm:bg-gradient-to-b sm:pb-5 sm:pt-5">
             <div className="-mt-1 select-none rounded-full bg-slate-100 px-3 pb-1 pt-1 text-[11px] font-bold normal-case text-slate-600 sm:-mt-4 sm:bg-transparent sm:px-5 sm:pb-5 sm:pt-2 sm:text-sm">
@@ -732,7 +732,7 @@ export default function AssistantAxisChat({
         {/* PersonaChart in the middle */}
         <div
           ref={chartContainerRef}
-          className="absolute left-0 top-0 order-1 h-full max-w-[120px] flex-1 flex-col overflow-hidden bg-white px-0 pb-40 sm:relative sm:order-2 sm:max-h-[calc(100dvh-180px)] sm:min-h-[calc(100dvh-180px)] sm:max-w-[300px]"
+          className="absolute left-0 top-0 order-1 h-full max-w-[120px] flex-1 flex-col overflow-hidden bg-white px-0 pb-40 sm:relative sm:order-2 sm:max-h-[calc(100dvh_-_var(--site-chrome-height)_-_105px)] sm:min-h-[calc(100dvh_-_var(--site-chrome-height)_-_105px)] sm:max-w-[300px]"
         >
           <div className="relative flex flex-col items-center justify-center gap-y-2">
             <div className="left-0 top-0 hidden w-full items-center justify-center px-2 pt-0 sm:absolute sm:flex sm:pt-[48px]">
@@ -917,7 +917,7 @@ export default function AssistantAxisChat({
         </div>
         <div
           ref={steeredScrollContainerRef}
-          className="absolute bottom-[270px] right-2 order-3 h-[calc(50dvh-140px)] max-h-[calc(50dvh-140px)] w-[calc(100dvw-135px)] max-w-[calc(100dvw-135px)] flex-1 flex-col overflow-y-scroll rounded-xl bg-sky-100 px-2 text-left text-xs text-slate-400 sm:relative sm:bottom-0 sm:right-0 sm:flex sm:h-full sm:max-h-[calc(100dvh-320px)] sm:min-h-[calc(100dvh-320px)] sm:w-full sm:max-w-full sm:px-5"
+          className="absolute bottom-[270px] right-2 order-3 h-[calc(50dvh_-_140px_-_var(--embed-bar-height)/2)] max-h-[calc(50dvh_-_140px_-_var(--embed-bar-height)/2)] w-[calc(100dvw-135px)] max-w-[calc(100dvw-135px)] flex-1 flex-col overflow-y-scroll rounded-xl bg-sky-100 px-2 text-left text-xs text-slate-400 sm:relative sm:bottom-0 sm:right-0 sm:flex sm:h-full sm:max-h-[calc(100dvh_-_var(--site-chrome-height)_-_245px)] sm:min-h-[calc(100dvh_-_var(--site-chrome-height)_-_245px)] sm:w-full sm:max-w-full sm:px-5"
         >
           <div className="sticky top-0.5 flex w-full flex-row justify-center from-sky-100 via-sky-100 to-transparent pb-2 pt-2 uppercase text-sky-700 sm:top-0 sm:bg-gradient-to-b sm:pb-5 sm:pt-5">
             <div className="-mt-1 select-none rounded-full bg-sky-100 px-3 pb-1 pt-1 text-[11px] font-bold normal-case sm:-mt-4 sm:bg-transparent sm:px-5 sm:pb-5 sm:pt-2 sm:text-sm">

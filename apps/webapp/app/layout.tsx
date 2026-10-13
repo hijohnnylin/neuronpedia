@@ -1,3 +1,4 @@
+import EmbedOpenFullPageBar from '@/components/embed-open-full-page-bar';
 import MdxDevReload from '@/components/mdx-dev-reload';
 import Navbar from '@/components/nav/navbar';
 import AuthProvider from '@/components/provider/auth-provider';
@@ -39,6 +40,10 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
 };
+
+// Marks an embed shown in an iframe before the first paint, so its bar does not shift the layout. It changes
+// <html> before hydration, so the embed's <html> suppresses the hydration warning.
+const MARK_IN_IFRAME_SCRIPT = "if (window.self !== window.top) document.documentElement.classList.add('in-iframe');";
 
 export async function generateMetadata(): Promise<Metadata> {
   const description = 'Open Source Interpretability Platform';
@@ -94,7 +99,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isEmbed = headersList.get('x-is-embed') === 'true';
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning={isEmbed}>
+      {isEmbed && (
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: MARK_IN_IFRAME_SCRIPT }} />
+        </head>
+      )}
       <body
         className={`flex min-h-[100dvh] flex-col bg-slate-50 bg-fixed ${inter.className} ${
           isEmbed ? 'embed overscroll-auto' : 'overscroll-none'
@@ -118,6 +128,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               )}
               <FeatureModal />
               <SimilarityMatrixModal />
+              {isEmbed && (
+                <Suspense fallback="">
+                  <EmbedOpenFullPageBar />
+                </Suspense>
+              )}
               <main className={`flex w-full flex-1 flex-col items-center gap-0 ${isEmbed ? 'pt-0' : 'pt-12 sm:pt-12'}`}>
                 {children}
               </main>
