@@ -250,11 +250,11 @@ export default function SteerCompletion({
 
   return (
     <div
-      className={`relative h-full max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] w-full min-w-0 flex-row text-sm font-medium leading-normal text-slate-500 sm:h-full sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)] sm:w-auto sm:basis-2/3 ${
+      className={`relative h-full max-h-[calc(100dvh_-_var(--site-chrome-height))] min-h-[calc(100dvh_-_var(--site-chrome-height))] w-full min-w-0 flex-row text-sm font-medium leading-normal text-slate-500 sm:h-full sm:w-auto sm:basis-2/3 ${
         showSettingsOnMobile ? 'hidden sm:flex' : 'flex'
       }`}
     >
-      <div className="hidden h-full max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] flex-1 flex-col overflow-y-scroll bg-slate-100 px-5 py-2 pt-28 text-left text-xs text-slate-400 sm:flex sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)]">
+      <div className="hidden h-full max-h-[calc(100dvh_-_var(--site-chrome-height))] min-h-[calc(100dvh_-_var(--site-chrome-height))] flex-1 flex-col overflow-y-scroll bg-slate-100 px-5 py-2 pt-28 text-left text-xs text-slate-400 sm:flex">
         <div className="sticky top-0.5 flex flex-row justify-center uppercase text-white sm:top-0">
           <div className="select-none rounded-full px-5 py-1 text-[10px] font-bold text-slate-600">Normal</div>
         </div>
@@ -274,7 +274,7 @@ export default function SteerCompletion({
           {isSteering && <LoadingSquare className="px-0 py-3" />}
         </div>
       </div>
-      <div className="flex h-full max-h-[calc(100dvh-48px)] min-h-[calc(100dvh-48px)] w-full flex-1 flex-col overflow-y-scroll bg-sky-100 px-3 py-2 pt-48 text-left text-xs text-slate-400 sm:max-h-[calc(100dvh-76px)] sm:min-h-[calc(100dvh-76px)] sm:px-5 sm:pt-28">
+      <div className="flex h-full max-h-[calc(100dvh_-_var(--site-chrome-height))] min-h-[calc(100dvh_-_var(--site-chrome-height))] w-full flex-1 flex-col overflow-y-scroll bg-sky-100 px-3 py-2 pt-48 text-left text-xs text-slate-400 sm:px-5 sm:pt-28">
         <div className="sticky top-0.5 flex flex-row justify-center uppercase text-sky-700 sm:top-0">
           <div className="select-none rounded-full px-5 py-1 text-[10px] font-bold">Steered</div>
         </div>
