@@ -70,12 +70,19 @@
 .nt-tour-active .nt-chat-tool * {
   pointer-events: none !important;
 }
+.nt-tour-active #nt-examples-bar,
 .nt-tour-hide-gutter .nt-gutter,
 .nt-tour-hide-monitor .nt-monitor,
 .nt-tour-hide-tooltip .nt-tooltip,
 .nt-tour-hide-no-swing .nt-no-swing {
   opacity: 0 !important;
   visibility: hidden;
+}
+/* On a phone the examples sit below the title. Remove them, to give the tour more height. */
+@media (max-width: 639px) {
+  .nt-tour-active #nt-examples-bar {
+    display: none;
+  }
 }
 /* In the first readout, only the wheel takes the click. Its slices and the pills do not take hover. */
 .nt-tour-no-slice-hover #nt-first-readout *,
