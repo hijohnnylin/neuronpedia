@@ -1,0 +1,117 @@
+---
+title: 'J++ Lens and Drift Calibrator (UI Research)'
+description: 'Better Jacobian Lens and a Community Collaboration with MIT Media Lab'
+date: 2026-10-15
+author: Johnny Lin and MIT Media Lab (Sheer Karny, Anthony Baez, Pat Pataranutaporn)
+image: ASSET_BASE_URL/blog/jpp-drift.jpg
+imagePreview: ASSET_BASE_URL/blog/jpp-drift.jpg
+---
+
+<div className="mt-2"></div>
+
+Hello! This update includes J++ Lens (a better Jacobian Lens) and Drift Calibrator - UI research that leverages interpretability for better user experiences. Drift Calibrator also has our first guest post below - a section written entirely by the collaborator.
+
+- ➡️ [**J++ Lens**](/qwen3.6-27b/jlens?shareId=cmuyz763o0001182xcprl8ar8) by Ayonrinde & Lindsey: Better Jacobian Lens that are a drop-in replacement.
+- ➡️ [**Drift Calibrator**](/drift-calibrator) by MIT Media Lab: UI research for visualizing internal AI behaviors with interpretability.
+
+**Other Updates**
+
+- **Posts**: You can assume our posts are not AI-generated - no more flagging posts as human-written.
+- **Docs**: We finally updated the [Neuronpedia docs](https://docs.neuronpedia.org) to cover our latest functionality.
+- **Jev Scorer**: Fast and cheap explanation scorer that works on any [Neuronpedia dashboard](https://www.neuronpedia.org/gemma-2-9b/20-res-matryoshka-dc/28). Click the score, select a Jev scorer type, then Generate. Or click Interpretable Score to check if a latent is [interpretable at all](https://arxiv.org/abs/2507.08473).
+- **Beta**: We're looking for a small group of beta testers for a new things coming soon. If you're interested, [send us a request](mailto:johnny@neuronpedia.org?subject=Add%20me%20to%20the%20beta&body=Add%20me%20to%20the%20beta).
+
+---
+
+## J++ Lens: Better Jacobian Lens
+
+#### [LessWrong](https://www.lesswrong.com/posts/nc9dHfcB22JdMzGbr) | [NP Demo](/qwen3.6-27b/jlens?shareId=cmuyz763o0001182xcprl8ar8) | [Code](https://github.com/safety-research/jpp_lens) | [Lenses](https://huggingface.co/koayon/jpp-lenses)
+
+Kola Ayonrinde & Lindsey just released [J++ Lens](https://www.lesswrong.com/posts/nc9dHfcB22JdMzGbr): drop-in replacements for Jacobian Lens with more faithful workspace readouts, especially at earlier layers.
+
+Here, we compare lenses in a prompt about the heart. In earlier layers, J-Lens (left) shows token `what?` a bunch of times, while J++ Lens (right) shows `cardiac` and `heart`.
+
+<img src="ASSET_BASE_URL/blog/jpp-lens-heart.jpg" alt="J-Lens and J++ Lens readouts for a prompt about the heart" />
+
+J++ Lens is live on Neuronpedia, and runs alongside every Qwen 27B chat:
+
+- ➡️ [Demo: JLens vs J++ Lens](/qwen3.6-27b/jlens?shareId=cmuyz763o0001182xcprl8ar8)
+- ➡️ [Demo: Early Layers](/qwen3.6-27b/jlens?shareId=cmuyz4f2p0000182x9t3s36vh) (Warning: Explicit Tokens in J-Lens)
+
+J++ Lenses also uploaded to the [Neuronpedia HF](https://huggingface.co/neuronpedia/jacobian-lens), with greater model coverage coming soon.
+
+---
+
+## Drift Calibrator - Guest Post by MIT Media Lab
+
+_An Interpretability Interface for Helping Users Anticipate Model Behavior_
+
+Sheer Karny, Anthony Baez, and Pat Pataranutaporn
+
+[**Try Drift Calibrator**](/drift-calibrator) | [**Paper**](ASSET_BASE_URL/blog/mit-drift-calibrator.pdf)
+
+<img src="ASSET_BASE_URL/blog/drift-0.gif" alt="Quick Demo of the Drift Calibrator UI" />
+
+TL;DR: When talking with other humans, we can rely on cues from body language and tone to contextualize the other person's mental states and intentions. However, when interacting with AI models we only have simple text outputs and no information about internal behavior or representations. To “backfill” this important missing context, we design interfaces that leverage interpretability for quick and at-a-glance understanding of what the model is thinking internally as we chat with it. Our case study with the MIT Media Lab demonstrates the importance of these interfaces, as well as our process for building them.
+
+### Introduction
+
+While most research in mechanistic interpretability focuses on improving methods to study models, everyday AI users are missing out on crucial benefits in safety and understanding from surfacing internal model behavior. Therefore, we can begin to offer modes of human-AI interaction that deliberately surface inner behavior. We hope that such an interface can give users insight beyond model outputs alone, acting as contextualizing information similar to what body language and tone does for understanding human utterances. We made an attempt at designing a mechanistically-informed interface, and demonstrated that users can successfully calibrate to an LLM’s shifting internal behaviors.
+
+### Motivation
+
+**How can interpretability help everyday users?**
+
+We believe that interpretability can help users by offering them insight into LLM behavior, particularly those that are misaligned to user goals. For instance, we know that over long, multi-turn conversations, LLM behavior can unexpectedly shift to behaviors that can cause users to believe false information ([Cheng et al., 2026](https://arxiv.org/abs/2510.01395)), fall into emotional dependence ([Fang et al., 2025](https://arxiv.org/abs/2503.17473)), or even enable psychosis-like symptoms ([Moore et al., 2026](https://arxiv.org/abs/2603.16567)). However, in current forms of AI interaction, users can only infer the model's behavioral state from its outputs. And even if users' guesses about a model’s internal behavior are correct, they have no point of reference to evaluate them.
+
+This gulf between model outputs and their internal representations can be addressed by helping users form accurate _mental models_ of LLM behavioral drift, thereby empowering them to directly identify and exercise resiliency to misaligned behaviors. Current user mental models of LLM behavior are derived from the model’s outputs alone, which we know to be opaque. Instead, we could reveal the internal states and representations alongside the model's outputs, offering the necessary feedback needed to build more comprehensive mental models.
+
+We therefore modified a typical chat-based AI interface so that it now translates internal representations into digestible, continuously updating, and mechanistically faithful _behavioral scores_ that help users identify and learn when LLM behaviors drift.
+
+Another way we can think about this interface is akin to an fMRI. We use fMRIs to gain insight into the brain, showing us the level of neural activity in different brain regions that have distinct roles for some given stimulus. This helps us understand how our brains process information. Our interface is similar, giving us insight into what features are most active during an LLM’s response. This signal, like an fMRI, does not offer perfect information into internal states, just a useful signal to further our understanding.
+
+**How do we know if interpretability is _actually_ helping users?**
+
+We deployed a large-scale user study (n=246) to evaluate how our interface helps users build more calibrated mental models of LLM behavioral drift in comparison to typical chat interfaces. Specifically, we compared how people predict model behaviors after chatting to a model where the interface was present versus those without it. Participants were specifically tasked with predicting behavioral scores after a brief chat, which directly evaluates the skill we want them to learn. We found that users that used our interface predicted these scores significantly better compared to those in normal chatbot interaction, demonstrating that our interface was able to better align user mental models to changing LLM behavior.
+
+We hope our design exploration and user study acts as a proof of concept for applying methods in mechanistic interpretability to enable more informed and aligned human-AI interaction. We also hope our work inspires others in the community to more critically think about ways to challenge and transform how interfaces facilitate interaction as AI becomes more capable and present in our lives.
+
+### Method
+
+Our interface calibrates users using _behavioral scores_ derived from difference-in-means activation vectors ([Chen et al., 2025](https://arxiv.org/abs/2507.21509)). These vectors describe the directions in activation space that correspond to different behaviors. Once these vectors are calculated, we took the cosine similarity between a difference-in-means activation vector for a given behavior and activations from a user prompt to quantify how active its feature direction is on a given model response. We then normalized these cosine similarities into behavioral scores on a scale between 0 and 1 to ensure user comprehension. Using activations in this way allows us to continually provide a causal measure of behaviors relevant to transparent LLM interaction.
+
+### Interface
+
+Our interface allows you to monitor the expression of six behavioral traits (sycophancy, toxicity, romanticness, empathy, roboticness, and sophistication) and how they evolve over a conversation. This is done by visualizing the _behavioral scores_ for each one of these traits. The interface is made up of three different components: 1\) sunburst, 2\) drift panel, 3\) attention cues.
+
+#### Sunburst
+
+<img src="ASSET_BASE_URL/blog/drift-1-sunburst-1.png" alt="Sunburst diagram static" />
+This diagram visualizes and organizes the behavioral scores on a single turn of a conversation. It contains the six
+traits we identify on a binary, making for 12 _trait poles_. We identify psychologically healthy traits in green,
+unhealthy in red, and neutral traits in gray. As a trait becomes more expressed, that trait’s cone becomes darker and
+extends out more, with the value of its score directly a function of activation values. Using a sunburst presents
+advantages over linear chart types because its radial layout avoids top-position bias across traits, and its concentric
+rings naturally encode the categorical (inner ring) and quantitative (outer ring) structure of the behavioral scores.
+Additionally, its silhouette produces an emergent personality “shape'' that lets users parse behavioral profiles
+quickly.
+
+<img src="ASSET_BASE_URL/blog/drift-2-sunburst-2.gif" alt="Sunburst diagram animated" />
+
+#### Drift Panel
+
+<img src="ASSET_BASE_URL/blog/drift-3-panel.gif" alt="drift panel" />
+
+This panel visualizes how behavioral scores on one trait axis shift (horizontal axis) over multiple turns (vertical axis). This complements the sunburst chart allowing a user to use two different views to process different types of information. The sunburst allows a user to view fine-grained behavioral information at a single turn snapshot, while the drift panel focuses on how only one trait changes over a conversation.
+
+#### Attention Cues
+
+<img src="ASSET_BASE_URL/blog/drift-4-attention.png" alt="Attention Cues static" />
+
+We help users navigate the increased cognitive load brought on by our interface with _attention cues._ Specifically, we indicate the trait that had the greatest shift since the previous turn with three cues: 1\) a blink and highlighting of the trait segment that grew the most in the _sunburst,_ 2\) a highlighting of that trait’s corresponding trace in the _drift panel_, 3\) a message in the _chat UI_ that indicates the greatest “Behavioral Swing.” By orchestrating these cues, we can draw your attention to the most salient shifts that are currently happening in your conversation to better facilitate learning.
+
+<img src="ASSET_BASE_URL/blog/drift-5-attention.gif" alt="Attention Cues gif" />
+
+### Learn More
+
+To learn more about our interface and study, check out [our paper](ASSET_BASE_URL/blog/mit-drift-calibrator.pdf), and contact us at <a href="mailto:skarny@mit.edu">skarny@mit.edu</a> and <a href="mailto:acbaez@mit.edu">acbaez@mit.edu</a>

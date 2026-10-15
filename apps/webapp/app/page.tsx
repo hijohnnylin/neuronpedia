@@ -695,6 +695,18 @@ export default async function Page() {
           />
         </a>
         <a
+          href={`${NEXT_PUBLIC_URL}/drift-calibrator`}
+          target="_blank"
+          className="flex flex-row items-center justify-center"
+          rel="noreferrer"
+        >
+          <img
+            src="/usedby/mit-media-lab.png"
+            className="h-[40px] opacity-60 grayscale hover:opacity-100 hover:grayscale-0"
+            alt="MIT Media Lab"
+          />
+        </a>
+        <a
           href={`${NEXT_PUBLIC_URL}/llama3.1-8b-eleuther_gp`}
           target="_blank"
           className="flex flex-row items-center justify-center"

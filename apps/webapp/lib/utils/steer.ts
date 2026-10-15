@@ -37,7 +37,7 @@ export const STEER_FREQUENCY_PENALTY_MIN = -2;
 export const STEER_FREQUENCY_PENALTY_MAX = 2;
 export const STEER_MAX_PROMPT_CHARS = 2048;
 export const STEER_MAX_PROMPT_CHARS_THINKING = 8192;
-export const STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS = 24576; // average 4 tokens = 6144 tokens max per conversation
+export const STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS = 29696; // about 4 chars per token: 8192 tokens less a 768-token reply
 export const STEER_SEED = 16;
 export const STEER_METHOD = NPSteerMethod.SIMPLE_ADDITIVE;
 export const STEER_METHOD_ASSISTANT_CAP = NPSteerMethod.PROJECTION_CAP;

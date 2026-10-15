@@ -232,6 +232,7 @@ async function saveSteerChatOutput(
       });
     }
   }
+  toReturnResult.defaultId = defaultOutputId ?? null;
   return toReturnResult;
 }
 
@@ -247,6 +248,14 @@ function createStream(generator: AsyncGenerator<SteerResultChat>) {
       controller.close();
     },
   });
+}
+
+async function* resumeAfter<T>(first: IteratorResult<T>, rest: AsyncGenerator<T>): AsyncGenerator<T> {
+  if (first.done) {
+    return;
+  }
+  yield first.value;
+  yield* rest;
 }
 
 async function* transformStream(
@@ -443,6 +452,8 @@ export type SteerResultChat = {
   // already starts with inputText. Those must be rendered as-is rather than after the prompt.
   outputTextIncludesPrompt?: boolean;
   id: string | null;
+  /** The saved DEFAULT row for this turn. */
+  defaultId?: string | null;
   shareUrl: string | null | undefined;
   limit: string | null;
   settings:
@@ -942,6 +953,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       : false;
     if (savedSteerDefaultOutput && defaultCovers) {
       console.log('has saved default output, setting it');
+      toReturnResult.defaultId = savedSteerDefaultOutput.id;
       toReturnResult[SteerOutputType.DEFAULT] = {
         raw: savedSteerDefaultOutput.outputText,
         chatTemplate: JSON.parse(savedSteerDefaultOutput.outputTextChatTemplate || '[]'),
@@ -1075,7 +1087,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         axisReadouts,
         axisDefinitions,
       );
-      const stream = createStream(generator);
+      // Awaited before the response starts, so an inference error (a prompt over the token limit,
+      // for one) reaches the catch below as a JSON error, not as a stream that breaks.
+      const first = await generator.next();
+      const stream = createStream(resumeAfter(first, generator));
       return new NextResponse(stream, {
         headers: {
           'Content-Type': 'text/event-stream',
@@ -1158,6 +1173,13 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     // has no chat template and the caller wants /api/steer instead.
     if (error instanceof InferenceServerError) {
       console.log('inference error', error.status, error.message);
+      // The inference server counts tokens, which the character limit above only estimates.
+      if (
+        error.status === 400 &&
+        (error.message.startsWith('Text too long:') || error.message.startsWith('No room to generate:'))
+      ) {
+        return NextResponse.json({ message: ERROR_STEER_MAX_PROMPT_CHARS }, { status: 400 });
+      }
       return NextResponse.json({ message: error.message }, { status: error.status });
     }
     console.log('unknown error', error);

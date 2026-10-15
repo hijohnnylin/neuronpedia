@@ -18,6 +18,10 @@ export default function NavBar({ session }: { session: Session | null }) {
   const { setSignInModalOpen, refreshUser } = useGlobalContext();
 
   const pathname = usePathname();
+  const isNeuralTransparency = pathname.toLowerCase().startsWith('/drift-calibrator');
+
+  /** Which tool of the site this page is, named under the wordmark, or nothing on the site at large. */
+  const sectionLabel = pathname.endsWith('/graph') ? 'Circuit Tracer' : null;
 
   useEffect(() => {
     if (session) {
@@ -61,17 +65,32 @@ export default function NavBar({ session }: { session: Session | null }) {
               {SITE_NAME_VERCEL_DEPLOY ? (
                 <p className="ml-1.5 font-medium text-[#7B3F00] sm:mt-0">{SITE_NAME_VERCEL_DEPLOY}</p>
               ) : (
-                <p className="flex flex-col items-start justify-start gap-y-[1px] pl-0.5 font-normal text-sky-800 sm:mt-0">
-                  Neuronpedia
-                  {pathname.endsWith('/graph') ? (
-                    <span className="hidden whitespace-nowrap text-[9px] font-semibold uppercase leading-none text-slate-600 sm:inline">
-                      {' '}
-                      Circuit Tracer
+                // The wordmark and, under it, which tool of the site this is. A column rather than
+                // the label living inside the wordmark, because the mark itself is a row here: on
+                // this one page it is Neuronpedia and MIT together, and the label belongs under
+                // both of them rather than under the first half.
+                <div className="flex flex-col items-start justify-start gap-y-[1px] pl-0.5">
+                  <span className="flex flex-row items-center font-normal text-sky-800">
+                    Neuronpedia
+                    {isNeuralTransparency && (
+                      <>
+                        <span className="ml-1 mr-1 text-[13px] font-bold text-slate-400/70">×</span>
+                        <Image
+                          src="/usedby/mit-media-lab.png"
+                          alt="MIT Media Lab logo"
+                          width="597"
+                          height="335"
+                          className="-my-1 h-[28px] w-auto"
+                        />
+                      </>
+                    )}
+                  </span>
+                  {sectionLabel && (
+                    <span className="hidden whitespace-nowrap text-[9px] font-semibold uppercase leading-none tracking-wide text-slate-500 sm:inline">
+                      {sectionLabel}
                     </span>
-                  ) : (
-                    ''
                   )}
-                </p>
+                </div>
               )}
               {DEMO_MODE ? (
                 <CustomTooltip

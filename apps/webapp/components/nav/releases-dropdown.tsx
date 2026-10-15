@@ -6,7 +6,7 @@ import { UNNAMED_AUTHOR_NAME } from '@/lib/utils/general';
 import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { StarFilledIcon } from '@radix-ui/react-icons';
-import { ChevronDown, CircleAlertIcon, Plus } from 'lucide-react';
+import { ChevronDown, CircleAlertIcon, Plus, University } from 'lucide-react';
 import Link from 'next/link';
 
 export const featuredStarReleases = [
@@ -20,7 +20,23 @@ export const featuredStarReleases = [
   'sae-bench',
   'jlens',
 ];
+export const communityReleases = ['drift-calibrator'];
 export const betaReleases = ['sparse-circuits'];
+
+const RELEASE_GROUPS = [featuredStarReleases, communityReleases, betaReleases];
+
+function releaseGroup(name: string | null | undefined) {
+  const group = RELEASE_GROUPS.findIndex((names) => names.includes(name ?? ''));
+  return group === -1 ? RELEASE_GROUPS.length : group;
+}
+
+/** Featured, then community, then beta, then the rest. Newest first in each group. */
+export function sortReleases<T extends { name?: string | null; createdAt?: Date | null }>(releases: T[]): T[] {
+  return [...releases].sort(
+    (a, b) =>
+      releaseGroup(a.name) - releaseGroup(b.name) || (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0),
+  );
+}
 
 export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: boolean }) {
   const router = useRouter();
@@ -41,56 +57,51 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
           sideOffset={-3}
           className="forceShowScrollBar z-50 max-h-[550px] w-full cursor-pointer overflow-hidden overflow-y-scroll rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
         >
-          {releases
-            .filter((release) => release.featured)
-            .sort((a, b) => {
-              const aIsStar = featuredStarReleases.includes(a.name ?? '');
-              const bIsStar = featuredStarReleases.includes(b.name ?? '');
-              if (aIsStar && !bIsStar) return -1;
-              if (!aIsStar && bIsStar) return 1;
-              // If both are (or aren't) starred, order by date
-              return (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0);
-            })
-            .map((release) => (
-              <DropdownMenu.Item
-                key={release.name}
-                className="flex max-w-[400px] flex-row items-center justify-between gap-x-1.5 border-b border-slate-100 hover:bg-slate-100 focus:outline-none"
+          {sortReleases(releases.filter((release) => release.featured)).map((release) => (
+            <DropdownMenu.Item
+              key={release.name}
+              className="flex max-w-[400px] flex-row items-center justify-between gap-x-1.5 border-b border-slate-100 hover:bg-slate-100 focus:outline-none"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  router.push(`/${release.name}`);
+                }}
+                className="flex w-full flex-col gap-y-0 overflow-hidden px-4 py-2 text-left font-sans text-xs text-sky-700 focus:outline-none"
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push(`/${release.name}`);
-                  }}
-                  className="flex w-full flex-col gap-y-0 overflow-hidden px-4 py-2 text-left font-sans text-xs text-sky-700 focus:outline-none"
-                >
-                  <div className="mt-0 flex flex-row justify-between gap-x-3 text-[12px] font-medium">
-                    <div>{release.descriptionShort}</div>
-                    {featuredStarReleases.includes(release.name ?? '') && (
-                      <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-emerald-600">
-                        <StarFilledIcon className="h-2 w-2" /> Featured
-                      </div>
-                    )}
-                    {betaReleases.includes(release.name ?? '') && (
-                      <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-yellow-600">
-                        <CircleAlertIcon className="h-2 w-2" /> Beta
-                      </div>
-                    )}
-                    {/* <div className="whitespace-pre text-[10px]  font-medium text-slate-400">
+                <div className="mt-0 flex flex-row justify-between gap-x-3 text-[12px] font-medium">
+                  <div>{release.descriptionShort}</div>
+                  {featuredStarReleases.includes(release.name ?? '') && (
+                    <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-emerald-600">
+                      <StarFilledIcon className="h-2 w-2" /> Featured
+                    </div>
+                  )}
+                  {communityReleases.includes(release.name ?? '') && (
+                    <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-sky-600">
+                      <University className="h-2.5 w-2.5" /> Community
+                    </div>
+                  )}
+                  {betaReleases.includes(release.name ?? '') && (
+                    <div className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-yellow-600">
+                      <CircleAlertIcon className="h-2 w-2" /> Beta
+                    </div>
+                  )}
+                  {/* <div className="whitespace-pre text-[10px]  font-medium text-slate-400">
                         {release?.createdAt?.toLocaleDateString("en-US", {
                           year: "numeric",
                           month: "long",
                         })}
                       </div> */}
-                  </div>
-                  <div className="flex flex-row justify-between gap-x-3 text-[9px] font-normal text-slate-500">
-                    {release.creatorName !== UNNAMED_AUTHOR_NAME
-                      ? `${release.creatorName}`
-                      : 'Under Anonymous Peer Review'}
-                    <div className="font-mono text-slate-400">{release.name?.toUpperCase()}</div>
-                  </div>
-                </button>
-              </DropdownMenu.Item>
-            ))}
+                </div>
+                <div className="flex flex-row justify-between gap-x-3 text-[9px] font-normal text-slate-500">
+                  {release.creatorName !== UNNAMED_AUTHOR_NAME
+                    ? `${release.creatorName}`
+                    : 'Under Anonymous Peer Review'}
+                  <div className="font-mono text-slate-400">{release.name?.toUpperCase()}</div>
+                </div>
+              </button>
+            </DropdownMenu.Item>
+          ))}
           {!breadcrumb && (
             <Link
               href={IS_LOCALHOST ? '/sae/new' : 'https://forms.gle/Yg51TYFutJysiyDP7'}

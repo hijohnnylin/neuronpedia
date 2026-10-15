@@ -1,0 +1,337 @@
+/*
+ * Drift Calibrator tour theme — overrides driver.js's default popover styles.
+ *
+ * Scoped to `.driver-popover.nt-driver-popover` so it only applies to
+ * tours that opt in via `driver({ popoverClass: 'nt-driver-popover' })`,
+ * and so the extra class bumps specificity above the defaults shipped
+ * in `driver.js/dist/driver.css` (which use single-class selectors).
+ *
+ * Palette: white surface, slate text, sky primary actions.
+ */
+
+.driver-popover.nt-driver-popover {
+  padding: 24px 28px 20px;
+  border-radius: 24px;
+  min-width: 420px;
+  max-width: 420px;
+  color: #334155; /* slate-700 */
+  background-color: #ffffff; /* sky-50 */
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.18),
+    0 2px 6px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25); /* slate-400/25 */
+}
+
+.driver-popover.nt-driver-popover * {
+  font-family:
+    var(--font-inter),
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Helvetica Neue',
+    sans-serif;
+}
+
+/* Title */
+.driver-popover.nt-driver-popover .driver-popover-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0f172a; /* slate-900 */
+  /* Reserve space for the close button. */
+  padding-right: 28px;
+  margin-bottom: 10px;
+}
+
+/* Description */
+.driver-popover.nt-driver-popover .driver-popover-description {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #475569; /* slate-600 */
+}
+.driver-popover.nt-driver-popover .driver-popover-description p {
+  margin: 0;
+}
+.driver-popover.nt-driver-popover .driver-popover-description p + p {
+  margin-top: 8px;
+}
+/*
+ * Page changes while the tour runs, from classes on `<html>`. Not inside the popover, so not
+ * scoped. Hidden parts keep their size. `!important` beats inline opacity, and driver.js's rule
+ * that lets the highlighted element take clicks.
+ */
+.nt-tour-active .nt-gutter:not(.nt-tooltip) {
+  transition:
+    opacity 500ms ease-out,
+    visibility 500ms;
+}
+.nt-tour-active .nt-chat-tool,
+.nt-tour-active .nt-chat-tool * {
+  pointer-events: none !important;
+}
+.nt-tour-hide-gutter .nt-gutter,
+.nt-tour-hide-monitor .nt-monitor,
+.nt-tour-hide-tooltip .nt-tooltip,
+.nt-tour-hide-no-swing .nt-no-swing {
+  opacity: 0 !important;
+  visibility: hidden;
+}
+/* In the first readout, only the wheel takes the click. Its slices and the pills do not take hover. */
+.nt-tour-no-slice-hover #nt-first-readout *,
+.nt-tour-no-slice-hover #nt-first-wheel * {
+  pointer-events: none !important;
+}
+.nt-tour-no-slice-hover #nt-first-readout #nt-first-wheel {
+  pointer-events: auto !important;
+  transition:
+    background-color 200ms ease-out,
+    box-shadow 200ms ease-out !important;
+}
+/* On hover, a tint and border behind the wheel instead of its zoom and shadow. */
+.nt-tour-no-slice-hover #nt-first-readout #nt-first-wheel:hover {
+  transform: none !important;
+  box-shadow: inset 0 0 0 1px #0284c7 !important; /* sky-600 */
+  background-color: #e0f2fe; /* sky-100 */
+}
+/* On the drift panel step, the lines at full strength, not faded towards the centre. */
+.nt-tour-full-lines #nt-trait-monitor [stroke='url(#nt-trait-ramp-faded)'] {
+  stroke: url(#nt-trait-ramp);
+}
+.nt-tour-full-lines #nt-trait-monitor [fill='url(#nt-trait-ramp-faded)'] {
+  fill: url(#nt-trait-ramp);
+}
+.nt-tour-full-lines #nt-trait-monitor [stroke='url(#nt-trait-neutral-faded)'] {
+  stroke: hsl(214 28% 72%); /* NEUTRAL_LINE */
+}
+.nt-tour-full-lines #nt-trait-monitor [fill='url(#nt-trait-neutral-faded)'] {
+  fill: hsl(214 28% 72%);
+}
+/* While a reply arrives, the overlay and popover step aside. The overlay still blocks clicks. */
+.nt-tour-loading .driver-overlay {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+.nt-tour-loading .driver-popover {
+  visibility: hidden;
+}
+.nt-tour-loading #nt-input * {
+  pointer-events: none !important;
+}
+
+/* The first step centres its title and pills. Pad the left as the close button pads the right. */
+.driver-popover.nt-driver-popover.nt-tour-intro .driver-popover-title {
+  padding-left: 28px;
+  text-align: center;
+}
+.driver-popover.nt-driver-popover.nt-tour-intro .nt-tour-badges {
+  justify-content: center;
+}
+
+/* Same pills as the page header. */
+.driver-popover.nt-driver-popover .nt-tour-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: -4px;
+  margin-bottom: 12px;
+}
+.driver-popover.nt-driver-popover .nt-tour-badge {
+  border-radius: 9999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: #fff;
+  background-color: #94a3b8; /* slate-400 */
+}
+.driver-popover.nt-driver-popover .driver-popover-description strong {
+  color: #0f172a; /* slate-900 */
+  font-weight: 600;
+}
+.driver-popover.nt-driver-popover .driver-popover-description em {
+  color: #334155; /* slate-700 */
+  font-style: italic;
+}
+.driver-popover.nt-driver-popover .driver-popover-description a {
+  color: #0369a1; /* sky-700 */
+  text-decoration: none;
+  border-bottom: 1px solid rgba(3, 105, 161, 0.35);
+}
+.driver-popover.nt-driver-popover .driver-popover-description a:hover {
+  border-bottom-color: #0369a1;
+}
+.driver-popover.nt-driver-popover .driver-popover-description a:focus,
+.driver-popover.nt-driver-popover .driver-popover-description a:focus-visible {
+  outline: none;
+  box-shadow: none;
+  ring: 0;
+}
+
+/* Close button (X in the corner) */
+.driver-popover.nt-driver-popover .driver-popover-close-btn {
+  top: 6px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 6px;
+  color: #94a3b8; /* slate-400 */
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+}
+.driver-popover.nt-driver-popover .driver-popover-close-btn:hover,
+.driver-popover.nt-driver-popover .driver-popover-close-btn:focus {
+  color: #475569; /* slate-600 */
+  background-color: rgba(148, 163, 184, 0.18); /* slate-400/18 */
+}
+
+/* Footer (progress + nav buttons) */
+.driver-popover.nt-driver-popover .driver-popover-footer {
+  margin-top: 12px;
+  gap: 12px;
+}
+.driver-popover.nt-driver-popover .driver-popover-progress-text {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8; /* slate-400 */
+}
+.driver-popover.nt-driver-popover .driver-popover-navigation-btns {
+  gap: 8px;
+}
+.driver-popover.nt-driver-popover .driver-popover-navigation-btns button + button {
+  margin-left: 0; /* gap handles spacing now */
+}
+
+/* Buttons */
+.driver-popover.nt-driver-popover .driver-popover-footer button {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0; /* slate-200 */
+  background-color: #ffffff;
+  color: #475569; /* slate-600 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.driver-popover.nt-driver-popover .driver-popover-footer button:hover,
+.driver-popover.nt-driver-popover .driver-popover-footer button:focus {
+  background-color: #f1f5f9; /* slate-100 */
+  border-color: #cbd5e1; /* slate-300 */
+  color: #0f172a; /* slate-900 */
+}
+
+/* Primary (Next / Done) */
+.driver-popover.nt-driver-popover .driver-popover-next-btn {
+  background-color: #0369a1; /* sky-700 */
+  border-color: #0369a1;
+  color: #ffffff;
+}
+.driver-popover.nt-driver-popover .driver-popover-next-btn:hover,
+.driver-popover.nt-driver-popover .driver-popover-next-btn:focus {
+  background-color: #075985; /* sky-800 */
+  border-color: #075985;
+  color: #ffffff;
+}
+
+/* Disabled state */
+.driver-popover.nt-driver-popover .driver-popover-footer .driver-popover-btn-disabled {
+  opacity: 0.45;
+}
+
+/* "Skip tour" button — only injected on step 1's popover footer (see
+ * `onPopoverRender` in `nt-tour.tsx`). Specificity must beat the
+ * generic `.driver-popover-footer button` rule above so it doesn't
+ * pick up the sky primary-button theme: a text/link look reads as a
+ * secondary "out" without competing with the next/done button. */
+.driver-popover.nt-driver-popover .driver-popover-footer button.nt-tour-skip-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 0px solid #e2e8f0; /* slate-200 */
+  background-color: #ffffff;
+  color: #94a3b8; /* slate-400 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+.driver-popover.nt-driver-popover .driver-popover-footer button.nt-tour-skip-btn:hover {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 0px solid #e2e8f0; /* slate-200 */
+  background-color: #f1f5f9; /* slate-100 */
+  color: #94a3b8; /* slate-400 */
+  text-shadow: none;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Arrow — driver.js renders this as a CSS triangle: a 0x0 element
+ * with `border: 5px solid <color>`, where 3 of the 4 sides are set to
+ * `transparent` per `.driver-popover-arrow-side-*`. We must NOT use
+ * shorthand `border-color` here (it would re-color the transparent
+ * sides and turn the triangle back into a square). Override per
+ * matching side so only the visible edge is repainted. */
+.driver-popover.nt-driver-popover .driver-popover-arrow.driver-popover-arrow-side-left {
+  border-left-color: #ffffff;
+}
+.driver-popover.nt-driver-popover .driver-popover-arrow.driver-popover-arrow-side-right {
+  border-right-color: #ffffff;
+}
+.driver-popover.nt-driver-popover .driver-popover-arrow.driver-popover-arrow-side-top {
+  border-top-color: #ffffff;
+}
+.driver-popover.nt-driver-popover .driver-popover-arrow.driver-popover-arrow-side-bottom {
+  border-bottom-color: #ffffff;
+}
+
+/* Mobile — shrink the popover and its text so the tour copy fits
+ * comfortably on small screens (the desktop sizes overflow / read as
+ * oversized on narrow viewports). */
+@media (max-width: 640px) {
+  .driver-popover.nt-driver-popover {
+    padding: 16px 18px 14px;
+    border-radius: 18px;
+    min-width: 0;
+    max-width: calc(100vw - 32px);
+  }
+  .driver-popover.nt-driver-popover .driver-popover-title {
+    font-size: 12.5px;
+    margin-bottom: 8px;
+  }
+  .driver-popover.nt-driver-popover .driver-popover-description {
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .driver-popover.nt-driver-popover .driver-popover-description p + p {
+    margin-top: 6px;
+  }
+  .driver-popover.nt-driver-popover .driver-popover-footer {
+    margin-top: 10px;
+  }
+  .driver-popover.nt-driver-popover .driver-popover-footer button {
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+  .driver-popover.nt-driver-popover .driver-popover-footer button.nt-tour-skip-btn,
+  .driver-popover.nt-driver-popover .driver-popover-footer button.nt-tour-skip-btn:hover {
+    padding: 5px 12px;
+    font-size: 11px;
+  }
+}

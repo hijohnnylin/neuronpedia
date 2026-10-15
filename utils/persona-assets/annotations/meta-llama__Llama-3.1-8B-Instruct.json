@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "Per-axis caveats and provenance for the Llama-3.1-8B-Instruct trait readouts, from the",
+    "reports/ directory of the multiturn-neural-transparency build that produced them.",
+    "Keyed by axis name without the '<author>_' prefix, which the converter adds from --author.",
+    "Neither key affects a projection: 'caveat' is for a UI to surface, 'provenance' is for",
+    "humans. r_squared and turn_bias are held-out, on a conversation-level split.",
+    "Corpus-wide caveats that belong to every axis rather than one: the corpus is synthetic",
+    "(Claude-written system prompts, a simulated user, a gpt-5-mini judge), calibration is",
+    "fitted on four-turn conversations only, and the six directions are not independent -",
+    "empathy and robotic sit at cosine 0.72, so a six-axis panel shows fewer than six things.",
+    "These six were also fitted with a persona-describing system prompt on every conversation,",
+    "and the page serving them sends none, so every reading is off the distribution they were",
+    "calibrated on. Not expressible in either format today, and not a template divergence -",
+    "Llama 3.1 renders no system message identically to an empty one - so it is recorded here",
+    "rather than enforced. See RenderConditions in inference_utils/persona/axis_data.py.",
+    "A caveat is about what an axis measures, not about how it is displayed: erudite's says its",
+    "two poles carry different amounts of information, which per-pole scaling makes both",
+    "visible without making both equally informative, and is why that fix alone was not enough."
+  ],
+  "empathy": {
+    "provenance": { "r_squared": 0.718, "turn_bias": 0.04 }
+  },
+  "erudite": {
+    "caveat": "Closer to a detector than a scale, and only in one direction. Prompted erudition does push it positive - median +0.57 at level 10, 87.5 percent of turns positive, crossing zero near level 5 - but it does not grade within that: levels 5 to 10 overlap heavily and R-squared restricted to levels 2 and above is 0.31, against 0.50-0.81 for the other five axes. Nor is a mildly positive reading distinctive, because ordinary conversation on this page sits at median -0.17 with a wide spread (10th to 90th percentile -0.30 to +0.30); only values well above +0.3 are unlikely to be ordinary traffic. A negative value says almost nothing, since an explicitly simplistic prompt (level 1, median -0.84) and no persona instruction at all overlap there. This is mostly the corpus rather than the direction - the gpt-5-mini judge also separates levels 2 to 10 by only 1.2 points here, against 7.6 for sycophancy and 9.1 for toxicity, so there is little above level 2 for any read-out to resolve, and a direction refit to target the upper range scored worse.",
+    "provenance": { "r_squared": 0.636, "turn_bias": 0.01 }
+  },
+  "robotic": {
+    "caveat": "Turn bias 0.19: part of what this reports is depth in the conversation rather than the trait. Correlated with empathy at cosine 0.72.",
+    "provenance": { "r_squared": 0.67, "turn_bias": 0.19 }
+  },
+  "romantic": {
+    "provenance": { "r_squared": 0.594, "turn_bias": 0.0 }
+  },
+  "sycophantic": {
+    "caveat": "Turn bias 0.40, the highest of the six: its residual still correlates strongly with position in the conversation after accounting for trait level, so a rising curve here may be depth rather than sycophancy. Treat cross-turn comparisons as untrustworthy.",
+    "provenance": { "r_squared": 0.707, "turn_bias": 0.4 }
+  },
+  "toxic": {
+    "caveat": "Comparable only within one system prompt. This is the best-fitting axis of the six by R-squared, but it is also the only one that responds more to how a prompt is worded than to how strongly it asks: at fixed trait intensity, which of the five phrasings was used explains 44.2 percent of the variance here, against 3.7 to 12.3 percent for the other five axes. So a difference between two conversations under different system prompts is not evidence of a difference in toxicity.",
+    "provenance": { "r_squared": 0.831, "turn_bias": 0.07 }
+  }
+}

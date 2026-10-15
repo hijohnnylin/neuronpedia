@@ -63,8 +63,8 @@ export default function NavBarButtons() {
           <div>Natural Language</div>
           <div>Autoencoders</div>
         </div>
-        <span className="absolute -right-1 -top-1 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
-          NEW
+        <span className="absolute -right-1 -top-1 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white">
+          MAY 26
         </span>
       </Link>
 
@@ -73,8 +73,8 @@ export default function NavBarButtons() {
         className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
         Assistant Axis
-        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
-          NEW
+        <span className="absolute -right-1 -top-1.5 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white">
+          JAN 26
         </span>
       </Link>
 
@@ -83,8 +83,8 @@ export default function NavBarButtons() {
         className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
       >
         Circuit Tracer
-        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-11 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
-          UPDATE
+        <span className="absolute -right-1 -top-1.5 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white">
+          APR 26
         </span>
       </Link>
 
@@ -434,14 +434,40 @@ export default function NavBarButtons() {
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
 
-      <Link
-        href="/api-doc"
-        prefetch={false}
-        rel="noreferrer"
-        className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 pr-2.5 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
-      >
-        API
-      </Link>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 pr-2.5 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
+          Docs
+          <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            sideOffset={-3}
+            className="z-50 min-w-[8rem] overflow-hidden rounded-md bg-white p-1 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+          >
+            <DropdownMenu.Item asChild>
+              <Link
+                href="https://docs.neuronpedia.org"
+                target="_blank"
+                prefetch={false}
+                rel="noreferrer"
+                className="flex cursor-pointer items-center rounded px-4 py-2 text-[13px] font-medium text-sky-700 outline-none hover:bg-sky-100 focus:bg-sky-100"
+              >
+                Docs
+              </Link>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item asChild>
+              <Link
+                href="/api-doc"
+                prefetch={false}
+                className="flex cursor-pointer items-center rounded px-4 py-2 text-[13px] font-medium text-sky-700 outline-none hover:bg-sky-100 focus:bg-sky-100"
+              >
+                API
+              </Link>
+            </DropdownMenu.Item>
+            <DropdownMenu.Arrow className="fill-white" />
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
 
       <Link
         href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3z9o0hxjl-MDX9pbATO2qESOazNDLpdQ"

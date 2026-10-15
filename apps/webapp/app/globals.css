@@ -1543,3 +1543,13 @@ foreignObject canvas {
     color: rgb(180 83 9);
   }
 }
+/* A trait name arriving beside a persona wheel, over the moment its bars grow out of the ring.
+   See `BADGE_REVEAL` in app/drift-calibrator/persona-sunburst.tsx, which is the only user. */
+@keyframes persona-badge-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

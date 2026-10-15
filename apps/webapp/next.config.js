@@ -83,6 +83,11 @@ const nextConfig = {
         destination: '/explorer/:id',
         permanent: true,
       },
+      {
+        source: '/neural-transparency',
+        destination: '/drift-calibrator',
+        permanent: false,
+      },
     ];
   },
   // https://github.com/mjmlio/mjml/issues/2562
