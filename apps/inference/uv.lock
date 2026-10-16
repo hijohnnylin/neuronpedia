@@ -1467,7 +1467,7 @@ wheels = [
 
 [[package]]
 name = "interp-engine"
-version = "1.13.2"
+version = "1.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "accelerate" },
@@ -1478,9 +1478,9 @@ dependencies = [
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/28/c78af4b1083b73be0985f04330368f8f7161c6a924e2c29f207866921eff/interp_engine-1.13.2.tar.gz", hash = "sha256:f78d542b85f86e73e254c4e6f4bb8bcf0276fcad59caab83d7045c7d798298af", size = 1066919, upload-time = "2026-10-10T22:39:24.072Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/a7/8dde9727332aa3d19d87426f2f8f1d2f0d28cb2a67ab7849c803622b8347/interp_engine-1.14.1.tar.gz", hash = "sha256:6e688745b0b36f72ec1871ae57d7ef03f287e458cafb7b5a32fa41f6b518550e", size = 1071926, upload-time = "2026-10-16T12:02:33.462Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/b7/3b80a21716fda5d717f05be2a3aa7184073aefff8635ce63b2653f18122d/interp_engine-1.13.2-py3-none-any.whl", hash = "sha256:35ec22bf29285f7ff96337600f24b7cb92ec7213fe69795455cc94502ada6bda", size = 544730, upload-time = "2026-10-10T22:39:22.439Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/b5/50542933a3035071f3bfaea3838771c6c78c8fb5c3cf00c0c5f98816fff4/interp_engine-1.14.1-py3-none-any.whl", hash = "sha256:427de5be6bf11f17c669b7f329f74e153d162a8380dc71d22efce10472137443", size = 546888, upload-time = "2026-10-16T12:02:31.53Z" },
 ]
 
 [package.optional-dependencies]
@@ -2066,7 +2066,7 @@ requires-dist = [
     { name = "hf-transfer", specifier = ">=0.1.9,<0.2" },
     { name = "huggingface", specifier = ">=0.0.1,<0.0.2" },
     { name = "huggingface-hub", specifier = ">=1.0" },
-    { name = "interp-engine", extras = ["vllm", "quant"], specifier = "==1.13.2" },
+    { name = "interp-engine", extras = ["vllm", "quant"], specifier = "==1.14.1" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "pandas", specifier = ">=2.2.2,<3" },
     { name = "psutil", specifier = ">=5.9.8,<6" },
