@@ -59,6 +59,7 @@ export const JLENS_MODEL_TOGGLE_OPTIONS = [
       { shareId: 'cmt2aym590000332xc7o88l99', displayName: '🛜 General Broadcast' },
       { shareId: 'cmt2b6yd70000012x6voje2h7', displayName: '🔀 Selective Mediation' },
       { shareId: 'cmt2bcgw40001012xgbleezs7', displayName: '🤼 Versus Logit-Lens' },
+      { shareId: 'cmvaai4k4000007jj7vhecp5s', displayName: '🫀 J++ Lens' },
     ],
   },
   {
