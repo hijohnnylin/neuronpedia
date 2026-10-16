@@ -1139,8 +1139,14 @@ export default function JlensChat({
       setHideNonWordTokens(ui.hideNonWordTokens);
       setTemperature(ui.temperature);
       // Shares predating a model's current cap can carry more than the slider
-      // now offers, so keep the restored value within it.
-      setNumCompletionTokens(Math.min(ui.numCompletionTokens, maxCompletionTokens));
+      // now offers, so keep the restored value within it. A read-out share has 0,
+      // which would make every follow-up turn empty, so it keeps the default.
+      setNumCompletionTokens(
+        Math.min(
+          ui.numCompletionTokens > 0 ? ui.numCompletionTokens : DEFAULT_LENS_COMPLETION_TOKENS,
+          maxCompletionTokens,
+        ),
+      );
       pendingScrollSelectionRef.current = ui.selectedPositions.length > 0 ? ui.selectedPositions : null;
       setLensColumns(ui.lensColumns);
     } else {
@@ -1256,9 +1262,13 @@ export default function JlensChat({
                       canCopy: !isEditing,
                       canEdit: !streaming && !steering && !isEditing,
                       onCopy: () => handleCopyMessage(idx, copyContent),
-                      // System and tool turns are copy-only: there is no editor for them.
+                      // System and tool turns, and turns with tool calls, are copy-only:
+                      // the editor has no place for a tool call.
                       onEdit:
-                        msgIdx == null || group.role === 'system' || group.roleLabel === 'tool'
+                        msgIdx == null ||
+                        group.role === 'system' ||
+                        group.roleLabel === 'tool' ||
+                        !!messages[msgIdx]?.toolCalls?.length
                           ? undefined
                           : () =>
                               group.role === 'user'
@@ -1657,15 +1667,15 @@ function GroupBubble({
     group.contentTokens.slice(0, firstGeneratedContentIdx).some((t) => t.token.trim() !== '');
   return (
     <div className={`group flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`relative flex max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-        <div className={`flex flex-col rounded-xl bg-white px-3 py-2 sm:gap-y-0.5`}>
+      <div className={`relative flex min-w-0 max-w-[80%] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+        <div className={`flex min-w-0 max-w-full flex-col rounded-xl bg-white px-3 py-2 sm:gap-y-0.5`}>
           {(group.role === 'system' || group.roleLabel === 'tool') && (
             <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
               {group.role === 'system' ? 'system' : 'tool'}
             </div>
           )}
           {group.headerTokens.length > 0 && (
-            <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">
+            <div className="whitespace-pre-wrap font-mono text-[9px] leading-tight text-slate-400 [overflow-wrap:anywhere]">
               {group.headerTokens.map((t, i) => (
                 <JlensTokenChip
                   key={t.position}
@@ -1685,7 +1695,8 @@ function GroupBubble({
               ))}
             </div>
           )}
-          <div className="whitespace-pre-wrap break-words font-serif text-[13px] leading-none sm:leading-relaxed">
+          {/* `anywhere`, not `break-words`, so that a long unbroken line cannot widen the bubble. */}
+          <div className="whitespace-pre-wrap font-serif text-[13px] leading-none [overflow-wrap:anywhere] sm:leading-relaxed">
             {group.contentTokens.map((token, tokenIdx) => {
               const newlineCount = (token.token.match(/\n/g) || []).length;
               const prevToken = tokenIdx > 0 ? group.contentTokens[tokenIdx - 1].token : undefined;
@@ -1734,7 +1745,7 @@ function GroupBubble({
             </div>
           )}
           {group.footerTokens.length > 0 && (
-            <div className="whitespace-pre-wrap break-words font-mono text-[9px] leading-tight text-slate-400">
+            <div className="whitespace-pre-wrap font-mono text-[9px] leading-tight text-slate-400 [overflow-wrap:anywhere]">
               {group.footerTokens.map((t, i) => (
                 <JlensTokenChip
                   key={t.position}
