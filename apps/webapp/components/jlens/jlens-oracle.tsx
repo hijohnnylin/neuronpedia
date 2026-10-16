@@ -266,8 +266,17 @@ export function useOracleReads({
     if (!enabled || unavailableReason) {
       return [];
     }
-    return isLoadedMeta ? repliedLayers : (meta?.oracle_layers ?? []);
-  }, [enabled, unavailableReason, isLoadedMeta, repliedLayers, meta]);
+    if (!isLoadedMeta) {
+      return meta?.oracle_layers ?? [];
+    }
+    if (repliedLayers) {
+      return repliedLayers;
+    }
+    // A loaded run may read if its servers had an oracle then. Runs saved
+    // before meta had `oracle_layers` go by the model.
+    const hadOracle = meta?.oracle_layers ? meta.oracle_layers.length > 0 : modelId in ORACLE_CREDITS;
+    return hadOracle ? null : [];
+  }, [enabled, unavailableReason, isLoadedMeta, repliedLayers, meta, modelId]);
   const canRead = servedLayers === null || servedLayers.length > 0;
   const layers = useMemo(() => {
     if (!enabled) {
