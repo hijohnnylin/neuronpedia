@@ -140,6 +140,9 @@ export default function ExplanationsPane({
     return getNlaSaeFormat(currentNeuron.modelId, layerNum);
   })();
   const isNlaSupported = nlaSaeFormat !== undefined;
+  // Intrusion detection reads Activation rows; features served from R2 dashboard files have none
+  const showInterpretableCheck = !getSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')
+    ?.externalDashboardsUrl;
 
   // On demand and not saved: the result is about the feature, not any explanation.
   const handleCheckInterpretable = async () => {
@@ -314,14 +317,6 @@ export default function ExplanationsPane({
                               </div> */}
                   <div className="h-fill flex-1">
                     <div className="flex-inline relative flex items-center">
-                      {explanation.typeName === EXPLANATIONTYPE_NP_MIN_ACT_LOGITS && (
-                        <span
-                          className="mr-1.5 shrink-0 rounded bg-rose-50 px-1 py-px font-sans text-[9px] font-semibold uppercase leading-tight text-rose-600"
-                          title="Explains the most negative activations"
-                        >
-                          Negative
-                        </span>
-                      )}
                       <h1
                         className="cursor-text select-text py-0 text-xs font-medium leading-snug text-slate-700"
                         title={explanation.description}
@@ -335,14 +330,31 @@ export default function ExplanationsPane({
                         if (explanation.typeName && explanation.typeName !== EXPLANATIONTYPE_HUMAN) {
                           return (
                             <div className="flex flex-col items-start justify-center gap-y-0.5">
-                              <a
-                                className="font-sans text-[11px] font-medium text-slate-500 hover:text-sky-600"
-                                href={`/explanation-type/${explanation.typeName}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                {explanation.typeName} · {explanation.explanationModelName}
-                              </a>
+                              <div className="flex flex-row items-center gap-x-1.5">
+                                <a
+                                  className="font-sans text-[11px] font-medium text-slate-500 hover:text-sky-600"
+                                  href={`/explanation-type/${explanation.typeName}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {explanation.typeName} · {explanation.explanationModelName}
+                                </a>
+                                {explanation.typeName === EXPLANATIONTYPE_NP_MIN_ACT_LOGITS && (
+                                  <CustomTooltip
+                                    trigger={
+                                      <span className="shrink-0 cursor-default rounded bg-rose-50 px-1 py-px font-sans text-[9px] font-semibold uppercase leading-tight text-rose-600">
+                                        Neg Acts
+                                      </span>
+                                    }
+                                    side="top"
+                                  >
+                                    <p className="leading-relaxed">
+                                      Explanations are based on positive activations by default. This one is based on
+                                      the most negative activations.
+                                    </p>
+                                  </CustomTooltip>
+                                )}
+                              </div>
                               {explanation.triggeredByUser && (
                                 <a
                                   className="cursor-pointer font-sans text-[10px] font-medium leading-none text-slate-300 hover:text-sky-600"
@@ -1062,50 +1074,51 @@ export default function ExplanationsPane({
         </div>
       </div>
       {/* Extra tools. One column on mobile, side by side with a divider from sm up. */}
-      <div className="flex w-full flex-col divide-y divide-slate-200 border-t border-slate-200 px-3 py-3 sm:flex-row sm:divide-x sm:divide-y-0">
-        {isNlaSupported && (
-          <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
-            <Popover.Root open={nlaPopoverOpen} onOpenChange={setNlaPopoverOpen}>
-              <Popover.Trigger asChild>
-                <button
-                  type="button"
-                  onClick={handleNlaExplain}
-                  disabled={nlaLoading || !currentNeuron?.source?.hfRepoId || !currentNeuron?.source?.hfFolderId}
-                  className="flex h-9 w-[140px] items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
-                >
-                  {nlaLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Explain With NLA'}
-                </button>
-              </Popover.Trigger>
-              <Popover.Portal>
-                <Popover.Content
-                  className="z-50 min-h-[320px] w-[320px] rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-lg"
-                  sideOffset={6}
-                  side="bottom"
-                  onInteractOutside={() => setNlaPopoverOpen(false)}
-                >
-                  {nlaError && <div className="text-xs text-red-500">{nlaError}</div>}
-                  {!nlaError && nlaLoading && !nlaPartialText && (
-                    <div className="flex items-center justify-center gap-x-2 py-2 text-xs text-slate-400">
-                      <LoadingSquare size={18} />
-                      <span>Generating NLA explanation...</span>
-                    </div>
-                  )}
-                  {!nlaError && nlaLoading && nlaPartialText && (
-                    <div className="flex flex-col gap-y-2">
-                      <div className="whitespace-pre-wrap border-l-2 border-slate-200 pl-2 text-xs font-medium leading-snug text-slate-700">
-                        {nlaPartialText}
+      {(isNlaSupported || showInterpretableCheck) && (
+        <div className="flex w-full flex-col divide-y divide-slate-200 border-t border-slate-200 px-3 py-3 sm:flex-row sm:divide-x sm:divide-y-0">
+          {isNlaSupported && (
+            <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
+              <Popover.Root open={nlaPopoverOpen} onOpenChange={setNlaPopoverOpen}>
+                <Popover.Trigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleNlaExplain}
+                    disabled={nlaLoading || !currentNeuron?.source?.hfRepoId || !currentNeuron?.source?.hfFolderId}
+                    className="flex h-9 w-[140px] items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+                  >
+                    {nlaLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Explain With NLA'}
+                  </button>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content
+                    className="z-50 min-h-[320px] w-[320px] rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-lg"
+                    sideOffset={6}
+                    side="bottom"
+                    onInteractOutside={() => setNlaPopoverOpen(false)}
+                  >
+                    {nlaError && <div className="text-xs text-red-500">{nlaError}</div>}
+                    {!nlaError && nlaLoading && !nlaPartialText && (
+                      <div className="flex items-center justify-center gap-x-2 py-2 text-xs text-slate-400">
+                        <LoadingSquare size={18} />
+                        <span>Generating NLA explanation...</span>
                       </div>
-                      <div className="flex items-center gap-x-1.5 text-[10px] text-slate-400">
-                        <LoadingSquare size={14} />
+                    )}
+                    {!nlaError && nlaLoading && nlaPartialText && (
+                      <div className="flex flex-col gap-y-2">
+                        <div className="whitespace-pre-wrap border-l-2 border-slate-200 pl-2 text-xs font-medium leading-snug text-slate-700">
+                          {nlaPartialText}
+                        </div>
+                        <div className="flex items-center gap-x-1.5 text-[10px] text-slate-400">
+                          <LoadingSquare size={14} />
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {nlaResult && (
-                    <div className="flex flex-col gap-y-2">
-                      <div className="whitespace-pre-wrap text-xs font-medium leading-snug text-slate-700">
-                        {nlaResult.description}
-                      </div>
-                      {/* {nlaResult.cosine_similarity !== null && (
+                    )}
+                    {nlaResult && (
+                      <div className="flex flex-col gap-y-2">
+                        <div className="whitespace-pre-wrap text-xs font-medium leading-snug text-slate-700">
+                          {nlaResult.description}
+                        </div>
+                        {/* {nlaResult.cosine_similarity !== null && (
                         <div className="flex items-center gap-x-1">
                           <span className="text-[10px] text-slate-400">Cos Sim</span>
                           <span
@@ -1123,59 +1136,59 @@ export default function ExplanationsPane({
                           </span>
                         </div>
                       )} */}
-                    </div>
-                  )}
-                  <Popover.Arrow className="fill-slate-200" />
-                </Popover.Content>
-              </Popover.Portal>
-            </Popover.Root>
-            <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
-              <p className="leading-relaxed">
-                Generates an explanation with a Natural Language Autoencoder, which reads the {`feature's`} decoder
-                vector directly instead of its activating texts.
-              </p>
-            </CustomTooltip>
-          </div>
-        )}
-        {/* Intrusion detection reads Activation rows; features served from R2 dashboard files have none */}
-        {!getSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')?.externalDashboardsUrl && (
-          <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
-            <button
-              type="button"
-              onClick={handleCheckInterpretable}
-              disabled={interpretableLoading || !currentNeuron?.index}
-              className="flex h-9 w-[140px] flex-col items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium leading-tight text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
-            >
-              {interpretableLoading ? (
-                <LoadingSpinner size={16} className="text-sky-700" />
-              ) : (
-                <>
-                  <span>Interpretable Score</span>
-                  <span className="text-[8px] uppercase text-slate-400">Intrusion Detection</span>
-                </>
-              )}
-            </button>
-            <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
-              <p className="leading-relaxed">
-                Tests whether this feature is interpretable from its contexts alone, with no explanation. Shows a model
-                groups of four activating texts plus one intruder and asks it to find the odd one out.
-              </p>
-              <p className="mt-2 leading-relaxed">
-                Based on the intruder detection task in{' '}
-                <a
-                  href="https://arxiv.org/pdf/2507.08473"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sky-700 underline hover:text-sky-900"
-                >
-                  Paulo &amp; Belrose (2025)
-                </a>
-                .
-              </p>
-            </CustomTooltip>
-          </div>
-        )}
-      </div>
+                      </div>
+                    )}
+                    <Popover.Arrow className="fill-slate-200" />
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+              <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
+                <p className="leading-relaxed">
+                  Generates an explanation with a Natural Language Autoencoder, which reads the {`feature's`} decoder
+                  vector directly instead of its activating texts.
+                </p>
+              </CustomTooltip>
+            </div>
+          )}
+          {showInterpretableCheck && (
+            <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
+              <button
+                type="button"
+                onClick={handleCheckInterpretable}
+                disabled={interpretableLoading || !currentNeuron?.index}
+                className="flex h-9 w-[140px] flex-col items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium leading-tight text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+              >
+                {interpretableLoading ? (
+                  <LoadingSpinner size={16} className="text-sky-700" />
+                ) : (
+                  <>
+                    <span>Interpretable Score</span>
+                    <span className="text-[8px] uppercase text-slate-400">Intrusion Detection</span>
+                  </>
+                )}
+              </button>
+              <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
+                <p className="leading-relaxed">
+                  Tests whether this feature is interpretable from its contexts alone, with no explanation. Shows a
+                  model groups of four activating texts plus one intruder and asks it to find the odd one out.
+                </p>
+                <p className="mt-2 leading-relaxed">
+                  Based on the intruder detection task in{' '}
+                  <a
+                    href="https://arxiv.org/pdf/2507.08473"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sky-700 underline hover:text-sky-900"
+                  >
+                    Paulo &amp; Belrose (2025)
+                  </a>
+                  .
+                </p>
+              </CustomTooltip>
+            </div>
+          )}
+        </div>
+      )}
       <InterpretabilityCheckDialog
         open={interpretableOpen}
         onOpenChange={setInterpretableOpen}
