@@ -27,6 +27,37 @@ export default function SourceSetSelector({
 }) {
   const { getSourceSetsForModelId, getSourceSet } = useGlobalContext();
 
+  const sourceSets = getSourceSetsForModelId(modelId)
+    .filter((ss) => (filterToRelease ? ss.releaseName === filterToRelease : true))
+    .filter((ss) => (filterToOnlyVisible ? ss.visibility === 'PUBLIC' : true))
+    // check that the sourceSet has at least one source that supports activation testing
+    .filter((ss) => (filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true))
+    .filter((ss) => (filterToAllowInferenceSearch ? ss.allowInferenceSearch : true))
+    .filter((ss) => (filterToOnlyHasDashboards ? ss.hasDashboards : true))
+    .sort((a, b) => {
+      if (a.name === NEURONS_SOURCESET) {
+        return 1;
+      }
+      if (b.name === NEURONS_SOURCESET) {
+        return -1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  if (sourceSets.length === 0) {
+    return (
+      <div className="flex flex-col">
+        <button
+          type="button"
+          disabled
+          className="flex h-10 max-h-[40px] min-h-[40px] w-full flex-1 cursor-default flex-row items-center justify-center whitespace-pre rounded border border-slate-200 bg-slate-50 px-2 font-mono text-[10px] font-medium uppercase text-slate-400 sm:px-3 sm:text-xs"
+        >
+          No SAEs Available
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
       <Select.Root
@@ -66,70 +97,29 @@ export default function SourceSetSelector({
               <ChevronUpIcon className="h-4 w-4" />
             </Select.ScrollUpButton>
             <Select.Viewport className="text-center">
-              {getSourceSetsForModelId(modelId)
-                .filter((ss) => {
-                  if (filterToRelease) {
-                    return ss.releaseName === filterToRelease;
-                  }
-                  return true;
-                })
-                .filter((ss) => {
-                  if (filterToOnlyVisible) {
-                    return ss.visibility === 'PUBLIC';
-                  }
-                  return true;
-                })
-                .filter((ss) => {
-                  // check that the sourceSet has at least one source that supports activation testing
-                  if (filterToInferenceEnabled) {
-                    return ss.sources?.some((s) => s.inferenceEnabled);
-                  }
-                  return true;
-                })
-                .filter((ss) => {
-                  if (filterToAllowInferenceSearch) {
-                    return ss.allowInferenceSearch;
-                  }
-                  return true;
-                })
-                .filter((ss) => {
-                  if (filterToOnlyHasDashboards) {
-                    return ss.hasDashboards;
-                  }
-                  return true;
-                })
-                .sort((a, b) => {
-                  if (a.name === NEURONS_SOURCESET) {
-                    return 1;
-                  }
-                  if (b.name === NEURONS_SOURCESET) {
-                    return -1;
-                  }
-                  return a.name.localeCompare(b.name);
-                })
-                .map((s) => (
-                  <Select.Item
-                    key={s.name}
-                    value={s.name || ''}
-                    className={`overflow-hidden ${
-                      sourceSet === s.name ? 'bg-sky-100 text-sky-700' : 'text-slate-600'
-                    } flex flex-col items-start gap-y-0.5 border-b px-3 py-2.5 font-mono text-xs hover:bg-slate-100 focus:outline-none`}
-                  >
-                    <div className="flex w-full flex-row items-center justify-between gap-x-3">
-                      <Select.ItemText>
-                        <span className={s.name === NEURONS_SOURCESET ? 'capitalize' : 'uppercase'}>{s.name}</span>
-                      </Select.ItemText>
-                      {getVisibilityBadge(s.visibility, true)}
+              {sourceSets.map((s) => (
+                <Select.Item
+                  key={s.name}
+                  value={s.name || ''}
+                  className={`overflow-hidden ${
+                    sourceSet === s.name ? 'bg-sky-100 text-sky-700' : 'text-slate-600'
+                  } flex flex-col items-start gap-y-0.5 border-b px-3 py-2.5 font-mono text-xs hover:bg-slate-100 focus:outline-none`}
+                >
+                  <div className="flex w-full flex-row items-center justify-between gap-x-3">
+                    <Select.ItemText>
+                      <span className={s.name === NEURONS_SOURCESET ? 'capitalize' : 'uppercase'}>{s.name}</span>
+                    </Select.ItemText>
+                    {getVisibilityBadge(s.visibility, true)}
+                  </div>
+                  <Select.ItemText className="text-left" />
+                  {s.name !== NEURONS_SOURCESET && (
+                    <div className="mt-0 flex w-full flex-row justify-between gap-x-3 font-sans text-[10px] font-normal text-slate-500">
+                      <div>{s.type}</div>
+                      <div>{s.creatorName}</div>
                     </div>
-                    <Select.ItemText className="text-left" />
-                    {s.name !== NEURONS_SOURCESET && (
-                      <div className="mt-0 flex w-full flex-row justify-between gap-x-3 font-sans text-[10px] font-normal text-slate-500">
-                        <div>{s.type}</div>
-                        <div>{s.creatorName}</div>
-                      </div>
-                    )}
-                  </Select.Item>
-                ))}
+                  )}
+                </Select.Item>
+              ))}
             </Select.Viewport>
             <Select.ScrollDownButton className="flex justify-center border-b bg-slate-100 text-slate-300">
               <ChevronDownIcon className="h-4 w-4" />

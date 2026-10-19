@@ -44,6 +44,7 @@ export default function SourceSelector({
   selectedHeadLayer = undefined,
   headLayerChangedCallback,
   compact = false,
+  noOptionsChangedCallback,
 }: {
   modelId: string;
   defaultSource?: string;
@@ -65,6 +66,8 @@ export default function SourceSelector({
   headLayerChangedCallback?: (layer: number) => void;
   // Shorter trigger, to leave room for a row below it in the same height
   compact?: boolean;
+  // Tells the parent when the model has no source to pick
+  noOptionsChangedCallback?: (hasNoOptions: boolean) => void;
 }) {
   const isMount = useIsMount();
   const router = useRouter();
@@ -115,6 +118,30 @@ export default function SourceSelector({
             filterToLayerNumber !== undefined ? getLayerNumFromSource(id) === filterToLayerNumber : true,
           )
           .toSorted((a, b) => getLayerNumFromSource(a) - getLayerNumFromSource(b));
+
+  const showHeads = includeHeads && !MODELS_WITHOUT_HEAD_DATA.includes(modelId);
+  // Same filters as the release menu below
+  const hasSaeSources = releases
+    .filter((r) => (filterToRelease ? r.name === filterToRelease : true))
+    .filter((r) => (filterToFeaturedReleases ? r.featured : true))
+    .some((r) =>
+      r.sourceSets
+        ?.filter((ss) => ss.modelId === modelId && ss.name !== NEURONS_SOURCESET)
+        .filter((ss) => (filterToRelease ? ss.releaseName === filterToRelease : true))
+        .filter((ss) => (filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true))
+        .filter((ss) => (filterToOnlyHasDashboards ? ss.hasDashboards : true))
+        .some((ss) =>
+          ss.sources
+            ?.filter((s) => (filterToInferenceEnabled ? s.inferenceEnabled : true))
+            .filter((s) => (filterToOnlyHasDashboards ? s.hasDashboards : true))
+            .some((s) => (filterToLayerNumber ? getLayerNumFromSource(s.id || '') === filterToLayerNumber : true)),
+        ),
+    );
+  const hasNoOptions = !showHeads && neuronLayers.length === 0 && !hasSaeSources;
+
+  useEffect(() => {
+    noOptionsChangedCallback?.(hasNoOptions);
+  }, [hasNoOptions, noOptionsChangedCallback]);
 
   function getOpenReleaseName() {
     if (selectedHeadLayer !== undefined) {
@@ -192,6 +219,22 @@ export default function SourceSelector({
     }
   }, [modelId]);
 
+  if (hasNoOptions) {
+    return (
+      <div className="flex flex-col">
+        <button
+          type="button"
+          disabled
+          className={`flex w-full flex-1 cursor-default flex-row items-center justify-center whitespace-pre rounded border border-slate-200 bg-slate-50 px-2 font-mono text-[10px] font-medium uppercase text-slate-400 sm:px-3 sm:text-xs ${
+            compact ? 'h-[26px] max-h-[26px] min-h-[26px]' : 'h-10 max-h-[40px] min-h-[40px]'
+          }`}
+        >
+          No SAEs Available
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
       <DropdownMenu.Root open={dropdownOpen}>
@@ -253,8 +296,7 @@ export default function SourceSelector({
             <DropdownMenu.Label className="sticky top-0 cursor-default border-b border-slate-100 bg-white py-1.5 text-center text-[10px] uppercase text-slate-400">
               Release
             </DropdownMenu.Label>
-            {includeHeads &&
-              !MODELS_WITHOUT_HEAD_DATA.includes(modelId) &&
+            {showHeads &&
               (headLayerList.length === 0 ? (
                 // No per-layer metrics available yet: make the row a direct link into the head finder.
                 <button

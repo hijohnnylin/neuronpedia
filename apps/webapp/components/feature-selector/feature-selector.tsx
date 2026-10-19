@@ -183,6 +183,7 @@ export default function FeatureSelector({
   const [index, setIndex] = useState<string | undefined>(defaultIndex);
   // When defined, the selector is in "attention head" mode and `index` refers to a head index.
   const [headLayer, setHeadLayer] = useState<number | undefined>(defaultHeadLayer);
+  const [hasNoSources, setHasNoSources] = useState(false);
   const router = useRouter();
 
   const indexInputRef = useRef<HTMLInputElement>(null);
@@ -319,6 +320,7 @@ export default function FeatureSelector({
             selectedHeadLayer={headLayer}
             headLayerChangedCallback={headLayerChanged}
             compact={isNeuronPage}
+            noOptionsChangedCallback={setHasNoSources}
           />
           {isNeuronPage && (
             <div className="mt-0.5 flex flex-row gap-x-0.5">
@@ -371,10 +373,15 @@ export default function FeatureSelector({
         ) : (
           <>
             <div className="flex flex-col">
-              <div className="flex h-10 max-h-[40px] min-h-[40px] flex-col items-center justify-center rounded border border-slate-300 bg-white px-0.5 py-0 text-center font-mono text-xs font-medium text-sky-700 placeholder-slate-400 focus:border-sky-700 focus:ring-0 sm:w-[60px] sm:px-1">
+              <div
+                className={`flex h-10 max-h-[40px] min-h-[40px] flex-col items-center justify-center rounded border px-0.5 py-0 text-center font-mono text-xs font-medium text-sky-700 placeholder-slate-400 focus:border-sky-700 focus:ring-0 sm:w-[60px] sm:px-1 ${
+                  hasNoSources ? 'border-slate-200 bg-slate-50 opacity-50' : 'border-slate-300 bg-white'
+                }`}
+              >
                 <input
                   type="text"
                   ref={indexInputRef}
+                  disabled={hasNoSources}
                   value={index}
                   onChange={(e) => {
                     const newValue = parseInt(e.target.value, 10);
@@ -428,7 +435,8 @@ export default function FeatureSelector({
                   }
                 }
               }}
-              className="flex h-10 max-h-[40px] min-h-[40px] select-none items-center justify-center rounded bg-slate-200 px-3 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white"
+              disabled={hasNoSources}
+              className="flex h-10 max-h-[40px] min-h-[40px] select-none items-center justify-center rounded bg-slate-200 px-3 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white disabled:pointer-events-none disabled:opacity-50"
             >
               Go
             </button>
