@@ -3,11 +3,13 @@
 import {
   getAdditionalInfoFromSource,
   getLayerNumFromSource,
+  getNeuronLayerLabel,
   getSourceSetNameFromSource,
   isCanonicalSource,
+  isNeuronLayerSource,
   NEURONS_SOURCESET,
 } from '@/lib/utils/source';
-import { SourceReleaseWithPartialRelations } from '@/prisma/generated/zod';
+import { SourceReleaseWithPartialRelations, SourceSetWithPartialRelations } from '@/prisma/generated/zod';
 import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
@@ -18,6 +20,9 @@ import { useGlobalContext } from '../provider/global-provider';
 // Sentinel name for the manually-injected "Attention Heads" pseudo-release that is always
 // pinned to the top of the release list when `includeHeads` is enabled.
 const ATTENTION_HEADS_RELEASE = '__attention_heads__';
+
+// Sentinel name for the "MLP Neurons" pseudo-release. The neurons source set has no release.
+const NEURONS_RELEASE = '__mlp_neurons__';
 
 // Models that have no attention head data, so the "Attention Heads" release/source is hidden for them.
 const MODELS_WITHOUT_HEAD_DATA = ['circuitgpt-python', 'deepseek-r1-llama-8b'];
@@ -38,6 +43,7 @@ export default function SourceSelector({
   headLayers = undefined,
   selectedHeadLayer = undefined,
   headLayerChangedCallback,
+  compact = false,
 }: {
   modelId: string;
   defaultSource?: string;
@@ -57,13 +63,21 @@ export default function SourceSelector({
   headLayers?: number[] | undefined;
   selectedHeadLayer?: number | undefined;
   headLayerChangedCallback?: (layer: number) => void;
+  // Shorter trigger, to leave room for a row below it in the same height
+  compact?: boolean;
 }) {
   const isMount = useIsMount();
   const router = useRouter();
   // Layers offered in the "Attention At Layer" submenu. Prefer an explicit list
   // (non-contiguous for hybrid models); otherwise fall back to 0..numHeadLayers-1.
   const headLayerList = headLayers ?? Array.from({ length: numHeadLayers }, (_, i) => i);
-  const { getSourceSetsForModelId, releases, getSourceSet, getReleaseForSourceSet } = useGlobalContext();
+  const { getSourceSetsForModelId, releases, getSourceSet, getReleaseForSourceSet, globalModels } = useGlobalContext();
+
+  const modelDefaultSourceSet = globalModels[modelId]?.defaultSourceSetName;
+  // By name, with the model's defaultSourceSetName first
+  const byModelDefaultThenName = (a: SourceSetWithPartialRelations, b: SourceSetWithPartialRelations) =>
+    Number(b.name === modelDefaultSourceSet) - Number(a.name === modelDefaultSourceSet) ||
+    (a.name || '').localeCompare(b.name || '');
 
   function getFirstSourceSetForModelId() {
     let sourceSets = getSourceSetsForModelId(modelId);
@@ -75,12 +89,7 @@ export default function SourceSelector({
         filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true,
       )
       .filter((ss) => (filterToOnlyHasDashboards ? ss.hasDashboards : true))
-      .sort((a, b) => {
-        if (a.name && b.name) {
-          return a.name.localeCompare(b.name);
-        }
-        return 0;
-      });
+      .sort(byModelDefaultThenName);
     if (sourceSets.length > 0) {
       return sourceSets[0].name;
     }
@@ -92,6 +101,30 @@ export default function SourceSelector({
       ? getReleaseForSourceSet(modelId, getSourceSetNameFromSource(defaultSource))
       : getReleaseForSourceSet(modelId, defaultSourceSet || getFirstSourceSetForModelId()),
   );
+
+  // Neuron layers to offer. Not for inference or release-filtered pickers: those need SAE sources.
+  // Like the release list below, this ignores filterToPublic.
+  const neuronsSourceSet = getSourceSet(modelId, NEURONS_SOURCESET);
+  const neuronLayers: string[] =
+    filterToInferenceEnabled || filterToRelease || (filterToOnlyHasDashboards && !neuronsSourceSet?.hasDashboards)
+      ? []
+      : (neuronsSourceSet?.sources || [])
+          .map((s) => s.id || '')
+          .filter((id) => isNeuronLayerSource(id))
+          .filter((id) =>
+            filterToLayerNumber !== undefined ? getLayerNumFromSource(id) === filterToLayerNumber : true,
+          )
+          .toSorted((a, b) => getLayerNumFromSource(a) - getLayerNumFromSource(b));
+
+  function getOpenReleaseName() {
+    if (selectedHeadLayer !== undefined) {
+      return ATTENTION_HEADS_RELEASE;
+    }
+    if (defaultSource && isNeuronLayerSource(defaultSource)) {
+      return NEURONS_RELEASE;
+    }
+    return release?.name;
+  }
 
   const [releaseOpen, setReleaseOpen] = useState<string | undefined>();
   const [sourceSetOpen, setSourceSetOpen] = useState<string>();
@@ -123,12 +156,15 @@ export default function SourceSelector({
         .filter((ss) => (filterToPublic ? ss.visibility === 'PUBLIC' : true))
         .filter((ss) => (filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true))
         .filter((ss) => (filterToOnlyHasDashboards ? ss.hasDashboards : true))
-        .sort((a, b) => {
-          if (a.name && b.name) {
-            return a.name.localeCompare(b.name);
-          }
-          return 0;
-        });
+        .sort(byModelDefaultThenName);
+      // Start on neurons when the model has them, unless its default source set is offered
+      if (neuronLayers.length > 0 && !sourceSets.some((ss) => ss.name === modelDefaultSourceSet)) {
+        setRelease(undefined);
+        if (!inHeadMode) {
+          sourceChangedCallback?.(neuronLayers[0]);
+        }
+        return;
+      }
       if (sourceSets.length > 0) {
         const newSourceSet = sourceSets[0].name;
         setSourceSetOpen(newSourceSet);
@@ -167,14 +203,16 @@ export default function SourceSelector({
               setReleaseOpen(undefined);
               setSourceSetOpen(undefined);
               setTimeout(() => {
-                setReleaseOpen(selectedHeadLayer !== undefined ? ATTENTION_HEADS_RELEASE : release?.name);
+                setReleaseOpen(getOpenReleaseName());
                 setSourceSetOpen(defaultSource ? getSourceSetNameFromSource(defaultSource) : '');
               }, 100);
               setTimeout(() => {
                 scrollToModelIdSource(defaultSource || '');
               }, 200);
             }}
-            className="flex h-10 max-h-[40px] min-h-[40px] w-full flex-1 flex-row items-center justify-center gap-x-1 whitespace-pre rounded border border-slate-300 bg-white px-2 text-[10px] font-medium uppercase text-sky-700 hover:bg-slate-50 focus:outline-none sm:pl-5 sm:pr-2 sm:text-xs"
+            className={`flex w-full flex-1 flex-row items-center justify-center gap-x-1 whitespace-pre rounded border border-slate-300 bg-white px-2 text-[10px] font-medium uppercase text-sky-700 hover:bg-slate-50 focus:outline-none sm:pl-5 sm:pr-2 sm:text-xs ${
+              compact ? 'h-[26px] max-h-[26px] min-h-[26px]' : 'h-10 max-h-[40px] min-h-[40px]'
+            }`}
           >
             {includeHeads && selectedHeadLayer !== undefined ? (
               <div className="flex flex-col items-center justify-center gap-y-0.5 leading-none">
@@ -187,8 +225,12 @@ export default function SourceSelector({
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center gap-y-0.5 leading-none">
-                <div className="flex flex-row items-center justify-center gap-x-0.5 font-mono">{defaultSource}</div>
-                {release && (
+                <div className="flex flex-row items-center justify-center gap-x-0.5 font-mono">
+                  {defaultSource && isNeuronLayerSource(defaultSource)
+                    ? getNeuronLayerLabel(defaultSource)
+                    : defaultSource}
+                </div>
+                {release && !compact && (
                   <div className="mt-0.5 text-center font-mono text-[8px] font-medium leading-none text-slate-400">
                     Source/SAE
                   </div>
@@ -202,7 +244,7 @@ export default function SourceSelector({
           <DropdownMenu.Content
             onPointerDownOutside={() => {
               setDropdownOpen(false);
-              setReleaseOpen(selectedHeadLayer !== undefined ? ATTENTION_HEADS_RELEASE : release?.name);
+              setReleaseOpen(getOpenReleaseName());
               setSourceSetOpen(defaultSource ? getSourceSetNameFromSource(defaultSource) : '');
             }}
             sideOffset={3}
@@ -286,6 +328,61 @@ export default function SourceSelector({
                   </DropdownMenu.Portal>
                 </DropdownMenu.Sub>
               ))}
+            {neuronLayers.length > 0 && (
+              <DropdownMenu.Sub open={releaseOpen === NEURONS_RELEASE}>
+                <DropdownMenu.SubTrigger
+                  onMouseEnter={() => {
+                    setReleaseOpen(NEURONS_RELEASE);
+                  }}
+                  className="group flex w-full max-w-[340px] flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b border-b-slate-100 bg-white px-3 py-3 text-xs font-medium hover:bg-sky-100 hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600"
+                >
+                  <div className="flex w-full flex-col items-start justify-center gap-y-1.5 leading-tight">
+                    <div className="flex w-full flex-row items-center justify-between gap-x-5 text-[10.5px] leading-none text-sky-700/70 group-hover:text-sky-700 group-data-[state=open]:text-sky-700">
+                      <div className="whitespace-pre font-mono font-bold uppercase">MLP Neurons</div>
+                      <div className="font-medium text-slate-400">{neuronsSourceSet?.creatorName}</div>
+                    </div>
+                    <div className="font-sans text-[12px] font-semibold capitalize text-slate-500 group-hover:text-slate-600 group-data-[state=open]:text-slate-600">
+                      {neuronsSourceSet?.description || 'MLP Neurons'}
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="-mr-2 ml-0 w-3 leading-none text-slate-400 group-hover:text-slate-600 group-data-[state=open]:text-slate-600" />
+                </DropdownMenu.SubTrigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.SubContent
+                    sideOffset={1}
+                    className="forceShowScrollBar z-40 max-h-[340px] w-full min-w-[160px] cursor-pointer divide-y divide-slate-100 overflow-y-scroll rounded bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] sm:max-h-[500px]"
+                  >
+                    <DropdownMenu.Label className="sticky top-0 cursor-default border-b border-slate-100 bg-white py-1.5 text-center text-[10px] uppercase text-slate-400">
+                      Layer
+                    </DropdownMenu.Label>
+                    {neuronLayers.map((layer) => (
+                      <div
+                        key={layer}
+                        ref={(el) => {
+                          modelIdSourceToRef.current[`${modelId}-${layer}`] = el;
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReleaseOpen(NEURONS_RELEASE);
+                            sourceChangedCallback?.(layer);
+                            setDropdownOpen(false);
+                          }}
+                          className={`${
+                            defaultSource === layer
+                              ? 'bg-sky-200 text-sky-700'
+                              : 'bg-white text-sky-700/70 hover:bg-sky-100'
+                          } flex w-full flex-1 cursor-pointer items-center justify-center px-3 py-2.5 font-mono text-[12px] font-bold uppercase hover:text-sky-700 focus:outline-none`}
+                        >
+                          {getNeuronLayerLabel(layer)}
+                        </button>
+                      </div>
+                    ))}
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Sub>
+            )}
             {releases
               .filter((r) => r.sourceSets?.some((ss) => ss.modelId === modelId))
               .filter((r) => (filterToRelease ? r.name === filterToRelease : true))

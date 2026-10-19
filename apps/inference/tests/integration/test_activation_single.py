@@ -54,6 +54,30 @@ def test_activation_single_with_source_and_index(client: TestClient):
     assert response_model.tokens == expected_tokens
 
 
+def test_activation_single_for_mlp_neuron(client: TestClient):
+    """
+    An MLP neuron source ("0") has no SAE. Both endpoints must serve it, without the BOS position,
+    and the batch result must match the single one.
+    """
+    body = {"model": MODEL_ID, "source": "0", "index": "10"}
+    single = client.post(ENDPOINT, json={**body, "prompt": TEST_PROMPT}, headers={"X-SECRET-KEY": X_SECRET_KEY})
+    assert single.status_code == 200, single.text
+    single_model = ActivationSingleResponse(**single.json())
+    assert single_model.tokens == ["Hello", ",", " world", "!"]
+    assert len(single_model.activation.values) == 4
+    assert single_model.activation.max_value == max(single_model.activation.values)
+
+    batch = client.post(
+        f"{ENDPOINT}-batch",
+        json={**body, "prompts": [TEST_PROMPT, TEST_PROMPT]},
+        headers={"X-SECRET-KEY": X_SECRET_KEY},
+    )
+    assert batch.status_code == 200, batch.text
+    for result in batch.json()["results"]:
+        assert result["tokens"] == single_model.tokens
+        assert pytest.approx(result["activation"]["values"], abs=ABS_TOLERANCE) == single_model.activation.values
+
+
 def test_activation_single_with_vector_and_hook(client: TestClient):
     """
     Test the /activation/single endpoint with vector and hook parameters.

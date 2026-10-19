@@ -7,6 +7,7 @@ import { AuthenticatedUser } from '../with-user';
 import { makeOaiMessage } from './autointerp-shared';
 
 const ERROR_ON_RECALL_REQUEST = 'Error';
+const RECALL_REQUEST_ATTEMPTS = 2;
 
 type ScoreMatchAndRawQuery = {
   match: boolean;
@@ -134,6 +135,19 @@ const makeJsonActivationAndExplanation = (act: ActivationPartial, explanation: s
     explanation,
   });
 
+// Some models put the JSON in a ```json fence. Throws when the reply holds no match value.
+export function parseMatchResponse(text: string): { match: boolean; reason: string } {
+  const unfenced = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '');
+  const parsed = JSON.parse(unfenced) as { match?: unknown; reason?: unknown };
+  if (parsed?.match !== true && parsed?.match !== false && parsed?.match !== 'true' && parsed?.match !== 'false') {
+    throw new Error(`Invalid match response: ${text.slice(0, 200)}`);
+  }
+  return { match: parsed.match === true || parsed.match === 'true', reason: String(parsed.reason ?? '') };
+}
+
 const activationMatchesExplanation = async (
   activation: ActivationPartial,
   explanation: string,
@@ -183,56 +197,28 @@ Only respond with in JSON with the format {"match": true, "reason": [reason why 
     makeOaiMessage('user', thirdUserMessage),
   ];
   const rawMessages = JSON.stringify(messages);
-  try {
-    const chatCompletion = await openai.chat.completions.create({
-      messages,
-      model: explanationScoreModelOpenRouterId || scorerModel,
-      max_tokens: 5000,
-      response_format: { type: 'json_object' },
-      temperature: 0,
-      reasoning_effort: 'low',
-    });
-    const matchResponse = chatCompletion.choices[0].message.content;
-    // console.log("Tokens: " + activation.tokens?.join(""));
-    // console.log("Explanation: " + explanation);
-    // console.log(matchResponse);
-    if (!matchResponse) {
-      return { match: false, reason: 'Errored', messages: rawMessages };
-    }
+  for (let attempt = 0; attempt < RECALL_REQUEST_ATTEMPTS; attempt += 1) {
     try {
-      const matchResponseParsed = JSON.parse(matchResponse) as {
-        match: boolean;
-        reason: string;
-      };
-      if (matchResponseParsed) {
-        return {
-          match: matchResponseParsed.match,
-          reason: matchResponseParsed.reason,
-          messages: rawMessages,
-        };
-      }
-      // invalid json response, consider this a failure
-      return {
-        match: false,
-        reason: 'Invalid JSON response format',
-        messages: rawMessages,
-      };
-    } catch {
-      // invalid json response, consider this a failure
-      return {
-        match: false,
-        reason: 'Invalid JSON response',
-        messages: rawMessages,
-      };
+      // eslint-disable-next-line no-await-in-loop
+      const chatCompletion = await openai.chat.completions.create({
+        messages,
+        model: explanationScoreModelOpenRouterId || scorerModel,
+        max_tokens: 5000,
+        response_format: { type: 'json_object' },
+        temperature: 0,
+        reasoning_effort: 'low',
+      });
+      const parsed = parseMatchResponse(chatCompletion.choices[0].message.content ?? '');
+      return { ...parsed, messages: rawMessages };
+    } catch (e) {
+      console.log(e);
     }
-  } catch (e) {
-    console.log(e);
-    return {
-      match: false,
-      reason: ERROR_ON_RECALL_REQUEST,
-      messages: rawMessages,
-    };
   }
+  return {
+    match: false,
+    reason: ERROR_ON_RECALL_REQUEST,
+    messages: rawMessages,
+  };
 };
 
 export const generateScoreRecallAlt = async (
@@ -263,16 +249,10 @@ export const generateScoreRecallAlt = async (
     topActPromises.push(matchPromise);
   });
   const topActResults = await Promise.all(topActPromises);
-  // check if all are "Error" -
-  const allErrors = topActResults.every(
-    (result) =>
-      typeof result === 'object' &&
-      result !== null &&
-      result.match === false &&
-      result.reason === ERROR_ON_RECALL_REQUEST,
-  );
-
-  if (allErrors) {
+  // A failed request is not an answer, so do not save a score that counts one
+  const hasError = (results: ScoreMatchAndRawQuery[]) =>
+    results.some((result) => result.reason === ERROR_ON_RECALL_REQUEST);
+  if (hasError(topActResults)) {
     throw new Error(ERROR_RECALL_ALT_FAILED);
   }
 
@@ -305,6 +285,9 @@ export const generateScoreRecallAlt = async (
   });
 
   const noActResults = await Promise.all(zeroActivationsPromises.concat(decoyActivationPromises));
+  if (hasError(noActResults)) {
+    throw new Error(ERROR_RECALL_ALT_FAILED);
+  }
   totalCorrectAnswers += noActResults.filter((res) => !res.match).length;
 
   const jsonDetails = {

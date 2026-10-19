@@ -96,7 +96,7 @@ export const ComputeHostOnSourceSetScalarFieldEnumSchema = z.enum(['sourceSetNam
 
 export const SourceScalarFieldEnumSchema = z.enum(['id','modelId','hasDashboards','inferenceEnabled','saelensConfig','saelensRelease','saelensSaeId','hfRepoId','hfFolderId','visibility','defaultOfModelId','setName','creatorId','hasUmap','hasUmapLogSparsity','hasUmapClusters','num_prompts','num_tokens_in_prompt','dataset','notes','cosSimMatchModelId','cosSimMatchSourceId','createdAt']);
 
-export const SourceSetScalarFieldEnumSchema = z.enum(['modelId','name','hasDashboards','allowInferenceSearch','visibility','description','type','creatorName','urls','creatorEmail','creatorId','releaseName','hasGraphs','graphEnabled','similarityMatrixEnabled','defaultOfModelId','defaultGraphModelId','defaultRange','defaultShowBreaks','showDfa','showCorrelated','showHeadAttribution','showUmap','createdAt']);
+export const SourceSetScalarFieldEnumSchema = z.enum(['modelId','name','hasDashboards','allowInferenceSearch','visibility','description','type','creatorName','urls','creatorEmail','creatorId','releaseName','hasGraphs','graphEnabled','similarityMatrixEnabled','defaultOfModelId','defaultGraphModelId','defaultRange','defaultShowBreaks','showDfa','showCorrelated','showHeadAttribution','showUmap','externalDashboardsUrl','createdAt']);
 
 export const SourceReleaseScalarFieldEnumSchema = z.enum(['name','visibility','isNewUi','featured','description','descriptionShort','urls','creatorEmail','creatorName','creatorNameShort','creatorId','defaultSourceSetName','defaultSourceId','defaultUmapSourceIds','createdAt']);
 
@@ -1925,6 +1925,7 @@ export const SourceSetSchema = z.object({
   showCorrelated: z.boolean(),
   showHeadAttribution: z.boolean(),
   showUmap: z.boolean(),
+  externalDashboardsUrl: z.string().nullable(),
   createdAt: z.coerce.date(),
 })
 

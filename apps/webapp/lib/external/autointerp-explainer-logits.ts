@@ -2,7 +2,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, Neuron, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { AutoInterpModelType, getAnthropicModelId, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import {
+  AutoInterpModelType,
+  getAnthropicModelId,
+  getExplainerReasoningEffort,
+  OPENROUTER_BASE_URL,
+} from '../utils/autointerp';
 import { makeAnthropicMessage, makeGeminiMessage, makeOaiMessage } from './autointerp-shared';
 
 const TOKENS_AROUND_MAX_ACTIVATING_TOKEN = 24;
@@ -334,9 +339,13 @@ export const generateExplanationNpMaxActLogits = async (
   explainerModelType: AutoInterpModelType,
   explainerKeyType: UserSecretType,
   explainerKey: string,
+  // For a sign-flipped neuron: the tokens that a negative activation promotes
+  useNegativeLogits = false,
 ) => {
-  // Replace all ▁ characters in feature.pos_str with spaces and clean up newlines
-  const processedTopPositiveLogits = feature.pos_str.map((logit) => logit.replace(/▁/g, ' ').replace(/\n/g, '').trim());
+  // Replace all ▁ characters in the logits with spaces and clean up newlines
+  const processedTopPositiveLogits = (useNegativeLogits ? feature.neg_str : feature.pos_str).map((logit) =>
+    logit.replace(/▁/g, ' ').replace(/\n/g, '').trim(),
+  );
 
   const newMessage = `
 
@@ -401,7 +410,7 @@ Explanation of neuron 5 behavior: `;
         max_completion_tokens: 4096,
         temperature: 1.0,
         top_p: 1.0,
-        reasoning_effort: 'low',
+        reasoning_effort: getExplainerReasoningEffort(explainerModelType),
       });
       const explanationString = chatCompletion.choices[0].message.content;
       console.log(explanationString);
@@ -433,7 +442,9 @@ Explanation of neuron 5 behavior: `;
       system: systemMessage,
       messages,
     });
-    const explanationString = (msg.content[0] as Anthropic.TextBlock).text;
+    // Newer Claude models can put a thinking block before the text
+    const explanationString =
+      msg.content.find((block): block is Anthropic.TextBlock => block.type === 'text')?.text ?? null;
     console.log(explanationString);
     const cleanedExplanation = postProcessExplanation(explanationString);
     console.log(cleanedExplanation);

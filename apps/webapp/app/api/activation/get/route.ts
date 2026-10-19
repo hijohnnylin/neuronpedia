@@ -1,3 +1,5 @@
+import { ApiError } from '@/lib/api-error';
+import { getActivationsForFeature } from '@/lib/db/neuron-dashboard';
 import { ERROR_NOT_FOUND_MESSAGE } from '@/lib/db/userCanAccess';
 import { PUBLIC_ACTIVATIONS_USER_IDS } from '@/lib/env';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
@@ -60,6 +62,11 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
     }
 
+    const loaded = await getActivationsForFeature({ modelId, layer: source, index: String(index) });
+    if (loaded.dashboard) {
+      return NextResponse.json(loaded.activations.toSorted((a, b) => b.maxValue - a.maxValue));
+    }
+
     const activations = await prisma.activation.findMany({
       where: {
         modelId,
@@ -80,6 +87,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     return NextResponse.json(activations);
   } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return NextResponse.json({ error: ERROR_NOT_FOUND_MESSAGE }, { status: 404 });
+    }
     console.error('Error fetching activations:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

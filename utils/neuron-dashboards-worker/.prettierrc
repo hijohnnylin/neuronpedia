@@ -1,0 +1,14 @@
+{
+  "bracketSpacing": true,
+  "semi": true,
+  "trailingComma": "all",
+  "printWidth": 120,
+  "tabWidth": 2,
+  "singleQuote": true,
+  "overrides": [
+    {
+      "files": ["*.jsonc", "tsconfig*.json"],
+      "options": { "trailingComma": "none" }
+    }
+  ]
+}

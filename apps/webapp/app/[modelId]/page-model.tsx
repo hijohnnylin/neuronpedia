@@ -11,7 +11,12 @@ import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs'
 import { getVisibilityBadge } from '@/components/visibility-badge';
 import { prisma } from '@/lib/db';
 import { SearchExplanationsType } from '@/lib/utils/general';
-import { getFirstSourceForModel, getFirstSourceSetForModel } from '@/lib/utils/source';
+import {
+  getDefaultSourceForModel,
+  getDefaultSourceSetForModel,
+  getFirstSourceForModel,
+  getFirstSourceSetForModel,
+} from '@/lib/utils/source';
 import { ModelWithPartialRelations } from '@/prisma/generated/zod';
 import { Visibility } from '@prisma/client';
 
@@ -46,6 +51,8 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
 
   const firstSourceSet = getFirstSourceSetForModel(model, Visibility.PUBLIC, false, false);
   const firstSource = getFirstSourceForModel(model, Visibility.PUBLIC, false, false);
+  const jumpToSourceSet = getDefaultSourceSetForModel(model, true);
+  const jumpToSource = getDefaultSourceForModel(model, true);
   return (
     <div className="flex w-full flex-col items-center pb-10">
       <BreadcrumbsComponent
@@ -71,8 +78,8 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
           <div className="flex flex-row justify-end gap-x-3">
             <JumpToPane
               defaultModelId={model.id}
-              defaultSourceSetName={firstSourceSet?.name || ''}
-              defaultSourceId={firstSource?.id || ''}
+              defaultSourceSetName={jumpToSourceSet?.name || ''}
+              defaultSourceId={jumpToSource?.id || ''}
               vertical
               filterToFeaturedReleases={false}
               showRandomFeature={false}

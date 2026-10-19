@@ -30,6 +30,57 @@ export async function unwrapAutointerpResponse<T>(result: Promise<AutointerpResu
 }
 
 export const EXPLANATIONTYPE_HUMAN = 'human';
+// np_max-act-logits on the neuron with its sign flipped: the most negative examples and the negative logits
+export const EXPLANATIONTYPE_NP_MIN_ACT_LOGITS = 'np_min-act-logits';
+
+type SignedActivation = { values: number[]; maxValue: number; minValue: number };
+
+// One example with the sign of the neuron flipped, so that its lowest token reads as the peak
+export function flipActivationSign<T extends SignedActivation>(activation: T): T {
+  const values = activation.values.map((v) => -v);
+  return {
+    ...activation,
+    values,
+    maxValue: values.length > 0 ? Math.max(...values) : -activation.minValue,
+    minValue: values.length > 0 ? Math.min(...values) : -activation.maxValue,
+  };
+}
+
+// The examples with the most negative values first, with the sign flipped
+export function flipToMostNegative<T extends SignedActivation>(activations: T[], count: number): T[] {
+  return activations
+    .map((activation) => ({ activation, min: Math.min(...activation.values) }))
+    .filter(({ min }) => min < 0)
+    .sort((a, b) => a.min - b.min)
+    .slice(0, count)
+    .map(({ activation }) => flipActivationSign(activation));
+}
+
+const SCORING_ACTIVATIONS_TO_LOAD = 20;
+const SCORING_ZERO_ACTIVATIONS_TO_LOAD_MAX = 5;
+
+// The examples that a scorer reads: the top 20 deduplicated, normalized to a max of 10, and up to
+// 5 all-zero ones. A min explanation describes the flipped neuron, so flip the examples first.
+export function selectScoringActivations<T extends SignedActivation & { tokens: string[] }>(
+  activations: T[],
+  isMin: boolean,
+): { activations: T[]; zeroActivations: T[] } {
+  const flipped = isMin ? activations.map(flipActivationSign) : activations;
+  const deduped = [...new Map(flipped.map((item) => [item.tokens.join(''), item])).values()];
+  deduped.sort((a, b) => b.maxValue - a.maxValue);
+  return {
+    activations: deduped
+      .slice(0, SCORING_ACTIVATIONS_TO_LOAD)
+      .filter((activation) => activation.maxValue > 0)
+      .map((activation) => ({
+        ...activation,
+        values: activation.values.map((value) => (value * 10) / activation.maxValue),
+      })),
+    zeroActivations: deduped
+      .filter((activation) => activation.maxValue === 0)
+      .slice(0, SCORING_ZERO_ACTIVATIONS_TO_LOAD_MAX),
+  };
+}
 
 export enum AutoInterpModelType {
   OPENAI = 'openai',
@@ -61,7 +112,7 @@ export const getAutoInterpModelTypeFromModelId = (modelId: string) => {
 export const ERROR_NO_AUTOINTERP_KEY = 'No auto-interp key found for user.';
 export const ERROR_REQUIRES_OPENROUTER = 'This autointerp type requires an OpenRouter key.';
 export const ERROR_RECALL_ALT_FAILED =
-  'All scoring requests failed. Check that you have enough credits in your API key (Either OpenRouter or others), and that your key has not been revoked.';
+  'Scoring requests failed. Check that you have enough credits in your API key (Either OpenRouter or others), and that your key has not been revoked.';
 export function getKeyTypeForAutoInterpModelType(modelType: AutoInterpModelType) {
   if (modelType === AutoInterpModelType.OPENAI) {
     return UserSecretType.OPENAI;
@@ -86,6 +137,11 @@ export function getAnthropicModelId(modelName: string): string {
 }
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+
+// Claude and Gemini explainers run without reasoning, also when the call goes through OpenRouter
+export function getExplainerReasoningEffort(modelType: AutoInterpModelType): 'low' | undefined {
+  return modelType === AutoInterpModelType.ANTHROPIC || modelType === AutoInterpModelType.GOOGLE ? undefined : 'low';
+}
 export function requiresOpenRouterForExplanationType(explanationType: string) {
   return explanationType === 'eleuther_acts_top20';
 }

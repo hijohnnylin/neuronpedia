@@ -148,7 +148,6 @@ export default function TabAnalyze({
                   defaultShowLineBreaks={false}
                   showControls={false}
                   showTest={false}
-                  showDatasource={false}
                   activations={animalNeuron?.activations}
                   activationItemClassName="py-2"
                 />

@@ -2,7 +2,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Activation, ExplanationModelType, UserSecretType } from '@prisma/client';
 import OpenAI from 'openai';
-import { AutoInterpModelType, getAnthropicModelId, isReasoningModel, OPENROUTER_BASE_URL } from '../utils/autointerp';
+import {
+  AutoInterpModelType,
+  getAnthropicModelId,
+  getExplainerReasoningEffort,
+  isReasoningModel,
+  OPENROUTER_BASE_URL,
+} from '../utils/autointerp';
 import { makeAnthropicMessage, makeGeminiMessage, makeOAIactivation, makeOaiMessage } from './autointerp-shared';
 
 const systemMessage = `We're studying neurons in a neural network. Each neuron looks for some particular thing in a short document. Look at the parts of the document the neuron activates for and summarize in a single sentence what the neuron is looking for. Don't list examples of words.
@@ -263,7 +269,7 @@ Explanation of neuron 4 behavior: the main thing this neuron does is find`;
         max_completion_tokens: 4096,
         temperature: 1.0,
         top_p: 1.0,
-        reasoning_effort: 'low',
+        reasoning_effort: getExplainerReasoningEffort(explainerModelType),
       });
       const explanationString = chatCompletion.choices[0].message.content;
       console.log(explanationString);
@@ -291,7 +297,9 @@ Explanation of neuron 4 behavior: the main thing this neuron does is find`;
       system: systemMessage,
       messages,
     });
-    const explanationString = (msg.content[0] as Anthropic.TextBlock).text;
+    // Newer Claude models can put a thinking block before the text
+    const explanationString =
+      msg.content.find((block): block is Anthropic.TextBlock => block.type === 'text')?.text ?? null;
     console.log(explanationString);
     return explanationString;
   }

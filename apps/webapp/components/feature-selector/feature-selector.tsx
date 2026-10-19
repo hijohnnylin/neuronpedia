@@ -2,6 +2,7 @@
 
 import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
 import { getFeaturePath } from '@/lib/utils/neuron-identifier';
+import { getDefaultSourceForModel, getDefaultSourceSetForModel, isNeuronLayerSource } from '@/lib/utils/source';
 import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDownIcon, ChevronLeft, ChevronRight, Search } from 'lucide-react';
@@ -86,6 +87,34 @@ function HeadIndexDropdown({
   );
 }
 
+// A 12px link under a selector box. A real link, so ctrl-click opens a new tab.
+function StepLink({
+  href,
+  disabled,
+  title,
+  children,
+}: {
+  href: string;
+  disabled: boolean;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      title={title}
+      aria-label={title}
+      aria-disabled={disabled}
+      tabIndex={disabled ? -1 : undefined}
+      className={`flex h-3 max-h-3 min-h-3 flex-1 select-none flex-row items-center justify-center gap-x-0.5 whitespace-pre rounded-sm bg-slate-200 font-mono text-[8px] font-medium uppercase leading-none text-slate-500 hover:bg-sky-700 hover:text-white ${
+        disabled ? 'pointer-events-none opacity-40' : ''
+      }`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export default function FeatureSelector({
   defaultModelId,
   defaultSourceSet,
@@ -147,7 +176,7 @@ export default function FeatureSelector({
   // Notified when the selector leaves attention-head mode (a non-head release/source is picked).
   onExitHeadMode?: () => void;
 }) {
-  const { getSourceSetsForModelId, getFirstSourceForSourceSet, globalModels, getDefaultModel } = useGlobalContext();
+  const { getFirstSourceForSourceSet, globalModels, getDefaultModel } = useGlobalContext();
   const [modelId, setModelId] = useState(defaultModelId || getDefaultModel()?.id || DEFAULT_MODELID);
   const [sourceSet, setSourceSet] = useState(defaultSourceSet || DEFAULT_SOURCESET);
   const [source, setSource] = useState(defaultSource);
@@ -157,6 +186,20 @@ export default function FeatureSelector({
   const router = useRouter();
 
   const indexInputRef = useRef<HTMLInputElement>(null);
+
+  // On a neuron page, layer step links sit under the layer box, for the page's own neuron.
+  const pageModelId = defaultModelId || modelId;
+  const pageModel = globalModels[pageModelId];
+  const pageIndex = parseInt(defaultIndex, 10);
+  const pageLayer =
+    showNextPrev && headLayer === undefined && defaultSource && isNeuronLayerSource(defaultSource) && pageIndex >= 0
+      ? parseInt(defaultSource, 10)
+      : undefined;
+  const isNeuronPage = pageLayer !== undefined;
+  const hasPrevLayer = isNeuronPage && pageLayer > 0;
+  const hasNextLayer = isNeuronPage && (!pageModel?.layers || pageLayer + 1 < pageModel.layers);
+  // neuronsPerLayer counts MLP neurons, so it only bounds neuron pages
+  const hasNextIndex = !pageModel?.neuronsPerLayer || pageIndex + 1 < pageModel.neuronsPerLayer;
 
   useEffect(() => {
     if (globalModels && !defaultSource) {
@@ -176,9 +219,9 @@ export default function FeatureSelector({
     }
     setHeadLayer(undefined);
     onModelChange?.(newModelId);
-    const newSourceSet = getSourceSetsForModelId(newModelId, filterToPublic)?.[0].name;
+    const newSourceSet = getDefaultSourceSetForModel(globalModels[newModelId], filterToPublic)?.name || '';
     setSourceSet(newSourceSet);
-    setSource(getFirstSourceForSourceSet(newModelId, newSourceSet));
+    setSource(getDefaultSourceForModel(globalModels[newModelId], filterToPublic)?.id);
   };
 
   const layerChanged = (newLayer: string) => {
@@ -246,7 +289,7 @@ export default function FeatureSelector({
 
             <Link
               className={`group hidden h-10 min-h-[40px] select-none flex-col items-center justify-center px-1.5 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white sm:flex ${
-                parseInt(defaultIndex, 10) > 0 ? '' : ''
+                isNeuronPage && !hasNextIndex ? 'pointer-events-none opacity-50' : ''
               }`}
               href={getFeaturePath(modelId, source, parseInt(defaultIndex, 10) + 1)}
             >
@@ -260,21 +303,44 @@ export default function FeatureSelector({
         {showModel && !modelOnSeparateRow && (
           <ModelSelector modelId={modelId} modelIdChangedCallback={modelIdChanged} filterToRelease={filterToRelease} />
         )}
-        <SourceSelector
-          modelId={modelId}
-          defaultSource={source}
-          sourceChangedCallback={layerChanged}
-          defaultSourceSet={defaultSourceSet}
-          filterToRelease={filterToRelease}
-          filterToInferenceEnabled={filterToInferenceEnabled}
-          filterToFeaturedReleases={filterToFeaturedReleases}
-          filterToPublic={filterToPublic}
-          includeHeads={includeHeads}
-          numHeadLayers={numHeadLayers}
-          headLayers={headLayers}
-          selectedHeadLayer={headLayer}
-          headLayerChangedCallback={headLayerChanged}
-        />
+        <div className="flex flex-col">
+          <SourceSelector
+            modelId={modelId}
+            defaultSource={source}
+            sourceChangedCallback={layerChanged}
+            defaultSourceSet={defaultSourceSet}
+            filterToRelease={filterToRelease}
+            filterToInferenceEnabled={filterToInferenceEnabled}
+            filterToFeaturedReleases={filterToFeaturedReleases}
+            filterToPublic={filterToPublic}
+            includeHeads={includeHeads}
+            numHeadLayers={numHeadLayers}
+            headLayers={headLayers}
+            selectedHeadLayer={headLayer}
+            headLayerChangedCallback={headLayerChanged}
+            compact={isNeuronPage}
+          />
+          {isNeuronPage && (
+            <div className="mt-0.5 flex flex-row gap-x-0.5">
+              <StepLink
+                href={getFeaturePath(pageModelId, String(pageLayer - 1), pageIndex)}
+                disabled={!hasPrevLayer}
+                title="Previous layer, same index"
+              >
+                <ChevronLeft className="h-2.5 w-2.5" />
+                {hasPrevLayer && `Layer ${pageLayer - 1}`}
+              </StepLink>
+              <StepLink
+                href={getFeaturePath(pageModelId, String(pageLayer + 1), pageIndex)}
+                disabled={!hasNextLayer}
+                title="Next layer, same index"
+              >
+                {hasNextLayer && `Layer ${pageLayer + 1}`}
+                <ChevronRight className="h-2.5 w-2.5" />
+              </StepLink>
+            </div>
+          )}
+        </div>
 
         {includeHeads && headLayer !== undefined ? (
           <>

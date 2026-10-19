@@ -5,6 +5,7 @@ import { ExplanationPartial, ExplanationPartialWithRelations, NeuronWithPartialR
 import { PUBLIC_ACTIVATIONS_USER_IDS } from '../env';
 import { getSourceSetNameFromSource } from '../utils/source';
 import { AuthenticatedUser } from '../with-user';
+import { ensureNeuronRowForFeature } from './neuron-dashboard';
 import {
   assertUserCanAccessModelAndSource,
   assertUserCanAccessModelAndSourceSet,
@@ -371,6 +372,7 @@ export const createNewExplanationWithoutScore = async (
   user: AuthenticatedUser | null = null,
 ): Promise<Explanation> => {
   await assertUserCanAccessModelAndSource(modelId, layer, user);
+  await ensureNeuronRowForFeature({ modelId, layer, index });
   const newExplanation = await prisma.explanation.create({
     data: {
       modelId,

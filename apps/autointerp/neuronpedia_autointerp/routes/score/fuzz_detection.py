@@ -2,11 +2,11 @@ import traceback
 
 import torch
 from fastapi import HTTPException
-from sae_auto_interp.clients import OpenRouter
 from sae_auto_interp.features import Example, Feature, FeatureRecord
 from sae_auto_interp.scorers import DetectionScorer, FuzzingScorer
 from sae_auto_interp.scorers.scorer import ScorerResult
 
+from neuronpedia_autointerp.clients import LowReasoningOpenRouter
 from neuronpedia_autointerp.schemas import (
     ScoreFuzzDetectionRequest,
     ScoreFuzzDetectionResponse,
@@ -53,7 +53,7 @@ async def generate_score_fuzz_detection(request: ScoreFuzzDetectionRequest) -> S
         feature_record.random_examples = non_activating_examples  # type: ignore
         feature_record.explanation = request.explanation  # type: ignore
 
-        client = OpenRouter(api_key=request.openrouter_key, model=request.model)
+        client = LowReasoningOpenRouter(api_key=request.openrouter_key, model=request.model)
 
         if request.type == ScoreFuzzDetectionType.FUZZ:
             scorer = FuzzingScorer(

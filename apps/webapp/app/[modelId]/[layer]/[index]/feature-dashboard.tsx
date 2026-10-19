@@ -5,29 +5,31 @@ import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import ExplanationScoreDetailDialog from '@/components/explanation-score-detail-dialog';
 import FeatureSelector from '@/components/feature-selector/feature-selector';
 import FeatureStats from '@/components/feature-stats';
-import CommentsPane from '@/components/panes/comments-pane';
 import ConnectedNeuronsPane from '@/components/panes/connected-neurons-pane';
 import CosSimPane from '@/components/panes/cossim-pane';
 import EmbedsPane from '@/components/panes/embeds-pane';
 import ExplanationsPane from '@/components/panes/explanations-pane';
-import ListsPane from '@/components/panes/lists-pane';
 import SaeLensConfigPane from '@/components/panes/saelens-config-pane';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
 import VectorItem from '@/components/vector-item';
+import useNeuronDashboard from '@/lib/hooks/use-neuron-dashboard';
+import { NeuronDashboardDocs, NeuronDashboardDocsContext } from '@/lib/hooks/use-neuron-dashboard-doc';
 import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
+import { signedLogHistogram } from '@/lib/utils/neuron-dashboard-histogram';
+import { applyNeuronDashboard } from '@/lib/utils/neuron-dashboards';
 import { getFeaturePath } from '@/lib/utils/neuron-identifier';
 import { neuronHasVectorInDatabase, shouldHideBreadcrumbsAndSelectorForNeuronVector } from '@/lib/utils/neuron-vector';
-import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
+import {
+  getNeuronLayerTitle,
+  getSourceSetNameFromSource,
+  isNeuronLayerSource,
+  NEURONS_SOURCESET,
+} from '@/lib/utils/source';
 import { Download } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import {
-  Activation,
-  CommentWithPartialRelations,
-  NeuronWithPartialRelations,
-  SourceWithPartialRelations,
-} from 'prisma/generated/zod';
+import { Activation, NeuronWithPartialRelations, SourceWithPartialRelations } from 'prisma/generated/zod';
 import { useEffect, useMemo, useState } from 'react';
 import BookmarkButton from './bookmark-button';
 
@@ -59,7 +61,41 @@ export default function FeatureDashboard({
   activationMarkerValue?: number;
 }) {
   const [currentNeuron, setCurrentNeuron] = useState<NeuronWithPartialRelations | undefined>(initialNeuron);
-  const { getReleaseForSourceSet } = useGlobalContext();
+  const { getReleaseForSourceSet, getSource, getSourceSet, globalModels } = useGlobalContext();
+  // A neuron with no database row has no model or sourceSet relation, so fall back to the global lists.
+  const crumbModel = currentNeuron?.model || globalModels[currentNeuron?.modelId || ''];
+  const crumbSourceSet =
+    currentNeuron?.sourceSet || getSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '');
+  const isNeuronLayer = isNeuronLayerSource(currentNeuron?.layer || '');
+  const externalDashboardsUrl = getSourceSet(
+    currentNeuron?.modelId || '',
+    currentNeuron?.sourceSetName || '',
+  )?.externalDashboardsUrl;
+  const externalDashboard = useNeuronDashboard(
+    externalDashboardsUrl,
+    currentNeuron?.modelId,
+    currentNeuron?.layer,
+    currentNeuron?.index,
+  );
+  const dashboardDocs = useMemo<NeuronDashboardDocs | null>(
+    () =>
+      externalDashboardsUrl && externalDashboard.status === 'ready'
+        ? { baseUrl: externalDashboardsUrl, docRefs: externalDashboard.dashboard.docRefs }
+        : null,
+    [externalDashboardsUrl, externalDashboard],
+  );
+  // Database fields, with activations and stats from the external dashboard when the source set has one.
+  const shownNeuron = useMemo(
+    () =>
+      currentNeuron && externalDashboard.status === 'ready'
+        ? applyNeuronDashboard(currentNeuron, externalDashboard.dashboard)
+        : currentNeuron,
+    [currentNeuron, externalDashboard],
+  );
+  const logHistogram = useMemo(
+    () => (externalDashboard.status === 'ready' ? signedLogHistogram(externalDashboard.dashboard.record) : undefined),
+    [externalDashboard],
+  );
   const [hideDeadWarning, setHideDeadWarning] = useState(false);
   const [testTextResult, setTestTextResult] = useState<Activation | undefined>();
   const pathname = usePathname();
@@ -83,7 +119,8 @@ export default function FeatureDashboard({
       }
       return true;
     }
-    if (currentNeuron?.source?.inferenceEnabled === true) {
+    const testSource = currentNeuron?.source || getSource(currentNeuron?.modelId || '', currentNeuron?.layer || '');
+    if (testSource?.inferenceEnabled === true) {
       if (embed) {
         return embedTest;
       }
@@ -148,17 +185,17 @@ export default function FeatureDashboard({
                   : []),
               ],
               <BreadcrumbLink href={`/${currentNeuron?.modelId}`} key={1}>
-                {currentNeuron?.model?.displayName}
+                {crumbModel?.displayName || currentNeuron?.modelId}
               </BreadcrumbLink>,
-              ...(currentNeuron?.sourceSet
+              ...(crumbSourceSet && !isNeuronLayer
                 ? [
-                    <BreadcrumbLink href={`/${currentNeuron?.modelId}/${currentNeuron?.sourceSet?.name}`} key={2.5}>
-                      {currentNeuron?.sourceSet?.type}
+                    <BreadcrumbLink href={`/${currentNeuron?.modelId}/${crumbSourceSet.name}`} key={2.5}>
+                      {crumbSourceSet.type}
                     </BreadcrumbLink>,
                   ]
                 : []),
               <BreadcrumbLink href={`/${currentNeuron?.modelId}/${currentNeuron?.layer}`} key={2}>
-                {currentNeuron?.layer.toUpperCase()}
+                {isNeuronLayer ? getNeuronLayerTitle(currentNeuron?.layer || '') : currentNeuron?.layer.toUpperCase()}
               </BreadcrumbLink>,
               <BreadcrumbPage key={3}>{currentNeuron?.index}</BreadcrumbPage>,
             ]}
@@ -189,7 +226,7 @@ export default function FeatureDashboard({
               />
             </div>
             <div className="hidden flex-row items-start justify-start gap-x-2 px-0 pt-1 sm:flex">
-              {allowTest() && (
+              {allowTest() && !isNeuronLayer && (
                 <button
                   type="button"
                   onClick={async () => {
@@ -274,18 +311,6 @@ export default function FeatureDashboard({
 
           {/* === EMBEDS */}
           <EmbedsPane currentNeuron={currentNeuron} testTextResult={testTextResult} />
-
-          {/* === LISTS */}
-          {/* TODO: fix this */}
-          <ListsPane currentNeuron={currentNeuron} reloadNeuron={reloadNeuron} />
-
-          {/* === COMMENTS */}
-          <div className="relative mb-0 mt-2 hidden flex-col overflow-hidden rounded-lg border bg-white text-xs shadow-md transition-all sm:mt-4 sm:flex">
-            <CommentsPane
-              initialComments={(currentNeuron?.comments as CommentWithPartialRelations[]) || []}
-              neuron={currentNeuron}
-            />
-          </div>
         </div>
 
         {/* === RIGHT PANE */}
@@ -334,43 +359,61 @@ export default function FeatureDashboard({
             id="activationScrollDiv"
           >
             <div className="flex-1 overflow-y-scroll border border-slate-200 sm:rounded-lg">
-              {currentNeuron?.pos_str && currentNeuron?.pos_str?.length > 0 && embedPlots && (
+              {shownNeuron?.pos_str && shownNeuron?.pos_str?.length > 0 && embedPlots && (
                 <div className="border-b px-2.5 pb-1.5 pt-1.5 sm:px-4 sm:pb-2 sm:pt-2">
                   <FeatureStats
-                    currentNeuron={currentNeuron}
+                    currentNeuron={shownNeuron}
                     embed={embed}
                     embedPlots={embedPlots}
                     activationMarkerValue={activationMarkerValue}
                     forceMiniStats={forceMiniStats}
+                    signedLogHistogram={logHistogram}
                   />
                 </div>
               )}
-              <ActivationsList
-                feature={currentNeuron}
-                defaultRange={forceMiniStats ? 1 : currentNeuron?.sourceSet?.defaultRange}
-                defaultShowLineBreaks={forceMiniStats ? false : currentNeuron?.sourceSet?.defaultShowBreaks}
-                showCopy={allowTest()}
-                showTest={allowTest()}
-                defaultActivationTestText={defaultTestText}
-                showControls={!embed}
-                overrideLeading={forceMiniStats ? 'leading-none sm:leading-none' : 'leading-tight sm:leading-tight'}
-                overrideTextSize={embed ? (forceMiniStats ? 'text-[10px]' : 'text-[10px] sm:text-[12px]') : undefined}
-                embed={embed}
-                activations={currentNeuron?.activations}
-                activationTestTextCallback={(activation) => {
-                  setTestTextResult(activation);
-                }}
-                // if false, only show the activation test
-                showActivations={embedActivations}
-                showSteerButton={embedSteer}
-                showTestField={embedTestField}
-              />
+              {externalDashboard.status === 'error' && (
+                <div className="border-b px-4 py-2 text-xs text-red-600">
+                  Could not load this dashboard: {externalDashboard.error}
+                </div>
+              )}
+              {externalDashboard.status === 'loading' ? (
+                <div className="flex h-48 w-full items-center justify-center text-sm font-medium text-slate-400">
+                  Loading dashboard...
+                </div>
+              ) : (
+                <NeuronDashboardDocsContext.Provider value={dashboardDocs}>
+                  <ActivationsList
+                    feature={shownNeuron}
+                    defaultRange={forceMiniStats ? 1 : currentNeuron?.sourceSet?.defaultRange}
+                    defaultShowLineBreaks={forceMiniStats ? false : currentNeuron?.sourceSet?.defaultShowBreaks}
+                    showCopy={allowTest()}
+                    showTest={allowTest()}
+                    defaultActivationTestText={defaultTestText}
+                    showControls={!embed}
+                    overrideLeading={forceMiniStats ? 'leading-none sm:leading-none' : 'leading-tight sm:leading-tight'}
+                    overrideTextSize={
+                      embed ? (forceMiniStats ? 'text-[10px]' : 'text-[10px] sm:text-[12px]') : undefined
+                    }
+                    embed={embed}
+                    activations={shownNeuron?.activations}
+                    activationTestTextCallback={(activation) => {
+                      setTestTextResult(activation);
+                    }}
+                    // if false, only show the activation test
+                    showActivations={embedActivations}
+                    // inference has no steering for MLP neurons
+                    showSteerButton={embedSteer && !isNeuronLayer}
+                    showTestField={embedTestField}
+                  />
+                </NeuronDashboardDocsContext.Provider>
+              )}
             </div>
           </div>
         </div>
 
         {/* === DEAD FEATURE */}
-        {currentNeuron?.maxActApprox === 0 &&
+        {shownNeuron?.maxActApprox === 0 &&
+          externalDashboard.status !== 'loading' &&
           !CIRCUIT_SPARSITY_MODELS.includes(currentNeuron?.modelId || '') &&
           !hideDeadWarning &&
           !currentNeuron?.hasVector && (

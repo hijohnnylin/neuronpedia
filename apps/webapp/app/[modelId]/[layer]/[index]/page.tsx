@@ -1,5 +1,7 @@
 import { getNeuronOptimized, neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
+import { userCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
+import { getNeuronLayerTitle, isNeuronLayerSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -9,9 +11,16 @@ export async function generateMetadata(props: {
   params: Promise<{ modelId: string; layer: string; index: string }>;
 }): Promise<Metadata> {
   const params = await props.params;
-  let title = `${params.modelId.toUpperCase()} · ${params.layer.toUpperCase()} · ${params.index.toUpperCase()}`;
-  const feat = await neuronExistsAndUserHasAccess(params.modelId, params.layer, params.index);
-  if (!feat) {
+  const isNeuronLayer = isNeuronLayerSource(params.layer);
+  const layerTitle = isNeuronLayer ? getNeuronLayerTitle(params.layer) : params.layer.toUpperCase();
+  let title = `${params.modelId.toUpperCase()} · ${layerTitle} · ${params.index.toUpperCase()}`;
+  // A neuron layer page renders without a Neuron row, so check the source set instead.
+  const visible =
+    (await neuronExistsAndUserHasAccess(params.modelId, params.layer, params.index)) ||
+    (isNeuronLayer &&
+      /^\d+$/.test(params.index) &&
+      (await userCanAccessModelAndSourceSet(params.modelId, NEURONS_SOURCESET, null, true)));
+  if (!visible) {
     title = '';
   }
   return {

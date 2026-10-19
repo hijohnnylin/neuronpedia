@@ -9,7 +9,7 @@ import JumpToSAE from '@/components/jump-to-sae';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import RandomReleaseFeature from '@/components/random-release-feature';
 import { DEFAULT_MODELID, DEFAULT_SOURCE, DEMO_MODE, IS_LOCALHOST } from '@/lib/env';
-import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
+import { getDefaultSourceForModel, getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { SourceReleaseWithPartialRelations } from '@/prisma/generated/zod';
 import { useRouter } from '@bprogress/next';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -22,16 +22,11 @@ import ReleasesDropdown from './releases-dropdown';
 
 export default function NavBarButtons() {
   const router = useRouter();
-  const { getSourceSetsForModelId, globalModels, releases, getDefaultModel, getFirstSourceForSourceSet } =
-    useGlobalContext();
+  const { getSourceSetsForModelId, globalModels, releases, getDefaultModel } = useGlobalContext();
   const [jumpToOpen, setJumpToOpen] = useState(false);
   const [jumpToModelModelId, setJumpToModelModelId] = useState(DEFAULT_MODELID || getDefaultModel()?.id || '');
 
-  const defaultSource =
-    DEFAULT_SOURCE ||
-    (getSourceSetsForModelId(jumpToModelModelId, true).length > 0
-      ? getFirstSourceForSourceSet(jumpToModelModelId, getSourceSetsForModelId(jumpToModelModelId, true)[0].name)
-      : '');
+  const defaultSource = DEFAULT_SOURCE || getDefaultSourceForModel(globalModels[jumpToModelModelId], true)?.id || '';
 
   return (
     <>

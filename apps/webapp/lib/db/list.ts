@@ -5,6 +5,7 @@ import { Activation } from '@prisma/client';
 import { forbidden, notFound } from '../api-error';
 import { ListNeuronToAdd, MAX_LIST_FEATURES_FOR_TEST_TEXT, MAX_LIST_TEST_TEXT_LENGTH_CHARS } from '../utils/list';
 import { AuthenticatedUser } from '../with-user';
+import { ensureNeuronRowForFeature } from './neuron-dashboard';
 import { AllowUnlistedFor, assertUserCanAccessModelAndSourceSet, userCanAccessClause } from './userCanAccess';
 
 export const assertUserOwnsList = async (listId: string, user: AuthenticatedUser) => {
@@ -47,6 +48,14 @@ export const addNeuronsToList = async (
   user: AuthenticatedUser,
 ) => {
   const list = await assertUserOwnsList(listId, user);
+  for (const neuronToAdd of listNeuronsToAdd) {
+    // eslint-disable-next-line no-await-in-loop
+    await ensureNeuronRowForFeature({
+      modelId: neuronToAdd.modelId,
+      layer: neuronToAdd.layer,
+      index: neuronToAdd.index,
+    });
+  }
 
   const createdListsOnNeurons = await prisma.listsOnNeurons.createManyAndReturn({
     data: listNeuronsToAdd.map((neuronToAdd) => ({

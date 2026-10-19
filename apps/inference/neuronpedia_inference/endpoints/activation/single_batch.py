@@ -8,6 +8,7 @@ from interp_engine import special_token_positions
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.activation.single import (
+    bos_positions,
     get_layer_num_from_sae_id,
     process_feature_activations,
     process_neuron_activations,
@@ -21,7 +22,7 @@ from neuronpedia_inference.engine_adapter import (
 )
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import activation_single_batch_cost
-from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
 from neuronpedia_inference.schemas import (
     ActivationSingleBatchRequest,
     ActivationSingleBatchResponse,
@@ -89,7 +90,8 @@ async def activation_single_batch(
         layer_num = get_layer_num_from_sae_id(source)
         index = int(request.index)
 
-        sae = sae_manager.get_sae(source)
+        # MLP neuron layers have no SAE to load.
+        sae = None if sae_manager.get_sae_type(source) == SAE_TYPE.NEURONS else sae_manager.get_sae(source)
 
         # TODO: we assume that if either SAE or model prepends bos, then we should prepend bos
         # this is not exactly correct, but sometimes the SAE doesn't have the prepend_bos flag set
@@ -103,7 +105,7 @@ async def activation_single_batch(
         for prompt in prompts:
             # if the prompt doesn't start with the bos, prepend it
             bos_token = model.tokenizer.bos_token
-            if not prompt.startswith(bos_token):
+            if bos_token and not prompt.startswith(bos_token):
                 prompt = bos_token + prompt
 
             tokens = model.to_tokens(
@@ -253,7 +255,7 @@ async def process_activations_batch(
         padded_tokens[i, : len(tokens)] = tokens
         original_lengths.append(len(tokens))
         # Find BOS indices for this sequence
-        bos_indices = (tokens == bos_token_id).nonzero(as_tuple=True)[0].tolist()
+        bos_indices = bos_positions(tokens, bos_token_id)
         all_bos_indices.append(bos_indices)
 
     # Run batch inference (backend-aware). Right-padded + causal attention => real positions
@@ -269,7 +271,7 @@ async def process_activations_batch(
         if sae_type == "neurons":
             # Extract single sequence from batch
             seq_cache = {hook_name: cache[hook_name][i : i + 1, :seq_len]}
-            result = process_neuron_activations(seq_cache, hook_name, index, sae_manager.device)
+            result = process_neuron_activations(seq_cache, hook_name, index, sae_manager.device, all_bos_indices[i])
         elif sae_manager.get_sae(layer) is not None:
             # Extract single sequence from batch
             seq_cache = {hook_name: cache[hook_name][i : i + 1, :seq_len]}

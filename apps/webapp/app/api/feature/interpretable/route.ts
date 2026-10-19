@@ -1,5 +1,5 @@
 import { badRequest, toErrorResponse } from '@/lib/api-error';
-import { prisma } from '@/lib/db';
+import { getActivationsForFeature, markNearZeroAsNonActivating } from '@/lib/db/neuron-dashboard';
 import { checkInterpretability } from '@/lib/external/interpretability-jev';
 import { NextRequest, NextResponse } from 'next/server';
 import { object, string } from 'yup';
@@ -40,10 +40,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await bodySchema.validate(await request.json());
 
-    let activations = await prisma.activation.findMany({
-      where: { neuron: { modelId: body.modelId, layer: body.layer, index: body.index } },
-      select: { tokens: true, values: true, maxValue: true },
-    });
+    const loaded = await getActivationsForFeature({ modelId: body.modelId, layer: body.layer, index: body.index });
+    let activations = loaded.dashboard
+      ? markNearZeroAsNonActivating(loaded.activations, loaded.dashboard)
+      : loaded.activations;
     if (activations.length === 0) {
       throw badRequest('Feature not found, or it has no activations stored.');
     }

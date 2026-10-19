@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "neuron-dashboards",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-18",
+  "workers_dev": true,
+  // dashboards.neuronpedia.org is a Cloudflare for SaaS custom hostname on the openaudit.com zone.
+  "routes": [{ "pattern": "dashboards.neuronpedia.org/*", "zone_name": "openaudit.com" }],
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "neuronpedia" }],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.05,
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  }
+}

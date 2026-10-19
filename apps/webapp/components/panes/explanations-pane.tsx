@@ -10,6 +10,7 @@ import {
   ERROR_RECALL_ALT_FAILED,
   ERROR_REQUIRES_OPENROUTER,
   EXPLANATIONTYPE_HUMAN,
+  EXPLANATIONTYPE_NP_MIN_ACT_LOGITS,
 } from '@/lib/utils/autointerp';
 import { getNlaSaeFormat } from '@/lib/utils/nla';
 import { SAEFormat } from '@/lib/utils/saelens';
@@ -44,6 +45,9 @@ function cleanNlaPartialText(raw: string): string {
     .replace(/<\/explanation\s*$/g, '')
     .trim();
 }
+
+const DEFAULT_EXPLANATION_TYPE = 'np_max-act-logits';
+const DEFAULT_EXPLANATION_MODEL = 'gemini-2.5-flash-lite';
 
 export default function ExplanationsPane({
   currentNeuron,
@@ -92,9 +96,19 @@ export default function ExplanationsPane({
 
   useEffect(() => {
     if (explanationTypesFiltered.length > 0) {
-      setSelectedExplanationType(explanationTypesFiltered[0]);
+      setSelectedExplanationType(
+        explanationTypesFiltered.find((t) => t.name === DEFAULT_EXPLANATION_TYPE) || explanationTypesFiltered[0],
+      );
     }
   }, [explanationTypesFiltered]);
+
+  useEffect(() => {
+    if (explanationModels.length > 0) {
+      setSelectedExplanationModel(
+        explanationModels.find((m) => m.name === DEFAULT_EXPLANATION_MODEL) || explanationModels[0],
+      );
+    }
+  }, [explanationModels]);
 
   useEffect(() => {
     if (explanationScoreTypes.length > 0) {
@@ -300,6 +314,14 @@ export default function ExplanationsPane({
                               </div> */}
                   <div className="h-fill flex-1">
                     <div className="flex-inline relative flex items-center">
+                      {explanation.typeName === EXPLANATIONTYPE_NP_MIN_ACT_LOGITS && (
+                        <span
+                          className="mr-1.5 shrink-0 rounded bg-rose-50 px-1 py-px font-sans text-[9px] font-semibold uppercase leading-tight text-rose-600"
+                          title="Explains the most negative activations"
+                        >
+                          Negative
+                        </span>
+                      )}
                       <h1
                         className="cursor-text select-text py-0 text-xs font-medium leading-snug text-slate-700"
                         title={explanation.description}
@@ -1013,6 +1035,8 @@ export default function ExplanationsPane({
                         </Link>
                       </div>,
                     );
+                  } else if (result.status === 400 && res.message) {
+                    showToastMessage(<div>{res.message}</div>);
                   } else {
                     showToastServerError();
                   }
@@ -1023,11 +1047,9 @@ export default function ExplanationsPane({
               } else {
                 const res = await result.json();
                 const exp = res.explanation as Explanation;
-                // append the explanation to the currentNeuron.explanations
-                if (currentNeuron && currentNeuron.explanations) {
-                  const newCurrentNeuron = { ...currentNeuron };
-                  newCurrentNeuron.explanations = [...currentNeuron.explanations, exp];
-                  setCurrentNeuron(newCurrentNeuron);
+                // append the explanation. A neuron with no database row has no explanations list yet
+                if (currentNeuron) {
+                  setCurrentNeuron({ ...currentNeuron, explanations: [...(currentNeuron.explanations || []), exp] });
                 }
                 setIsAutoInterping(false);
               }
@@ -1115,41 +1137,44 @@ export default function ExplanationsPane({
             </CustomTooltip>
           </div>
         )}
-        <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
-          <button
-            type="button"
-            onClick={handleCheckInterpretable}
-            disabled={interpretableLoading || !currentNeuron?.index}
-            className="flex h-9 w-[140px] flex-col items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium leading-tight text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
-          >
-            {interpretableLoading ? (
-              <LoadingSpinner size={16} className="text-sky-700" />
-            ) : (
-              <>
-                <span>Interpretable Score</span>
-                <span className="text-[8px] uppercase text-slate-400">Intrusion Detection</span>
-              </>
-            )}
-          </button>
-          <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
-            <p className="leading-relaxed">
-              Tests whether this feature is interpretable from its contexts alone, with no explanation. Shows a model
-              groups of four activating texts plus one intruder and asks it to find the odd one out.
-            </p>
-            <p className="mt-2 leading-relaxed">
-              Based on the intruder detection task in{' '}
-              <a
-                href="https://arxiv.org/pdf/2507.08473"
-                target="_blank"
-                rel="noreferrer"
-                className="text-sky-700 underline hover:text-sky-900"
-              >
-                Paulo &amp; Belrose (2025)
-              </a>
-              .
-            </p>
-          </CustomTooltip>
-        </div>
+        {/* Intrusion detection reads Activation rows; features served from R2 dashboard files have none */}
+        {!getSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')?.externalDashboardsUrl && (
+          <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
+            <button
+              type="button"
+              onClick={handleCheckInterpretable}
+              disabled={interpretableLoading || !currentNeuron?.index}
+              className="flex h-9 w-[140px] flex-col items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium leading-tight text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+            >
+              {interpretableLoading ? (
+                <LoadingSpinner size={16} className="text-sky-700" />
+              ) : (
+                <>
+                  <span>Interpretable Score</span>
+                  <span className="text-[8px] uppercase text-slate-400">Intrusion Detection</span>
+                </>
+              )}
+            </button>
+            <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
+              <p className="leading-relaxed">
+                Tests whether this feature is interpretable from its contexts alone, with no explanation. Shows a model
+                groups of four activating texts plus one intruder and asks it to find the odd one out.
+              </p>
+              <p className="mt-2 leading-relaxed">
+                Based on the intruder detection task in{' '}
+                <a
+                  href="https://arxiv.org/pdf/2507.08473"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-700 underline hover:text-sky-900"
+                >
+                  Paulo &amp; Belrose (2025)
+                </a>
+                .
+              </p>
+            </CustomTooltip>
+          </div>
+        )}
       </div>
       <InterpretabilityCheckDialog
         open={interpretableOpen}

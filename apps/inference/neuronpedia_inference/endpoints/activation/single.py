@@ -15,7 +15,7 @@ from neuronpedia_inference.engine_adapter import (
 )
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import activation_single_cost
-from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
 from neuronpedia_inference.schemas import (
     ActivationSingleRequest,
     ActivationSingleResponse,
@@ -63,7 +63,8 @@ async def activation_single(
         layer_num = get_layer_num_from_sae_id(source)
         index = int(request.index)
 
-        sae = sae_manager.get_sae(source)
+        # MLP neuron layers have no SAE to load.
+        sae = None if sae_manager.get_sae_type(source) == SAE_TYPE.NEURONS else sae_manager.get_sae(source)
 
         # TODO: we assume that if either SAE or model prepends bos, then we should prepend bos
         # this is not exactly correct, but sometimes the SAE doesn't have the prepend_bos flag set
@@ -71,7 +72,7 @@ async def activation_single(
         prepend_bos = False
         # if the prompt doesn't start with the bos, prepend it
         bos_token = model.tokenizer.bos_token
-        if not prompt.startswith(bos_token):
+        if bos_token and not prompt.startswith(bos_token):
             prompt = bos_token + prompt
 
         tokens = model.to_tokens(
@@ -167,13 +168,19 @@ async def process_activations(
     sae_type = sae_manager.get_sae_type(layer)
 
     # zero out all values that are the BOS token
-    bos_token_id = model.tokenizer.bos_token_id
-    bos_indices = (tokens == bos_token_id).nonzero(as_tuple=True)[0]
+    bos_indices = bos_positions(tokens, model.tokenizer.bos_token_id)
 
     cache = await capture_cache_async(model, tokens, [hook_name])
     if sae_type == "neurons":
-        return process_neuron_activations(cache, hook_name, index, sae_manager.device)
+        return process_neuron_activations(cache, hook_name, index, sae_manager.device, bos_indices)
     return process_feature_activations(sae_manager.get_sae(layer), sae_type, cache, hook_name, index, bos_indices)
+
+
+def bos_positions(tokens: torch.Tensor, bos_token_id: int | None) -> list[int]:
+    """Positions of the BOS token in ``tokens``; none for a tokenizer without one (Qwen)."""
+    if bos_token_id is None:
+        return []
+    return (tokens == bos_token_id).nonzero(as_tuple=True)[0].tolist()
 
 
 def process_neuron_activations(
@@ -181,9 +188,16 @@ def process_neuron_activations(
     hook_name: str,
     index: int,
     device: str,
+    bos_indices: list[int] | None = None,
 ) -> ActivationValues:
+    """One MLP neuron's values, with BOS handled as for SAE features: zeroed, and dropped from the front."""
     mlp_activation_data = cache[hook_name].to(device)
     values = torch.transpose(mlp_activation_data[0], 0, 1)[index].detach().tolist()
+    bos_indices = bos_indices or []
+    for idx in bos_indices:
+        values[idx] = 0
+    if len(bos_indices) > 0:
+        values = values[1:]
     max_value = max(values)
     return ActivationValues(
         values=values,

@@ -1,5 +1,7 @@
 'use client';
 
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/shadcn/dialog';
+import useNeuronDashboardDoc, { NeuronDashboardDocContext } from '@/lib/hooks/use-neuron-dashboard-doc';
 import {
   ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS,
   LINE_BREAK_REPLACEMENT_CHAR,
@@ -8,9 +10,9 @@ import {
 } from '@/lib/utils/activations';
 import { cn } from '@/lib/utils/ui';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { Copy } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { ActivationPartialWithRelations } from 'prisma/generated/zod';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ActivationItemTokenTooltip from './activation-item-token-tooltip';
 
 const ACTIVATION_MAX_COPY_TOKENS = 512;
@@ -20,6 +22,33 @@ const REGULAR_TOKEN_CLASSNAME = 'border-2 border-transparent hover:bg-slate-200'
 export const CENTER_ME_CLASSNAME = 'center-me';
 
 const BOTTOM_ACTIVATION_DATA_SOURCE = 'bottom';
+
+// Document text outside the stored window: it has no activation values, so it is not colored.
+function PlainTokens({
+  tokens,
+  showLineBreaks,
+  className,
+}: {
+  tokens: string[];
+  showLineBreaks: boolean;
+  className: string;
+}) {
+  return (
+    <>
+      {tokens.map((token, i) => {
+        const text = replaceHtmlAnomalies(token);
+        return (
+          <span key={i}>
+            <span className={`inline-block whitespace-pre font-mono text-slate-400 ${className}`}>
+              {text.length > 0 && text.trim() === '' ? text.replace(/\s/g, '\u00A0') : text}
+            </span>
+            {(token.indexOf('\n') !== -1 || text === LINE_BREAK_REPLACEMENT_CHAR) && showLineBreaks && <br />}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 export default function ActivationItem({
   activation,
@@ -40,6 +69,8 @@ export default function ActivationItem({
   overrideLeading = 'leading-none sm:leading-tight',
   overrideTextColor = 'text-slate-600',
   className,
+  overallMinActivationValueInList,
+  fullContext,
 }: {
   activation: ActivationPartialWithRelations;
   overallMaxActivationValueInList?: number;
@@ -56,11 +87,20 @@ export default function ActivationItem({
   overrideLeading?: string;
   overrideTextColor?: string;
   className?: string;
+  // most negative value in the list, so negative tokens share one red scale; defaults to this row's own minimum
+  overallMinActivationValueInList?: number;
+  // document text around the window, shown uncolored before and after it
+  fullContext?: NeuronDashboardDocContext;
 }) {
   const [currentRange, setCurrentRange] = useState(tokensToDisplayAroundMaxActToken);
   const [isExpanded, setIsExpanded] = useState(false);
   const [dfaMaxIndex, setDfaMaxIndex] = useState(0);
   const [zHoveredTargetIndex, setZHoveredTargetIndex] = useState<number | null>(null);
+  const dashboardDoc = useNeuronDashboardDoc(activation.id);
+  const [docContext, setDocContext] = useState<NeuronDashboardDocContext | 'loading' | 'error' | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
+  const [isFullContextOpen, setIsFullContextOpen] = useState(false);
+  const fullContextRef = useRef<HTMLDivElement>(null);
 
   const maxActivationTokenIndex = activation.maxValueTokenIndex || 0;
   const maxActivationValue = activation.maxValue || 0;
@@ -76,6 +116,11 @@ export default function ActivationItem({
 
   const isBottomActivation = activation.dataSource === BOTTOM_ACTIVATION_DATA_SOURCE;
   const minActivationTokenIndex = activation.values ? activation.values.indexOf(Math.min(...activation.values)) : 0;
+  const negativeScale = Math.abs(
+    isBottomActivation
+      ? activation.minValue || 0
+      : (overallMinActivationValueInList ?? Math.min(0, ...(activation.values || []))),
+  );
 
   // For bottom activations, center around the most negative value; otherwise center around max
   const anchorTokenIndex = isBottomActivation ? minActivationTokenIndex : maxActivationTokenIndex;
@@ -163,6 +208,61 @@ export default function ActivationItem({
     }
 
     return toReturn;
+  }
+
+  const showFullContextButton =
+    dashboardDoc !== null &&
+    !fullContext &&
+    (isExpanded || tokensToDisplayAroundMaxActToken >= ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[2].size);
+
+  function openFullContext() {
+    setIsFullContextOpen(true);
+    if (dashboardDoc && (docContext === null || docContext === 'error')) {
+      setDocContext('loading');
+      dashboardDoc
+        .loadContext()
+        .then(setDocContext)
+        .catch(() => setDocContext('error'));
+    }
+  }
+
+  useEffect(() => {
+    if (isFullContextOpen && typeof docContext === 'object' && docContext !== null) {
+      requestAnimationFrame(() => {
+        fullContextRef.current?.querySelector(`.${CENTER_ME_CLASSNAME}`)?.scrollIntoView({ block: 'center' });
+      });
+    }
+  }, [isFullContextOpen, docContext]);
+
+  async function copyToTestField() {
+    if (!setActivationTestText) {
+      return;
+    }
+    if (dashboardDoc) {
+      // The whole document, so a test sees the same context as the dashboard run.
+      setIsCopying(true);
+      try {
+        setActivationTestText(await dashboardDoc.loadText());
+        window.scrollTo(0, 0);
+        return;
+      } catch (error) {
+        console.error('error loading document text, copying the window instead:', error);
+      } finally {
+        setIsCopying(false);
+      }
+    }
+    const wholeString = activation.tokens?.join('') || '';
+    // truncate to the tokens around the max activation
+    if (activation.values && activation.tokens && activation.values.length > ACTIVATION_MAX_COPY_TOKENS) {
+      const maxIndex = activation.values?.indexOf(Math.max(...activation.values!));
+      const startIndex = Math.max(0, maxIndex - ACTIVATION_MAX_COPY_TOKENS / 2);
+      const endIndex = Math.min(activation.tokens?.length, maxIndex + ACTIVATION_MAX_COPY_TOKENS / 2);
+      const truncatedString = activation.tokens?.slice(startIndex, endIndex);
+      setActivationTestText(truncatedString.join(''));
+    } else {
+      setActivationTestText(wholeString);
+    }
+    window.scrollTo(0, 0);
   }
 
   return (
@@ -286,6 +386,9 @@ export default function ActivationItem({
           </>
         )}
 
+        {fullContext && (
+          <PlainTokens tokens={fullContext.before} showLineBreaks={showLineBreaks} className={overrideTextSize} />
+        )}
         {/* in all cases, we should display the activations / max activation (green background) */}
         {activation.tokens &&
           activation.tokens.map((token, tokenIndex) => {
@@ -355,14 +458,14 @@ export default function ActivationItem({
                             backgroundImage: (() => {
                               const tokenValue = activation.values ? activation.values[tokenIndex] : 0;
                               const isNegativeToken = tokenValue < 0;
-                              // For bottom activations with negative token values, use red; otherwise use green
-                              const useRed = isBottomActivation && isNegativeToken;
+                              // Negative values (MLP neurons, vector projections) are red; positive values are green
+                              const useRed = isNegativeToken && negativeScale > 0;
                               const zHoverContribution =
                                 hasZPattern && zHoveredTargetIndex !== null
                                   ? Math.max(0, zContributionsBySource.get(tokenIndex) || 0)
                                   : 0;
                               return makeActivationBackgroundColorWithDFA(
-                                useRed ? Math.abs(activation.minValue || 0) : overallMaxActivationValueInList,
+                                useRed ? negativeScale : overallMaxActivationValueInList,
                                 useRed ? Math.abs(tokenValue) : tokenValue,
                                 useRed ? '253, 164, 175' : '52, 211, 153',
                                 hasZPattern
@@ -407,31 +510,80 @@ export default function ActivationItem({
             }
             return '';
           })}
+        {fullContext && (
+          <PlainTokens tokens={fullContext.after} showLineBreaks={showLineBreaks} className={overrideTextSize} />
+        )}
+        {showFullContextButton && (
+          <div className="flex w-full justify-center pt-1.5">
+            <button
+              type="button"
+              className="rounded bg-slate-100 px-2.5 py-1 font-sans text-[10px] font-medium text-slate-500 hover:bg-sky-100 hover:text-sky-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                openFullContext();
+              }}
+            >
+              Show Full Context
+            </button>
+          </div>
+        )}
       </div>
       {showCopy && setActivationTestText && (
         <div className="mt-0 flex flex-row items-center justify-end">
           <button
             type="button"
             className="flex cursor-pointer flex-row rounded bg-slate-100 p-1.5 text-[10px] font-medium text-slate-400 hover:bg-slate-200"
-            title="Copy/Remix"
-            onClick={() => {
-              const wholeString = activation.tokens?.join('') || '';
-              // truncate to the tokens around the max activation
-              if (activation.values && activation.tokens && activation.values.length > ACTIVATION_MAX_COPY_TOKENS) {
-                const maxIndex = activation.values?.indexOf(Math.max(...activation.values!));
-                const startIndex = Math.max(0, maxIndex - ACTIVATION_MAX_COPY_TOKENS / 2);
-                const endIndex = Math.min(activation.tokens?.length, maxIndex + ACTIVATION_MAX_COPY_TOKENS / 2);
-                const truncatedString = activation.tokens?.slice(startIndex, endIndex);
-                setActivationTestText(truncatedString.join(''));
-              } else {
-                setActivationTestText(wholeString);
-              }
-              window.scrollTo(0, 0);
-            }}
+            title="Test Prompt"
+            disabled={isCopying}
+            onClick={copyToTestField}
           >
-            <Copy className="h-3 w-3" />
+            <Play className="h-3 w-3" />
           </button>
         </div>
+      )}
+      {dashboardDoc && !fullContext && (
+        <Dialog open={isFullContextOpen} onOpenChange={setIsFullContextOpen}>
+          <DialogContent className="flex max-h-[85vh] max-w-4xl flex-col gap-3 bg-white" aria-describedby={undefined}>
+            <DialogHeader className="flex flex-row items-center justify-between gap-x-3 space-y-0 pr-8">
+              <DialogTitle className="text-left font-mono text-xs font-semibold uppercase text-slate-500">
+                {activation.modelId} · Layer {activation.layer} · Neuron {activation.index}
+              </DialogTitle>
+              {setActivationTestText && (
+                <button
+                  type="button"
+                  className="flex shrink-0 flex-row items-center gap-x-1 rounded bg-sky-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                  disabled={isCopying}
+                  onClick={async () => {
+                    setIsFullContextOpen(false);
+                    await copyToTestField();
+                  }}
+                >
+                  <Play className="h-3 w-3" /> Test Prompt
+                </button>
+              )}
+            </DialogHeader>
+            <div ref={fullContextRef} className="min-h-0 overflow-y-auto pr-2">
+              {typeof docContext === 'object' && docContext !== null ? (
+                <ActivationItem
+                  activation={activation}
+                  overallMaxActivationValueInList={overallMaxActivationValueInList}
+                  overallMinActivationValueInList={overallMinActivationValueInList}
+                  showLineBreaks={showLineBreaks}
+                  centerAndBorderOnTokenIndex={anchorTokenIndex}
+                  enableExpanding={false}
+                  showCopy={false}
+                  overrideTextSize={overrideTextSize}
+                  overrideLeading="leading-tight"
+                  fullContext={docContext}
+                />
+              ) : (
+                <div className="py-6 text-center text-xs text-slate-400">
+                  {docContext === 'error' ? 'Could not load the full document.' : 'Loading full document...'}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

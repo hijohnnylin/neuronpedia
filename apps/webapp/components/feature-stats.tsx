@@ -3,6 +3,7 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import useWindowSize from '@/lib/hooks/use-window-size';
 import { replaceHtmlAnomalies } from '@/lib/utils/activations';
+import { SignedLogHistogram } from '@/lib/utils/neuron-dashboard-histogram';
 import { getLayerNumFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle } from 'lucide-react';
@@ -24,6 +25,9 @@ const Plot = dynamic(
 );
 // const Plot = createPlotlyComponent(Plotly);
 const MAX_EMBED_TOP_LOGITS = 5;
+// Above this many logits in a column, both columns show COLLAPSED_LOGITS and a "Show More" button.
+const COLLAPSE_LOGITS_ABOVE = 10;
+const COLLAPSED_LOGITS = 9;
 
 export default function FeatureStats({
   currentNeuron,
@@ -33,6 +37,7 @@ export default function FeatureStats({
   embedPlots = true,
   forceMiniStats = false,
   activationMarkerValue,
+  signedLogHistogram,
 }: {
   currentNeuron: NeuronWithPartialRelations;
   vertical?: boolean;
@@ -41,10 +46,29 @@ export default function FeatureStats({
   embedPlots?: boolean;
   forceMiniStats?: boolean;
   activationMarkerValue?: number;
+  // Exact log-binned counts. When set, a toggle switches the activation plot to them.
+  signedLogHistogram?: SignedLogHistogram;
 }) {
   const { getSourceSet, globalModels } = useGlobalContext();
   const [maxLogit, setMaxLogit] = useState<number | undefined>();
+  const [histogramScale, setHistogramScale] = useState<'linear' | 'log'>('linear');
+  const [showAllLogits, setShowAllLogits] = useState(false);
   const { windowSize } = useWindowSize();
+  const isMiniStats = Boolean(
+    (embed && !embedPlots) || (windowSize.width && windowSize.width < 640) || vertical || forceMiniStats,
+  );
+  const logitsCollapsible =
+    !isMiniStats &&
+    Math.max(currentNeuron?.pos_str.length || 0, currentNeuron?.neg_str.length || 0) > COLLAPSE_LOGITS_ABOVE;
+  const showLogHistogram = histogramScale === 'log' && signedLogHistogram && signedLogHistogram.x.length > 0;
+
+  function isLogitRowHidden(i: number) {
+    return (isMiniStats && i >= MAX_EMBED_TOP_LOGITS) || (logitsCollapsible && !showAllLogits && i >= COLLAPSED_LOGITS);
+  }
+
+  useEffect(() => {
+    setShowAllLogits(false);
+  }, [currentNeuron?.modelId, currentNeuron?.layer, currentNeuron?.index]);
 
   const modelHasNeuronsSourceSet = (modelId: string) => {
     const model = globalModels[modelId];
@@ -265,15 +289,7 @@ export default function FeatureStats({
                 <div className="flex flex-col gap-y-0.5 text-[9px] sm:text-[11px]">
                   {currentNeuron?.neg_str.map((s, i) => (
                     <div
-                      className={`flex-row justify-between gap-x-1 ${
-                        ((embed && !embedPlots) ||
-                          (windowSize.width && windowSize.width < 640) ||
-                          vertical ||
-                          forceMiniStats) &&
-                        i >= MAX_EMBED_TOP_LOGITS
-                          ? 'hidden'
-                          : 'flex'
-                      }`}
+                      className={`flex-row justify-between gap-x-1 ${isLogitRowHidden(i) ? 'hidden' : 'flex'}`}
                       key={i}
                     >
                       <pre
@@ -328,15 +344,7 @@ export default function FeatureStats({
                 <div className="flex flex-col gap-y-0.5 text-[9px] sm:text-[11px]">
                   {currentNeuron?.pos_str.map((s, i) => (
                     <div
-                      className={`flex-row justify-between gap-x-1 ${
-                        ((embed && !embedPlots) ||
-                          (windowSize.width && windowSize.width < 640) ||
-                          vertical ||
-                          forceMiniStats) &&
-                        i >= MAX_EMBED_TOP_LOGITS
-                          ? 'hidden'
-                          : 'flex'
-                      }`}
+                      className={`flex-row justify-between gap-x-1 ${isLogitRowHidden(i) ? 'hidden' : 'flex'}`}
                       key={i}
                     >
                       <pre
@@ -362,6 +370,15 @@ export default function FeatureStats({
               </div>
             )}
           </div>
+          {logitsCollapsible && (
+            <button
+              type="button"
+              onClick={() => setShowAllLogits(!showAllLogits)}
+              className="mt-1.5 self-center rounded px-2 py-0.5 font-sans text-[10px] font-medium uppercase text-sky-700 hover:bg-sky-100"
+            >
+              {showAllLogits ? 'Show Less' : 'Show More'}
+            </button>
+          )}
         </div>
 
         <div className={`flex-1 flex-col ${(embed && !embedPlots) || vertical ? 'hidden' : 'flex'}`}>
@@ -374,6 +391,24 @@ export default function FeatureStats({
               Act<span className="hidden sm:inline-block">ivations</span> Density{' '}
               {((currentNeuron?.frac_nonzero || 0) * 100).toFixed(3)}%
             </div>
+            {signedLogHistogram && signedLogHistogram.x.length > 0 && !forceMiniStats && (
+              <div className="flex shrink-0 flex-row overflow-hidden rounded border border-slate-200 text-[9px] leading-none">
+                {(['linear', 'log'] as const).map((scale) => (
+                  <button
+                    key={scale}
+                    type="button"
+                    onClick={() => setHistogramScale(scale)}
+                    className={`px-1.5 py-0.5 uppercase ${
+                      histogramScale === scale
+                        ? 'bg-slate-200 text-slate-700'
+                        : 'bg-white text-slate-400 hover:bg-slate-100'
+                    }`}
+                  >
+                    {scale}
+                  </button>
+                ))}
+              </div>
+            )}
             <Tooltip.Provider delayDuration={300} skipDelayDuration={0}>
               <Tooltip.Root>
                 <Tooltip.Trigger asChild>
@@ -399,6 +434,16 @@ export default function FeatureStats({
                     {activationMarkerValue !== undefined
                       ? `The green line indicates the activation value of this feature with your current prompt.`
                       : ''}
+                    {signedLogHistogram ? (
+                      <>
+                        <br />
+                        <br />
+                        <strong>Linear and Log</strong>
+                        {`: These counts are stored in log bins of |activation|. Linear spreads each log bin over equal-width bins, so its shape inside one bin is approximate. Log shows the exact counts: zero is at the center, negative values are on the left, and each bar stacks tokens with the gate open (orange) and closed (gray).`}
+                      </>
+                    ) : (
+                      ''
+                    )}
                     {currentNeuron?.logits_hist_data_bar_values.length > 0 ? (
                       <>
                         <br />
@@ -416,7 +461,78 @@ export default function FeatureStats({
             </Tooltip.Provider>
           </div>
           <div className="flex flex-col sm:flex-col sm:gap-y-1 sm:pt-1">
-            {currentNeuron?.freq_hist_data_bar_values.length > 0 && (
+            {showLogHistogram && signedLogHistogram && (
+              <Plot
+                data={[
+                  {
+                    x: signedLogHistogram.x,
+                    y: signedLogHistogram.gateOpen,
+                    type: 'bar',
+                    name: 'Gate open',
+                    marker: { color: '#ff8c00' },
+                    hovertemplate: signedLogHistogram.labels.map(
+                      (label, i) =>
+                        `<b>Activation Range</b>: ${label}<br><b>Tokens, Gate Open</b>: ${signedLogHistogram.gateOpen[i].toLocaleString()}<extra></extra>`,
+                    ),
+                  },
+                  {
+                    x: signedLogHistogram.x,
+                    y: signedLogHistogram.gateClosed,
+                    type: 'bar',
+                    name: 'Gate closed',
+                    marker: { color: '#94a3b8' },
+                    hovertemplate: signedLogHistogram.labels.map(
+                      (label, i) =>
+                        `<b>Activation Range</b>: ${label}<br><b>Tokens, Gate Closed</b>: ${signedLogHistogram.gateClosed[i].toLocaleString()}<extra></extra>`,
+                    ),
+                  },
+                ]}
+                layout={{
+                  height: (windowSize.width && windowSize.width < 640) || forceMiniStats ? 35 : 70,
+                  xaxis: {
+                    gridcolor: 'lightgrey',
+                    zerolinecolor: 'lightgrey',
+                    fixedrange: true,
+                    tickvals: signedLogHistogram.tickvals,
+                    ticktext: signedLogHistogram.ticktext,
+                    tickfont: {
+                      size: (windowSize.width && windowSize.width < 640) || vertical || forceMiniStats ? 7 : 10,
+                    },
+                  },
+                  yaxis: {
+                    tickformat: '.1s',
+                    gridcolor: 'lightgrey',
+                    zerolinecolor: 'lightgrey',
+                    fixedrange: true,
+                    tickfont: {
+                      size: (windowSize.width && windowSize.width < 640) || forceMiniStats ? 7 : 10,
+                    },
+                  },
+                  barmode: 'stack',
+                  bargap: 0.05,
+                  showlegend: false,
+                  margin: {
+                    l: 0,
+                    r: 0,
+                    b: 0,
+                    t: 0,
+                    pad: (windowSize.width && windowSize.width < 640) || forceMiniStats ? 1 : 4,
+                  },
+                  paper_bgcolor: 'rgba(0,0,0,0)',
+                  plot_bgcolor: 'rgba(0,0,0,0)',
+                }}
+                config={{
+                  responsive: false,
+                  displayModeBar: false,
+                  editable: false,
+                  scrollZoom: false,
+                }}
+                className={`mb-3 ml-3.5 mr-0 mt-[1px] h-[35px] min-h-[35px] flex-1 ${
+                  forceMiniStats ? '' : 'sm:mb-4 sm:ml-7 sm:h-16 sm:min-h-16'
+                }`}
+              />
+            )}
+            {!showLogHistogram && currentNeuron?.freq_hist_data_bar_values.length > 0 && (
               <Plot
                 data={[
                   {

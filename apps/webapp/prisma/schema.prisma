@@ -692,6 +692,10 @@ model SourceSet {
   showHeadAttribution Boolean @default(false)
   showUmap            Boolean @default(false)
 
+  // base URL of dashboard files outside the database, eg https://dashboards.neuronpedia.org/v1/qwen3-32b
+  // when set, the browser reads each feature's dashboard from it (see lib/utils/neuron-dashboards.ts)
+  externalDashboardsUrl String?
+
   createdAt DateTime @default(now())
 
   @@unique([modelId, name], name: "modelId_name")

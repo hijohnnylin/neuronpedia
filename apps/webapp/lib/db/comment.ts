@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { AuthenticatedUser } from '../with-user';
+import { ensureNeuronRowForFeature } from './neuron-dashboard';
 import { assertUserCanAccessModelAndSource } from './userCanAccess';
 
 export const getCommentsByUser = async (user: AuthenticatedUser) =>
@@ -21,6 +22,7 @@ export const createComment = async (
   user: AuthenticatedUser,
 ) => {
   await assertUserCanAccessModelAndSource(modelId, layer, user);
+  await ensureNeuronRowForFeature({ modelId, layer, index });
   return prisma.comment.create({
     data: {
       text: text.trim(),

@@ -154,12 +154,30 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       source: { select: { inferenceEnabled: true } },
     },
   });
-  if (!target) {
-    return NextResponse.json({ message: 'Feature not found.' }, { status: 404 });
+  let inferenceEnabled: boolean | undefined;
+  if (target) {
+    // A vector is run by the model alone, so it only needs the model to be enabled. An SAE feature
+    // needs its source loaded on a host, which is what the source flag tracks.
+    inferenceEnabled = target.hasVector ? target.model.inferenceEnabled : target.source?.inferenceEnabled;
+  } else {
+    // A source set with dashboard files has no Neuron rows, so check the index and source instead.
+    const source = await prisma.source.findUnique({
+      where: { modelId_id: { modelId: neuron.modelId, id: neuron.layer } },
+      select: {
+        inferenceEnabled: true,
+        set: { select: { externalDashboardsUrl: true, model: { select: { neuronsPerLayer: true } } } },
+      },
+    });
+    const index = neuron.index.toString();
+    if (
+      !source?.set.externalDashboardsUrl ||
+      !/^\d+$/.test(index) ||
+      parseInt(index, 10) >= source.set.model.neuronsPerLayer
+    ) {
+      return NextResponse.json({ message: 'Feature not found.' }, { status: 404 });
+    }
+    inferenceEnabled = source.inferenceEnabled;
   }
-  // A vector is run by the model alone, so it only needs the model to be enabled. An SAE feature
-  // needs its source loaded on a host, which is what the source flag tracks.
-  const inferenceEnabled = target.hasVector ? target.model.inferenceEnabled : target.source?.inferenceEnabled;
   if (!inferenceEnabled) {
     return NextResponse.json(
       { message: `Inference is not enabled for ${neuron.modelId}/${neuron.layer}.` },

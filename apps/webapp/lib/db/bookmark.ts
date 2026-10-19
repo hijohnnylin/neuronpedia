@@ -1,9 +1,11 @@
 import { prisma } from '@/lib/db';
 import { AuthenticatedUser } from '../with-user';
+import { ensureNeuronRowForFeature } from './neuron-dashboard';
 import { assertUserCanAccessModelAndSource } from './userCanAccess';
 
 export const createBookmark = async (modelId: string, layer: string, index: string, user: AuthenticatedUser) => {
   await assertUserCanAccessModelAndSource(modelId, layer, user);
+  await ensureNeuronRowForFeature({ modelId, layer, index });
   return prisma.bookmark.create({
     data: {
       userId: user.id,

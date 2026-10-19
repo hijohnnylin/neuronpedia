@@ -20,6 +20,16 @@ export function isNeuronLayerSource(source: string) {
   return /^-?\d+$/.test(source);
 }
 
+// For the source dropdown, eg "Neurons Layer 6"
+export function getNeuronLayerLabel(layer: string) {
+  return `Neurons Layer ${layer}`;
+}
+
+// For breadcrumbs, eg "MLP Neurons - Layer 6"
+export function getNeuronLayerTitle(layer: string) {
+  return `MLP Neurons - Layer ${layer}`;
+}
+
 export function getLayerNumFromSource(source: string) {
   if (isNeuronLayerSource(source)) {
     return parseInt(source, 10);
@@ -232,5 +242,26 @@ export function getFirstSourceForModel(
         }
         return true;
       }) || undefined
+  );
+}
+
+// The source set a picker starts on: the model's defaultSourceSetName, else its neurons, else the first by name.
+// Neurons ignore publicOnly, like the neurons item in the source dropdown.
+export function getDefaultSourceSetForModel(model: ModelWithPartialRelations | undefined, publicOnly = false) {
+  const sourceSets = (model?.sourceSets || []).filter((ss) => ss.hasDashboards);
+  const listed = sourceSets.filter((ss) => !publicOnly || ss.visibility === Visibility.PUBLIC);
+  return (
+    listed.find((ss) => ss.name === model?.defaultSourceSetName) ||
+    sourceSets.find((ss) => ss.name === NEURONS_SOURCESET) ||
+    listed.toSorted((a, b) => (a.name || '').localeCompare(b.name || ''))[0]
+  );
+}
+
+// The model's defaultSourceId when it is in the default source set, else that set's first source in natural order
+export function getDefaultSourceForModel(model: ModelWithPartialRelations | undefined, publicOnly = false) {
+  const sources = (getDefaultSourceSetForModel(model, publicOnly)?.sources || []).filter((s) => s.hasDashboards);
+  return (
+    sources.find((s) => s.id === model?.defaultSourceId) ||
+    sources.toSorted((a, b) => (a.id || '').localeCompare(b.id || '', undefined, { numeric: true }))[0]
   );
 }

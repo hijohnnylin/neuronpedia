@@ -33,7 +33,6 @@ export default function QuizNeuron({
           defaultShowLineBreaks={false}
           showControls={false}
           showTest={false}
-          showDatasource={false}
           showTopActivationToken={false}
           activations={neuron?.activations}
           activationItemClassName="py-2"
