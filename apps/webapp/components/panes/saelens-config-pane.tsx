@@ -3,6 +3,7 @@
 import CustomTooltip from '@/components/custom-tooltip';
 import { Button } from '@/components/shadcn/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shadcn/card';
+import { saeHasConfig } from '@/lib/utils/source';
 import { SourceWithPartialRelations } from '@/prisma/generated/zod';
 import { Prisma } from '@prisma/client';
 import copy from 'copy-to-clipboard';
@@ -142,11 +143,6 @@ function ConfigItem({
       </div>
     </div>
   );
-}
-
-// True when the source has a SAELens config, a Hugging Face folder, or SAELens load ids to show.
-export function saeHasConfig(sae: SourceWithPartialRelations) {
-  return Boolean(sae.saelensConfig || (sae.hfRepoId && sae.hfFolderId) || (sae.saelensSaeId && sae.saelensRelease));
 }
 
 export default function SaeLensConfigPane({

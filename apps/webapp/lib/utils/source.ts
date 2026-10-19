@@ -265,3 +265,8 @@ export function getDefaultSourceForModel(model: ModelWithPartialRelations | unde
     sources.toSorted((a, b) => (a.id || '').localeCompare(b.id || '', undefined, { numeric: true }))[0]
   );
 }
+
+// True when the source has a SAELens config, a Hugging Face folder, or SAELens load ids to show.
+export function saeHasConfig(sae: SourceWithPartialRelations) {
+  return Boolean(sae.saelensConfig || (sae.hfRepoId && sae.hfFolderId) || (sae.saelensSaeId && sae.saelensRelease));
+}

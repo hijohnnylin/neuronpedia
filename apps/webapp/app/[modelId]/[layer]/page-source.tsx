@@ -10,7 +10,7 @@ import UmapPane from '@/components/panes/umap-pane';
 import { BreadcrumbItem, BreadcrumbLink } from '@/components/shadcn/breadcrumbs';
 import { getVisibilityBadge } from '@/components/visibility-badge';
 import { DEMO_MODE } from '@/lib/env';
-import { getLayerNumAsStringFromSource } from '@/lib/utils/source';
+import { getLayerNumAsStringFromSource, saeHasConfig } from '@/lib/utils/source';
 import {
   EvalWithPartialRelations,
   SourceReleaseWithRelations,
@@ -19,7 +19,7 @@ import {
 } from '@/prisma/generated/zod';
 import { Visibility } from '@prisma/client';
 import Link from 'next/link';
-import SaeLensConfigPane, { saeHasConfig } from '../../../components/panes/saelens-config-pane';
+import SaeLensConfigPane from '../../../components/panes/saelens-config-pane';
 
 export default function PageSource({
   source,
