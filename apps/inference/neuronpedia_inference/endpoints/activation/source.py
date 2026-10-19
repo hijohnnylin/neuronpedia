@@ -62,7 +62,7 @@ async def activation_source(
     # iterate through prompts and prepend bos if needed
     processed_prompts = []
     for prompt in request.prompts:
-        if not prompt.startswith(bos_token):
+        if bos_token and not prompt.startswith(bos_token):
             prompt = bos_token + prompt
         processed_prompts.append(prompt)
     request.prompts = processed_prompts

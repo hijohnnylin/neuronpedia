@@ -65,7 +65,7 @@ async def activation_all(
     sae_manager = SAEManager.get_instance()
     config = Config.get_instance()
     config.check_requested_model(request.model)
-    if request.source_set not in sae_manager.get_valid_sae_sets():
+    if not sae_manager.is_searchable_sae_set(request.source_set):
         logger.error(
             "Invalid source set: %s, valid sets are %s",
             request.source_set,
@@ -78,7 +78,7 @@ async def activation_all(
 
     # if the request doesn't start with the bos, prepend it
     bos_token = Model.get_instance().tokenizer.bos_token
-    if not request.prompt.startswith(bos_token):
+    if bos_token and not request.prompt.startswith(bos_token):
         request.prompt = bos_token + request.prompt
 
     # # Removed this check because our SAE manager will just load and unload as needed (though it will be a little slower)
@@ -135,7 +135,7 @@ class ActivationProcessor:
         prepend_bos = False
         # if the prompt doesn't start with the bos, prepend it
         bos_token = model.tokenizer.bos_token
-        if not request.prompt.startswith(bos_token):
+        if bos_token and not request.prompt.startswith(bos_token):
             request.prompt = bos_token + request.prompt
 
         tokens, str_tokens, cache = await self._tokenize_and_get_cache(request.prompt, prepend_bos, request)
@@ -216,6 +216,10 @@ class ActivationProcessor:
             MAX_NUM_RESULTS,
         )
 
+        model = Model.get_instance()
+        # With no BOS token (Qwen3), position 0 is a real token, so keep it.
+        drop_bos = request.ignore_bos and model.default_prepend_bos and bool(model.tokenizer.bos_token)
+
         top_rows: torch.Tensor | None = None
         for selected_source in request.selected_sources:
             layer_num = self._get_layer_num(selected_source)
@@ -224,7 +228,7 @@ class ActivationProcessor:
 
             activations_by_index = self._get_activations_by_index(sae_type, selected_source, cache, hook_name)
 
-            if request.ignore_bos and Model.get_instance().default_prepend_bos:
+            if drop_bos:
                 activations_by_index[:, 0] = 0
 
             candidates = self._source_top_rows(activations_by_index, layer_num, request, num_results)

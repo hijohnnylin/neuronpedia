@@ -43,9 +43,12 @@ class SAEManager:
         device: str = "cuda",
         sae_gpu_budget_bytes: int = 0,
         sae_pinned_host_bytes: int = 0,
+        mlp_width: int | None = None,
     ):
         self.config = Config.get_instance()
         self.num_layers = num_layers
+        # Width of each `neurons` source (d_mlp). None when the model config does not give it.
+        self.mlp_width = mlp_width
         self.device = device
         self.max_loaded_saes = self.config.max_loaded_saes
 
@@ -276,6 +279,9 @@ class SAEManager:
                 "transcoder": False,
                 "type": SAE_TYPE.NEURONS,
                 "hook": f"blocks.{layer_str}.mlp.hook_post",
+                # The memory-cost estimate reads these. The capture is d_mlp wide, not d_model.
+                "d_sae": self.mlp_width,
+                "d_in": self.mlp_width,
             }
 
         self.sae_set_to_saes[self.NEURONS_SOURCESET] = neurons_sourceset
@@ -369,3 +375,7 @@ class SAEManager:
 
     def get_valid_sae_sets(self):
         return self.valid_sae_sets
+
+    def is_searchable_sae_set(self, sae_set: str) -> bool:
+        """True for a configured SAE set, and for the `neurons` set every pod serves."""
+        return sae_set in self.valid_sae_sets or sae_set == self.NEURONS_SOURCESET

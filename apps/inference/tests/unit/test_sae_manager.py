@@ -138,6 +138,35 @@ class TestLoadSaes:
         }
 
 
+class TestNeuronsSet:
+    """Every pod serves the `neurons` set (mlp.hook_post), with or without SAE sets."""
+
+    def _manager(self, config: Config, mlp_width: int | None) -> SAEManager:
+        with patch("neuronpedia_inference.sae_manager.Config.get_instance", return_value=config):
+            manager = SAEManager(num_layers=4, device="cpu", mlp_width=mlp_width)
+        manager.setup_neuron_layers()
+        return manager
+
+    def test_neurons_is_searchable_without_being_a_configured_set(self):
+        manager = self._manager(build_config(), mlp_width=None)
+
+        assert manager.is_searchable_sae_set("neurons")
+        assert "neurons" not in manager.get_valid_sae_sets()
+        assert not manager.is_searchable_sae_set("res-jb")
+
+    def test_neuron_sources_record_the_mlp_width(self):
+        manager = self._manager(build_config(), mlp_width=25600)
+
+        assert manager.sae_set_to_saes["neurons"] == ["0", "1", "2", "3"]
+        assert manager.get_d_in("3") == 25600
+        assert manager.get_d_sae("3") == 25600
+
+    def test_unknown_mlp_width_leaves_the_fallback_to_memory_cost(self):
+        manager = self._manager(build_config(), mlp_width=None)
+
+        assert manager.get_d_in("0") is None
+
+
 class TestResidency:
     @pytest.mark.parametrize(
         ("accesses", "expected"),

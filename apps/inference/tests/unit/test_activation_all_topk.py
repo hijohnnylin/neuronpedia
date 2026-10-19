@@ -97,7 +97,7 @@ def _reference_global_sort(blocks: list[torch.Tensor], request: MagicMock) -> li
     return all_rows[order][: request.num_results].tolist()
 
 
-def _stream(blocks: list[torch.Tensor], request: MagicMock) -> list[list[float]]:
+def _stream(blocks: list[torch.Tensor], request: MagicMock, bos_token: str | None = "<bos>") -> list[list[float]]:
     """Run `_stream_top_activations` with the SAE/model/config singletons stubbed out."""
     sae_manager = MagicMock()
     sae_manager.sae_set_to_saes = {SOURCE_SET: list(SOURCES)}
@@ -106,6 +106,7 @@ def _stream(blocks: list[torch.Tensor], request: MagicMock) -> list[list[float]]
 
     model = MagicMock()
     model.default_prepend_bos = True
+    model.tokenizer.bos_token = bos_token
 
     config = MagicMock()
     config.device = "cpu"
@@ -223,6 +224,18 @@ def test_a_selected_source_beyond_the_set_listing_is_reduced():
     assert len(rows) == request.num_results
     # Column 0 of each row is the layer number the feature came from.
     assert {row[0] for row in rows} == {27}
+
+
+def test_ignore_bos_keeps_position_zero_when_the_tokenizer_has_no_bos():
+    """Qwen3 has no BOS token, so position 0 is the first real token of the prompt."""
+    blocks = _activations()
+    request = _request(5, ignore_bos=True)
+
+    streamed = _stream(blocks, request, bos_token=None)
+
+    expected = _reference_global_sort(blocks, _request(5, ignore_bos=False))
+    for rank, (got, want) in enumerate(zip(streamed, expected, strict=True)):
+        assert got == pytest.approx(want), f"row {rank} differs"
 
 
 def test_num_results_is_clamped():

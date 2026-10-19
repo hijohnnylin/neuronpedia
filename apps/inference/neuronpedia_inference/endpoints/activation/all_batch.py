@@ -58,7 +58,7 @@ async def activation_all_batch(
         )
 
     config.check_requested_model(request.model)
-    if request.source_set not in sae_manager.get_valid_sae_sets():
+    if not sae_manager.is_searchable_sae_set(request.source_set):
         logger.error(
             "Invalid source set: %s, valid sets are %s",
             request.source_set,
@@ -73,7 +73,7 @@ async def activation_all_batch(
     bos_token = Model.get_instance().tokenizer.bos_token
     processed_prompts = []
     for prompt in prompts:
-        if not prompt.startswith(bos_token):
+        if bos_token and not prompt.startswith(bos_token):
             processed_prompts.append(bos_token + prompt)
         else:
             processed_prompts.append(prompt)
@@ -167,7 +167,7 @@ class ActivationProcessor(SinglePromptActivationProcessor):
         for prompt in prompts:
             # if the prompt doesn't start with the bos, prepend it
             bos_token = model.tokenizer.bos_token
-            if not prompt.startswith(bos_token):
+            if bos_token and not prompt.startswith(bos_token):
                 prompt = bos_token + prompt
 
             tokens = model.to_tokens(

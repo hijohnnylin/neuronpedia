@@ -96,8 +96,10 @@ async def activation_topk_by_token(
 
     # if the request doesn't start with the bos, prepend it
     bos_token = Model.get_instance().tokenizer.bos_token
-    if not prompt.startswith(bos_token):
+    if bos_token and not prompt.startswith(bos_token):
         prompt = bos_token + prompt
+    # With no BOS token (Qwen3), position 0 is a real token, so keep it.
+    ignore_bos = ignore_bos and bool(bos_token)
 
     tokens = model.to_tokens(
         prompt,

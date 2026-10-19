@@ -72,7 +72,8 @@ async def activation_topk_by_token_batch(
 
     source = request.source
     top_k = request.top_k if request.top_k is not None else DEFAULT_TOP_K
-    ignore_bos = request.ignore_bos
+    # With no BOS token (Qwen3), position 0 is a real token, so keep it.
+    ignore_bos = request.ignore_bos and bool(model.tokenizer.bos_token)
 
     prepend_bos = False
 
@@ -83,7 +84,7 @@ async def activation_topk_by_token_batch(
     for prompt in prompts:
         # if the request doesn't start with the bos, prepend it
         bos_token = model.tokenizer.bos_token
-        if not prompt.startswith(bos_token):
+        if bos_token and not prompt.startswith(bos_token):
             prompt = bos_token + prompt
 
         tokens = model.to_tokens(
