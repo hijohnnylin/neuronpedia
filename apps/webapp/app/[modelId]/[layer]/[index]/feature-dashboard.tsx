@@ -384,8 +384,8 @@ export default function FeatureDashboard({
                 <NeuronDashboardDocsContext.Provider value={dashboardDocs}>
                   <ActivationsList
                     feature={shownNeuron}
-                    defaultRange={forceMiniStats ? 1 : currentNeuron?.sourceSet?.defaultRange}
-                    defaultShowLineBreaks={forceMiniStats ? false : currentNeuron?.sourceSet?.defaultShowBreaks}
+                    defaultRange={forceMiniStats ? 1 : crumbSourceSet?.defaultRange}
+                    defaultShowLineBreaks={forceMiniStats ? false : crumbSourceSet?.defaultShowBreaks}
                     showCopy={allowTest()}
                     showTest={allowTest()}
                     defaultActivationTestText={defaultTestText}
