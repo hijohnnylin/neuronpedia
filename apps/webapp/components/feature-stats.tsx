@@ -3,7 +3,7 @@
 import { useGlobalContext } from '@/components/provider/global-provider';
 import useWindowSize from '@/lib/hooks/use-window-size';
 import { replaceHtmlAnomalies } from '@/lib/utils/activations';
-import { SignedLogHistogram } from '@/lib/utils/neuron-dashboard-histogram';
+import { SignedLogHistogram, signedLogX } from '@/lib/utils/neuron-dashboard-histogram';
 import { getLayerNumFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle } from 'lucide-react';
@@ -46,12 +46,12 @@ export default function FeatureStats({
   embedPlots?: boolean;
   forceMiniStats?: boolean;
   activationMarkerValue?: number;
-  // Exact log-binned counts. When set, a toggle switches the activation plot to them.
+  // Exact log-binned counts. When set, the activation plot shows them, filtered by gate state.
   signedLogHistogram?: SignedLogHistogram;
 }) {
   const { getSourceSet, globalModels } = useGlobalContext();
   const [maxLogit, setMaxLogit] = useState<number | undefined>();
-  const [histogramScale, setHistogramScale] = useState<'linear' | 'log'>('linear');
+  const [shownGates, setShownGates] = useState({ open: true, closed: false });
   const [showAllLogits, setShowAllLogits] = useState(false);
   const { windowSize } = useWindowSize();
   const isMiniStats = Boolean(
@@ -60,7 +60,25 @@ export default function FeatureStats({
   const logitsCollapsible =
     !isMiniStats &&
     Math.max(currentNeuron?.pos_str.length || 0, currentNeuron?.neg_str.length || 0) > COLLAPSE_LOGITS_ABOVE;
-  const showLogHistogram = histogramScale === 'log' && signedLogHistogram && signedLogHistogram.x.length > 0;
+  const showLogHistogram = Boolean(signedLogHistogram && signedLogHistogram.x.length > 0);
+  const logHistogramMax = signedLogHistogram
+    ? Math.max(
+        0,
+        ...signedLogHistogram.x.map(
+          (_, i) =>
+            (shownGates.open ? signedLogHistogram.gateOpen[i] : 0) +
+            (shownGates.closed ? signedLogHistogram.gateClosed[i] : 0),
+        ),
+      )
+    : 0;
+
+  // At least one gate state stays shown
+  function toggleGate(gate: 'open' | 'closed') {
+    setShownGates((current) => {
+      const next = { ...current, [gate]: !current[gate] };
+      return next.open || next.closed ? next : current;
+    });
+  }
 
   function isLogitRowHidden(i: number) {
     return (isMiniStats && i >= MAX_EMBED_TOP_LOGITS) || (logitsCollapsible && !showAllLogits && i >= COLLAPSED_LOGITS);
@@ -391,20 +409,23 @@ export default function FeatureStats({
               Act<span className="hidden sm:inline-block">ivations</span> Density{' '}
               {((currentNeuron?.frac_nonzero || 0) * 100).toFixed(3)}%
             </div>
-            {signedLogHistogram && signedLogHistogram.x.length > 0 && !forceMiniStats && (
+            {showLogHistogram && !forceMiniStats && (
               <div className="flex shrink-0 flex-row overflow-hidden rounded border border-slate-200 text-[9px] leading-none">
-                {(['linear', 'log'] as const).map((scale) => (
+                {(
+                  [
+                    ['open', 'Gate Open'],
+                    ['closed', 'Closed'],
+                  ] as const
+                ).map(([gate, label]) => (
                   <button
-                    key={scale}
+                    key={gate}
                     type="button"
-                    onClick={() => setHistogramScale(scale)}
-                    className={`px-1.5 py-0.5 uppercase ${
-                      histogramScale === scale
-                        ? 'bg-slate-200 text-slate-700'
-                        : 'bg-white text-slate-400 hover:bg-slate-100'
+                    onClick={() => toggleGate(gate)}
+                    className={`whitespace-nowrap px-1.5 py-0.5 uppercase ${
+                      shownGates[gate] ? 'bg-slate-200 text-slate-700' : 'bg-white text-slate-400 hover:bg-slate-100'
                     }`}
                   >
-                    {scale}
+                    {label}
                   </button>
                 ))}
               </div>
@@ -438,8 +459,8 @@ export default function FeatureStats({
                       <>
                         <br />
                         <br />
-                        <strong>Linear and Log</strong>
-                        {`: These counts are stored in log bins of |activation|. Linear spreads each log bin over equal-width bins, so its shape inside one bin is approximate. Log shows the exact counts: zero is at the center, negative values are on the left, and each bar stacks tokens with the gate open (orange) and closed (gray).`}
+                        <strong>Gate Open and Closed</strong>
+                        {`: Exact counts in log bins of |activation|. Zero is at the center and negative values are on the left. Tokens with the gate open are orange and tokens with the gate closed are gray. By default, only tokens with the gate open show.`}
                       </>
                     ) : (
                       ''
@@ -464,28 +485,36 @@ export default function FeatureStats({
             {showLogHistogram && signedLogHistogram && (
               <Plot
                 data={[
-                  {
-                    x: signedLogHistogram.x,
-                    y: signedLogHistogram.gateOpen,
-                    type: 'bar',
-                    name: 'Gate open',
-                    marker: { color: '#ff8c00' },
-                    hovertemplate: signedLogHistogram.labels.map(
-                      (label, i) =>
-                        `<b>Activation Range</b>: ${label}<br><b>Tokens, Gate Open</b>: ${signedLogHistogram.gateOpen[i].toLocaleString()}<extra></extra>`,
-                    ),
-                  },
-                  {
-                    x: signedLogHistogram.x,
-                    y: signedLogHistogram.gateClosed,
-                    type: 'bar',
-                    name: 'Gate closed',
-                    marker: { color: '#94a3b8' },
-                    hovertemplate: signedLogHistogram.labels.map(
-                      (label, i) =>
-                        `<b>Activation Range</b>: ${label}<br><b>Tokens, Gate Closed</b>: ${signedLogHistogram.gateClosed[i].toLocaleString()}<extra></extra>`,
-                    ),
-                  },
+                  ...(shownGates.open
+                    ? [
+                        {
+                          x: signedLogHistogram.x,
+                          y: signedLogHistogram.gateOpen,
+                          type: 'bar' as const,
+                          name: 'Gate open',
+                          marker: { color: '#ff8c00' },
+                          hovertemplate: signedLogHistogram.labels.map(
+                            (label, i) =>
+                              `<b>Activation Range</b>: ${label}<br><b>Tokens, Gate Open</b>: ${signedLogHistogram.gateOpen[i].toLocaleString()}<extra></extra>`,
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(shownGates.closed
+                    ? [
+                        {
+                          x: signedLogHistogram.x,
+                          y: signedLogHistogram.gateClosed,
+                          type: 'bar' as const,
+                          name: 'Gate closed',
+                          marker: { color: '#94a3b8' },
+                          hovertemplate: signedLogHistogram.labels.map(
+                            (label, i) =>
+                              `<b>Activation Range</b>: ${label}<br><b>Tokens, Gate Closed</b>: ${signedLogHistogram.gateClosed[i].toLocaleString()}<extra></extra>`,
+                          ),
+                        },
+                      ]
+                    : []),
                 ]}
                 layout={{
                   height: (windowSize.width && windowSize.width < 640) || forceMiniStats ? 35 : 70,
@@ -520,6 +549,32 @@ export default function FeatureStats({
                   },
                   paper_bgcolor: 'rgba(0,0,0,0)',
                   plot_bgcolor: 'rgba(0,0,0,0)',
+                  shapes:
+                    activationMarkerValue !== undefined
+                      ? [
+                          {
+                            type: 'line',
+                            x0: signedLogX(activationMarkerValue, signedLogHistogram.sigma),
+                            x1: signedLogX(activationMarkerValue, signedLogHistogram.sigma),
+                            y0: 0,
+                            y1: logHistogramMax,
+                            line: { color: 'green', width: 2 },
+                          },
+                        ]
+                      : [],
+                  annotations:
+                    activationMarkerValue !== undefined
+                      ? [
+                          {
+                            x: signedLogX(activationMarkerValue, signedLogHistogram.sigma),
+                            y: logHistogramMax,
+                            text: `${activationMarkerValue.toFixed(1)}`,
+                            showarrow: false,
+                            font: { size: 9, color: 'green' },
+                            yshift: 5,
+                          },
+                        ]
+                      : [],
                 }}
                 config={{
                   responsive: false,

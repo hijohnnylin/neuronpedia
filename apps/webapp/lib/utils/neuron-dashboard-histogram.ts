@@ -88,7 +88,16 @@ export type SignedLogHistogram = {
   labels: string[];
   tickvals: number[];
   ticktext: string[];
+  sigma: number;
 };
+
+// x of a signed activation value on the signedLogHistogram axis, at its bin when outside the log bins
+export function signedLogX(value: number, sigma: number): number {
+  const m = Math.abs(value);
+  const x = m > 0 ? 1 + ((Math.log10(m / sigma) - LOG_MIN) * LOG_BINS) / LOG_DECADES : 0;
+  const clamped = x < 1 ? 0.5 : Math.min(x, HIST_BINS_PER_SIGN - 0.5);
+  return value < 0 ? -clamped : clamped;
+}
 
 function formatValue(v: number) {
   const m = Math.abs(v);
@@ -132,7 +141,7 @@ export function signedLogHistogram(record: HistRecord): SignedLogHistogram {
   const first = filled.indexOf(true);
   const last = filled.lastIndexOf(true);
   if (first === -1 || !(sigma > 0)) {
-    return { x: [], gateOpen: [], gateClosed: [], labels: [], tickvals: [], ticktext: [] };
+    return { x: [], gateOpen: [], gateClosed: [], labels: [], tickvals: [], ticktext: [], sigma };
   }
   const shown = bars.slice(first, last + 1);
   const xMin = shown[0].x - 0.5;
@@ -173,5 +182,6 @@ export function signedLogHistogram(record: HistRecord): SignedLogHistogram {
     labels: shown.map((bar) => bar.label),
     tickvals,
     ticktext,
+    sigma,
   };
 }

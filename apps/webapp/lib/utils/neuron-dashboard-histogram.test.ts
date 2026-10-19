@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './__fixtures__/neuron-dashboard-qwen3-32b-31-12345.json';
-import { HIST_BINS_PER_SIGN, histBinRange, linearHistogram, signedLogHistogram } from './neuron-dashboard-histogram';
+import {
+  HIST_BINS_PER_SIGN,
+  histBinRange,
+  linearHistogram,
+  signedLogHistogram,
+  signedLogX,
+} from './neuron-dashboard-histogram';
 import { NeuronDashboardRecord } from './neuron-dashboards';
 
 const record = fixture.record as NeuronDashboardRecord;
@@ -98,5 +104,21 @@ describe('signedLogHistogram', () => {
     expect(h.tickvals.filter((x) => x > 0).length).toBeLessThanOrEqual(4);
     expect(h.tickvals.filter((x) => x < 0).length).toBeLessThanOrEqual(4);
     expect(h.tickvals.every((x) => x >= h.x[0] - 0.5 && x <= h.x[h.x.length - 1] + 0.5)).toBe(true);
+  });
+});
+
+describe('signedLogX', () => {
+  it('puts a value inside its bin, mirrored for negative values', () => {
+    // |act| = 1 with sigma 1 is the lower edge of bin 33, which spans x 33 to 34
+    expect(signedLogX(1, 1)).toBeCloseTo(33);
+    expect(signedLogX(-1, 1)).toBeCloseTo(-33);
+    expect(signedLogX(1.1, 1)).toBeGreaterThan(33);
+    expect(signedLogX(1.1, 1)).toBeLessThan(34);
+  });
+
+  it('puts values outside the log bins at the center of the end bins', () => {
+    expect(signedLogX(0, 1)).toBe(0.5);
+    expect(signedLogX(1e-6, 1)).toBe(0.5);
+    expect(signedLogX(-1e6, 1)).toBe(-65.5);
   });
 });
