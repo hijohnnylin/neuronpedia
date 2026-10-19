@@ -19,7 +19,7 @@ import {
 } from '@/prisma/generated/zod';
 import { Visibility } from '@prisma/client';
 import Link from 'next/link';
-import SaeLensConfigPane from '../../../components/panes/saelens-config-pane';
+import SaeLensConfigPane, { saeHasConfig } from '../../../components/panes/saelens-config-pane';
 
 export default function PageSource({
   source,
@@ -31,6 +31,8 @@ export default function PageSource({
   simMatrixDemo?: string;
 }) {
   const release = source.set && source.set.releases ? source.set.releases : null;
+  // Dashboards in files (R2) have no Neuron rows to browse and no SAE evals.
+  const hasExternalDashboards = Boolean(source.set?.externalDashboardsUrl);
 
   return (
     <div className="flex w-full flex-col items-center pb-10">
@@ -123,11 +125,13 @@ export default function PageSource({
             />
           )}
 
-          <div className="flex w-full flex-col items-center justify-center">
-            <div className="w-full max-w-screen-lg">
-              <SaeLensConfigPane inSAEPage sae={source as SourceWithPartialRelations} />
+          {saeHasConfig(source as SourceWithPartialRelations) && (
+            <div className="flex w-full flex-col items-center justify-center">
+              <div className="w-full max-w-screen-lg">
+                <SaeLensConfigPane inSAEPage sae={source as SourceWithPartialRelations} />
+              </div>
             </div>
-          </div>
+          )}
 
           {source.inferenceEnabled && (
             <SearchInferenceSourcePane
@@ -173,7 +177,7 @@ export default function PageSource({
             </div>
           )}
 
-          {source.hasDashboards && (
+          {source.hasDashboards && !hasExternalDashboards && (
             <BrowserPane
               modelId={source.modelId}
               sourceSet={source.set?.name || ''}
@@ -183,7 +187,7 @@ export default function PageSource({
             />
           )}
 
-          {!DEMO_MODE && (
+          {!DEMO_MODE && !hasExternalDashboards && (
             <SAEEvalsPane
               sae={source as SourceWithPartialRelations}
               evals={source.evals as EvalWithPartialRelations[]}

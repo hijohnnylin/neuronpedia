@@ -156,9 +156,13 @@ export default function GlobalProvider({
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       })
-        .then((response) => response.json())
-        .then((n: NeuronWithPartialRelations) => {
-          setFeatureModalFeature(n);
+        .then(async (response) => {
+          // A neuron with no row 404s here. Its dashboard loads from files, so show it as is.
+          setFeatureModalFeature(
+            response.ok
+              ? ((await response.json()) as NeuronWithPartialRelations)
+              : { ...featureModalFeature, activations: [] },
+          );
         })
         .catch((error) => {
           console.error(`error submitting getting rest of neuron: ${error}`);

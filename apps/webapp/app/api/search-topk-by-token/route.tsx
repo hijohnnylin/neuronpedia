@@ -2,6 +2,7 @@ import { ActivationTopkByTokenBatchResponse, ActivationTopkByTokenResponse } fro
 import { getNeuronsForTopkSearcherExplanationOnly } from '@/lib/db/neuron';
 import { assertUserCanAccessModelAndSource } from '@/lib/db/userCanAccess';
 import { getActivationsTopKByToken, SearchTopKResult } from '@/lib/utils/inference';
+import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { boolean, mixed, number, object, string, ValidationError } from 'yup';
@@ -143,7 +144,14 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         topFeatures: r.topFeatures.map((f) => ({
           activationValue: f.activationValue,
           featureIndex: f.featureIndex,
-          feature: neuronData.find((n) => n.index === f.featureIndex.toString()),
+          // A neuron whose dashboard is in files has no row until something is written for it.
+          feature: neuronData.find((n) => n.index === f.featureIndex.toString()) ?? {
+            modelId,
+            layer: source,
+            index: f.featureIndex.toString(),
+            sourceSetName: getSourceSetNameFromSource(source),
+            explanations: [],
+          },
         })),
       })),
     };
@@ -159,8 +167,11 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     // remove all that are below the density threshold
     if (densityThreshold !== -1) {
       toReturn.results = toReturn.results.map((r) => {
+        // A feature with no density stats (a neuron with no row) is kept.
         r.topFeatures = r.topFeatures.filter(
-          (f) => f.feature?.frac_nonzero && f.feature?.frac_nonzero <= densityThreshold,
+          (f) =>
+            f.feature?.frac_nonzero === undefined ||
+            (f.feature.frac_nonzero && f.feature.frac_nonzero <= densityThreshold),
         );
         return r;
       });

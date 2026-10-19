@@ -146,7 +146,7 @@ export default function SearchTopkByToken({
       return feats.toSorted((a, b) => b.frequency - a.frequency);
     }
     if (sortBy === 'density') {
-      return feats.toSorted((a, b) => b.feature.frac_nonzero - a.feature.frac_nonzero);
+      return feats.toSorted((a, b) => (b.feature.frac_nonzero ?? -1) - (a.feature.frac_nonzero ?? -1));
     }
     return feats;
   }
@@ -619,7 +619,7 @@ export default function SearchTopkByToken({
                           <div className="font-sans text-[8px] text-slate-400">MAX ACT</div>
                         </div>
                         <div className="ml-0.5 flex flex-col items-center justify-center gap-y-0 overflow-visible py-2 font-mono text-xs font-bold text-slate-600">
-                          {(f.feature.frac_nonzero * 100).toFixed(2)}%
+                          {f.feature.frac_nonzero === undefined ? '—' : `${(f.feature.frac_nonzero * 100).toFixed(2)}%`}
                           <div className="font-sans text-[8px] text-slate-400">DENSITY</div>
                         </div>
                       </button>

@@ -135,9 +135,11 @@ export default function FeatureDashboard({
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       })
-        .then((response) => response.json())
-        .then((n: NeuronWithPartialRelations) => {
-          setCurrentNeuron(n);
+        .then(async (response) => {
+          // A neuron with no row 404s here, so keep what we have.
+          if (response.ok) {
+            setCurrentNeuron((await response.json()) as NeuronWithPartialRelations);
+          }
           setNeuronLoaded(true);
         })
         .catch((error) => {

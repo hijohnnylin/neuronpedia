@@ -166,7 +166,8 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
               />
             </div>
           )}
-          {sourceSet.hasDashboards && (
+          {/* Dashboards in files (R2) have no Neuron rows to browse. */}
+          {sourceSet.hasDashboards && !sourceSet.externalDashboardsUrl && (
             <div className="flex w-full flex-col gap-y-6">
               <BrowserPane
                 modelId={sourceSet.modelId}

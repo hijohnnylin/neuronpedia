@@ -144,6 +144,11 @@ function ConfigItem({
   );
 }
 
+// True when the source has a SAELens config, a Hugging Face folder, or SAELens load ids to show.
+export function saeHasConfig(sae: SourceWithPartialRelations) {
+  return Boolean(sae.saelensConfig || (sae.hfRepoId && sae.hfFolderId) || (sae.saelensSaeId && sae.saelensRelease));
+}
+
 export default function SaeLensConfigPane({
   sae,
   numPrompts,
@@ -164,6 +169,10 @@ export default function SaeLensConfigPane({
     sae.hfRepoId && sae.hfFolderId ? `https://huggingface.co/${sae.hfRepoId}/tree/main/${sae.hfFolderId}` : undefined;
 
   const [showMoreConfig, setShowMoreConfig] = useState(false);
+
+  if (!saeHasConfig(sae) && !(numPrompts && numTokensInPrompt) && !dashboardDataset) {
+    return null;
+  }
 
   return (
     <Card className="w-full bg-white">
