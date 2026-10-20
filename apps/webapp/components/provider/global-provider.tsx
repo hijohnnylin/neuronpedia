@@ -2,6 +2,7 @@
 
 import { STEER_FORCE_ALLOW_INSTRUCT_MODELS } from '@/lib/env';
 import { formatToGlobalModels } from '@/lib/utils/general';
+import { emptyNeuron } from '@/lib/utils/neuron-dashboards';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import {
   Bookmark,
@@ -157,11 +158,16 @@ export default function GlobalProvider({
         headers: { 'Content-Type': 'application/json' },
       })
         .then(async (response) => {
-          // A neuron with no row 404s here. Its dashboard loads from files, so show it as is.
+          // A neuron with no row 404s here. Its dashboard loads from files, so fill in empty fields.
+          const { modelId, layer, index, sourceSetName } = featureModalFeature;
           setFeatureModalFeature(
             response.ok
               ? ((await response.json()) as NeuronWithPartialRelations)
-              : { ...featureModalFeature, activations: [] },
+              : {
+                  ...emptyNeuron(modelId, layer, index, sourceSetName || getSourceSetNameFromSource(layer)),
+                  ...featureModalFeature,
+                  activations: [],
+                },
           );
         })
         .catch((error) => {

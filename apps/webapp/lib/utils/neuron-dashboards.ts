@@ -223,6 +223,54 @@ export function recordToNeuronDashboard(
   };
 }
 
+// A neuron with no database row. The dashboard does not set every field, and FeatureStats reads them all.
+export function emptyNeuron(
+  modelId: string,
+  layer: string,
+  index: string,
+  sourceSetName: string,
+): NeuronWithPartialRelations {
+  return {
+    modelId,
+    layer,
+    index,
+    sourceSetName,
+    creatorId: '',
+    createdAt: new Date(),
+    maxActApprox: 0.01,
+    neuron_alignment_indices: [],
+    neuron_alignment_values: [],
+    neuron_alignment_l1: [],
+    correlated_neurons_indices: [],
+    correlated_neurons_pearson: [],
+    correlated_neurons_l1: [],
+    correlated_features_indices: [],
+    correlated_features_pearson: [],
+    correlated_features_l1: [],
+    neg_str: [],
+    neg_values: [],
+    pos_str: [],
+    pos_values: [],
+    frac_nonzero: 0,
+    freq_hist_data_bar_heights: [],
+    freq_hist_data_bar_values: [],
+    logits_hist_data_bar_heights: [],
+    logits_hist_data_bar_values: [],
+    decoder_weights_dist: [],
+    umap_cluster: null,
+    umap_log_feature_sparsity: null,
+    umap_x: null,
+    umap_y: null,
+    topkCosSimIndices: [],
+    topkCosSimValues: [],
+    vector: [],
+    hasVector: false,
+    vectorDefaultSteerStrength: null,
+    hookName: null,
+    vectorLabel: null,
+  };
+}
+
 // Puts dashboard data over a neuron. Database-only fields (explanations, comments, lists) stay.
 export function applyNeuronDashboard(
   neuron: NeuronWithPartialRelations,

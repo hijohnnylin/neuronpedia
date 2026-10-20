@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixture from './__fixtures__/neuron-dashboard-qwen3-32b-31-12345.json';
 import {
   applyNeuronDashboard,
+  emptyNeuron,
   fetchNeuronDashboard,
   fetchNeuronDashboardDocText,
   fetchNeuronDashboardDocTokens,
@@ -130,6 +131,14 @@ describe('recordToNeuronDashboard', () => {
     expect(applied.explanations).toEqual([{ id: 'e1' }]);
     expect(applied.activations).toBe(dashboard.activations);
     expect(applied.maxActApprox).toBe(record.stats.max);
+  });
+
+  it('gives a neuron with no row every list FeatureStats reads', () => {
+    const applied = applyNeuronDashboard(emptyNeuron('qwen3-32b', '31', '12345', 'neurons'), dashboard);
+    expect(applied.pos_str).toEqual(dashboard.neuron.pos_str);
+    expect(applied.freq_hist_data_bar_values).toEqual(dashboard.neuron.freq_hist_data_bar_values);
+    expect(applied.logits_hist_data_bar_values).toEqual([]);
+    expect(applied.logits_hist_data_bar_heights).toEqual([]);
   });
 });
 
