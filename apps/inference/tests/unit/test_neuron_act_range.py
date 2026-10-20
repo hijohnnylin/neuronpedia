@@ -107,6 +107,17 @@ def test_no_table_is_refused():
         neuron_max_scale(None, 0, N_FEATURES)
 
 
+@pytest.mark.parametrize("contents", [None, b"not a safetensors file"], ids=["missing", "corrupt"])
+def test_an_unreadable_table_is_refused(tmp_path: Path, contents: bytes | None):
+    """A table lost from the pod's disk gives a 400 with the reason, not a 500."""
+    path = tmp_path / "act_range.safetensors"
+    if contents is not None:
+        path.write_bytes(contents)
+    load_neuron_max_scales.cache_clear()
+    with pytest.raises(NeuronActRangeError, match="Cannot read"):
+        neuron_max_scale(str(path), 0, N_FEATURES)
+
+
 @pytest.mark.parametrize(
     ("normalize", "source_set", "path", "status"),
     [

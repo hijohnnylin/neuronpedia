@@ -33,9 +33,13 @@ class NeuronActRangeError(ValueError):
 @lru_cache(maxsize=2)
 def load_neuron_max_scales(path: str) -> torch.Tensor:
     """Return the divisor per neuron, ``[n_layers, d_mlp]`` float32 on the CPU, always > 0."""
+    from safetensors import SafetensorError
     from safetensors.torch import load_file
 
-    tensors = load_file(path)
+    try:
+        tensors = load_file(path)
+    except (OSError, SafetensorError) as e:
+        raise NeuronActRangeError(f"Cannot read the neuron activation range table {path}: {e}") from e
     if "max" not in tensors:
         raise NeuronActRangeError(f"Neuron activation range table {path} has no 'max'")
     table = tensors["max"].float()
