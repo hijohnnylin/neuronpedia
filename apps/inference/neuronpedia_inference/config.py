@@ -139,7 +139,7 @@ class Config:
     # the startup banner. A string rather than the addresses because this banner prints before the
     # SAEs load, so `sae` has no address list yet; the resolved set is in the ready banner.
     static_points_summary: str | None = None
-    # Per-neuron corpus max and min, for search-all with `normalizeByMax`.
+    # Per-neuron corpus quantiles, for search-all with `rankByPercentile`.
     # None: that option returns 400. See inference_utils/neuron_act_range.py.
     neuron_act_range_path: str | None = None
 

@@ -8,7 +8,7 @@ from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.activation.all import (
     ActivationProcessor as SinglePromptActivationProcessor,
 )
-from neuronpedia_inference.endpoints.activation.all import normalize_by_max_error
+from neuronpedia_inference.endpoints.activation.all import rank_by_percentile_error
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     capture_padded_cache_async,
@@ -67,7 +67,7 @@ async def activation_all_batch(
             sae_manager.get_valid_sae_sets(),
         )
         return JSONResponse(content={"error": "Invalid source set"}, status_code=400)
-    if (error := normalize_by_max_error(request)) is not None:
+    if (error := rank_by_percentile_error(request)) is not None:
         return error
 
     if len(request.selected_sources) == 0:

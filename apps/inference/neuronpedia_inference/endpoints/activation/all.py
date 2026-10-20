@@ -18,7 +18,7 @@ from neuronpedia_inference.engine_adapter import (
 from neuronpedia_inference.inference_utils.neuron_act_range import (
     NO_TABLE_MESSAGE,
     NeuronActRangeError,
-    neuron_max_scale,
+    neuron_rarity,
 )
 from neuronpedia_inference.memory_cost import activation_all_cost
 from neuronpedia_inference.sae_manager import SAEManager
@@ -40,8 +40,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Result rows are [layer_num, feature_index, max_value, max_value_index, sum_values, sort_key,
-# *activations]. sort_key is max_value or sum_values, divided by the neuron's corpus max when
-# normalize_by_max is set, so the raw values stay as they are.
+# *activations]. sort_key is max_value or sum_values, or with rank_by_percentile the neuron's
+# rarity at its highest sort-token activation, so the raw values stay as they are.
 _ROW_HEADER_WIDTH = 6
 _SORT_KEY_COL = 5
 
@@ -59,16 +59,16 @@ class ActivationTopKRequest(Protocol):
     selected_sources: list[str]
     ignore_bos: bool
     sort_by_token_indexes: list[int]
-    normalize_by_max: bool
+    rank_by_percentile: bool
 
 
-def normalize_by_max_error(request: ActivationTopKRequest) -> JSONResponse | None:
-    """A 400 when `normalize_by_max` cannot be served for this request, else None."""
-    if not request.normalize_by_max:
+def rank_by_percentile_error(request: ActivationTopKRequest) -> JSONResponse | None:
+    """A 400 when `rank_by_percentile` cannot be served for this request, else None."""
+    if not request.rank_by_percentile:
         return None
     if request.source_set != SAEManager.NEURONS_SOURCESET:
         return JSONResponse(
-            content={"error": f"normalizeByMax is only for the {SAEManager.NEURONS_SOURCESET} source set"},
+            content={"error": f"rankByPercentile is only for the {SAEManager.NEURONS_SOURCESET} source set"},
             status_code=400,
         )
     if not Config.get_instance().neuron_act_range_path:
@@ -91,7 +91,7 @@ async def activation_all(
             sae_manager.get_valid_sae_sets(),
         )
         return JSONResponse(content={"error": "Invalid source set"}, status_code=400)
-    if (error := normalize_by_max_error(request)) is not None:
+    if (error := rank_by_percentile_error(request)) is not None:
         return error
 
     if len(request.selected_sources) == 0:
@@ -292,17 +292,18 @@ class ActivationProcessor:
                     f"Sort by token indexes {out_of_range} are out of range for the captured "
                     f"activations, which cover only {captured_len} token position(s)."
                 )
-            sum_values = activations_by_index[:, request.sort_by_token_indexes].sum(dim=1)
+            sort_acts = activations_by_index[:, request.sort_by_token_indexes]
+            sum_values = sort_acts.sum(dim=1)
             sort_key = sum_values
+            peak = sort_acts.max(dim=1).values
         else:
             sum_values = torch.zeros_like(max_values)
             sort_key = max_values
+            peak = max_values
 
-        if request.normalize_by_max:
-            scale = neuron_max_scale(
-                Config.get_instance().neuron_act_range_path, layer_num, int(activations_by_index.shape[0])
-            )
-            sort_key = sort_key.to(torch.float32) / scale.to(sort_key.device)
+        if request.rank_by_percentile:
+            # Rarity rises with activation, so the rarest sort token is the one with the highest value.
+            sort_key = neuron_rarity(Config.get_instance().neuron_act_range_path, layer_num, peak)
 
         keep = min(num_results, int(sort_key.shape[0]))
         # Stable, so equal keys keep feature-index order. Ties are the common case rather

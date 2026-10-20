@@ -16,10 +16,10 @@ from neuronpedia_inference.schemas.common import BaseSchema
 # class rather than inherited: they carry per-endpoint descriptions that end up in the
 # published spec, and a shared base would flatten them into one wording.
 
-NORMALIZE_BY_MAX_DESCRIPTION = (
-    "Only for the `neurons` source set. Rank each neuron by its sort value divided by the largest "
-    "activation it reached on a text corpus, so neurons with large raw scales do not crowd out the "
-    "rest. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw."
+RANK_BY_PERCENTILE_DESCRIPTION = (
+    "Only for the `neurons` source set. Rank each neuron by how rare its highest sort-token "
+    "activation is for that neuron on a text corpus (its percentile), not by the raw value. "
+    "Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw."
 )
 
 
@@ -142,7 +142,7 @@ class ActivationAllRequest(BaseSchema):
         description="Whether or not to include features whose highest activation value is the BOS token."
     )
     num_results: StrictInt | None = Field(default=25, description="Optional. The number of top features to return.")
-    normalize_by_max: StrictBool = Field(default=False, description=NORMALIZE_BY_MAX_DESCRIPTION)
+    rank_by_percentile: StrictBool = Field(default=False, description=RANK_BY_PERCENTILE_DESCRIPTION)
 
 
 class ActivationAllResponse(BaseSchema):
@@ -176,7 +176,7 @@ class ActivationAllBatchRequest(BaseSchema):
         description="Whether or not to include features whose highest activation value is the BOS token."
     )
     num_results: StrictInt | None = Field(default=25, description="Optional. The number of top features to return.")
-    normalize_by_max: StrictBool = Field(default=False, description=NORMALIZE_BY_MAX_DESCRIPTION)
+    rank_by_percentile: StrictBool = Field(default=False, description=RANK_BY_PERCENTILE_DESCRIPTION)
 
 
 class ActivationAllBatchResult(BaseSchema):

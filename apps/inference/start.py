@@ -120,7 +120,7 @@ def parse_args():
         "--neuron_act_range_path",
         type=str,
         default=None,
-        help="Per-neuron corpus max/min table (.safetensors) for search-all with normalizeByMax.",
+        help="Per-neuron corpus quantile table (.safetensors) for search-all with rankByPercentile.",
     )
     parser.add_argument(
         "--device",

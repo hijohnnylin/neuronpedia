@@ -14,12 +14,6 @@
             "title": "Model",
             "type": "string"
           },
-          "normalizeByMax": {
-            "default": false,
-            "description": "Only for the `neurons` source set. Rank each neuron by its sort value divided by the largest activation it reached on a text corpus, so neurons with large raw scales do not crowd out the rest. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.",
-            "title": "Normalizebymax",
-            "type": "boolean"
-          },
           "numResults": {
             "anyOf": [
               {
@@ -40,6 +34,12 @@
             },
             "title": "Prompts",
             "type": "array"
+          },
+          "rankByPercentile": {
+            "default": false,
+            "description": "Only for the `neurons` source set. Rank each neuron by how rare its highest sort-token activation is for that neuron on a text corpus (its percentile), not by the raw value. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.",
+            "title": "Rankbypercentile",
+            "type": "boolean"
           },
           "selectedSources": {
             "description": "List of specific SAEs to get activations for (eg [\"0-gemmascope-res-65k\", \"5-gemmascope-res-65k\"]). If not specified, will get activations for all SAEs in the source set.",
@@ -231,12 +231,6 @@
             "title": "Model",
             "type": "string"
           },
-          "normalizeByMax": {
-            "default": false,
-            "description": "Only for the `neurons` source set. Rank each neuron by its sort value divided by the largest activation it reached on a text corpus, so neurons with large raw scales do not crowd out the rest. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.",
-            "title": "Normalizebymax",
-            "type": "boolean"
-          },
           "numResults": {
             "anyOf": [
               {
@@ -254,6 +248,12 @@
             "description": "Input text prompt to get activations for",
             "title": "Prompt",
             "type": "string"
+          },
+          "rankByPercentile": {
+            "default": false,
+            "description": "Only for the `neurons` source set. Rank each neuron by how rare its highest sort-token activation is for that neuron on a text corpus (its percentile), not by the raw value. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.",
+            "title": "Rankbypercentile",
+            "type": "boolean"
           },
           "selectedSources": {
             "description": "List of specific SAEs to get activations for (eg [\"0-gemmascope-res-65k\", \"5-gemmascope-res-65k\"]). If not specified, will get activations for all SAEs in the source set.",

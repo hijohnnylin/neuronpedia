@@ -633,8 +633,8 @@ export const runInferenceActivationAll = async (
   const serverHost = await resolveHost(inferenceTarget(modelId, { sourceSetName, user }));
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
-  // Raw neuron scales differ by orders of magnitude, so rank neurons by fraction of their corpus max
-  const normalizeByMax = sourceSetName === NEURONS_SOURCESET;
+  // Raw neuron scales differ by orders of magnitude, so rank neurons by how rare each activation is for them
+  const rankByPercentile = sourceSetName === NEURONS_SOURCESET;
 
   if (Array.isArray(text)) {
     return unwrapInferenceResponse(
@@ -647,7 +647,7 @@ export const runInferenceActivationAll = async (
           sourceSet: sourceSetName,
           ignoreBos,
           numResults,
-          normalizeByMax,
+          rankByPercentile,
         },
       }),
     );
@@ -662,7 +662,7 @@ export const runInferenceActivationAll = async (
         sourceSet: sourceSetName,
         ignoreBos,
         numResults,
-        normalizeByMax,
+        rankByPercentile,
       },
     }),
   );

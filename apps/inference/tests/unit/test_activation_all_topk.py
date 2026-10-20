@@ -16,6 +16,7 @@ CPU-only synthetic activations: no model, no SAE weights, cheap enough for CI.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -62,16 +63,19 @@ def _request(
     request.num_results = num_results
     request.sort_by_token_indexes = sort_by_token_indexes or []
     request.ignore_bos = ignore_bos
-    request.normalize_by_max = False
+    request.rank_by_percentile = False
     return request
 
 
 def _reference_global_sort(
-    blocks: list[torch.Tensor], request: MagicMock, scales: torch.Tensor | None = None
+    blocks: list[torch.Tensor],
+    request: MagicMock,
+    rank_key: Callable[[int, torch.Tensor], torch.Tensor] | None = None,
 ) -> list[list[float]]:
     """The original: every source's rows concatenated, sorted once, then truncated.
 
-    `scales` [n_sources, n_features] divides the sort key per row, as normalize_by_max does.
+    `rank_key(layer, peak)` replaces the sort key, as rank_by_percentile does. `peak` is each
+    row's highest sort-token activation, or its max with no sort tokens.
     """
     rows = []
     for layer_num, block in enumerate(blocks):
@@ -84,8 +88,10 @@ def _reference_global_sort(
         else:
             sum_values = torch.zeros_like(max_values)
         key = sum_values if request.sort_by_token_indexes else max_values
-        if scales is not None:
-            key = key / scales[layer_num]
+        if rank_key is not None:
+            sort_acts = activations[:, request.sort_by_token_indexes] if request.sort_by_token_indexes else None
+            peak = sort_acts.max(dim=1).values if sort_acts is not None else max_values
+            key = rank_key(layer_num, peak)
         n_features = activations.shape[0]
         rows.append(
             torch.cat(
@@ -212,7 +218,7 @@ def test_a_selected_source_beyond_the_set_listing_is_reduced():
     request.num_results = 5
     request.sort_by_token_indexes = [1, 2, 3]
     request.ignore_bos = True
-    request.normalize_by_max = False
+    request.rank_by_percentile = False
 
     sae_manager = MagicMock()
     sae_manager.sae_set_to_saes = {SOURCE_SET: list(set_sources)}
