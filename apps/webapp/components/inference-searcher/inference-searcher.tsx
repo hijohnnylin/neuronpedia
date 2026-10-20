@@ -2,6 +2,7 @@
 
 import ModelSelector from '@/components/feature-selector/model-selector';
 import SourceSetSelector from '@/components/feature-selector/sourceset-selector';
+import LayerGridSelector from '@/components/layer-grid-selector';
 import PanelLoader from '@/components/panel-loader';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import {
@@ -11,19 +12,13 @@ import {
 import { Button } from '@/components/shadcn/button';
 import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
 import { replaceHtmlAnomalies } from '@/lib/utils/activations';
-import {
-  getAdditionalInfoFromSource,
-  getFirstSourceSetForModel,
-  getLayerNumAsStringFromSource,
-} from '@/lib/utils/source';
+import { getFirstSourceSetForModel } from '@/lib/utils/source';
 import { SourceSetWithPartialRelations } from '@/prisma/generated/zod';
 import { useRouter } from '@bprogress/next';
 import { Visibility } from '@prisma/client';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import * as Select from '@radix-ui/react-select';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
 import { Form, Formik, FormikProps } from 'formik';
-import { Check, ChevronDownIcon, HelpCircle, Search } from 'lucide-react';
+import { HelpCircle, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 import ExamplesButtons from './examples-buttons';
@@ -194,71 +189,11 @@ export default function InferenceSearcher({
               />
             )}
             <div className="flex flex-col">
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger className="flex h-10 max-h-[40px] min-h-[40px] w-full flex-1 flex-row items-center justify-center gap-x-1 whitespace-pre rounded border border-slate-300 bg-white px-2 font-mono text-[10px] font-medium leading-tight text-sky-700 hover:bg-slate-50 sm:pl-4 sm:pr-2 sm:text-xs">
-                  {selectedLayers
-                    ? selectedLayers?.length === 0
-                      ? 'All Layers'
-                      : `Layer${selectedLayers.length > 1 ? 's ' : ' '}${selectedLayers
-                          .map(
-                            (l) =>
-                              getLayerNumAsStringFromSource(l) +
-                              (getAdditionalInfoFromSource(l).length > 0 ? ` ${getAdditionalInfoFromSource(l)}` : ''),
-                          )
-                          .join(', ')}`
-                    : 'No Layers Selected'}
-                  <Select.Icon>
-                    <ChevronDownIcon className="-mr-1 ml-0 w-4 leading-none" />
-                  </Select.Icon>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    className="z-30 max-h-[305px] cursor-pointer overflow-scroll rounded-md border border-slate-300 bg-white text-[10px] font-medium text-sky-700 shadow"
-                    sideOffset={5}
-                  >
-                    <DropdownMenu.CheckboxItem
-                      className="flex h-8 min-w-[100px] flex-row items-center overflow-hidden border-b px-3 font-mono text-xs hover:bg-slate-100 focus:outline-none"
-                      checked={selectedLayers?.length === 0}
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        setSelectedLayers([]);
-                      }}
-                    >
-                      <div className="w-7">
-                        <DropdownMenu.ItemIndicator>
-                          <Check className="h-4 w-4" />
-                        </DropdownMenu.ItemIndicator>
-                      </div>
-                      <div className="flex items-center justify-center leading-none">All Layers</div>
-                    </DropdownMenu.CheckboxItem>
-                    {availableLayers.map((layer) => (
-                      <DropdownMenu.CheckboxItem
-                        key={layer}
-                        className="flex h-8 flex-row items-center overflow-hidden border-b px-3 font-mono text-xs hover:bg-slate-100 focus:outline-none"
-                        checked={selectedLayers?.indexOf(layer) !== -1}
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          if (selectedLayers?.indexOf(layer) === -1) {
-                            setSelectedLayers([...selectedLayers, layer].toSorted());
-                          } else {
-                            setSelectedLayers(selectedLayers?.filter((layerToCheck) => layerToCheck !== layer));
-                          }
-                        }}
-                      >
-                        <div className="w-7">
-                          <DropdownMenu.ItemIndicator>
-                            <Check className="h-4 w-4" />
-                          </DropdownMenu.ItemIndicator>
-                        </div>
-                        <div className="flex items-center justify-center uppercase leading-none">
-                          {getLayerNumAsStringFromSource(layer)}
-                          {getAdditionalInfoFromSource(layer).length > 0 && ` ${getAdditionalInfoFromSource(layer)}`}
-                        </div>
-                      </DropdownMenu.CheckboxItem>
-                    ))}
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
+              <LayerGridSelector
+                layers={availableLayers}
+                selectedLayers={selectedLayers ?? []}
+                onChange={setSelectedLayers}
+              />
             </div>
           </div>
         </div>

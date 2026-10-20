@@ -1,8 +1,8 @@
 'use client';
 
-import LayerSelector from '@/components/feature-selector/layer-selector';
 import ModelSelector from '@/components/feature-selector/model-selector';
 import SourceSetSelector from '@/components/feature-selector/sourceset-selector';
+import { LayerGridPicker } from '@/components/layer-grid-selector';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { DEFAULT_MODELID, DEFAULT_SOURCE, DEFAULT_SOURCESET, NEXT_PUBLIC_SEARCH_TOPK_MAX_CHAR_LENGTH } from '@/lib/env';
@@ -286,12 +286,10 @@ export default function SearchTopkByToken({
             sourceSetChangedCallback={sourceSetChangedCallback}
             filterToAllowInferenceSearch
           />
-          <LayerSelector
-            modelId={modelId}
+          <LayerGridPicker
+            layers={getSourcesForSourceSet(modelId, sourceSet, true, true, false)}
             layer={source}
-            sourceSet={sourceSet}
-            filterToInferenceEnabled
-            layerChangedCallback={setSource}
+            onChange={setSource}
           />
         </div>
         <div id="searchfield" className="mb-2 mt-2 flex w-full flex-row items-center justify-center">
