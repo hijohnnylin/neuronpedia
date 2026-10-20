@@ -70,12 +70,12 @@ def _request(
 def _reference_global_sort(
     blocks: list[torch.Tensor],
     request: MagicMock,
-    rank_key: Callable[[int, torch.Tensor], torch.Tensor] | None = None,
+    rank_key: Callable[[int, torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]] | None = None,
 ) -> list[list[float]]:
     """The original: every source's rows concatenated, sorted once, then truncated.
 
-    `rank_key(layer, peak)` replaces the sort key, as rank_by_percentile does. `peak` is each
-    row's highest sort-token activation, or its max with no sort tokens.
+    `rank_key(layer, highest, lowest)` gives the sort key and the ranked-by-lowest flag, as
+    rank_by_percentile does. Both extremes are over the sort tokens, or all tokens without them.
     """
     rows = []
     for layer_num, block in enumerate(blocks):
@@ -88,10 +88,11 @@ def _reference_global_sort(
         else:
             sum_values = torch.zeros_like(max_values)
         key = sum_values if request.sort_by_token_indexes else max_values
+        ranked_by_lowest = torch.zeros_like(max_values)
         if rank_key is not None:
-            sort_acts = activations[:, request.sort_by_token_indexes] if request.sort_by_token_indexes else None
-            peak = sort_acts.max(dim=1).values if sort_acts is not None else max_values
-            key = rank_key(layer_num, peak)
+            sort_acts = activations[:, request.sort_by_token_indexes] if request.sort_by_token_indexes else activations
+            key, low = rank_key(layer_num, sort_acts.max(dim=1).values, sort_acts.min(dim=1).values)
+            ranked_by_lowest = low.to(torch.float32)
         n_features = activations.shape[0]
         rows.append(
             torch.cat(
@@ -102,6 +103,7 @@ def _reference_global_sort(
                     max_indices.unsqueeze(1).to(torch.float32),
                     sum_values.unsqueeze(1).to(torch.float32),
                     key.unsqueeze(1).to(torch.float32),
+                    ranked_by_lowest.unsqueeze(1),
                     activations.to(torch.float32),
                 ),
                 dim=1,

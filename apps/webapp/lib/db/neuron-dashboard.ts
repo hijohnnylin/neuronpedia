@@ -5,7 +5,7 @@
 import { notFound } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
 import { fetchNeuronDashboard, NeuronDashboard, NeuronDashboardError } from '@/lib/utils/neuron-dashboards';
-import { getSourceSetNameFromSource } from '@/lib/utils/source';
+import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { ActivationPartialWithRelations } from '@/prisma/generated/zod';
 import { Activation, Neuron } from '@prisma/client';
 
@@ -28,6 +28,19 @@ export async function getExternalNeuronDashboard(ids: FeatureIds): Promise<Neuro
     }
     throw error;
   }
+}
+
+// Search-all ranks neurons by percentile only where the inference pod has a percentile table. Tables
+// are built from the dashboard files, so only neuron source sets with external dashboards have one.
+export async function sourceSetRanksByPercentile(modelId: string, sourceSetName: string): Promise<boolean> {
+  if (sourceSetName !== NEURONS_SOURCESET) {
+    return false;
+  }
+  const sourceSet = await prisma.sourceSet.findUnique({
+    where: { modelId_name: { modelId, name: sourceSetName } },
+    select: { externalDashboardsUrl: true },
+  });
+  return Boolean(sourceSet?.externalDashboardsUrl);
 }
 
 function toActivationRow(activation: ActivationPartialWithRelations, ids: FeatureIds): Activation {

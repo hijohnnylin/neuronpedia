@@ -5,10 +5,19 @@ import { InferenceActivationAllResult } from '@/components/provider/inference-ac
 import useNeuronDashboard from '@/lib/hooks/use-neuron-dashboard';
 import { replaceHtmlAnomalies } from '@/lib/utils/activations';
 import { signedLogHistogram } from '@/lib/utils/neuron-dashboard-histogram';
-import { applyNeuronDashboard, emptyNeuron, neuronDashboardExtremes } from '@/lib/utils/neuron-dashboards';
+import {
+  applyNeuronDashboard,
+  emptyNeuron,
+  NEURON_DASHBOARD_BOTTOM_DATA_SOURCE,
+  neuronDashboardExtremes,
+} from '@/lib/utils/neuron-dashboards';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { ActivationPartialWithRelations, ExplanationPartialWithRelations } from '@/prisma/generated/zod';
 import { useMemo } from 'react';
+
+function valueColor(value: number) {
+  return value < 0 ? 'text-red-700' : 'text-emerald-700';
+}
 
 function MiniActivation({
   label,
@@ -104,6 +113,13 @@ export default function ResultItem({
     [externalDashboard, result],
   );
   const dfa = getSourceSet(result.modelId, sourceSetName)?.showDfa;
+  const lowestIndex = useMemo(
+    () => result.values.reduce((lowest, value, i) => (value < result.values[lowest] ? i : lowest), 0),
+    [result.values],
+  );
+  // A negative match shows its lowest token, not its highest.
+  const shownIndex = result.rankedByLowest ? lowestIndex : result.maxValueIndex;
+  const sortSum = searchSortIndexes.reduce((sum, index) => sum + result.values[index], 0);
 
   return (
     <a
@@ -131,6 +147,14 @@ export default function ResultItem({
           <span className="mb-2.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase text-slate-600 group-hover:bg-sky-200 sm:mb-1 sm:text-xs">
             {result.layer}:{result.index}
           </span>
+          {result.rankedByLowest && (
+            <span
+              className="rounded bg-red-50 px-1.5 py-0.5 font-sans text-[10px] font-bold uppercase text-red-600"
+              title="This neuron matched by how rarely it goes this negative, not by a high activation."
+            >
+              Negative Match
+            </span>
+          )}
         </div>
         <div className="flex basis-8/12 flex-col sm:basis-9/12">
           <div className={`mt-0 flex ${searchSortIndexes.length > 0 ? 'flex-col' : 'flex-row items-center'} gap-x-2`}>
@@ -139,12 +163,7 @@ export default function ResultItem({
                 {searchSortIndexes.length > 1 && (
                   <div className="sticky left-0 flex flex-col items-center justify-center gap-y-0.5 bg-white pr-1">
                     <div className="px-1 text-[10px] font-bold uppercase text-slate-400">Sum</div>
-                    <span className="mt-0 text-[11px] text-emerald-700">
-                      {searchSortIndexes
-                        .map((index) => result.values[index])
-                        .reduce((a, b) => a + b, 0)
-                        .toFixed(1)}
-                    </span>
+                    <span className={`mt-0 text-[11px] ${valueColor(sortSum)}`}>{sortSum.toFixed(1)}</span>
                   </div>
                 )}
                 {searchSortIndexes.map((searchSortIndex) => (
@@ -152,7 +171,7 @@ export default function ResultItem({
                     <div className="whitespace-pre rounded bg-slate-200 px-1 font-mono text-xs font-medium">
                       {replaceHtmlAnomalies(tokens[searchSortIndex])}
                     </div>
-                    <span className="mt-0 text-[11px] text-emerald-700">
+                    <span className={`mt-0 text-[11px] ${valueColor(result.values[searchSortIndex])}`}>
                       {result.values[searchSortIndex].toFixed(1)}
                     </span>
                   </div>
@@ -161,9 +180,11 @@ export default function ResultItem({
             ) : (
               <div className="flex flex-col items-center gap-y-0.5 px-2 text-xs text-slate-700">
                 <div className="whitespace-pre rounded bg-slate-200 px-1 font-mono font-medium">
-                  {replaceHtmlAnomalies(tokens[result.maxValueIndex])}
+                  {replaceHtmlAnomalies(tokens[shownIndex])}
                 </div>
-                <span className="mt-0 text-[11px] text-emerald-700">{result.maxValue.toFixed(1)}</span>
+                <span className={`mt-0 text-[11px] ${valueColor(result.values[shownIndex])}`}>
+                  {result.values[shownIndex].toFixed(1)}
+                </span>
               </div>
             )}
             <ActivationItem
@@ -173,6 +194,10 @@ export default function ResultItem({
                 tokens,
                 maxValueTokenIndex: result.maxValueIndex,
                 maxValue: result.maxValue,
+                ...(result.rankedByLowest && {
+                  minValue: result.values[lowestIndex],
+                  dataSource: NEURON_DASHBOARD_BOTTOM_DATA_SOURCE,
+                }),
                 dfaValues: result.dfaValues,
                 dfaMaxValue: result.dfaMaxValue,
                 dfaTargetIndex: result.dfaTargetIndex,

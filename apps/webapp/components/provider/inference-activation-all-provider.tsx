@@ -28,6 +28,8 @@ export type InferenceActivationAllResult = {
   dfaValues?: number[] | undefined;
   dfaTargetIndex?: number | undefined;
   dfaMaxValue?: number | undefined;
+  // true when a percentile-ranked neuron matched by its lowest activation
+  rankedByLowest?: boolean | undefined;
 };
 
 export const [InferenceActivationAllContext, useInferenceActivationAllContext] = createContextWrapper<{

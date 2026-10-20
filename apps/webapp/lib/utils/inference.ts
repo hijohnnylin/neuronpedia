@@ -10,7 +10,7 @@ import type {
 import { NPSteerType } from '@/lib/api/inference-types';
 import { getTransformerLensModelIdIfExists } from '@/lib/db/model';
 import { getNeuronOnly } from '@/lib/db/neuron';
-import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
+import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import {
   ChatMessage,
   replaceSteerModelIdIfNeeded,
@@ -628,13 +628,13 @@ export const runInferenceActivationAll = async (
   sortIndexes: number[],
   ignoreBos: boolean,
   user: AuthenticatedUser | null,
+  // Raw neuron scales differ by orders of magnitude, so rank neurons by how rare each activation is for them
+  rankByPercentile = false,
 ) => {
   // TODO: we don't currently support search-all on different instances
   const serverHost = await resolveHost(inferenceTarget(modelId, { sourceSetName, user }));
 
   const transformerLensModelId = await getTransformerLensModelIdIfExists(modelId);
-  // Raw neuron scales differ by orders of magnitude, so rank neurons by how rare each activation is for them
-  const rankByPercentile = sourceSetName === NEURONS_SOURCESET;
 
   if (Array.isArray(text)) {
     return unwrapInferenceResponse(

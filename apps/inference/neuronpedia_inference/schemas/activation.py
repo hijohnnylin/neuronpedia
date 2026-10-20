@@ -17,9 +17,14 @@ from neuronpedia_inference.schemas.common import BaseSchema
 # published spec, and a shared base would flatten them into one wording.
 
 RANK_BY_PERCENTILE_DESCRIPTION = (
-    "Only for the `neurons` source set. Rank each neuron by how rare its highest sort-token "
+    "Only for the `neurons` source set. Rank each neuron by how rare its highest or lowest sort-token "
     "activation is for that neuron on a text corpus (its percentile), not by the raw value. "
     "Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw."
+)
+
+RANKED_BY_LOWEST_DESCRIPTION = (
+    "Set only with rankByPercentile. True when the neuron ranked by its lowest sort-token activation, "
+    "which was rarer for it than its highest."
 )
 
 
@@ -122,6 +127,7 @@ class ActivationAllFeature(BaseSchema):
     dfa_values: list[StrictFloat] | None = None
     dfa_target_index: StrictInt | None = None
     dfa_max_value: StrictFloat | None = None
+    ranked_by_lowest: StrictBool | None = Field(default=None, description=RANKED_BY_LOWEST_DESCRIPTION)
 
 
 class ActivationAllRequest(BaseSchema):

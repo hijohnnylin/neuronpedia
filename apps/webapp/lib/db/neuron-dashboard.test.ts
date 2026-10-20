@@ -8,6 +8,7 @@ import {
   getActivationsForFeature,
   markNearZeroAsNonActivating,
   NEAR_ZERO_FRACTION,
+  sourceSetRanksByPercentile,
 } from './neuron-dashboard';
 
 // vi.mock is hoisted above the imports, so its factory can only close over
@@ -43,6 +44,23 @@ const dashboard = recordToNeuronDashboard(fixture.record as NeuronDashboardRecor
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('sourceSetRanksByPercentile', () => {
+  it('is on for a neuron source set with dashboard files', async () => {
+    sourceSetFindUnique.mockResolvedValue({ externalDashboardsUrl: 'https://dashboards.example/v2/qwen3-32b' });
+    await expect(sourceSetRanksByPercentile('qwen3-32b', 'neurons')).resolves.toBe(true);
+  });
+
+  it('is off for a neuron source set without them, whose pods have no table', async () => {
+    sourceSetFindUnique.mockResolvedValue({ externalDashboardsUrl: null });
+    await expect(sourceSetRanksByPercentile('gpt2-small', 'neurons')).resolves.toBe(false);
+  });
+
+  it('is off for an SAE source set without reading the database', async () => {
+    await expect(sourceSetRanksByPercentile('gpt2-small', 'res-jb')).resolves.toBe(false);
+    expect(sourceSetFindUnique).not.toHaveBeenCalled();
+  });
 });
 
 describe('getActivationsForFeature', () => {

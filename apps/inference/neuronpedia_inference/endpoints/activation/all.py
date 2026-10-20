@@ -40,10 +40,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Result rows are [layer_num, feature_index, max_value, max_value_index, sum_values, sort_key,
-# *activations]. sort_key is max_value or sum_values, or with rank_by_percentile the neuron's
-# rarity at its highest sort-token activation, so the raw values stay as they are.
-_ROW_HEADER_WIDTH = 6
+# ranked_by_lowest, *activations]. sort_key is max_value or sum_values, or with
+# rank_by_percentile the rarity of the neuron's rarer sort-token extreme. ranked_by_lowest is 1
+# when that extreme is its lowest activation. The raw values stay as they are.
+_ROW_HEADER_WIDTH = 7
 _SORT_KEY_COL = 5
+_RANKED_BY_LOWEST_COL = 6
 
 # Ceiling on `num_results`. The running top-K buffer is [num_results, n_tokens + 6] and the
 # response carries every one of those rows as JSON floats, so an unbounded value is both a
@@ -295,15 +297,21 @@ class ActivationProcessor:
             sort_acts = activations_by_index[:, request.sort_by_token_indexes]
             sum_values = sort_acts.sum(dim=1)
             sort_key = sum_values
-            peak = sort_acts.max(dim=1).values
         else:
+            sort_acts = activations_by_index
             sum_values = torch.zeros_like(max_values)
             sort_key = max_values
-            peak = max_values
 
+        ranked_by_lowest = torch.zeros_like(max_values)
         if request.rank_by_percentile:
-            # Rarity rises with activation, so the rarest sort token is the one with the highest value.
-            sort_key = neuron_rarity(Config.get_instance().neuron_act_range_path, layer_num, peak)
+            # Rarity is monotonic in each tail, so the rarest sort token is the highest or the lowest one.
+            sort_key, low_is_rarer = neuron_rarity(
+                Config.get_instance().neuron_act_range_path,
+                layer_num,
+                sort_acts.max(dim=1).values,
+                sort_acts.min(dim=1).values,
+            )
+            ranked_by_lowest = low_is_rarer.to(max_values.dtype)
 
         keep = min(num_results, int(sort_key.shape[0]))
         # Stable, so equal keys keep feature-index order. Ties are the common case rather
@@ -320,6 +328,7 @@ class ActivationProcessor:
                 max_indices[order].unsqueeze(1).to(torch.float32).to(device),
                 sum_values[order].unsqueeze(1).to(torch.float32).to(device),
                 sort_key[order].unsqueeze(1).to(torch.float32).to(device),
+                ranked_by_lowest[order].unsqueeze(1).to(torch.float32).to(device),
                 activations_by_index[order].to(torch.float32).to(device),
             ),
             dim=1,
@@ -389,6 +398,7 @@ class ActivationProcessor:
                 sum_values=sum_values,
                 max_value=max_value,
                 max_value_index=max_value_index,
+                ranked_by_lowest=bool(result[_RANKED_BY_LOWEST_COL]) if request.rank_by_percentile else None,
             )
             if SAEManager.get_instance().is_dfa_enabled(source):
                 dfa = await self._calculate_dfa_values(

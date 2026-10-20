@@ -9,6 +9,7 @@ import { ActivationAllBatchResponse, ActivationAllResponse } from '@/lib/api/inf
 import { prisma } from '@/lib/db';
 import { createInferenceActivationsAndReturn } from '@/lib/db/activation';
 import { getNeuronsForSearcher } from '@/lib/db/neuron';
+import { sourceSetRanksByPercentile } from '@/lib/db/neuron-dashboard';
 import { assertUserCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
 import {
   DEMO_MODE,
@@ -118,6 +119,9 @@ const DEFAULT_DENSITY_THRESHOLD = -1;
  *                         type: number
  *                       maxValueIndex:
  *                         type: number
+ *                       rankedByLowest:
+ *                         description: Only for neuron source sets ranked by percentile. True when the neuron matched by its lowest (most negative) activation on the sort tokens, not its highest.
+ *                         type: boolean
  *       400:
  *         description: Invalid request body or missing search text.
  *       500:
@@ -152,6 +156,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // Throws a 404 ApiError, which the wrapper renders. Catching it here to return 500 was
   // reporting a caller's typo as a Neuronpedia outage.
   await assertUserCanAccessModelAndSourceSet(modelId, sourceSetName, request.user);
+  const rankByPercentile = await sourceSetRanksByPercentile(modelId, sourceSetName);
 
   // if it's a batch search, we don't need to check savedSearch or fetch the feature
   if (Array.isArray(body.text)) {
@@ -164,6 +169,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       sortIndexes,
       body.ignoreBos,
       request.user,
+      rankByPercentile,
     )) as ActivationAllBatchResponse;
 
     const batchResults: InferenceActivationAllResponse[] = [];
@@ -181,6 +187,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           dfaValues: activation.dfaValues ?? undefined,
           dfaTargetIndex: activation.dfaTargetIndex ?? undefined,
           dfaMaxValue: activation.dfaMaxValue ?? undefined,
+          rankedByLowest: activation.rankedByLowest ?? undefined,
         })),
         sortIndexes,
       };
@@ -189,61 +196,63 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     return NextResponse.json({ results: batchResults });
   }
-  // see if we found this before
-  const savedSearch = await prisma.savedSearch.findUnique({
-    where: {
-      modelId_query: {
-        modelId,
-        query: body.text,
-        selectedLayers,
-        sortByIndexes: sortIndexes,
-        sourceSet: sourceSetName,
-        ignoreBos: body.ignoreBos,
-        numResults,
-        densityThreshold,
-      },
-    },
-    include: {
-      activations: {
-        orderBy: {
-          order: 'asc',
+  // see if we found this before. The cache key has no ranking method, so percentile searches skip it.
+  const savedSearch = rankByPercentile
+    ? null
+    : await prisma.savedSearch.findUnique({
+        where: {
+          modelId_query: {
+            modelId,
+            query: body.text,
+            selectedLayers,
+            sortByIndexes: sortIndexes,
+            sourceSet: sourceSetName,
+            ignoreBos: body.ignoreBos,
+            numResults,
+            densityThreshold,
+          },
         },
         include: {
-          activation: {
+          activations: {
+            orderBy: {
+              order: 'asc',
+            },
             include: {
-              neuron: {
+              activation: {
                 include: {
-                  activations: {
-                    orderBy: {
-                      maxValue: 'desc',
-                    },
-                    take: 1,
-                    where: {
-                      creatorId: {
-                        in: PUBLIC_ACTIVATIONS_USER_IDS,
+                  neuron: {
+                    include: {
+                      activations: {
+                        orderBy: {
+                          maxValue: 'desc',
+                        },
+                        take: 1,
+                        where: {
+                          creatorId: {
+                            in: PUBLIC_ACTIVATIONS_USER_IDS,
+                          },
+                        },
                       },
+                      explanations: {
+                        // include: {
+                        //   author: {
+                        //     select: {
+                        //       name: true,
+                        //     },
+                        //   },
+                        //   votes: true,
+                        // },
+                        orderBy: [{ scoreV2: 'desc' }, { scoreV1: 'desc' }],
+                      },
+                      model: true,
                     },
                   },
-                  explanations: {
-                    // include: {
-                    //   author: {
-                    //     select: {
-                    //       name: true,
-                    //     },
-                    //   },
-                    //   votes: true,
-                    // },
-                    orderBy: [{ scoreV2: 'desc' }, { scoreV1: 'desc' }],
-                  },
-                  model: true,
                 },
               },
             },
           },
         },
-      },
-    },
-  });
+      });
 
   let hasMissingNeuron = false;
 
@@ -279,6 +288,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
       sortIndexes,
       body.ignoreBos,
       request.user,
+      rankByPercentile,
     )) as ActivationAllResponse;
 
     console.log('got activations: ', result.activations.length);
@@ -314,6 +324,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           dfaValues: activation.dfaValues ?? undefined,
           dfaTargetIndex: activation.dfaTargetIndex ?? undefined,
           dfaMaxValue: activation.dfaMaxValue ?? undefined,
+          rankedByLowest: activation.rankedByLowest ?? undefined,
         });
         return;
       }
@@ -322,7 +333,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
         console.log(`skipping dense neuron: ${neuron.index}`);
         return;
       }
+      // A percentile rank already says how strong a match is, and it can be on the negative side.
       if (
+        rankByPercentile ||
         (sortIndexes.length === 0 && activation.maxValue > 0) ||
         (sortIndexes.length > 0 && activation.sumValues != null && activation.sumValues > 0)
       ) {
@@ -337,6 +350,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
           dfaValues: activation.dfaValues ?? undefined,
           dfaTargetIndex: activation.dfaTargetIndex ?? undefined,
           dfaMaxValue: activation.dfaMaxValue ?? undefined,
+          rankedByLowest: activation.rankedByLowest ?? undefined,
         });
       }
     });
@@ -350,7 +364,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   };
 
   // if not a cached retrieval, make savedsearch
-  if (!savedSearch && !hasMissingNeuron) {
+  if (!savedSearch && !hasMissingNeuron && !rankByPercentile) {
     // look up the userid to use for creating search
     if (request.user) {
       // eslint-disable-next-line

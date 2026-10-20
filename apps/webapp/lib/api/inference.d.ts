@@ -425,7 +425,7 @@ export interface components {
       prompts: string[];
       /**
        * Rankbypercentile
-       * @description Only for the `neurons` source set. Rank each neuron by how rare its highest sort-token activation is for that neuron on a text corpus (its percentile), not by the raw value. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.
+       * @description Only for the `neurons` source set. Rank each neuron by how rare its highest or lowest sort-token activation is for that neuron on a text corpus (its percentile), not by the raw value. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.
        * @default false
        */
       rankByPercentile: boolean;
@@ -485,6 +485,11 @@ export interface components {
       maxValue: number;
       /** Maxvalueindex */
       maxValueIndex: number;
+      /**
+       * Rankedbylowest
+       * @description Set only with rankByPercentile. True when the neuron ranked by its lowest sort-token activation, which was rarer for it than its highest.
+       */
+      rankedByLowest?: boolean | null;
       /** Source */
       source: string;
       /** Sumvalues */
@@ -520,7 +525,7 @@ export interface components {
       prompt: string;
       /**
        * Rankbypercentile
-       * @description Only for the `neurons` source set. Rank each neuron by how rare its highest sort-token activation is for that neuron on a text corpus (its percentile), not by the raw value. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.
+       * @description Only for the `neurons` source set. Rank each neuron by how rare its highest or lowest sort-token activation is for that neuron on a text corpus (its percentile), not by the raw value. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.
        * @default false
        */
       rankByPercentile: boolean;
