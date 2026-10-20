@@ -4,6 +4,7 @@
 
 import { notFound } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
+import { PUBLIC_ACTIVATIONS_USER_IDS } from '@/lib/env';
 import { fetchNeuronDashboard, NeuronDashboard, NeuronDashboardError } from '@/lib/utils/neuron-dashboards';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { ActivationPartialWithRelations } from '@/prisma/generated/zod';
@@ -97,10 +98,23 @@ export async function getActivationsForFeature(
   if (dashboard) {
     return { activations: dashboard.activations.map((a) => toActivationRow(a, ids)), dashboard };
   }
+  const key = { modelId: ids.modelId, layer: ids.layer, index: ids.index };
+  const neuron = await prisma.neuron.findUnique({
+    where: { modelId_layer_index: key },
+    select: { hasVector: true, creatorId: true },
+  });
   const activations = await prisma.activation.findMany({
-    where: { neuron: { modelId: ids.modelId, layer: ids.layer, index: ids.index } },
+    where: { ...key, creatorId: { in: activationCreatorIds(neuron) } },
   });
   return { activations, dashboard: null };
+}
+
+// Creators whose Activation rows the feature page shows: the public set, plus the creator of a vector.
+// Search-all saves rows under each searcher's id. Those must not reach scoring or explaining.
+export function activationCreatorIds(neuron: { hasVector: boolean; creatorId: string | null } | null): string[] {
+  return neuron?.hasVector && neuron.creatorId
+    ? [neuron.creatorId].concat(PUBLIC_ACTIVATIONS_USER_IDS)
+    : PUBLIC_ACTIVATIONS_USER_IDS;
 }
 
 // Rows that reference a feature (explanations, for example) need its Neuron row. Creates a bare one

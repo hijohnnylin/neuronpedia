@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api-error';
+import { PUBLIC_ACTIVATIONS_USER_IDS } from '../env';
 import fixture from '../utils/__fixtures__/neuron-dashboard-qwen3-32b-31-12345.json';
 import { NeuronDashboardError, NeuronDashboardRecord, recordToNeuronDashboard } from '../utils/neuron-dashboards';
 import {
+  activationCreatorIds,
   ensureNeuronRowForDashboard,
   ensureNeuronRowForFeature,
   getActivationsForFeature,
@@ -75,6 +77,7 @@ describe('getActivationsForFeature', () => {
     });
     expect(fetchNeuronDashboard).toHaveBeenCalledWith('https://dashboards.example/v1/qwen3-32b', ids);
     expect(activationFindMany).not.toHaveBeenCalled();
+    expect(neuronFindUnique).not.toHaveBeenCalled();
     expect(loaded).toBe(dashboard);
     expect(activations).toHaveLength(dashboard.activations.length);
     // the explainers read tokens and values; the route ranks by maxValue
@@ -86,6 +89,7 @@ describe('getActivationsForFeature', () => {
 
   it('reads Activation rows when the source set has no dashboard files', async () => {
     sourceSetFindUnique.mockResolvedValue({ externalDashboardsUrl: null });
+    neuronFindUnique.mockResolvedValue({ hasVector: false, creatorId: 'owner' });
     activationFindMany.mockResolvedValue([{ id: 'a' }]);
 
     const { activations, dashboard: loaded } = await getActivationsForFeature({ ...ids, layer: '6-res-jb' });
@@ -94,6 +98,43 @@ describe('getActivationsForFeature', () => {
     expect(fetchNeuronDashboard).not.toHaveBeenCalled();
     expect(loaded).toBeNull();
     expect(activations).toEqual([{ id: 'a' }]);
+  });
+
+  it('reads only the public creators rows, not those search-all saved for other users', async () => {
+    sourceSetFindUnique.mockResolvedValue({ externalDashboardsUrl: null });
+    neuronFindUnique.mockResolvedValue({ hasVector: false, creatorId: 'owner' });
+    activationFindMany.mockResolvedValue([]);
+
+    await getActivationsForFeature({ ...ids, layer: '6-res-jb' });
+
+    expect(activationFindMany.mock.calls[0][0].where).toEqual({
+      modelId: 'qwen3-32b',
+      layer: '6-res-jb',
+      index: '12345',
+      creatorId: { in: PUBLIC_ACTIVATIONS_USER_IDS },
+    });
+  });
+
+  it('also reads the rows of the creator of a vector', async () => {
+    sourceSetFindUnique.mockResolvedValue({ externalDashboardsUrl: null });
+    neuronFindUnique.mockResolvedValue({ hasVector: true, creatorId: 'owner' });
+    activationFindMany.mockResolvedValue([]);
+
+    await getActivationsForFeature({ ...ids, layer: '6-res-jb' });
+
+    expect(activationFindMany.mock.calls[0][0].where.creatorId).toEqual({
+      in: ['owner', ...PUBLIC_ACTIVATIONS_USER_IDS],
+    });
+  });
+});
+
+describe('activationCreatorIds', () => {
+  it('is the public set when there is no Neuron row', () => {
+    expect(activationCreatorIds(null)).toEqual(PUBLIC_ACTIVATIONS_USER_IDS);
+  });
+
+  it('adds no creator for a vector without one', () => {
+    expect(activationCreatorIds({ hasVector: true, creatorId: null })).toEqual(PUBLIC_ACTIVATIONS_USER_IDS);
   });
 });
 
