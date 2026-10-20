@@ -117,6 +117,12 @@ def parse_args():
         help="Maximum number of tokens for the lens endpoints only (logit/jacobian lens). Independent of --token_limit.",
     )
     parser.add_argument(
+        "--neuron_act_range_path",
+        type=str,
+        default=None,
+        help="Per-neuron corpus max/min table (.safetensors) for search-all with normalizeByMax.",
+    )
+    parser.add_argument(
         "--device",
         help="Device to run the model on",
     )
@@ -318,6 +324,8 @@ def main():
         os.environ["TOKEN_LIMIT"] = str(args.token_limit)
     if "LENS_TOKEN_LIMIT" not in os.environ:
         os.environ["LENS_TOKEN_LIMIT"] = str(args.lens_token_limit)
+    if "NEURON_ACT_RANGE_PATH" not in os.environ and args.neuron_act_range_path:
+        os.environ["NEURON_ACT_RANGE_PATH"] = args.neuron_act_range_path
     if "DEVICE" not in os.environ and args.device is not None:
         os.environ["DEVICE"] = args.device
     if "INCLUDE_SAE" not in os.environ:

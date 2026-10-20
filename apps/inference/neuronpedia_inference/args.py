@@ -32,6 +32,8 @@ def parse_env_and_args():
     # 1024 and is independent of TOKEN_LIMIT so JLens conversations can be longer
     # (or shorter) than the limit used by the other endpoints.
     args.lens_token_limit = int(os.getenv("LENS_TOKEN_LIMIT", "1024"))
+    # Per-neuron corpus max/min table (.safetensors) for search-all normalizeByMax. Optional.
+    args.neuron_act_range_path = os.getenv("NEURON_ACT_RANGE_PATH") or None
     # Left as None when DEVICE is unset so interp_engine.select_backend() can
     # auto-pick (cuda -> vLLM/eager; else mps for fp16/fp32-native; else cpu).
     # Set DEVICE explicitly to override the auto-selection.

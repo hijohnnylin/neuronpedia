@@ -139,6 +139,9 @@ class Config:
     # the startup banner. A string rather than the addresses because this banner prints before the
     # SAEs load, so `sae` has no address list yet; the resolved set is in the ready banner.
     static_points_summary: str | None = None
+    # Per-neuron corpus max and min, for search-all with `normalizeByMax`.
+    # None: that option returns 400. See inference_utils/neuron_act_range.py.
+    neuron_act_range_path: str | None = None
 
     # Accepted as constructor arguments but stored under the derived names below.
     include_sae: InitVar[list[str] | None] = None
@@ -181,6 +184,7 @@ class Config:
         "backend",
         "num_gpus",
         "static_points_summary",
+        "neuron_act_range_path",
     )
 
     def __post_init__(

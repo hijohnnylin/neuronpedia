@@ -15,6 +15,11 @@ from neuronpedia_inference.engine_adapter import (
     capture_dfa_inputs,
     dfa_from_v_and_probs,
 )
+from neuronpedia_inference.inference_utils.neuron_act_range import (
+    NO_TABLE_MESSAGE,
+    NeuronActRangeError,
+    neuron_max_scale,
+)
 from neuronpedia_inference.memory_cost import activation_all_cost
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.schemas import (
@@ -34,14 +39,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Result rows are [layer_num, feature_index, max_value, max_value_index, sum_values,
-# *activations], so the activation vector starts at column 5 and the two possible sort
-# keys sit at columns 2 and 4.
-_ROW_HEADER_WIDTH = 5
-_SORT_KEY_COL_MAX_VALUE = 2
-_SORT_KEY_COL_SUM_VALUES = 4
+# Result rows are [layer_num, feature_index, max_value, max_value_index, sum_values, sort_key,
+# *activations]. sort_key is max_value or sum_values, divided by the neuron's corpus max when
+# normalize_by_max is set, so the raw values stay as they are.
+_ROW_HEADER_WIDTH = 6
+_SORT_KEY_COL = 5
 
-# Ceiling on `num_results`. The running top-K buffer is [num_results, n_tokens + 5] and the
+# Ceiling on `num_results`. The running top-K buffer is [num_results, n_tokens + 6] and the
 # response carries every one of those rows as JSON floats, so an unbounded value is both a
 # memory and a payload problem. The webapp asks for 50 and caps itself at 100.
 MAX_NUM_RESULTS = 1000
@@ -55,6 +59,21 @@ class ActivationTopKRequest(Protocol):
     selected_sources: list[str]
     ignore_bos: bool
     sort_by_token_indexes: list[int]
+    normalize_by_max: bool
+
+
+def normalize_by_max_error(request: ActivationTopKRequest) -> JSONResponse | None:
+    """A 400 when `normalize_by_max` cannot be served for this request, else None."""
+    if not request.normalize_by_max:
+        return None
+    if request.source_set != SAEManager.NEURONS_SOURCESET:
+        return JSONResponse(
+            content={"error": f"normalizeByMax is only for the {SAEManager.NEURONS_SOURCESET} source set"},
+            status_code=400,
+        )
+    if not Config.get_instance().neuron_act_range_path:
+        return JSONResponse(content={"error": NO_TABLE_MESSAGE}, status_code=400)
+    return None
 
 
 @router.post("/activation/all", responses={200: {"model": ActivationAllResponse}})
@@ -72,6 +91,8 @@ async def activation_all(
             sae_manager.get_valid_sae_sets(),
         )
         return JSONResponse(content={"error": "Invalid source set"}, status_code=400)
+    if (error := normalize_by_max_error(request)) is not None:
+        return error
 
     if len(request.selected_sources) == 0:
         request.selected_sources = sae_manager.sae_set_to_saes[request.source_set]
@@ -103,7 +124,7 @@ async def activation_all(
         logger.info("Activations result processed successfully")
 
         return result
-    except BackendUnsupported as e:
+    except (BackendUnsupported, NeuronActRangeError) as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
     except Exception as e:
         # An allocation OOM here is retryable and does not poison the CUDA context, so it
@@ -202,7 +223,7 @@ class ActivationProcessor:
         """Reduce the selected sources to the global top-K, one source at a time.
 
         Peak GPU memory is ONE source's ``[d_sae, n_tokens]`` encode plus the
-        ``[num_results, n_tokens + 5]`` result buffer, so it does not grow with the number
+        ``[num_results, n_tokens + 6]`` result buffer, so it does not grow with the number
         of selected sources. That matters because an empty ``selected_sources`` expands to
         the whole set (the all-layers default in the UI): holding every source at once and
         then sorting a copy of the concatenation cost ~9.4 GiB for 26 gemmascope-res-65k
@@ -277,6 +298,12 @@ class ActivationProcessor:
             sum_values = torch.zeros_like(max_values)
             sort_key = max_values
 
+        if request.normalize_by_max:
+            scale = neuron_max_scale(
+                Config.get_instance().neuron_act_range_path, layer_num, int(activations_by_index.shape[0])
+            )
+            sort_key = sort_key.to(torch.float32) / scale.to(sort_key.device)
+
         keep = min(num_results, int(sort_key.shape[0]))
         # Stable, so equal keys keep feature-index order. Ties are the common case rather
         # than a curiosity: on a short prompt most features never fire, so the tail of the
@@ -291,6 +318,7 @@ class ActivationProcessor:
                 max_values[order].unsqueeze(1).to(torch.float32).to(device),
                 max_indices[order].unsqueeze(1).to(torch.float32).to(device),
                 sum_values[order].unsqueeze(1).to(torch.float32).to(device),
+                sort_key[order].unsqueeze(1).to(torch.float32).to(device),
                 activations_by_index[order].to(torch.float32).to(device),
             ),
             dim=1,
@@ -311,9 +339,8 @@ class ActivationProcessor:
         """
         if top_rows is None:
             return candidates
-        key_col = _SORT_KEY_COL_SUM_VALUES if request.sort_by_token_indexes else _SORT_KEY_COL_MAX_VALUE
         merged = torch.cat((top_rows, candidates), dim=0)
-        _, order = torch.sort(merged[:, key_col], descending=True, stable=True)
+        _, order = torch.sort(merged[:, _SORT_KEY_COL], descending=True, stable=True)
         return merged[order[:num_results]]
 
     def _get_activations_by_index(

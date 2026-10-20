@@ -8,10 +8,12 @@ from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.activation.all import (
     ActivationProcessor as SinglePromptActivationProcessor,
 )
+from neuronpedia_inference.endpoints.activation.all import normalize_by_max_error
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     capture_padded_cache_async,
 )
+from neuronpedia_inference.inference_utils.neuron_act_range import NeuronActRangeError
 from neuronpedia_inference.memory_cost import activation_all_batch_cost
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.schemas import (
@@ -65,6 +67,8 @@ async def activation_all_batch(
             sae_manager.get_valid_sae_sets(),
         )
         return JSONResponse(content={"error": "Invalid source set"}, status_code=400)
+    if (error := normalize_by_max_error(request)) is not None:
+        return error
 
     if len(request.selected_sources) == 0:
         request.selected_sources = sae_manager.sae_set_to_saes[request.source_set]
@@ -116,7 +120,7 @@ async def activation_all_batch(
         ]
 
         return ActivationAllBatchResponse(results=response_results)
-    except BackendUnsupported as e:
+    except (BackendUnsupported, NeuronActRangeError) as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
     except Exception as e:
         # An allocation OOM here is retryable and does not poison the CUDA context, so it

@@ -988,6 +988,7 @@ async def initialize(
             token_limit=args.token_limit,
             lens_token_limit=args.lens_token_limit,
             device=args.device,
+            neuron_act_range_path=args.neuron_act_range_path,
             override_model_id=args.override_model_id,
             include_sae=args.include_sae,
             exclude_sae=args.exclude_sae,

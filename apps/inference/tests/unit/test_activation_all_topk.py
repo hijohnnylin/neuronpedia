@@ -62,11 +62,17 @@ def _request(
     request.num_results = num_results
     request.sort_by_token_indexes = sort_by_token_indexes or []
     request.ignore_bos = ignore_bos
+    request.normalize_by_max = False
     return request
 
 
-def _reference_global_sort(blocks: list[torch.Tensor], request: MagicMock) -> list[list[float]]:
-    """The original: every source's rows concatenated, sorted once, then truncated."""
+def _reference_global_sort(
+    blocks: list[torch.Tensor], request: MagicMock, scales: torch.Tensor | None = None
+) -> list[list[float]]:
+    """The original: every source's rows concatenated, sorted once, then truncated.
+
+    `scales` [n_sources, n_features] divides the sort key per row, as normalize_by_max does.
+    """
     rows = []
     for layer_num, block in enumerate(blocks):
         activations = block.clone()
@@ -77,6 +83,9 @@ def _reference_global_sort(blocks: list[torch.Tensor], request: MagicMock) -> li
             sum_values = activations[:, request.sort_by_token_indexes].sum(dim=1)
         else:
             sum_values = torch.zeros_like(max_values)
+        key = sum_values if request.sort_by_token_indexes else max_values
+        if scales is not None:
+            key = key / scales[layer_num]
         n_features = activations.shape[0]
         rows.append(
             torch.cat(
@@ -86,18 +95,23 @@ def _reference_global_sort(blocks: list[torch.Tensor], request: MagicMock) -> li
                     max_values.unsqueeze(1).to(torch.float32),
                     max_indices.unsqueeze(1).to(torch.float32),
                     sum_values.unsqueeze(1).to(torch.float32),
+                    key.unsqueeze(1).to(torch.float32),
                     activations.to(torch.float32),
                 ),
                 dim=1,
             )
         )
     all_rows = torch.cat(rows, dim=0)
-    key_col = 4 if request.sort_by_token_indexes else 2
-    _, order = torch.sort(all_rows[:, key_col], descending=True, stable=True)
+    _, order = torch.sort(all_rows[:, 5], descending=True, stable=True)
     return all_rows[order][: request.num_results].tolist()
 
 
-def _stream(blocks: list[torch.Tensor], request: MagicMock, bos_token: str | None = "<bos>") -> list[list[float]]:
+def _stream(
+    blocks: list[torch.Tensor],
+    request: MagicMock,
+    bos_token: str | None = "<bos>",
+    act_range_path: str | None = None,
+) -> list[list[float]]:
     """Run `_stream_top_activations` with the SAE/model/config singletons stubbed out."""
     sae_manager = MagicMock()
     sae_manager.sae_set_to_saes = {SOURCE_SET: list(SOURCES)}
@@ -110,6 +124,7 @@ def _stream(blocks: list[torch.Tensor], request: MagicMock, bos_token: str | Non
 
     config = MagicMock()
     config.device = "cpu"
+    config.neuron_act_range_path = act_range_path
 
     cache = {f"hook-{source}": block for source, block in zip(SOURCES, blocks, strict=True)}
 
@@ -197,6 +212,7 @@ def test_a_selected_source_beyond_the_set_listing_is_reduced():
     request.num_results = 5
     request.sort_by_token_indexes = [1, 2, 3]
     request.ignore_bos = True
+    request.normalize_by_max = False
 
     sae_manager = MagicMock()
     sae_manager.sae_set_to_saes = {SOURCE_SET: list(set_sources)}

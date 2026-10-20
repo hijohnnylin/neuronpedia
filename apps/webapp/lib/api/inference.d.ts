@@ -413,6 +413,12 @@ export interface components {
        */
       model: string;
       /**
+       * Normalizebymax
+       * @description Only for the `neurons` source set. Rank each neuron by its sort value divided by the largest activation it reached on a text corpus, so neurons with large raw scales do not crowd out the rest. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.
+       * @default false
+       */
+      normalizeByMax: boolean;
+      /**
        * Numresults
        * @description Optional. The number of top features to return.
        * @default 25
@@ -501,6 +507,12 @@ export interface components {
        * @description Name of the model to test activations on
        */
       model: string;
+      /**
+       * Normalizebymax
+       * @description Only for the `neurons` source set. Rank each neuron by its sort value divided by the largest activation it reached on a text corpus, so neurons with large raw scales do not crowd out the rest. Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw.
+       * @default false
+       */
+      normalizeByMax: boolean;
       /**
        * Numresults
        * @description Optional. The number of top features to return.
