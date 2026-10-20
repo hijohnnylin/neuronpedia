@@ -171,10 +171,15 @@ export default function ActivationSingleForm({
                   minRows={1}
                   maxRows={5}
                   onChange={(e) => {
-                    if (enterSubmits && e.target.value.indexOf('\n') !== -1) {
-                      testClicked(e.target.value);
-                    } else {
-                      setCustomText(e.target.value);
+                    setCustomText(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    // Enter runs the test, Shift+Enter adds a line
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      if (!isSubmitting) {
+                        testClicked(customText);
+                      }
                     }
                   }}
                   className="form-input mt-0 block w-full flex-1 resize-none rounded-l border-0 border-slate-300 px-2.5 py-2 font-mono text-[11px] leading-tight text-slate-700 placeholder-slate-400 focus:border-slate-300 focus:outline-0 focus:ring-0 sm:h-24 sm:px-3 sm:text-xs"

@@ -203,9 +203,12 @@ export default function HeadActivationsList({
               value={customText}
               onChange={(e) => setCustomText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                // Enter runs the test, Shift+Enter adds a line
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  runCustom();
+                  if (!isRunningCustom) {
+                    runCustom();
+                  }
                 }
               }}
               minRows={2}
