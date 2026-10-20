@@ -12,6 +12,7 @@ import {
   NEURON_DASHBOARD_BOTTOM_DATA_SOURCE,
   neuronByteRange,
   NeuronDashboardError,
+  neuronDashboardExtremes,
   NeuronDashboardRecord,
   npyDataOffset,
   recordToNeuronDashboard,
@@ -131,6 +132,19 @@ describe('recordToNeuronDashboard', () => {
     expect(applied.explanations).toEqual([{ id: 'e1' }]);
     expect(applied.activations).toBe(dashboard.activations);
     expect(applied.maxActApprox).toBe(record.stats.max);
+  });
+
+  it('picks the first top and first bottom example, not a band row', () => {
+    const { top, bottom } = neuronDashboardExtremes(dashboard, ids);
+    expect(top?.maxValue).toBe(record.top[0].act);
+    expect(bottom?.maxValue).toBe(record.bottom[0].act);
+    expect(bottom?.dataSource).toBe(NEURON_DASHBOARD_BOTTOM_DATA_SOURCE);
+    // A negative band row comes before the bottom list, so the first bottom-sourced row can be a band row.
+    expect(bottom?.id).toContain('-bottom-0');
+    expect(neuronDashboardExtremes({ ...dashboard, activations: [] }, ids)).toEqual({
+      top: undefined,
+      bottom: undefined,
+    });
   });
 
   it('gives a neuron with no row every list FeatureStats reads', () => {

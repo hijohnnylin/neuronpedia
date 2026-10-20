@@ -498,7 +498,7 @@ export default function InferenceSearcher({
                 const topExplanation = result.neuron?.explanations ? result.neuron?.explanations[0] : undefined;
                 return (
                   <ResultItem
-                    key={result.index}
+                    key={`${result.layer}:${result.index}`}
                     result={result}
                     tokens={tokens}
                     topExplanation={topExplanation}

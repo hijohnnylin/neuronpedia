@@ -153,6 +153,10 @@ function exampleToActivation(
   };
 }
 
+function activationIdPrefix(ids: { modelId: string; layer: string; index: string }) {
+  return `${ids.modelId}-${ids.layer}-${ids.index}`;
+}
+
 // Maps a record to the Neuron fields and Activation rows that FeatureStats and ActivationsList read.
 // dataSource puts a row in the positive or negative column. Bands carry binContains; the top and bottom
 // lists do not, so their headers read "Top" and "Bottom". Top rows keep binMin -1 for the one-column view.
@@ -164,7 +168,7 @@ export function recordToNeuronDashboard(
   if (record.v !== NEURON_DASHBOARD_FORMAT_VERSION) {
     throw new NeuronDashboardError(`unsupported dashboard format v${record.v}`);
   }
-  const prefix = `${ids.modelId}-${ids.layer}-${ids.index}`;
+  const prefix = activationIdPrefix(ids);
   const activations: ActivationPartialWithRelations[] = [];
   const docRefs: Record<string, NeuronDashboardDocRef> = {};
   const add = (
@@ -221,6 +225,16 @@ export function recordToNeuronDashboard(
     record,
     docRefs,
   };
+}
+
+// The strongest positive and the most negative example. Band rows of either sign come between them.
+export function neuronDashboardExtremes(
+  dashboard: NeuronDashboard,
+  ids: { modelId: string; layer: string; index: string },
+): { top: ActivationPartialWithRelations | undefined; bottom: ActivationPartialWithRelations | undefined } {
+  const prefix = activationIdPrefix(ids);
+  const find = (id: string) => dashboard.activations.find((activation) => activation.id === id);
+  return { top: find(`${prefix}-top-0`), bottom: find(`${prefix}-bottom-0`) };
 }
 
 // A neuron with no database row. The dashboard does not set every field, and FeatureStats reads them all.
