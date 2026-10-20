@@ -1,5 +1,6 @@
 import { toErrorResponse } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
+import { getEvalActivationsCreatorIds } from '@/lib/db/activation';
 import { getActivationsForFeature, markNearZeroAsNonActivating } from '@/lib/db/neuron-dashboard';
 import { getAutoInterpKeyToUse } from '@/lib/db/userSecret';
 import { generateScoreEleuther } from '@/lib/external/autointerp-scorer-eleuther';
@@ -215,6 +216,10 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       layer: explanation.layer,
       index: explanation.index,
     });
+    const evalCreatorIds = await getEvalActivationsCreatorIds(null);
+    loaded.activations = loaded.activations.filter(
+      (a: { creatorId: string | null }) => a.creatorId && evalCreatorIds.in.includes(a.creatorId),
+    );
     const isMin = explanation.typeName === EXPLANATIONTYPE_NP_MIN_ACT_LOGITS;
     const { activations, zeroActivations } = selectScoringActivations(
       loaded.dashboard ? markNearZeroAsNonActivating(loaded.activations, loaded.dashboard) : loaded.activations,

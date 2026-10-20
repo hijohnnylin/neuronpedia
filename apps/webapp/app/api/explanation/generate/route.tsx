@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db';
+import { getEvalActivationsCreatorIds } from '@/lib/db/activation';
 import { ensureNeuronRowForDashboard, getActivationsForFeature } from '@/lib/db/neuron-dashboard';
 import { getUserByName } from '@/lib/db/user';
 import { getAutoInterpKeyToUse } from '@/lib/db/userSecret';
@@ -160,6 +161,10 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
       }
 
       const loaded = await getActivationsForFeature(featureIds);
+      const _evalCids = await getEvalActivationsCreatorIds(null);
+      loaded.activations = loaded.activations.filter(
+        (a: { creatorId: string | null }) => a.creatorId && _evalCids.in.includes(a.creatorId),
+      );
       let { activations } = loaded;
 
       // remove duplicates in activations where the tokens.join("") is the same
@@ -208,6 +213,10 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
 
     if (explanationType.name === 'oai_attention-head') {
       const loaded = await getActivationsForFeature(featureIds);
+      const _evalCids = await getEvalActivationsCreatorIds(null);
+      loaded.activations = loaded.activations.filter(
+        (a: { creatorId: string | null }) => a.creatorId && _evalCids.in.includes(a.creatorId),
+      );
       let { activations } = loaded;
 
       // remove duplicates in activations where the tokens.join("") is the same
@@ -265,6 +274,10 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
     if (explanationType.name === 'np_max-act-logits' || explanationType.name === EXPLANATIONTYPE_NP_MIN_ACT_LOGITS) {
       const isMin = explanationType.name === EXPLANATIONTYPE_NP_MIN_ACT_LOGITS;
       const loaded = await getActivationsForFeature(featureIds);
+      const _evalCids = await getEvalActivationsCreatorIds(null);
+      loaded.activations = loaded.activations.filter(
+        (a: { creatorId: string | null }) => a.creatorId && _evalCids.in.includes(a.creatorId),
+      );
       let { activations } = loaded;
 
       // remove duplicates in activations where the tokens.join("") is the same
@@ -333,6 +346,10 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
 
     if (explanationType.name === 'np_max-act') {
       const loaded = await getActivationsForFeature(featureIds);
+      const _evalCids = await getEvalActivationsCreatorIds(null);
+      loaded.activations = loaded.activations.filter(
+        (a: { creatorId: string | null }) => a.creatorId && _evalCids.in.includes(a.creatorId),
+      );
       let { activations } = loaded;
 
       // remove duplicates in activations where the tokens.join("") is the same
@@ -393,6 +410,10 @@ export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
 
     if (explanationType.name === 'oai_token-act-pair') {
       const loaded = await getActivationsForFeature(featureIds);
+      const _evalCids = await getEvalActivationsCreatorIds(null);
+      loaded.activations = loaded.activations.filter(
+        (a: { creatorId: string | null }) => a.creatorId && _evalCids.in.includes(a.creatorId),
+      );
       let { activations } = loaded;
 
       // remove duplicates in activations where the tokens.join("") is the same

@@ -1,4 +1,5 @@
 import { badRequest, toErrorResponse } from '@/lib/api-error';
+import { getEvalActivationsCreatorIds } from '@/lib/db/activation';
 import { getActivationsForFeature, markNearZeroAsNonActivating } from '@/lib/db/neuron-dashboard';
 import { checkInterpretability } from '@/lib/external/interpretability-jev';
 import { NextRequest, NextResponse } from 'next/server';
@@ -41,6 +42,10 @@ export async function POST(request: NextRequest) {
     const body = await bodySchema.validate(await request.json());
 
     const loaded = await getActivationsForFeature({ modelId: body.modelId, layer: body.layer, index: body.index });
+    const evalCreatorIds = await getEvalActivationsCreatorIds(null);
+    loaded.activations = loaded.activations.filter(
+      (a: { creatorId: string | null }) => a.creatorId && evalCreatorIds.in.includes(a.creatorId),
+    );
     let activations = loaded.dashboard
       ? markNearZeroAsNonActivating(loaded.activations, loaded.dashboard)
       : loaded.activations;

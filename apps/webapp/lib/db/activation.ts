@@ -79,3 +79,17 @@ export const createInferenceActivationsAndReturn = async (
     skipDuplicates: true,
   });
 };
+
+/**
+ * Creator IDs whose activation rows should compose eval sets (score/generate/interpretable).
+ * Mirrors the display filter in lib/db/neuron.ts: public activation creators plus the
+ * feature's own creator. Rows persisted by other accounts (e.g. the anonymous inference
+ * user via /api/search-all) must not compose eval sets behind a different filter
+ * than the one the feature page shows.
+ */
+export async function getEvalActivationsCreatorIds(neuronCreatorId: string | null): Promise<{ in: string[] }> {
+  const { PUBLIC_ACTIVATIONS_USER_IDS } = await import('@/lib/db/neuron');
+  const ids = [...PUBLIC_ACTIVATIONS_USER_IDS];
+  if (neuronCreatorId && !ids.includes(neuronCreatorId)) ids.push(neuronCreatorId);
+  return { in: ids };
+}
