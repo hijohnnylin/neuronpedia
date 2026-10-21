@@ -1,10 +1,13 @@
-import Plotly from 'plotly.js-dist-min';
 // import { Data } from "plotly.js";
 import { UMAP_HEIGHT, UMAP_INITIAL_COLORS, useUmapContext } from '@/components/provider/umap-provider';
+import dynamic from 'next/dynamic';
 import createPlotlyComponent from 'react-plotly.js/factory';
 import { getLogSparsityColorFromValue } from './umap-plot-active';
 
-const Plot = createPlotlyComponent(Plotly);
+const Plot = dynamic(
+  () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
+  { ssr: false },
+);
 
 // export const SEARCH_MATCHED_COLOR = colors.amber[400];
 const SEARCH_MATCHED_SIZE = 3.5;
