@@ -1,38 +1,14 @@
 import Plotly from 'plotly.js-dist-min';
 // import { Data } from "plotly.js";
-import {
-  SPARSITY_COLOR_MAX,
-  SPARSITY_COLOR_MIN,
-  SPARSITY_COLORS,
-  UMAP_HEIGHT,
-  UMAP_INITIAL_COLORS,
-  useUmapContext,
-} from '@/components/provider/umap-provider';
+import { UMAP_HEIGHT, UMAP_INITIAL_COLORS, useUmapContext } from '@/components/provider/umap-provider';
 import { NeuronIdentifier } from '@/lib/utils/neuron-identifier';
 import createPlotlyComponent from 'react-plotly.js/factory';
+import { getLogSparsityColorFromValue, SEARCH_NOT_MATCHED_COLOR } from './umap-constants';
 
 const Plot = createPlotlyComponent(Plotly);
 
-export const SEARCH_NOT_MATCHED_COLOR = '#e3e3e3';
 const SEARCH_NOT_MATCHED_SIZE = 3.5;
 const INITIAL_SIZE = 3.5;
-
-export function getLogSparsityColorFromValue(value: number): string {
-  // Define the value range
-  const minValue = SPARSITY_COLOR_MIN;
-  const maxValue = SPARSITY_COLOR_MAX;
-
-  // Normalize the value to a 0-1 scale based on the value range
-  let normalizedValue = (value - minValue) / (maxValue - minValue);
-
-  // Ensure the normalized value is clamped between 0 and 1
-  normalizedValue = Math.min(Math.max(normalizedValue, 0), 1);
-
-  // Scale the normalized value to the range of indices
-  const index = Math.round(normalizedValue * (SPARSITY_COLORS.length - 1));
-
-  return SPARSITY_COLORS[index];
-}
 
 export default function UmapPlotActive({ modelId, showLists }: { modelId: string; showLists: boolean }) {
   const {
