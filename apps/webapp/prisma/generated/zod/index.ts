@@ -11,37 +11,43 @@ import { Prisma } from '@prisma/client';
 export type NullableJsonInput = Prisma.JsonValue | null | 'JsonNull' | 'DbNull' | Prisma.NullTypes.DbNull | Prisma.NullTypes.JsonNull;
 
 export const transformJsonNull = (v?: NullableJsonInput) => {
-  if (!v || v === 'DbNull') return Prisma.DbNull;
-  if (v === 'JsonNull') return Prisma.JsonNull;
+  if (!v || v === 'DbNull') return Prisma.NullTypes.DbNull;
+  if (v === 'JsonNull') return Prisma.NullTypes.JsonNull;
   return v;
 };
 
-export const JsonValue: z.ZodType<Prisma.JsonValue> = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.lazy(() => z.array(JsonValue)),
-  z.lazy(() => z.record(JsonValue)),
-]);
+export const JsonValueSchema: z.ZodType<Prisma.JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.literal(null),
+    z.record(z.string(), z.lazy(() => JsonValueSchema.optional())),
+    z.array(z.lazy(() => JsonValueSchema)),
+  ])
+);
 
-export type JsonValueType = z.infer<typeof JsonValue>;
+export type JsonValueType = z.infer<typeof JsonValueSchema>;
 
 export const NullableJsonValue = z
-  .union([JsonValue, z.literal('DbNull'), z.literal('JsonNull')])
+  .union([JsonValueSchema, z.literal('DbNull'), z.literal('JsonNull')])
   .nullable()
   .transform((v) => transformJsonNull(v));
 
 export type NullableJsonValueType = z.infer<typeof NullableJsonValue>;
 
-export const InputJsonValue: z.ZodType<Prisma.InputJsonValue> = z.union([
-  z.string(),
-  z.number(),
-  z.boolean(),
-  z.lazy(() => z.array(InputJsonValue.nullable())),
-  z.lazy(() => z.record(InputJsonValue.nullable())),
-]);
+export const InputJsonValueSchema: z.ZodType<Prisma.InputJsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.object({ toJSON: z.any() }),
+    z.record(z.string(), z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)]))),
+    z.array(z.lazy(() => z.union([InputJsonValueSchema, z.literal(null)]))),
+  ])
+);
 
-export type InputJsonValueType = z.infer<typeof InputJsonValue>;
+export type InputJsonValueType = z.infer<typeof InputJsonValueSchema>;
 
 
 /////////////////////////////////////////
@@ -172,15 +178,15 @@ export const VectorScalarFieldEnumSchema = z.enum(['id','modelId','name','author
 
 export const SortOrderSchema = z.enum(['asc','desc']);
 
-export const JsonNullValueInputSchema = z.enum(['JsonNull',]);
+export const JsonNullValueInputSchema: z.ZodType<Prisma.JsonNullValueInput> = z.enum(['JsonNull',]).transform((value) => (value === 'JsonNull' ? Prisma.JsonNull : value));
 
-export const NullableJsonNullValueInputSchema = z.enum(['DbNull','JsonNull',]).transform((v) => transformJsonNull(v));
+export const NullableJsonNullValueInputSchema: z.ZodType<Prisma.NullableJsonNullValueInput> = z.enum(['DbNull','JsonNull',]).transform((value) => value === 'JsonNull' ? Prisma.JsonNull : value === 'DbNull' ? Prisma.DbNull : value);
 
 export const QueryModeSchema = z.enum(['default','insensitive']);
 
 export const NullsOrderSchema = z.enum(['first','last']);
 
-export const JsonNullValueFilterSchema = z.enum(['DbNull','JsonNull','AnyNull',]);
+export const JsonNullValueFilterSchema: z.ZodType<Prisma.JsonNullValueFilter> = z.enum(['DbNull','JsonNull','AnyNull',]).transform((value) => value === 'JsonNull' ? Prisma.JsonNull : value === 'DbNull' ? Prisma.DbNull : value === 'AnyNull' ? Prisma.AnyNull : value);
 
 export const UserSecretTypeSchema = z.enum(['NEURONPEDIA','OPENAI','GOOGLE','ANTHROPIC','OPENROUTER']);
 
@@ -239,7 +245,7 @@ export type ProbeLogActionType = `${z.infer<typeof ProbeLogActionSchema>}`
 /////////////////////////////////////////
 
 export const AccountSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   userId: z.string(),
   type: z.string(),
   provider: z.string(),
@@ -300,7 +306,7 @@ export const AccountWithPartialRelationsSchema: z.ZodType<AccountWithPartialRela
 /////////////////////////////////////////
 
 export const SessionSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   sessionToken: z.string(),
   userId: z.string(),
   expires: z.coerce.date(),
@@ -354,7 +360,7 @@ export const SessionWithPartialRelationsSchema: z.ZodType<SessionWithPartialRela
 
 export const UserSecretSchema = z.object({
   type: UserSecretTypeSchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   username: z.string(),
   value: z.string(),
   createdAt: z.coerce.date(),
@@ -408,7 +414,7 @@ export const UserSecretWithPartialRelationsSchema: z.ZodType<UserSecretWithParti
 /////////////////////////////////////////
 
 export const UserSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   name: z.string().regex(new RegExp(/^[a-zA-Z0-9-.]+$/), "Name should contain only numbers, letters, dashes, and periods.",).min(1).max(39).transform((val) => val.toLowerCase()),
   bio: z.string().nullable(),
   email: z.string().nullable(),
@@ -421,7 +427,7 @@ export const UserSchema = z.object({
   isProblemEditor: z.boolean(),
   emailNewsletterNotification: z.boolean(),
   emailUnsubscribeAll: z.boolean(),
-  emailUnsubscribeCode: z.string().cuid(),
+  emailUnsubscribeCode: z.cuid(),
   createdAt: z.coerce.date(),
 })
 
@@ -657,12 +663,12 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
 /////////////////////////////////////////
 
 export const GraphMetadataSubgraphSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   displayName: z.string().nullable(),
   graphMetadataId: z.string(),
   pinnedIds: z.string().array(),
-  supernodes: InputJsonValue,
-  clerps: InputJsonValue,
+  supernodes: JsonValueSchema,
+  clerps: JsonValueSchema,
   pruningThreshold: z.number().nullable(),
   densityThreshold: z.number().nullable(),
   userId: z.string(),
@@ -723,7 +729,7 @@ export const GraphMetadataSubgraphWithPartialRelationsSchema: z.ZodType<GraphMet
 /////////////////////////////////////////
 
 export const GraphMetadataSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   sourceSetName: z.string().nullable(),
   slug: z.string(),
@@ -799,7 +805,7 @@ export const GraphMetadataWithPartialRelationsSchema: z.ZodType<GraphMetadataWit
 /////////////////////////////////////////
 
 export const GraphMetadataDataPutRequestSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   ipAddress: z.string(),
   filename: z.string(),
   url: z.string(),
@@ -854,12 +860,12 @@ export const GraphMetadataDataPutRequestWithPartialRelationsSchema: z.ZodType<Gr
 /////////////////////////////////////////
 
 export const JlensShareSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   kind: z.string(),
   modelId: z.string(),
   url: z.string(),
   description: z.string().nullable(),
-  lockedTokens: InputJsonValue,
+  lockedTokens: JsonValueSchema,
   selectedPositions: z.number().int().array(),
   lensColumns: z.string().array(),
   activeLensModeTab: z.string(),
@@ -933,7 +939,7 @@ export const JlensShareWithPartialRelationsSchema: z.ZodType<JlensShareWithParti
 /////////////////////////////////////////
 
 export const JlensSharePutRequestSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   ipAddress: z.string(),
   filename: z.string(),
   url: z.string(),
@@ -988,7 +994,7 @@ export const JlensSharePutRequestWithPartialRelationsSchema: z.ZodType<JlensShar
 /////////////////////////////////////////
 
 export const ListCommentSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   listId: z.string(),
   text: z.string(),
   userId: z.string(),
@@ -1047,7 +1053,7 @@ export const ListCommentWithPartialRelationsSchema: z.ZodType<ListCommentWithPar
 /////////////////////////////////////////
 
 export const ListSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   name: z.string(),
   description: z.string(),
   defaultTestText: z.string().nullable(),
@@ -1260,7 +1266,7 @@ export type VerificationTokenPartial = z.infer<typeof VerificationTokenPartialSc
 /////////////////////////////////////////
 
 export const SignInEmailLogSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   to: z.string(),
   toKey: z.string(),
   sentAt: z.coerce.date(),
@@ -1301,7 +1307,7 @@ export const ModelSchema = z.object({
   createdAt: z.coerce.date(),
   owner: z.string().trim().min(1),
   updatedAt: z.coerce.date(),
-  website: z.string().url().nullable(),
+  website: z.url().nullable(),
 })
 
 export type Model = z.infer<typeof ModelSchema>
@@ -1446,7 +1452,7 @@ export const ModelWithPartialRelationsSchema: z.ZodType<ModelWithPartialRelation
 /////////////////////////////////////////
 
 export const ModelHeadMetricsSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   layer: z.number().int(),
   headIndex: z.number().int(),
@@ -1462,11 +1468,11 @@ export const ModelHeadMetricsSchema = z.object({
   qkDistance: z.number().nullable(),
   qkDistanceVariance: z.number().nullable(),
   inductionScore: z.number().nullable(),
-  qkDistanceHistogram: NullableJsonValue.optional(),
-  topQueryTokens: NullableJsonValue.optional(),
-  topKeyTokens: NullableJsonValue.optional(),
-  activationHistogram: NullableJsonValue.optional(),
-  headStatistics: NullableJsonValue.optional(),
+  qkDistanceHistogram: JsonValueSchema.nullable(),
+  topQueryTokens: JsonValueSchema.nullable(),
+  topKeyTokens: JsonValueSchema.nullable(),
+  activationHistogram: JsonValueSchema.nullable(),
+  headStatistics: JsonValueSchema.nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })
@@ -1489,11 +1495,11 @@ export type ModelHeadMetricsRelations = {
 };
 
 export type ModelHeadMetricsWithRelations = Omit<z.infer<typeof ModelHeadMetricsSchema>, "qkDistanceHistogram" | "topQueryTokens" | "topKeyTokens" | "activationHistogram" | "headStatistics"> & {
-  qkDistanceHistogram?: NullableJsonInput;
-  topQueryTokens?: NullableJsonInput;
-  topKeyTokens?: NullableJsonInput;
-  activationHistogram?: NullableJsonInput;
-  headStatistics?: NullableJsonInput;
+  qkDistanceHistogram?: JsonValueType | null;
+  topQueryTokens?: JsonValueType | null;
+  topKeyTokens?: JsonValueType | null;
+  activationHistogram?: JsonValueType | null;
+  headStatistics?: JsonValueType | null;
 } & ModelHeadMetricsRelations
 
 export const ModelHeadMetricsWithRelationsSchema: z.ZodType<ModelHeadMetricsWithRelations> = ModelHeadMetricsSchema.merge(z.object({
@@ -1508,11 +1514,11 @@ export type ModelHeadMetricsPartialRelations = {
 };
 
 export type ModelHeadMetricsPartialWithRelations = Omit<z.infer<typeof ModelHeadMetricsPartialSchema>, "qkDistanceHistogram" | "topQueryTokens" | "topKeyTokens" | "activationHistogram" | "headStatistics"> & {
-  qkDistanceHistogram?: NullableJsonInput;
-  topQueryTokens?: NullableJsonInput;
-  topKeyTokens?: NullableJsonInput;
-  activationHistogram?: NullableJsonInput;
-  headStatistics?: NullableJsonInput;
+  qkDistanceHistogram?: JsonValueType | null;
+  topQueryTokens?: JsonValueType | null;
+  topKeyTokens?: JsonValueType | null;
+  activationHistogram?: JsonValueType | null;
+  headStatistics?: JsonValueType | null;
 } & ModelHeadMetricsPartialRelations
 
 export const ModelHeadMetricsPartialWithRelationsSchema: z.ZodType<ModelHeadMetricsPartialWithRelations> = ModelHeadMetricsPartialSchema.merge(z.object({
@@ -1520,11 +1526,11 @@ export const ModelHeadMetricsPartialWithRelationsSchema: z.ZodType<ModelHeadMetr
 })).partial()
 
 export type ModelHeadMetricsWithPartialRelations = Omit<z.infer<typeof ModelHeadMetricsSchema>, "qkDistanceHistogram" | "topQueryTokens" | "topKeyTokens" | "activationHistogram" | "headStatistics"> & {
-  qkDistanceHistogram?: NullableJsonInput;
-  topQueryTokens?: NullableJsonInput;
-  topKeyTokens?: NullableJsonInput;
-  activationHistogram?: NullableJsonInput;
-  headStatistics?: NullableJsonInput;
+  qkDistanceHistogram?: JsonValueType | null;
+  topQueryTokens?: JsonValueType | null;
+  topKeyTokens?: JsonValueType | null;
+  activationHistogram?: JsonValueType | null;
+  headStatistics?: JsonValueType | null;
 } & ModelHeadMetricsPartialRelations
 
 export const ModelHeadMetricsWithPartialRelationsSchema: z.ZodType<ModelHeadMetricsWithPartialRelations> = ModelHeadMetricsSchema.merge(z.object({
@@ -1536,7 +1542,7 @@ export const ModelHeadMetricsWithPartialRelationsSchema: z.ZodType<ModelHeadMetr
 /////////////////////////////////////////
 
 export const ModelHeadSequenceSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   layer: z.number().int(),
   headIndex: z.number().int(),
@@ -1602,7 +1608,7 @@ export const ModelHeadSequenceWithPartialRelationsSchema: z.ZodType<ModelHeadSeq
 
 export const ComputeHostSchema = z.object({
   service: ComputeServiceSchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   name: z.string(),
   hostUrl: z.string(),
   provider: z.string().nullable(),
@@ -1794,7 +1800,7 @@ export const SourceSchema = z.object({
   modelId: z.string(),
   hasDashboards: z.boolean(),
   inferenceEnabled: z.boolean(),
-  saelensConfig: NullableJsonValue.optional(),
+  saelensConfig: JsonValueSchema.nullable(),
   saelensRelease: z.string().nullable(),
   saelensSaeId: z.string().nullable(),
   hfRepoId: z.string().nullable(),
@@ -1839,7 +1845,7 @@ export type SourceRelations = {
 };
 
 export type SourceWithRelations = Omit<z.infer<typeof SourceSchema>, "saelensConfig"> & {
-  saelensConfig?: NullableJsonInput;
+  saelensConfig?: JsonValueType | null;
 } & SourceRelations
 
 export const SourceWithRelationsSchema: z.ZodType<SourceWithRelations> = SourceSchema.merge(z.object({
@@ -1868,7 +1874,7 @@ export type SourcePartialRelations = {
 };
 
 export type SourcePartialWithRelations = Omit<z.infer<typeof SourcePartialSchema>, "saelensConfig"> & {
-  saelensConfig?: NullableJsonInput;
+  saelensConfig?: JsonValueType | null;
 } & SourcePartialRelations
 
 export const SourcePartialWithRelationsSchema: z.ZodType<SourcePartialWithRelations> = SourcePartialSchema.merge(z.object({
@@ -1883,7 +1889,7 @@ export const SourcePartialWithRelationsSchema: z.ZodType<SourcePartialWithRelati
 })).partial()
 
 export type SourceWithPartialRelations = Omit<z.infer<typeof SourceSchema>, "saelensConfig"> & {
-  saelensConfig?: NullableJsonInput;
+  saelensConfig?: JsonValueType | null;
 } & SourcePartialRelations
 
 export const SourceWithPartialRelationsSchema: z.ZodType<SourceWithPartialRelations> = SourceSchema.merge(z.object({
@@ -2085,12 +2091,12 @@ export const SourceReleaseWithPartialRelationsSchema: z.ZodType<SourceReleaseWit
 /////////////////////////////////////////
 
 export const EvalSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   typeName: z.string(),
   modelId: z.string(),
   sourceId: z.string(),
-  output: InputJsonValue,
-  detailedMetrics: NullableJsonValue.optional(),
+  output: JsonValueSchema,
+  detailedMetrics: JsonValueSchema.nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })
@@ -2115,7 +2121,7 @@ export type EvalRelations = {
 };
 
 export type EvalWithRelations = Omit<z.infer<typeof EvalSchema>, "detailedMetrics"> & {
-  detailedMetrics?: NullableJsonInput;
+  detailedMetrics?: JsonValueType | null;
 } & EvalRelations
 
 export const EvalWithRelationsSchema: z.ZodType<EvalWithRelations> = EvalSchema.merge(z.object({
@@ -2134,7 +2140,7 @@ export type EvalPartialRelations = {
 };
 
 export type EvalPartialWithRelations = Omit<z.infer<typeof EvalPartialSchema>, "detailedMetrics"> & {
-  detailedMetrics?: NullableJsonInput;
+  detailedMetrics?: JsonValueType | null;
 } & EvalPartialRelations
 
 export const EvalPartialWithRelationsSchema: z.ZodType<EvalPartialWithRelations> = EvalPartialSchema.merge(z.object({
@@ -2144,7 +2150,7 @@ export const EvalPartialWithRelationsSchema: z.ZodType<EvalPartialWithRelations>
 })).partial()
 
 export type EvalWithPartialRelations = Omit<z.infer<typeof EvalSchema>, "detailedMetrics"> & {
-  detailedMetrics?: NullableJsonInput;
+  detailedMetrics?: JsonValueType | null;
 } & EvalPartialRelations
 
 export const EvalWithPartialRelationsSchema: z.ZodType<EvalWithPartialRelations> = EvalSchema.merge(z.object({
@@ -2162,7 +2168,7 @@ export const EvalTypeSchema = z.object({
   displayName: z.string(),
   description: z.string(),
   longerDescription: z.string(),
-  outputSchema: InputJsonValue,
+  outputSchema: JsonValueSchema,
   featured: z.boolean(),
   url: z.string().nullable(),
   createdAt: z.coerce.date(),
@@ -2347,7 +2353,7 @@ export const NeuronWithPartialRelationsSchema: z.ZodType<NeuronWithPartialRelati
 /////////////////////////////////////////
 
 export const ExplanationSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   layer: z.string(),
   index: z.string(),
@@ -2454,7 +2460,7 @@ export const ExplanationWithPartialRelationsSchema: z.ZodType<ExplanationWithPar
 /////////////////////////////////////////
 
 export const ExplanationModelSettingsSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   temperature: z.number().nullable(),
   maxTokens: z.number().int().nullable(),
   topP: z.number().nullable(),
@@ -2637,7 +2643,7 @@ export const ExplanationTypeWithPartialRelationsSchema: z.ZodType<ExplanationTyp
 /////////////////////////////////////////
 
 export const ExplanationScoreSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   initiatedByUserId: z.string(),
   value: z.number(),
   explanationId: z.string(),
@@ -2834,7 +2840,7 @@ export const ExplanationScoreModelWithPartialRelationsSchema: z.ZodType<Explanat
 /////////////////////////////////////////
 
 export const ExplanationActivationV1Schema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   explanationId: z.string(),
   activationId: z.string(),
   expectedValues: z.number().array(),
@@ -2902,7 +2908,7 @@ export const ExplanationActivationV1WithPartialRelationsSchema: z.ZodType<Explan
 /////////////////////////////////////////
 
 export const VoteSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   voterId: z.string(),
   reason: z.string().nullable(),
   points: z.number().int(),
@@ -2963,7 +2969,7 @@ export const VoteWithPartialRelationsSchema: z.ZodType<VoteWithPartialRelations>
 /////////////////////////////////////////
 
 export const ActivationSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   tokens: z.string().array(),
   dataIndex: z.string().nullable(),
   index: z.string(),
@@ -3057,7 +3063,7 @@ export const ActivationWithPartialRelationsSchema: z.ZodType<ActivationWithParti
 /////////////////////////////////////////
 
 export const CommentSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   layer: z.string(),
   index: z.string(),
@@ -3118,7 +3124,7 @@ export const CommentWithPartialRelationsSchema: z.ZodType<CommentWithPartialRela
 /////////////////////////////////////////
 
 export const BookmarkSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   layer: z.string(),
   index: z.string(),
@@ -3178,7 +3184,7 @@ export const BookmarkWithPartialRelationsSchema: z.ZodType<BookmarkWithPartialRe
 /////////////////////////////////////////
 
 export const SavedSearchSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   query: z.string(),
   tokens: z.string().array(),
   modelId: z.string(),
@@ -3368,7 +3374,7 @@ export const SteerOutputToNeuronWithPartialRelationsSchema: z.ZodType<SteerOutpu
 
 export const SteerOutputSchema = z.object({
   type: SteerOutputTypeSchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   steerSpecialTokens: z.boolean(),
   inputText: z.string(),
@@ -3560,7 +3566,7 @@ export const ProblemNodeWithPartialRelationsSchema: z.ZodType<ProblemNodeWithPar
 export const ProblemEdgeSchema = z.object({
   type: ProblemEdgeTypeSchema,
   approvalState: ProblemNodeApprovalStateSchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   sourceNodeId: z.number().int(),
   targetNodeId: z.number().int(),
   approverId: z.string().nullable(),
@@ -3630,7 +3636,7 @@ export const ProblemEdgeWithPartialRelationsSchema: z.ZodType<ProblemEdgeWithPar
 /////////////////////////////////////////
 
 export const ProblemNodeCommentSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   problemNodeId: z.number().int(),
   parentCommentId: z.string().nullable(),
   text: z.string(),
@@ -3701,7 +3707,7 @@ export const ProblemNodeCommentWithPartialRelationsSchema: z.ZodType<ProblemNode
 /////////////////////////////////////////
 
 export const ProblemNodeLogSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   timestamp: z.coerce.date(),
   userId: z.string(),
   problemNodeId: z.number().int(),
@@ -3831,7 +3837,7 @@ export const NlaSourceWithPartialRelationsSchema: z.ZodType<NlaSourceWithPartial
 /////////////////////////////////////////
 
 export const NlaExplainCacheSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   text: z.string(),
   /**
    * SHA-256 hex of `text` (UTF-8); used in the unique key so btree stays under Postgres row-size limits.
@@ -3904,7 +3910,7 @@ export const NlaExplainCacheWithPartialRelationsSchema: z.ZodType<NlaExplainCach
 /////////////////////////////////////////
 
 export const NlaExplainShareSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   cacheId: z.string(),
   position: z.number().int().nullable(),
   paragraph: z.number().int().nullable(),
@@ -3963,7 +3969,7 @@ export const NlaExplainShareWithPartialRelationsSchema: z.ZodType<NlaExplainShar
 /////////////////////////////////////////
 
 export const SampleDatasetSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   name: z.string(),
   description: z.string().nullable(),
   url: z.string().nullable(),
@@ -4019,12 +4025,12 @@ export const SampleDatasetWithPartialRelationsSchema: z.ZodType<SampleDatasetWit
 
 export const SampleSchema = z.object({
   type: ProbeSampleTypeSchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   datasetId: z.string(),
   sampleIndex: z.number().int(),
   groundTruth: z.boolean(),
-  conversation: InputJsonValue,
+  conversation: JsonValueSchema,
   conversationTokenized: z.number().int().array(),
   conversationTokenizedStr: z.string().array(),
   finalResponseStartIndex: z.number().int(),
@@ -4101,7 +4107,7 @@ export const ProbeSchema = z.object({
   architecture: ProbeArchitectureSchema,
   tokenSelection: TokenSelectionSchema,
   reductionMethod: ReductionMethodSchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   customLabel: z.string(),
   modelId: z.string(),
   userId: z.string(),
@@ -4171,7 +4177,7 @@ export const ProbeWithPartialRelationsSchema: z.ZodType<ProbeWithPartialRelation
 /////////////////////////////////////////
 
 export const ProbeMatchSchema = z.object({
-  id: z.string().cuid(),
+  id: z.cuid(),
   probeId: z.string(),
   sampleId: z.string(),
   probeCorrect: z.boolean(),
@@ -4233,12 +4239,12 @@ export const ProbeMatchWithPartialRelationsSchema: z.ZodType<ProbeMatchWithParti
 
 export const ProbeLogSchema = z.object({
   action: ProbeLogActionSchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   userId: z.string().nullable(),
   probeId: z.string().nullable(),
   sampleId: z.string().nullable(),
-  details: NullableJsonValue.optional(),
+  details: JsonValueSchema.nullable(),
   createdAt: z.coerce.date(),
 })
 
@@ -4260,7 +4266,7 @@ export const ProcessLockSchema = z.object({
   name: z.string(),
   startedAt: z.coerce.date(),
   expiresAt: z.coerce.date(),
-  details: NullableJsonValue.optional(),
+  details: JsonValueSchema.nullable(),
 })
 
 export type ProcessLock = z.infer<typeof ProcessLockSchema>
@@ -4395,7 +4401,7 @@ export const VectorTagOnVectorWithPartialRelationsSchema: z.ZodType<VectorTagOnV
 
 export const VectorSchema = z.object({
   visibility: VisibilitySchema,
-  id: z.string().cuid(),
+  id: z.cuid(),
   modelId: z.string(),
   name: z.string(),
   author: z.string(),
@@ -4407,7 +4413,7 @@ export const VectorSchema = z.object({
   displayName: z.string().nullable(),
   caveat: z.string().nullable(),
   values: z.number().array(),
-  projectionParams: InputJsonValue,
+  projectionParams: JsonValueSchema,
   hfRepoId: z.string().nullable(),
   hfFolderId: z.string().nullable(),
   creatorId: z.string(),
