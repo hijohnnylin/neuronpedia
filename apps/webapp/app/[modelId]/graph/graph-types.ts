@@ -264,8 +264,28 @@ export type AnthropicFeatureDetail = {
   index: number;
   examples_quantiles: AnthropicFeatureExampleQuantile[];
 };
-export const GraphSupernodesSchema = z.array(z.array(z.string()));
-export const GraphClerpsSchema = z.array(z.array(z.string()));
+// Limits on saved subgraph arrays. A graph has at most 10,000 feature nodes plus its error,
+// embedding and logit nodes, so 20,000 is above any real graph. Zod checks a `.max()` before it
+// parses the elements, so a large hostile array fails fast instead of using a lot of memory.
+const GRAPH_MAX_NODE_IDS = 20_000;
+const GRAPH_MAX_SUPERNODES = 10_000;
+
+// Each supernode is [label, ...nodeIds], and a node is in one supernode only. The total is checked
+// first, because a limit on each inner array still lets the outer array multiply it.
+export const GraphSupernodesSchema = z.preprocess(
+  (input, ctx) => {
+    if (Array.isArray(input)) {
+      const members = input.reduce((sum: number, sn) => sum + (Array.isArray(sn) ? sn.length - 1 : 0), 0);
+      if (members > GRAPH_MAX_NODE_IDS) {
+        ctx.addIssue({ code: 'custom', message: `Supernodes can hold at most ${GRAPH_MAX_NODE_IDS} nodes in total.` });
+      }
+    }
+    return input;
+  },
+  z.array(z.array(z.string()).max(GRAPH_MAX_NODE_IDS + 1)).max(GRAPH_MAX_SUPERNODES),
+);
+// Each clerp is [featureId, label].
+export const GraphClerpsSchema = z.array(z.array(z.string()).length(2)).max(GRAPH_MAX_NODE_IDS);
 
 export type GraphSupernodes = z.infer<typeof GraphSupernodesSchema>;
 export type GraphClerps = z.infer<typeof GraphClerpsSchema>;
@@ -273,7 +293,7 @@ export const SaveSubgraphRequestSchema = z.object({
   modelId: z.string(),
   slug: z.string(),
   displayName: z.string().optional(),
-  pinnedIds: z.array(z.string()),
+  pinnedIds: z.array(z.string()).max(GRAPH_MAX_NODE_IDS),
   supernodes: GraphSupernodesSchema,
   clerps: GraphClerpsSchema,
   pruningThreshold: z.number().nullable(),

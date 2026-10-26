@@ -24,9 +24,9 @@ const RegisterSchema = z
     providerRef: z.string().nullish(),
     // The full set this host serves. Registration is declarative: whatever is
     // sent replaces what was there, so a host that drops an SAE stops receiving
-    // requests for it.
-    sourceIds: z.array(z.string()).default([]),
-    sourceSetNames: z.array(z.string()).default([]),
+    // requests for it. The largest model has about 1,400 sources in 44 sets.
+    sourceIds: z.array(z.string()).max(10_000).default([]),
+    sourceSetNames: z.array(z.string()).max(1_000).default([]),
     // Singular, unlike the two above: an NLA process fixes its verbalizer,
     // reconstructor and layer at startup, so it serves one source and no
     // request can ask it for another.
