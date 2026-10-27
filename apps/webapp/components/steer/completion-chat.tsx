@@ -4,14 +4,18 @@ import SteerChatMessage from '@/components/steer/chat-message';
 import { LoadingSquare } from '@/components/svg/loading-square';
 import { NPSteerMethod, STEER_METHOD_LABELS } from '@/lib/api/inference-types';
 import { IS_ACTUALLY_NEURONPEDIA_ORG } from '@/lib/env';
-import { ChatMessage, STEER_MAX_PROMPT_CHARS, STEER_MAX_PROMPT_CHARS_THINKING, SteerFeature } from '@/lib/utils/steer';
+import {
+  ChatMessage,
+  STEER_LONG_CHAT_MODELS,
+  STEER_MAX_PROMPT_CHARS,
+  STEER_MAX_PROMPT_CHARS_THINKING,
+  SteerFeature,
+} from '@/lib/utils/steer';
 import copy from 'copy-to-clipboard';
 import { EventSourceParserStream } from 'eventsource-parser/stream';
 import { ArrowUp, RotateCcw, Share, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
-
-export const NNSIGHT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b'];
 
 export default function SteerCompletionChat({
   showSettingsOnMobile,
@@ -123,7 +127,9 @@ export default function SteerCompletionChat({
     const steeredPromptToSendChars = newSteeredChatMessages.map((m) => m.content).join('').length;
 
     // // check for character limit
-    const maxPromptChars = NNSIGHT_MODELS.includes(modelId) ? STEER_MAX_PROMPT_CHARS_THINKING : STEER_MAX_PROMPT_CHARS;
+    const maxPromptChars = STEER_LONG_CHAT_MODELS.includes(modelId)
+      ? STEER_MAX_PROMPT_CHARS_THINKING
+      : STEER_MAX_PROMPT_CHARS;
     if (defaultPromptToSendChars >= maxPromptChars || steeredPromptToSendChars >= maxPromptChars) {
       alert('Sorry, we limit the length of each chat conversation.\nPlease click Reset to start a new conversation.');
       setIsSteering(false);

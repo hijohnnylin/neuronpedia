@@ -23,6 +23,7 @@ import {
   STEER_FREQUENCY_PENALTY,
   STEER_FREQUENCY_PENALTY_MAX,
   STEER_FREQUENCY_PENALTY_MIN,
+  STEER_LONG_CHAT_MODELS,
   STEER_MAX_PROMPT_CHARS,
   STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS,
   STEER_MAX_PROMPT_CHARS_THINKING,
@@ -768,7 +769,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     let maxPromptChars = STEER_MAX_PROMPT_CHARS;
     if (hasAxes) {
       maxPromptChars = STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS;
-    } else if (NNSIGHT_MODELS.includes(modelId)) {
+    } else if (STEER_LONG_CHAT_MODELS.includes(modelId)) {
       maxPromptChars = STEER_MAX_PROMPT_CHARS_THINKING;
     }
     if (totalDefaultChars > maxPromptChars || totalSteeredChars > maxPromptChars) {

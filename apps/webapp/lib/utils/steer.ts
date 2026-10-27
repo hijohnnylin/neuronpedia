@@ -38,6 +38,8 @@ export const STEER_FREQUENCY_PENALTY_MAX = 2;
 export const STEER_MAX_PROMPT_CHARS = 2048;
 export const STEER_MAX_PROMPT_CHARS_THINKING = 8192;
 export const STEER_MAX_PROMPT_CHARS_ASSISTANT_AXIS = 29696; // about 4 chars per token: 8192 tokens less a 768-token reply
+// Chat models whose pods take 4096+ tokens, so a conversation may use STEER_MAX_PROMPT_CHARS_THINKING.
+export const STEER_LONG_CHAT_MODELS = ['llama3.3-70b-it', 'gpt-oss-20b', 'qwen3-32b', 'gemma-4-31b-it'];
 export const STEER_SEED = 16;
 export const STEER_METHOD = NPSteerMethod.SIMPLE_ADDITIVE;
 export const STEER_METHOD_ASSISTANT_CAP = NPSteerMethod.PROJECTION_CAP;
