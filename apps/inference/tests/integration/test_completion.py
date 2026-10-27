@@ -121,8 +121,9 @@ def steer_vector(magnitude: float = 1000.0) -> NPSteerVector:
         ),
         pytest.param(
             NPSteerMethod.SIMPLE_ADDITIVE,
-            {"features": [steer_neuron()]},
-            "\n\nI'm a little bit confused about the",
+            # Strong enough that the decode does not hang on a near tie between CPUs.
+            {"features": [steer_neuron(strength=50.0)]},
+            " Pages Pages Pages Pages Pages Pages Pages Pages Pages Pages",
             id="additive-with-neuron",
         ),
         pytest.param(
