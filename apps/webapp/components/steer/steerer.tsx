@@ -624,20 +624,24 @@ export default function Steerer({
           </div>
         ) : (
           <div className="flex flex-1 flex-col">
-            <div className="mb-0.5 mt-4 text-left text-[10px] font-medium uppercase text-slate-500">
-              Select a Preset
-            </div>
-            <SteerPresetSelector
-              loadingPresets={loadingPresets}
-              featurePresets={featurePresets}
-              presetIsSelected={presetIsSelected}
-              selectedFeatures={selectedFeatures}
-              setSelectedFeatures={setSelectedFeatures}
-              setSteerMethod={setSteerMethod}
-              setShowSettingsOnMobile={setShowSettingsOnMobile}
-              deleteUserVector={deleteUserVector}
-              loadSavedSteerOutput={loadSavedSteerOutput}
-            />
+            {(loadingPresets || featurePresets.length > 0) && (
+              <>
+                <div className="mb-0.5 mt-4 text-left text-[10px] font-medium uppercase text-slate-500">
+                  Select a Preset
+                </div>
+                <SteerPresetSelector
+                  loadingPresets={loadingPresets}
+                  featurePresets={featurePresets}
+                  presetIsSelected={presetIsSelected}
+                  selectedFeatures={selectedFeatures}
+                  setSelectedFeatures={setSelectedFeatures}
+                  setSteerMethod={setSteerMethod}
+                  setShowSettingsOnMobile={setShowSettingsOnMobile}
+                  deleteUserVector={deleteUserVector}
+                  loadSavedSteerOutput={loadSavedSteerOutput}
+                />
+              </>
+            )}
 
             <div className="mb-0.5 mt-5 text-left text-[10px] font-medium uppercase text-slate-500">What to Steer</div>
             <div className="mt-2 flex w-full flex-row items-center justify-center gap-x-2">
@@ -655,7 +659,7 @@ export default function Steerer({
                 className="flex-1 border-slate-300 text-slate-500"
                 variant="outline"
               >
-                + Add Feature
+                + Add Feature/Neuron
               </Button>
               <Button
                 onClick={() => {
