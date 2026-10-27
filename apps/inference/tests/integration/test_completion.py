@@ -89,6 +89,11 @@ def steer_feature(index: int = STEER_FEATURE_INDEX) -> NPSteerFeature:
     )
 
 
+def steer_neuron(index: int = STEER_FEATURE_INDEX, layer: int = 7, strength: float = 1.0) -> NPSteerFeature:
+    """An MLP neuron of the `neurons` source set, which every pod serves. Its source is its layer."""
+    return NPSteerFeature(model=MODEL_ID, source=str(layer), index=index, strength=strength)
+
+
 def steer_vector(magnitude: float = 1000.0) -> NPSteerVector:
     # Deliberately large and uniform: big enough to dominate the residual stream, so a
     # steering method that silently did nothing could not produce the outputs below.
@@ -113,6 +118,12 @@ def steer_vector(magnitude: float = 1000.0) -> NPSteerVector:
             {"vectors": [steer_vector()]},
             "!!!!!!!!!!",
             id="additive-with-vector",
+        ),
+        pytest.param(
+            NPSteerMethod.SIMPLE_ADDITIVE,
+            {"features": [steer_neuron()]},
+            "\n\nI'm a little bit confused about the",
+            id="additive-with-neuron",
         ),
         pytest.param(
             NPSteerMethod.ORTHOGONAL_DECOMP,
@@ -161,6 +172,12 @@ class TestRejectedRequests:
 
         assert response.status_code == 400
         assert response.json()["error"] == "Text too long: 6002 tokens, max is 500"
+
+    def test_a_neuron_the_model_does_not_have(self, client: TestClient):
+        response = post(client, completion_request(types=[NPSteerType.STEERED], features=[steer_neuron(index=3072)]))
+
+        assert response.status_code == 400
+        assert response.json()["error"] == "Neuron index 3072 is out of range: this model has 3072 neurons per layer"
 
     @pytest.mark.parametrize(
         "steer_with",

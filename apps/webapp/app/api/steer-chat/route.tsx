@@ -10,7 +10,7 @@ import {
 } from '@/lib/api/inference-types';
 import { prisma } from '@/lib/db';
 import { getModelById } from '@/lib/db/model';
-import { neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
+import { referencedNeuronWithAccess } from '@/lib/db/neuron-dashboard';
 import { getPersonaAxisDefinitions, getPersonaAxisFits } from '@/lib/db/persona-axis';
 import { ERROR_NOT_FOUND_MESSAGE } from '@/lib/db/userCanAccess';
 import { DEMO_MODE, NEXT_PUBLIC_URL } from '@/lib/env';
@@ -816,10 +816,8 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
 
     for (const feature of body.features) {
       // eslint-disable-next-line no-await-in-loop
-      const accessResult = await neuronExistsAndUserHasAccess(
-        feature.modelId,
-        feature.layer,
-        feature.index.toString(),
+      const accessResult = await referencedNeuronWithAccess(
+        { modelId: feature.modelId, layer: feature.layer, index: feature.index.toString() },
         request.user,
       );
       if (!accessResult) {

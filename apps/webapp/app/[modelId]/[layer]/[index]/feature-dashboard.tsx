@@ -24,6 +24,7 @@ import {
   getNeuronLayerTitle,
   getSourceSetNameFromSource,
   isNeuronLayerSource,
+  isSteerableNeuronLayer,
   NEURONS_SOURCESET,
 } from '@/lib/utils/source';
 import { Download } from 'lucide-react';
@@ -67,6 +68,9 @@ export default function FeatureDashboard({
   const crumbSourceSet =
     currentNeuron?.sourceSet || getSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '');
   const isNeuronLayer = isNeuronLayerSource(currentNeuron?.layer || '');
+  const canSteer =
+    !isNeuronLayer ||
+    isSteerableNeuronLayer(crumbSourceSet, getSource(currentNeuron?.modelId || '', currentNeuron?.layer || ''));
   const externalDashboardsUrl = getSourceSet(
     currentNeuron?.modelId || '',
     currentNeuron?.sourceSetName || '',
@@ -403,8 +407,7 @@ export default function FeatureDashboard({
                     }}
                     // if false, only show the activation test
                     showActivations={embedActivations}
-                    // inference has no steering for MLP neurons
-                    showSteerButton={embedSteer && !isNeuronLayer}
+                    showSteerButton={embedSteer && canSteer}
                     showTestField={embedTestField}
                   />
                 </NeuronDashboardDocsContext.Provider>

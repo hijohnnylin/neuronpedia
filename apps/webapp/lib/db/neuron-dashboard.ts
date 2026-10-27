@@ -4,9 +4,12 @@
 
 import { notFound } from '@/lib/api-error';
 import { prisma } from '@/lib/db';
+import { neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
+import { userCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
 import { PUBLIC_ACTIVATIONS_USER_IDS } from '@/lib/env';
 import { fetchNeuronDashboard, NeuronDashboard, NeuronDashboardError } from '@/lib/utils/neuron-dashboards';
 import { getSourceSetNameFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
+import { AuthenticatedUser } from '@/lib/with-user';
 import { ActivationPartialWithRelations } from '@/prisma/generated/zod';
 import { Activation, Neuron } from '@prisma/client';
 
@@ -146,4 +149,18 @@ export async function ensureNeuronRowForFeature(ids: FeatureIds): Promise<void> 
   if (dashboard) {
     await ensureNeuronRowForDashboard(ids, dashboard);
   }
+}
+
+// neuronExistsAndUserHasAccess for a feature that a saved row will reference (a saved steer, for
+// example). A dashboard neuron with no Neuron row gets one, but only after the access check.
+export async function referencedNeuronWithAccess(ids: FeatureIds, user: AuthenticatedUser | null) {
+  const neuron = await neuronExistsAndUserHasAccess(ids.modelId, ids.layer, ids.index, user);
+  if (neuron) {
+    return neuron;
+  }
+  if (!(await userCanAccessModelAndSourceSet(ids.modelId, getSourceSetNameFromSource(ids.layer), user, true))) {
+    return null;
+  }
+  await ensureNeuronRowForFeature(ids);
+  return neuronExistsAndUserHasAccess(ids.modelId, ids.layer, ids.index, user);
 }

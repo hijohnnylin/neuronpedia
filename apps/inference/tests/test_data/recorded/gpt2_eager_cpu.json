@@ -213,7 +213,7 @@
     "lens_jacobian": true,
     "lens_jpp": false,
     "lens_logit": true,
-    "neurons": false,
+    "neurons": true,
     "steer_completion": true,
     "steer_completion_chat": true,
     "tokenize": true

@@ -1473,7 +1473,7 @@ export interface components {
     };
     /**
      * NPSteerFeature
-     * @description An SAE feature to steer with, and how hard.
+     * @description An SAE feature or MLP neuron to steer with, and how hard.
      */
     NPSteerFeature: {
       /** Index */

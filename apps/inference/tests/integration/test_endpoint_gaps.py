@@ -45,7 +45,7 @@ def test_capabilities(client: TestClient):
     assert data["backend"] == "eager"
     assert "resid_post" in data["capture_points"]
     assert data["endpoints"]["tokenize"] is True
-    assert data["endpoints"]["neurons"] is False
+    assert data["endpoints"]["neurons"] is True
 
 
 def test_activation_all_batch(client: TestClient):

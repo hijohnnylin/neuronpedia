@@ -141,6 +141,7 @@ export default function FeatureSelector({
   onHeadFinderToggle,
   onModelChange,
   onExitHeadMode,
+  includeSteerableNeurons = false,
 }: {
   defaultModelId?: string;
   defaultSourceSet?: string;
@@ -175,6 +176,8 @@ export default function FeatureSelector({
   onModelChange?: (modelId: string) => void;
   // Notified when the selector leaves attention-head mode (a non-head release/source is picked).
   onExitHeadMode?: () => void;
+  // With filterToInferenceEnabled, also offer neuron layers that can be steered
+  includeSteerableNeurons?: boolean;
 }) {
   const { getFirstSourceForSourceSet, globalModels, getDefaultModel } = useGlobalContext();
   const [modelId, setModelId] = useState(defaultModelId || getDefaultModel()?.id || DEFAULT_MODELID);
@@ -321,6 +324,7 @@ export default function FeatureSelector({
             headLayerChangedCallback={headLayerChanged}
             compact={isNeuronPage}
             noOptionsChangedCallback={setHasNoSources}
+            includeSteerableNeurons={includeSteerableNeurons}
           />
           {isNeuronPage && (
             <div className="mt-0.5 flex flex-row gap-x-0.5">

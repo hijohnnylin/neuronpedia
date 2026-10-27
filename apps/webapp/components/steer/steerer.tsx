@@ -10,7 +10,8 @@ import { Button } from '@/components/shadcn/button';
 import { NPLogprob, NPSteerMethod } from '@/lib/api/inference-types';
 import { useIsMount } from '@/lib/hooks/use-is-mount';
 import { SearchExplanationsType } from '@/lib/utils/general';
-import { getFirstSourceSetForModel } from '@/lib/utils/source';
+import { emptyNeuron } from '@/lib/utils/neuron-dashboards';
+import { getFirstSourceSetForModel, isSteerableNeuronLayer, NEURONS_SOURCESET } from '@/lib/utils/source';
 import {
   ChatMessage,
   FeaturePreset,
@@ -68,6 +69,8 @@ export default function Steerer({
     getInferenceEnabledForModel,
     getFirstInferenceEnabledModel,
     getInferenceEnabledModels,
+    getSource,
+    getSourceSet,
   } = useGlobalContext();
   const searchParams = useSearchParams();
   const hideModelSelector = searchParams.get('hideModelSelector') === 'true';
@@ -275,15 +278,33 @@ export default function Steerer({
       });
   }
 
+  // A dashboard neuron has no Neuron row until a saved steer makes one, so the feature API gives 404.
+  async function fetchFeatureToSteer(
+    featureModelId: string,
+    layer: string,
+    index: string,
+  ): Promise<NeuronWithPartialRelations> {
+    const response = await fetch(`/api/feature/${featureModelId}/${layer}/${index}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (response.ok) {
+      return response.json();
+    }
+    if (
+      response.status === 404 &&
+      isSteerableNeuronLayer(getSourceSet(featureModelId, NEURONS_SOURCESET), getSource(featureModelId, layer))
+    ) {
+      return emptyNeuron(featureModelId, layer, index, NEURONS_SOURCESET);
+    }
+    throw new Error(`Could not get feature ${featureModelId}/${layer}/${index}: ${response.status}`);
+  }
+
   async function setInitialSteerFeatureFromSourceAndIndex(source: string, index: string) {
     // use the searchparams "source" and "index" to set the initial steering configuration
     setIsSteering(true);
     reset();
-    await fetch(`/api/feature/${modelId}/${source}/${index}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then((response) => response.json())
+    await fetchFeatureToSteer(modelId, source, index)
       .then((resp: NeuronWithPartialRelations) => {
         setIsSteering(false);
         const feature = {
@@ -539,6 +560,7 @@ export default function Steerer({
                   showModel={false}
                   defaultModelId={replaceSteerModelIdIfNeeded(modelId)}
                   filterToInferenceEnabled
+                  includeSteerableNeurons
                   defaultSourceSet={
                     getFirstSourceSetForModel(
                       globalModels[replaceSteerModelIdIfNeeded(modelId)],
@@ -549,11 +571,7 @@ export default function Steerer({
                   }
                   exclusiveCallback
                   callback={async (feature) => {
-                    await fetch(`/api/feature/${feature.modelId}/${feature.layer}/${feature.index}`, {
-                      method: 'GET',
-                      headers: { 'Content-Type': 'application/json' },
-                    })
-                      .then((response) => response.json())
+                    await fetchFeatureToSteer(feature.modelId, feature.layer, feature.index)
                       .then((n: NeuronWithPartialRelations) => {
                         addToSelectedFeatures({
                           modelId: feature.modelId,

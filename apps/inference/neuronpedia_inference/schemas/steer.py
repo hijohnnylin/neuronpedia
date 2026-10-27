@@ -87,7 +87,7 @@ class NPReadSpec(ExactSchema):
 
 
 class NPSteerFeature(BaseSchema):
-    """An SAE feature to steer with, and how hard."""
+    """An SAE feature or MLP neuron to steer with, and how hard."""
 
     model: StrictStr
     source: StrictStr

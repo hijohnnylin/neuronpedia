@@ -18,6 +18,7 @@ from neuronpedia_inference.endpoints.steer.completion import steer_target
         ("blocks.4.hook_resid_pre", Address("resid_post", 3)),
         ("blocks.4.hook_resid_post", Address("resid_post", 4)),
         ("blocks.4.attn.hook_z", Address("z", 4)),
+        ("blocks.4.mlp.hook_post", Address("mlp_act", 4)),
     ],
 )
 def test_a_hook_maps_to_the_point_its_steer_writes(hook: str, want: Address) -> None:

@@ -44,11 +44,14 @@ class SAEManager:
         sae_gpu_budget_bytes: int = 0,
         sae_pinned_host_bytes: int = 0,
         mlp_width: int | None = None,
+        mlp_width_uniform: bool = True,
     ):
         self.config = Config.get_instance()
         self.num_layers = num_layers
         # Width of each `neurons` source (d_mlp). None when the model config does not give it.
         self.mlp_width = mlp_width
+        # False when layers differ in width, so a one-hot of mlp_width does not fit every layer.
+        self.mlp_width_uniform = mlp_width_uniform
         self.device = device
         self.max_loaded_saes = self.config.max_loaded_saes
 

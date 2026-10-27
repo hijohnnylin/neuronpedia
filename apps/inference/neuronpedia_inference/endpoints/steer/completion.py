@@ -32,9 +32,11 @@ from neuronpedia_inference.inference_utils.sampling import (
     state_settings_once,
 )
 from neuronpedia_inference.inference_utils.steering import (
+    NeuronSteerError,
     SteeringSettings,
     format_sse_message,
     process_features_vectorized,
+    refuse_split_neuron_steer,
     remove_sse_formatting,
     stop_when_client_leaves,
     stream_lock,
@@ -133,7 +135,11 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
         return too_long
 
     if request.features is not None:
-        features = process_features_vectorized(request.features)
+        try:
+            features = process_features_vectorized(request.features)
+            refuse_split_neuron_steer(features, steer_method)
+        except NeuronSteerError as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
     elif request.vectors is not None:
         features = request.vectors
 
@@ -232,8 +238,9 @@ def steer_target(hook_name: str) -> Address:
 
     ``resid_pre[X]`` is the output of decoder layer ``X-1`` (``resid_post[X-1]``), or the embedding
     output for ``X == 0``; ``resid_post[X]`` maps directly; ``hook_z`` steers the concatenated
-    per-head attention output that attention-output SAEs live in. One mapping for every backend,
-    so a pod passes a check for one target and reaches the engine at the same one.
+    per-head attention output that attention-output SAEs live in; ``mlp.hook_post`` (``mlp_act``)
+    steers MLP neurons. One mapping for every backend, so a pod passes a check for one target and
+    reaches the engine at the same one.
     """
     address = tlens_hook_to_point(hook_name)
     name, layer = address.name, address.layer
@@ -241,9 +248,11 @@ def steer_target(hook_name: str) -> Address:
         raise ValueError(f"Engine steering needs a per-layer hook, but {hook_name!r} maps to the global point {name!r}")
     if name == "resid_pre":
         return Address("embeddings") if layer == 0 else Address("resid_post", layer - 1)
-    if name in ("resid_post", "z"):
+    if name in ("resid_post", "z", "mlp_act"):
         return Address(name, layer)
-    raise ValueError(f"Engine steering supports resid_pre/resid_post/attn.hook_z hooks only, got {hook_name!r}")
+    raise ValueError(
+        f"Engine steering supports resid_pre/resid_post/attn.hook_z/mlp.hook_post hooks only, got {hook_name!r}"
+    )
 
 
 def _hook_of(feature: NPSteerFeature | NPSteerVector) -> str:

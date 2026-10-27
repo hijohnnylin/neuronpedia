@@ -36,9 +36,11 @@ from neuronpedia_inference.inference_utils.sampling import (
     state_settings_once,
 )
 from neuronpedia_inference.inference_utils.steering import (
+    NeuronSteerError,
     SteeringSettings,
     format_sse_message,
     process_features_vectorized,
+    refuse_split_neuron_steer,
     remove_sse_formatting,
     stop_when_client_leaves,
     stream_lock,
@@ -276,7 +278,11 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
         return too_long
 
     if request.features is not None:
-        features = process_features_vectorized(request.features)
+        try:
+            features = process_features_vectorized(request.features)
+            refuse_split_neuron_steer(features, steer_method)
+        except NeuronSteerError as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
     elif request.vectors is not None:
         features = request.vectors
     elif not wants_steering:

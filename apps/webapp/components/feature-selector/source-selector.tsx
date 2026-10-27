@@ -7,6 +7,7 @@ import {
   getSourceSetNameFromSource,
   isCanonicalSource,
   isNeuronLayerSource,
+  isSteerableNeuronLayer,
   NEURONS_SOURCESET,
 } from '@/lib/utils/source';
 import { SourceReleaseWithPartialRelations, SourceSetWithPartialRelations } from '@/prisma/generated/zod';
@@ -45,6 +46,7 @@ export default function SourceSelector({
   headLayerChangedCallback,
   compact = false,
   noOptionsChangedCallback,
+  includeSteerableNeurons = false,
 }: {
   modelId: string;
   defaultSource?: string;
@@ -68,6 +70,8 @@ export default function SourceSelector({
   compact?: boolean;
   // Tells the parent when the model has no source to pick
   noOptionsChangedCallback?: (hasNoOptions: boolean) => void;
+  // With filterToInferenceEnabled, also offer neuron layers that can be steered
+  includeSteerableNeurons?: boolean;
 }) {
   const isMount = useIsMount();
   const router = useRouter();
@@ -105,13 +109,16 @@ export default function SourceSelector({
       : getReleaseForSourceSet(modelId, defaultSourceSet || getFirstSourceSetForModelId()),
   );
 
-  // Neuron layers to offer. Not for inference or release-filtered pickers: those need SAE sources.
-  // Like the release list below, this ignores filterToPublic.
+  // Neuron layers to offer. Inference pickers need SAE sources, except steering, which can take
+  // steerable neuron layers. Not for release-filtered pickers. Like the release list, ignores filterToPublic.
   const neuronsSourceSet = getSourceSet(modelId, NEURONS_SOURCESET);
   const neuronLayers: string[] =
-    filterToInferenceEnabled || filterToRelease || (filterToOnlyHasDashboards && !neuronsSourceSet?.hasDashboards)
+    (filterToInferenceEnabled && !includeSteerableNeurons) ||
+    filterToRelease ||
+    (filterToOnlyHasDashboards && !neuronsSourceSet?.hasDashboards)
       ? []
       : (neuronsSourceSet?.sources || [])
+          .filter((s) => !filterToInferenceEnabled || isSteerableNeuronLayer(neuronsSourceSet, s))
           .map((s) => s.id || '')
           .filter((id) => isNeuronLayerSource(id))
           .filter((id) =>

@@ -68,7 +68,7 @@ from neuronpedia_inference.endpoints.lens.lens_loader import (
     place_jacobian_lens_on_device,
     place_jacobian_lens_on_worker,
 )
-from neuronpedia_inference.endpoints.lens.model_specific import resolve_mlp_width
+from neuronpedia_inference.endpoints.lens.model_specific import mlp_width_is_uniform, resolve_mlp_width
 from neuronpedia_inference.endpoints.lens.oracle import prepare_oracle
 from neuronpedia_inference.endpoints.lens.oracle import router as lens_oracle_router
 from neuronpedia_inference.endpoints.lens.prompt import (
@@ -1134,6 +1134,7 @@ async def initialize(
             sae_gpu_budget_bytes=sae_gpu_budget_bytes,
             sae_pinned_host_bytes=sae_pinned_host_bytes,
             mlp_width=resolve_mlp_width(model, hf_model_id),
+            mlp_width_uniform=mlp_width_is_uniform(model, hf_model_id),
         )
         SAEManager._instance.load_saes()
 

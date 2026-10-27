@@ -62,19 +62,36 @@ def _softcap_from_hf_config(hf_config: Any) -> float | None:
     return float(softcap) if softcap is not None else None
 
 
-def resolve_mlp_width(model: Any, hf_model_id: str | None) -> int | None:
-    """Return the MLP hidden width (``d_mlp``), or ``None`` if the config does not give it.
+def _config_mlp_width(model: Any, hf_model_id: str | None) -> Any:
+    """The config's MLP width as given: an int, a per-layer list, or None.
 
-    This is the width of a ``neurons`` source. A per-layer list gives its widest entry.
+    GPT-2 states ``n_inner``, and leaves it unset for the default of ``4 * n_embd``.
     """
     hf_config = _try_get_hf_config(model, hf_model_id)
     if hf_config is None:
         return None
     text_config = hf_config.get_text_config() if hasattr(hf_config, "get_text_config") else hf_config
     width = getattr(text_config, "intermediate_size", None)
+    if width is None and isinstance(getattr(text_config, "n_embd", None), int):
+        width = getattr(text_config, "n_inner", None) or 4 * text_config.n_embd
+    return width
+
+
+def resolve_mlp_width(model: Any, hf_model_id: str | None) -> int | None:
+    """Return the MLP hidden width (``d_mlp``), or ``None`` if the config does not give it.
+
+    This is the width of a ``neurons`` source. A per-layer list gives its widest entry.
+    """
+    width = _config_mlp_width(model, hf_model_id)
     if isinstance(width, list | tuple):
         width = max((w for w in width if isinstance(w, int)), default=None)
     return width if isinstance(width, int) and width > 0 else None
+
+
+def mlp_width_is_uniform(model: Any, hf_model_id: str | None) -> bool:
+    """False when the config gives a different MLP width per layer, so one width does not fit every layer."""
+    width = _config_mlp_width(model, hf_model_id)
+    return not isinstance(width, list | tuple) or len(set(width)) <= 1
 
 
 def _resolve_hf_model_id(model_id: str | None) -> str | None:

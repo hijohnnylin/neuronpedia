@@ -123,6 +123,6 @@ async def capabilities():
             "lens_logit": can_residual,
             "lens_jacobian": lens_jacobian,
             "lens_jpp": lens_jpp,
-            "neurons": False,  # mlp.hook_post not served by the engine backends
+            "neurons": can_capture,  # mlp.hook_post (mlp_act): activations, and steering where hooks run
         },
     }

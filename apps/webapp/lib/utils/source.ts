@@ -20,6 +20,20 @@ export function isNeuronLayerSource(source: string) {
   return /^-?\d+$/.test(source);
 }
 
+// Neuron steering is on only for neuron layers with file dashboards (SourceSet.externalDashboardsUrl)
+// and inference. Older neuron sets have no pod that steers neurons.
+export function isSteerableNeuronLayer(
+  sourceSet: { name?: string | null; externalDashboardsUrl?: string | null } | undefined,
+  source: { id?: string | null; inferenceEnabled?: boolean | null } | undefined,
+) {
+  return Boolean(
+    sourceSet?.name === NEURONS_SOURCESET &&
+    sourceSet.externalDashboardsUrl &&
+    source?.inferenceEnabled &&
+    isNeuronLayerSource(source.id || ''),
+  );
+}
+
 // For the source dropdown, eg "Neurons Layer 6"
 export function getNeuronLayerLabel(layer: string) {
   return `Neurons Layer ${layer}`;
