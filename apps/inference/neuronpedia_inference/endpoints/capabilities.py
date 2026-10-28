@@ -15,6 +15,8 @@ from fastapi import APIRouter
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.activation.all import MAX_NUM_RESULTS
 from neuronpedia_inference.endpoints.lens.lens_loader import JacobianLensStore, JppLensStore
+from neuronpedia_inference.endpoints.lens.residual_spec import block_output_point
+from neuronpedia_inference.engine_adapter import BackendUnsupported, assert_residual_available
 from neuronpedia_inference.sae_cache import sae_cache
 from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.shared import Model, budget, limiter
@@ -40,8 +42,15 @@ async def capabilities():
     can_residual = described.residual_readable
     attention = described.attention
 
-    lens_jacobian = can_residual and JacobianLensStore.get() is not None
-    lens_jpp = can_residual and JppLensStore.get() is not None
+    # The lens reads the block output, which is `resid_streams` on a hyper-connection trunk, not
+    # `resid_post`. Ask the same gate the lens endpoint asks.
+    try:
+        assert_residual_available(model, point=block_output_point(model))
+        can_lens = True
+    except BackendUnsupported:
+        can_lens = False
+    lens_jacobian = can_lens and JacobianLensStore.get() is not None
+    lens_jpp = can_lens and JppLensStore.get() is not None
 
     # Gradient support as a fact rather than as an inference from the backend name: eager serves
     # gradients only when loaded with requires_grad=True (serving does not), and vLLM cannot serve
@@ -120,7 +129,7 @@ async def capabilities():
             "dfa": attention,  # eager value+attn_probs / vLLM recompute; only on -att- sources
             "steer_completion": True,
             "steer_completion_chat": True,
-            "lens_logit": can_residual,
+            "lens_logit": can_lens,
             "lens_jacobian": lens_jacobian,
             "lens_jpp": lens_jpp,
             "neurons": can_capture,  # mlp.hook_post (mlp_act): activations, and steering where hooks run

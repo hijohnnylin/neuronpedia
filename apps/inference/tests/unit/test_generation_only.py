@@ -440,6 +440,24 @@ class TestWhatCapabilitiesReports:
         assert endpoints["activation_raw"] is False
         assert endpoints["lens_logit"] is False
 
+    def test_a_static_multi_stream_pod_advertises_the_lens(self):
+        """DeepSeek-V4 declares `resid_streams`, the block output its lens reads, and no `resid_post`."""
+        from interp_engine.address import Address
+
+        from neuronpedia_inference.endpoints.lens.lens_loader import JacobianLensStore
+
+        points = tuple(Address("resid_streams", i) for i in range(4))
+        JacobianLensStore._instance = object()  # type: ignore[assignment]
+        try:
+            endpoints = self._report(hooks=False, static_points=points, residual_basis=ResidualBasis(n_streams=4))[
+                "endpoints"
+            ]
+        finally:
+            JacobianLensStore._instance = None
+        assert endpoints["lens_logit"] is True
+        assert endpoints["lens_jacobian"] is True
+        assert endpoints["activation_raw"] is False
+
 
 class TestSaeStaticAddresses:
     def test_resid_pre_hooks_become_reads_and_writes(self):
