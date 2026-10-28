@@ -34,6 +34,7 @@ import {
   extractAssistantText,
   groupTokensBySpans,
   JlensTokenGroup,
+  lastTurnPrefill,
   messageIndicesForGroups,
   toChatPayload,
   tokensToText,
@@ -659,25 +660,12 @@ export default function JlensChat({
       // If the last assistant turn was generated from a user-supplied prefill,
       // preserve it: drop the assistant turn but re-send its prefill as a
       // trailing assistant message so the steered regeneration continues from
-      // the same prefix (otherwise the steered output loses the prefill). The
-      // prefill is the leading non-generated content of that assistant turn.
-      // A template's auto-injected <think></think> scaffold is not a prefill, and
-      // is excluded here by `sectionBucket` keeping header/scaffold spans out of
-      // `contentTokens` — so only whitespace has to be screened out below.
+      // the same prefix (otherwise the steered output loses the prefill). A
+      // template's auto-injected <think></think> scaffold is not a prefill.
       let prefill = '';
       if (convo.length > 0 && convo[convo.length - 1].role === 'assistant') {
         convo.pop();
-        const lastGroup = groupedMessages?.[groupedMessages.length - 1];
-        if (lastGroup && lastGroup.role === 'assistant') {
-          const firstGen = lastGroup.contentTokens.findIndex((t) => t.is_generated);
-          if (firstGen > 0) {
-            const prefixTokens = lastGroup.contentTokens.slice(0, firstGen);
-            const isRealPrefill = prefixTokens.some((t) => t.token.trim() !== '');
-            if (isRealPrefill) {
-              prefill = tokensToText(prefixTokens);
-            }
-          }
-        }
+        prefill = groupedMessages ? lastTurnPrefill(groupedMessages) : '';
       }
       if (convo.length === 0) {
         return;

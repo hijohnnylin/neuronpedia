@@ -250,6 +250,31 @@ export function extractAssistantText(tokens: LensTokenMessage[], prefill = ''): 
   return joinPrefill(prefill, tokensToText(picked));
 }
 
+// The user prefill of the last assistant turn: its input text before the first
+// generated token. A prefill with reasoning shows as two bubbles, and its think
+// tags are header and footer tokens with a channel. Input messages carry no
+// channel, so the role header and the template scaffold have none.
+export function lastTurnPrefill(groups: JlensTokenGroup[]): string {
+  const last = groups[groups.length - 1];
+  if (!last || last.role !== 'assistant') {
+    return '';
+  }
+  const turn = last.messageIndex == null ? [last] : groups.filter((g) => g.messageIndex === last.messageIndex);
+  const tokens = turn
+    .flatMap((g) => [...g.headerTokens, ...g.contentTokens, ...g.footerTokens])
+    .sort((a, b) => a.position - b.position);
+  const prefix: LensTokenMessage[] = [];
+  for (const t of tokens) {
+    if (t.is_generated) {
+      return prefix.some((p) => p.token.trim() !== '') ? tokensToText(prefix) : '';
+    }
+    if (sectionBucket(t.section) === 'content' || t.channel != null) {
+      prefix.push(t);
+    }
+  }
+  return '';
+}
+
 // Trailing whitespace is always dropped (the chat template re-adds its own
 // newline before the turn-end token, so keeping it would double up). Leading
 // whitespace is only dropped when the generated text starts the message —

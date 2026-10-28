@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   extractAssistantText,
   groupTokensBySpans,
+  lastTurnPrefill,
   messageIndicesForGroups,
   toChatPayload,
   tokensToText,
@@ -206,6 +207,55 @@ describe('groupTokensBySpans', () => {
     expect(groups[1].footerTokens.map((t) => t.token)).toEqual(['</think>']);
     expect(tokensToText(groups[2].contentTokens)).toBe('Hello');
     expect(messageIndicesForGroups(groups, [{ role: 'user' }, { role: 'assistant' }])).toEqual([0, 1, 1]);
+  });
+});
+
+describe('lastTurnPrefill', () => {
+  const usr = { role: 'user', message_index: 0, section: 'content' };
+  const asst = { role: 'assistant', message_index: 1 };
+  const prefill = (tokens: [string, Partial<LensTokenMessage>][]) =>
+    lastTurnPrefill(groupTokensBySpans(spanned(tokens)).messages);
+
+  it('returns the input text before the first generated token', () => {
+    expect(
+      prefill([
+        ['Hi', usr],
+        ['<|im_start|>assistant', { ...asst, section: 'header' }],
+        ['Sure', { ...asst, section: 'content' }],
+        [',', { ...asst, section: 'content', is_generated: true }],
+      ]),
+    ).toBe('Sure');
+  });
+
+  it('keeps the reasoning and its tags when the prefill is two bubbles', () => {
+    expect(
+      prefill([
+        ['Hi', usr],
+        ['<|im_start|>assistant\n', { ...asst, section: 'header' }],
+        ['<think>', { ...asst, channel: 'analysis', section: 'header' }],
+        ['\nSay hi.\n', { ...asst, channel: 'analysis', section: 'content' }],
+        ['</think>', { ...asst, channel: 'analysis', section: 'footer' }],
+        ['\n\nHello', { ...asst, channel: 'final', section: 'content' }],
+        [' there', { ...asst, channel: 'final', section: 'content', is_generated: true }],
+      ]),
+    ).toBe('<think>\nSay hi.\n</think>\n\nHello');
+  });
+
+  it('is empty with no generated token, or only whitespace before it', () => {
+    expect(
+      prefill([
+        ['Hi', usr],
+        ['Hello', { ...asst, section: 'content' }],
+      ]),
+    ).toBe('');
+    expect(
+      prefill([
+        ['Hi', usr],
+        ['<think>\n\n</think>', { ...asst, section: 'scaffold' }],
+        ['\n\n', { ...asst, section: 'content' }],
+        ['Hello', { ...asst, section: 'content', is_generated: true }],
+      ]),
+    ).toBe('');
   });
 });
 
