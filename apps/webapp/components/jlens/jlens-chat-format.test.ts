@@ -188,6 +188,25 @@ describe('groupTokensBySpans', () => {
       0, 1, 2,
     ]);
   });
+
+  it('splits an input assistant message into its reasoning and its answer, both mapped to it', () => {
+    const asst = { role: 'assistant', message_index: 1 };
+    const tokens = spanned([
+      ['Hi', { ...usr, message_index: 0, section: 'content' }],
+      ['<|im_start|>', { ...asst, section: 'header' }],
+      ['<think>', { ...asst, channel: 'analysis', section: 'header' }],
+      ['Say hi', { ...asst, channel: 'analysis', section: 'content' }],
+      ['</think>', { ...asst, channel: 'analysis', section: 'footer' }],
+      ['Hello', { ...asst, channel: 'final', section: 'content' }],
+    ]);
+    const { messages: groups } = groupTokensBySpans(tokens);
+    expect(groups.map((g) => g.channel)).toEqual([undefined, 'analysis', 'final']);
+    expect(tokensToText(groups[1].contentTokens)).toBe('Say hi');
+    expect(groups[1].headerTokens.map((t) => t.token)).toEqual(['<|im_start|>', '<think>']);
+    expect(groups[1].footerTokens.map((t) => t.token)).toEqual(['</think>']);
+    expect(tokensToText(groups[2].contentTokens)).toBe('Hello');
+    expect(messageIndicesForGroups(groups, [{ role: 'user' }, { role: 'assistant' }])).toEqual([0, 1, 1]);
+  });
 });
 
 describe('toChatPayload', () => {

@@ -138,22 +138,27 @@ export function groupTokensBySpans(tokens: LensTokenMessage[]): {
   let prevSection: string | null = null;
   let prevChannel: string | null = null;
   let genBlock = 0;
+  let msgBlock = 0;
   for (let i = 0; i < tokens.length; i += 1) {
     const t = tokens[i];
     const mi = t.message_index ?? null;
     const channel = t.channel ?? null;
+    // A reasoning-tag block ends with no header of its own, so a switch between
+    // two named channels (`analysis` -> `final`) opens a block. Both sides must
+    // be named: harmony's structural markers sit at `null` before their channel
+    // name is parsed, and splitting on that would break a single harmony block.
+    const switchesChannel = prevChannel != null && channel != null && channel !== prevChannel;
     let key: string;
     if (mi != null) {
-      key = `msg:${mi}`;
+      // An input message with reasoning splits the same way.
+      if (switchesChannel) {
+        msgBlock += 1;
+      }
+      key = `msg:${mi}:${msgBlock}`;
     } else {
       // Generated / scaffold token. A new harmony block starts when a header
       // token follows a non-header token (e.g. `<|end|>` then `<|start|>`).
       const startsHeaderBlock = t.section === 'header' && prevSection != null && prevSection !== 'header';
-      // ...and a reasoning-tag block ends without one, so a switch between two
-      // named channels (`analysis` -> `final`) opens a block too. Both sides must
-      // be named: harmony's structural markers sit at `null` before their channel
-      // name is parsed, and splitting on that would break a single harmony block.
-      const switchesChannel = prevChannel != null && channel != null && channel !== prevChannel;
       if (startsHeaderBlock || switchesChannel) {
         genBlock += 1;
       }

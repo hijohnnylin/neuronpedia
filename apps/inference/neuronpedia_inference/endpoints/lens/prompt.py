@@ -4,6 +4,7 @@ import logging
 import unicodedata
 from collections.abc import AsyncIterator, Mapping
 from contextlib import nullcontext
+from dataclasses import replace
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -14,8 +15,13 @@ from interp_engine import (
     EagerModel,
     GeneratedTurnSpans,
     NoChatTemplateError,
+    ReasoningTags,
     ResidualBasisUnsupported,
+    TokenSpan,
     VLLMModel,
+    added_vocab,
+    detect_reasoning_tags,
+    is_harmony,
     lens_stream,
     steer,
 )
@@ -577,7 +583,48 @@ def compute_prompt_spans(model, request: LensPromptRequest, prompt_token_ids: li
     # Only trust the spans if they align exactly with the tokenized prompt.
     if [int(s.token_id) for s in spans] != [int(t) for t in prompt_token_ids]:
         return [], False
-    return spans, is_prefill
+    added = added_vocab(model.tokenizer)
+    tags = None if is_harmony(added) else detect_reasoning_tags(added)
+    return channel_prompt_reasoning(spans, tags), is_prefill
+
+
+def channel_prompt_reasoning(spans: list[TokenSpan], tags: ReasoningTags | None) -> list[TokenSpan]:
+    """Give the reasoning block of each assistant message in the prompt its own channel.
+
+    ``GeneratedTurnSpans`` does this for generated tokens, but ``message_spans`` does not, so the
+    reasoning of a prompt message, its close tag and its answer came back as one content run and
+    showed as one body. As for generated tokens: the open and close tags are the reasoning
+    channel's header and footer, the text between them its content, and what follows the answer
+    channel. A block with no close tag runs to the end of the message, as a prefill can stop
+    mid-thought. A message with no reasoning text (an empty ``<think></think>`` scaffold) stays as
+    it was.
+    """
+    if tags is None:
+        return spans
+    by_message: dict[int, list[int]] = {}
+    for i, s in enumerate(spans):
+        if s.role == "assistant" and s.message_index is not None and s.channel is None:
+            by_message.setdefault(s.message_index, []).append(i)
+    out = list(spans)
+    for positions in by_message.values():
+        words = [spans[i].token_str.strip() for i in positions]
+        if tags.open not in words:
+            continue
+        start = words.index(tags.open)
+        end = words.index(tags.close, start) if tags.close in words[start:] else len(words)
+        if not any(words[start + 1 : end]):
+            continue
+        for j, i in enumerate(positions[start:], start):
+            s = spans[i]
+            if j == start:
+                out[i] = replace(s, channel=tags.reasoning_channel, section="header")
+            elif j < end:
+                out[i] = replace(s, channel=tags.reasoning_channel)
+            elif j == end:
+                out[i] = replace(s, channel=tags.reasoning_channel, section="footer")
+            else:
+                out[i] = replace(s, channel=tags.answer_channel)
+    return out
 
 
 # --------------------------------------------------------------------------- #
