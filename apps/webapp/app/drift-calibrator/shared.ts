@@ -4,7 +4,7 @@ export const NT_TITLE = 'Drift Calibrator';
 // rows in the database.
 export const NT_MODEL_ID = 'llama3.1-8b-it';
 
-export const NT_PAPER_URL = 'https://neuronpedia.s3.us-east-1.amazonaws.com/site-assets/blog/mit-drift-calibrator.pdf';
+export const NT_PAPER_URL = 'https://arxiv.org/abs/2605.15455';
 export const NT_BLOG_URL = '/blog/jpp-drift-ui';
 export const NT_CONTACT_URL = 'mailto:skarny@mit.edu,acbaez@mit.edu';
 
