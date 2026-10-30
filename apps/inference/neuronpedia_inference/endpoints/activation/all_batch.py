@@ -5,10 +5,8 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from neuronpedia_inference.config import Config
-from neuronpedia_inference.endpoints.activation.all import (
-    ActivationProcessor as SinglePromptActivationProcessor,
-)
-from neuronpedia_inference.endpoints.activation.all import rank_by_percentile_error
+from neuronpedia_inference.endpoints.activation.all import ActivationProcessor as SinglePromptActivationProcessor
+from neuronpedia_inference.endpoints.activation.all import ActivationRequestError, rank_by_percentile_error
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     capture_padded_cache_async,
@@ -120,7 +118,7 @@ async def activation_all_batch(
         ]
 
         return ActivationAllBatchResponse(results=response_results)
-    except (BackendUnsupported, NeuronActRangeError) as e:
+    except (ActivationRequestError, BackendUnsupported, NeuronActRangeError) as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
     except Exception as e:
         # An allocation OOM here is retryable and does not poison the CUDA context, so it
@@ -182,14 +180,16 @@ class ActivationProcessor(SinglePromptActivationProcessor):
 
             batch_token_limit = config.activation_token_limit / MAX_BATCH_SIZE
             if len(tokens) > batch_token_limit:
-                raise ValueError(f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests")
+                raise ActivationRequestError(
+                    f"Text too long: {len(tokens)} tokens, max is {batch_token_limit} for batch requests"
+                )
 
             str_tokens = model.to_str_tokens(prompt, prepend_bos=prepend_bos)
 
             # Validate sort_by_token_indexes for this prompt
             for token_index in request.sort_by_token_indexes:
                 if token_index >= len(str_tokens) or token_index < 0:
-                    raise ValueError(
+                    raise ActivationRequestError(
                         f"Sort by token index {token_index} is out of range for "
                         f"the given prompt, which only has {len(str_tokens)} tokens."
                     )
