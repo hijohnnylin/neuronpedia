@@ -1,9 +1,10 @@
 'use client';
 
+import CustomTooltip from '@/components/custom-tooltip';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { compareModelIdsBySize } from '@/lib/utils/general';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { StarFilledIcon } from '@radix-ui/react-icons';
+import { QuestionMarkCircledIcon, StarFilledIcon } from '@radix-ui/react-icons';
 import { ChevronDownIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { JLENS_DEMOS_BAR_ID } from './jlens-tour-constants';
@@ -123,6 +124,63 @@ export function getNextJlensDemo(
   return { href: `/${modelId}/jlens?shareId=${option.demos[idx + 1].shareId}`, label: 'Next demo' };
 }
 
+const QWEN_HF_REVISION = '6a9e13bd6fc8f0983b9b99948120bc37f49c13e9';
+const JLENS_HF_REVISION = 'e166deb5ad540932100ef803c8c9bcc2a5453694';
+const JLENS_HF_BLOB = `https://huggingface.co/neuronpedia/jacobian-lens/blob/${JLENS_HF_REVISION}/qwen3.6-27b`;
+
+const QWEN_HOVER_INFO = (
+  <div className="flex flex-col gap-y-1.5">
+    <p>
+      <strong>Model:</strong>{' '}
+      <a
+        href={`https://huggingface.co/Qwen/Qwen3.6-27B/tree/${QWEN_HF_REVISION}`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <code className="text-sky-600 hover:underline">Qwen/Qwen3.6-27B</code>
+      </a>{' '}
+      <span className="text-slate-400">@ {QWEN_HF_REVISION.slice(0, 7)}</span>
+    </p>
+    <p>
+      <strong>Jacobian Lens:</strong>{' '}
+      <a
+        href={`${JLENS_HF_BLOB}/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <code className="text-sky-600 hover:underline">Qwen3.6-27B_jacobian_lens_n1000.pt</code>
+      </a>
+    </p>
+    <p>
+      <strong>J++ Lens:</strong>{' '}
+      <a
+        href={`${JLENS_HF_BLOB}/jpp/Salesforce-wikitext/Qwen3.6-27B_jpp_lens.pt`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <code className="text-sky-600 hover:underline">Qwen3.6-27B_jpp_lens.pt</code>
+      </a>
+    </p>
+    <div className="flex flex-col gap-y-1">
+      <strong>Deployment</strong>
+      <ul className="ml-4 list-inside list-disc">
+        <li>
+          <strong>Model:</strong> <code>bf16</code>, no quantization
+        </li>
+        <li>
+          <strong>KV Cache:</strong> <code>bf16</code>
+        </li>
+        <li>
+          <strong>Lenses:</strong> <code>bf16</code>
+        </li>
+        <li>
+          <strong>Max Length:</strong> 4,096 tokens
+        </li>
+      </ul>
+    </div>
+  </div>
+);
+
 const tabClass = (active: boolean, rounding: string) =>
   `relative flex h-7 cursor-pointer items-center justify-center border text-[10px] sm:text-[11px] font-medium transition-colors hover:z-20 hover:border-sky-700 hover:bg-sky-100 sm:px-3 ${rounding} ${
     active ? 'z-10 border-sky-700 bg-sky-700 text-white hover:bg-sky-700' : 'border-slate-200 bg-white text-slate-500'
@@ -188,9 +246,28 @@ export default function JlensModelSelector({
           <button
             type="button"
             onClick={() => onModelChange('qwen3.6-27b')}
-            className={tabClass(modelId === 'qwen3.6-27b', 'rounded-l-md px-2.5 sm:rounded-l-lg')}
+            className={tabClass(modelId === 'qwen3.6-27b', 'rounded-l-md px-2.5 sm:rounded-l-lg sm:pr-7')}
           >
             Qwen <span className="hidden sm:inline sm:px-1">3.6</span> 27B
+            <CustomTooltip
+              side="bottom"
+              delayDuration={0}
+              wide
+              trigger={
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label="About Qwen 3.6 27B"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="right-2 top-1/2 hidden -translate-y-1/2 items-center text-current opacity-70 transition-opacity hover:opacity-100 sm:absolute sm:block"
+                >
+                  <QuestionMarkCircledIcon className="h-3 w-3" />
+                </span>
+              }
+            >
+              {QWEN_HOVER_INFO}
+            </CustomTooltip>
           </button>
           {/* <button
             type="button"
