@@ -35,7 +35,7 @@ export default async function Page() {
             <p>
               ·{' '}
               <a
-                href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3z9o0hxjl-MDX9pbATO2qESOazNDLpdQ"
+                href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-4fi8qynnl-n2QrsTx3eJZHFHJ3Qzab4A"
                 className="font-bold text-sky-700 hover:underline"
               >
                 Slack #neuronpedia or #general

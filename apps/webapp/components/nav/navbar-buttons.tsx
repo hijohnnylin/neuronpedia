@@ -465,7 +465,7 @@ export default function NavBarButtons() {
       </DropdownMenu.Root>
 
       <Link
-        href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-3z9o0hxjl-MDX9pbATO2qESOazNDLpdQ"
+        href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-4fi8qynnl-n2QrsTx3eJZHFHJ3Qzab4A"
         target="_blank"
         rel="noreferrer"
         className="flex cursor-pointer items-center whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-medium text-emerald-700 transition-all hover:bg-emerald-200 hover:text-emerald-700 focus:outline-none data-[state=open]:bg-emerald-700 data-[state=open]:text-white sm:mr-1"
