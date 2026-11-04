@@ -250,7 +250,10 @@ class ConvergenceTracker:
 
     With ``resume=True`` and an existing CSV, rows are appended and the earlier
     rows are replayed into the window and milestones, so a fit resumed from its
-    checkpoint keeps one continuous curve and the same stop behaviour.
+    checkpoint keeps one continuous curve and the same stop behaviour. Rows are
+    keyed by ``prompt_idx``: because the callback runs before the checkpoint is
+    saved, a prompt whose row reached the CSV but whose checkpoint did not is
+    retried on resume, and the retry is recognised rather than counted twice.
     """
 
     CSV_COLUMNS = (
@@ -282,6 +285,12 @@ class ConvergenceTracker:
         self.stopped_at: int | None = None
         self._crossed: dict[float, int] = {}
         self._recent: deque[float] = deque(maxlen=self.window)
+        # Prompt indexes already present in the CSV. The metrics callback
+        # runs before the checkpoint is saved, so a process killed between
+        # the two leaves a CSV row the checkpoint does not know about; on
+        # resume that prompt is processed again and must not be counted a
+        # second time.
+        self._seen_prompt_idxs: set[int] = set()
         append = resume and self._replay(csv_path)
         self._file = open(csv_path, "a" if append else "w", newline="")  # noqa: SIM115 (closed in close())
         self._writer = csv.writer(self._file)
@@ -302,6 +311,10 @@ class ConvergenceTracker:
         if not rows or set(self.CSV_COLUMNS) - set(rows[0]):
             return False
         for row in rows:
+            prompt_idx = int(row["prompt_idx"])
+            if prompt_idx in self._seen_prompt_idxs:
+                continue  # duplicate row left by an earlier interrupted resume
+            self._seen_prompt_idxs.add(prompt_idx)
             value = float(row["mean_rel_change"])
             if not math.isnan(value):  # the first prompt has no Δmean
                 self._note(int(row["n_done"]), value)
@@ -315,7 +328,31 @@ class ConvergenceTracker:
             if thr not in self._crossed and mean_rel_change < thr:
                 self._crossed[thr] = n_done
 
+    def _should_stop(self, n_done: int) -> bool:
+        """Early-stop test against the current window, recording the stop."""
+        if (
+            self.stop_at_delta is not None
+            and n_done >= self.min_prompts
+            and len(self._recent) == self.window
+            and (sum(self._recent) / self.window) < self.stop_at_delta
+        ):
+            smoothed = sum(self._recent) / self.window
+            self.stopped_at = n_done
+            print(
+                f"Converged: {self.window}-prompt mean Δmean={smoothed:.2e} < "
+                f"{self.stop_at_delta:g} at {n_done} prompts — stopping early."
+            )
+            return True
+        return False
+
     def record(self, p: jlens.FitProgress) -> bool:
+        if p.prompt_idx in self._seen_prompt_idxs:
+            # Retried prompt: its row was written (and replayed above) before
+            # the interruption, so do not write or count it again. Its sample
+            # is already in the window; re-test the stop condition so the
+            # resumed fit makes the same decision as the uninterrupted one.
+            return self._should_stop(p.n_done)
+        self._seen_prompt_idxs.add(p.prompt_idx)
         self._writer.writerow(
             [
                 p.n_done,
@@ -332,20 +369,7 @@ class ConvergenceTracker:
             return False
         self._note(p.n_done, p.mean_rel_change)
 
-        if (
-            self.stop_at_delta is not None
-            and p.n_done >= self.min_prompts
-            and len(self._recent) == self.window
-            and (sum(self._recent) / self.window) < self.stop_at_delta
-        ):
-            smoothed = sum(self._recent) / self.window
-            self.stopped_at = p.n_done
-            print(
-                f"Converged: {self.window}-prompt mean Δmean={smoothed:.2e} < "
-                f"{self.stop_at_delta:g} at {p.n_done} prompts — stopping early."
-            )
-            return True
-        return False
+        return self._should_stop(p.n_done)
 
     def close(self) -> None:
         self._file.close()
