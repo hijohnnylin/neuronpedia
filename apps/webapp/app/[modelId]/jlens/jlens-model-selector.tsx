@@ -106,6 +106,9 @@ const FEATURED_MODEL_IDS = JLENS_MODEL_TOGGLE_OPTIONS.filter((o) => 'featured' i
 // dropdown trigger instead.
 const TAB_MODEL_IDS: readonly string[] = ['qwen3.6-27b', 'gemma-3-12b', 'deepseek-v4-flash'];
 
+// Inference models with no fitted Jacobian lens.
+const NO_JLENS_MODEL_IDS: readonly string[] = ['gemma-4-31b-it'];
+
 // Given the model + currently-viewed shareId, return where a "Next demo" button
 // should go: the next demo in that model's curated list, or free chat when on
 // the last demo (labelled "Free Chat" accordingly). Returns null when the
@@ -210,16 +213,18 @@ export default function JlensModelSelector({
   const hasDedicatedTab = TAB_MODEL_IDS.includes(modelId);
   const demos: readonly JlensDemo[] = currentOption?.demos ?? [];
 
-  // Show every inference-enabled model in the dropdown, but surface the pinned
-  // models at the top as "Featured" (same treatment as the releases dropdown)
-  // rather than hiding them.
-  const dropdownModelIds = [...getInferenceEnabledModels()].sort((a, b) => {
-    const aIsFeatured = FEATURED_MODEL_IDS.includes(a);
-    const bIsFeatured = FEATURED_MODEL_IDS.includes(b);
-    if (aIsFeatured && !bIsFeatured) return -1;
-    if (!aIsFeatured && bIsFeatured) return 1;
-    return compareModelIdsBySize(a, b);
-  });
+  // Show every inference-enabled model with a lens in the dropdown, but surface
+  // the pinned models at the top as "Featured" (same treatment as the releases
+  // dropdown) rather than hiding them.
+  const dropdownModelIds = [...getInferenceEnabledModels()]
+    .filter((id) => !NO_JLENS_MODEL_IDS.includes(id))
+    .sort((a, b) => {
+      const aIsFeatured = FEATURED_MODEL_IDS.includes(a);
+      const bIsFeatured = FEATURED_MODEL_IDS.includes(b);
+      if (aIsFeatured && !bIsFeatured) return -1;
+      if (!aIsFeatured && bIsFeatured) return 1;
+      return compareModelIdsBySize(a, b);
+    });
 
   // When switching to a demo, horizontally scroll the active demo button into
   // view within its own scroll container only (no ancestor scrolling, which is
