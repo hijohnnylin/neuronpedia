@@ -511,6 +511,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   // it wants explained (already-explained ∪ newly-selected); the route
   // reuses any prior cache rows covering subsets of that set and only
   // forwards the genuinely-missing positions to the upstream NLA server.
+  if (!nlaSourceId) {
+    return NextResponse.json({ error: 'nlaSourceId is required' }, { status: 400 });
+  }
   if (!Array.isArray(positions) || positions.length === 0) {
     return NextResponse.json({ error: 'positions is required and must be a non-empty array' }, { status: 400 });
   }
