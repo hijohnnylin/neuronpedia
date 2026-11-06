@@ -1,6 +1,6 @@
 import { GetObjectCommand, ListObjectsV2Command, S3 } from '@aws-sdk/client-s3';
 import { ungzip } from 'node-gzip';
-import { getLayerNumFromSource, getSourceSetNameFromSource } from './source';
+import { getLayerNumFromSource, getSourceSetNameFromSource, isNeuronLayerSource, NEURONS_SOURCESET } from './source';
 
 export const DATASET_BUCKET = 'neuronpedia-datasets';
 export const DATASET_REGION = 'us-east-1';
@@ -35,6 +35,13 @@ export async function listBucketAtPath(path: string, delimiter?: string) {
   return response;
 }
 
+// Neuron layers are exported one level down, at <model>/neurons/<layer>.
+export function getS3SourcePath(modelId: string, sourceId: string) {
+  return isNeuronLayerSource(sourceId)
+    ? `${DATASET_BASE_PATH}${modelId}/${NEURONS_SOURCESET}/${sourceId}`
+    : `${DATASET_BASE_PATH}${modelId}/${sourceId}`;
+}
+
 export function parseLine(line: string) {
   const parsedData = JSON.parse(line);
   if (parsedData.createdAt) {
@@ -54,10 +61,13 @@ export async function getS3ModelsToSources() {
     await Promise.all(
       s3models.map(async (model) => {
         const response = await listBucketAtPath(model, '/');
-        return [
-          model.replace(DATASET_BASE_PATH, '').replace('/', ''),
-          response.CommonPrefixes?.map((content) => content.Prefix?.split('/')[2]) || [],
-        ];
+        const sources = response.CommonPrefixes?.map((content) => content.Prefix?.split('/')[2]) || [];
+        if (sources.includes(NEURONS_SOURCESET)) {
+          const layers = await listBucketAtPath(`${model}${NEURONS_SOURCESET}/`, '/');
+          sources.splice(sources.indexOf(NEURONS_SOURCESET), 1);
+          sources.push(...(layers.CommonPrefixes?.map((content) => content.Prefix?.split('/')[3]) || []));
+        }
+        return [model.replace(DATASET_BASE_PATH, '').replace('/', ''), sources];
       }),
     ),
   );

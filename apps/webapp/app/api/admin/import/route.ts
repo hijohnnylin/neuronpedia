@@ -4,10 +4,10 @@ import { prisma } from '@/lib/db';
 import { importConfigFromS3, importJsonlString } from '@/lib/db/import';
 import { IS_LOCALHOST } from '@/lib/env';
 import {
-  DATASET_BASE_PATH,
   downloadAndDecompressFile,
   downloadFileJsonlParsedLines,
   getFilesInPath,
+  getS3SourcePath,
 } from '@/lib/utils/s3';
 import { getAuthedAdminUser, RequestAuthedAdminUser, RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
@@ -46,7 +46,7 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
     }
     explanationBatchStart = Number.parseInt(explanationBatchStartParam, 10);
   }
-  const path = `${DATASET_BASE_PATH}${modelId}/${sourceId}`;
+  const path = getS3SourcePath(modelId, sourceId);
   console.log('Importing data from', path);
 
   if (!IS_LOCALHOST && (!request.user || !(await getAuthedAdminUser(request as RequestAuthedAdminUser)))) {
