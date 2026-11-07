@@ -31,7 +31,7 @@ export const maxDuration = 120;
                     "required": ["modelId", "layer", "index", "description", "typeName"],
                     "properties": {
                       "modelId": { "type": "string", "description": "The model ID, for example qwen3-8b." },
-                      "layer": { "type": "string", "description": "The source ID, for example 9-neurons." },
+                      "layer": { "type": "string", "description": "The source ID. For MLP neurons, the layer number, for example 9." },
                       "index": { "type": "string", "description": "The feature index." },
                       "description": { "type": "string", "description": "The explanation. A short phrase is fine." },
                       "typeName": { "type": "string", "description": "Your explanation type." },
@@ -51,7 +51,7 @@ export const maxDuration = 120;
                 "explanations": [
                   {
                     "modelId": "qwen3-8b",
-                    "layer": "9-neurons",
+                    "layer": "9",
                     "index": "10358",
                     "description": "wine",
                     "typeName": "my-site",

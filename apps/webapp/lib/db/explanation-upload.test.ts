@@ -30,7 +30,7 @@ vi.mock('@/lib/db/neuron-dashboard', () => ({ ensureNeuronRowForFeature: mocks.e
 const user = { id: 'uploader', name: 'uploader' };
 const item = {
   modelId: 'qwen3-8b',
-  layer: '9-neurons',
+  layer: '9',
   index: '10358',
   description: 'wine',
   typeName: 'my-site',
@@ -51,7 +51,7 @@ beforeEach(() => {
   mocks.typeFindMany.mockResolvedValue([{ name: 'my-site', creatorId: 'uploader' }]);
   mocks.modelTypeFindMany.mockResolvedValue([]);
   mocks.canAccess.mockResolvedValue(true);
-  mocks.neuronFindMany.mockResolvedValue([{ modelId: 'qwen3-8b', layer: '9-neurons', index: '10358' }]);
+  mocks.neuronFindMany.mockResolvedValue([{ modelId: 'qwen3-8b', layer: '9', index: '10358' }]);
   mocks.explanationFindMany.mockResolvedValue([]);
   mocks.createManyAndReturn.mockImplementation(async ({ data }) =>
     data.map((d: typeof item, i: number) => ({ id: `e${i}`, ...d })),
@@ -118,7 +118,7 @@ describe('uploadExplanations', () => {
   it('refuses the whole batch when one feature is missing', async () => {
     const err = await errorOf(uploadExplanations([item, { ...item, index: '99' }], user));
     expect(err.status).toBe(404);
-    expect(err.message).toContain('qwen3-8b@9-neurons:99');
+    expect(err.message).toContain('qwen3-8b@9:99');
     expect(mocks.createManyAndReturn).not.toHaveBeenCalled();
   });
 
@@ -135,7 +135,7 @@ describe('uploadExplanations', () => {
       sourceUrl: 'https://example.com/n',
       metadata: { title: 'Wine Bottle' },
     });
-    expect(result.created[0].url).toMatch(/\/qwen3-8b\/9-neurons\/10358$/);
+    expect(result.created[0].url).toMatch(/\/qwen3-8b\/9\/10358$/);
   });
 
   it('skips explanations that are already there, and repeats in the batch', async () => {
