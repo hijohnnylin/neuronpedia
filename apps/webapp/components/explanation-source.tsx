@@ -11,7 +11,7 @@ import {
 import { ExplanationPartialWithRelations } from '@/prisma/generated/zod';
 import * as Popover from '@radix-ui/react-popover';
 import { ExternalLink, Info } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const BADGE_CLASSES = {
   negative: 'bg-rose-50 text-rose-600',
@@ -94,6 +94,17 @@ function MetadataValue({ value }: { value: unknown }) {
 export function ExplanationMetadataButton({ metadata }: { metadata: unknown }) {
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
+  // Wait before closing, so the pointer can cross the gap from the button to the popup.
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const startHover = () => {
+    clearTimeout(closeTimer.current);
+    setHovered(true);
+  };
+  const endHover = () => {
+    clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setHovered(false), 200);
+  };
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
   if (!hasMetadata(metadata)) {
     return null;
   }
@@ -112,8 +123,8 @@ export function ExplanationMetadataButton({ metadata }: { metadata: unknown }) {
           type="button"
           aria-label="Show details"
           className="ml-1 inline-flex -translate-y-px align-middle text-slate-400 hover:text-sky-600"
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
+          onMouseEnter={startHover}
+          onMouseLeave={endHover}
           onClick={() => setPinned(!pinned)}
         >
           <Info className="h-3 w-3" />
@@ -125,8 +136,8 @@ export function ExplanationMetadataButton({ metadata }: { metadata: unknown }) {
           sideOffset={4}
           side="bottom"
           align="start"
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
+          onMouseEnter={startHover}
+          onMouseLeave={endHover}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <MetadataValue value={metadata} />
