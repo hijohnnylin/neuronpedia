@@ -11,6 +11,9 @@ export default function CustomTooltip({
   delayDuration,
   minMargin = false,
   className,
+  align,
+  alignOffset,
+  collisionPadding,
 }: {
   trigger: React.ReactNode;
   children: React.ReactNode;
@@ -21,6 +24,10 @@ export default function CustomTooltip({
   /** If true, applies minimal margin for compact tooltips */
   minMargin?: boolean;
   className?: string;
+  align?: 'start' | 'center' | 'end';
+  alignOffset?: number;
+  /** Minimum gap in px between the tooltip and the window edge. */
+  collisionPadding?: number;
 }) {
   return (
     <OldTooltip.Provider delayDuration={0} skipDelayDuration={0}>
@@ -33,6 +40,9 @@ export default function CustomTooltip({
             } text-xs text-slate-600 shadow ${wide ? 'max-w-[640px]' : 'max-w-[320px]'}`}
             sideOffset={3}
             side={side}
+            align={align}
+            alignOffset={alignOffset}
+            collisionPadding={collisionPadding}
           >
             {children}
           </OldTooltip.Content>

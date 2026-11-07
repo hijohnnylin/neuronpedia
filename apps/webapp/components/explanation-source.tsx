@@ -160,7 +160,10 @@ export function ExternalExplanationCredit({ explanation }: { explanation: Explan
           <ExternalLink className="h-2.5 w-2.5" />
         </a>
       }
-      side="top"
+      side="bottom"
+      align="start"
+      alignOffset={12}
+      collisionPadding={12}
     >
       <div className="flex flex-col gap-y-1.5 leading-relaxed">
         <p>
