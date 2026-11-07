@@ -1,12 +1,14 @@
 'use client';
 
 import CustomTooltip from '@/components/custom-tooltip';
+import { JPP_CREDITS } from '@/components/jlens/jlens-lens-mode';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { compareModelIdsBySize } from '@/lib/utils/general';
+import { jppLensAvailable } from '@/lib/utils/lens';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { QuestionMarkCircledIcon, StarFilledIcon } from '@radix-ui/react-icons';
 import { ChevronDownIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, type SyntheticEvent, useEffect, useRef } from 'react';
 import { JLENS_DEMOS_BAR_ID } from './jlens-tour-constants';
 
 export interface JlensDemo {
@@ -127,62 +129,233 @@ export function getNextJlensDemo(
   return { href: `/${modelId}/jlens?shareId=${option.demos[idx + 1].shareId}`, label: 'Next demo' };
 }
 
-const QWEN_HF_REVISION = '6a9e13bd6fc8f0983b9b99948120bc37f49c13e9';
-const JLENS_HF_REVISION = 'e166deb5ad540932100ef803c8c9bcc2a5453694';
-const JLENS_HF_BLOB = `https://huggingface.co/neuronpedia/jacobian-lens/blob/${JLENS_HF_REVISION}/qwen3.6-27b`;
+// What each model's server runs, for the "?" hover. Models with no entry show no "?".
+// The model and its lenses share one dtype; the KV cache does too unless `kvCache` says otherwise.
+interface ModelLensInfo {
+  hfModelId: string;
+  hfModelRevision?: string;
+  // The neuronpedia/jacobian-lens revision that has the lens files.
+  lensRevision?: string;
+  jlensPath: string;
+  jppPath?: string;
+  dtype?: string;
+  quantization?: string;
+  kvCache?: string;
+  maxLength: number;
+}
 
-const QWEN_HOVER_INFO = (
-  <div className="flex flex-col gap-y-1.5">
-    <p>
-      <strong>Model:</strong>{' '}
-      <a
-        href={`https://huggingface.co/Qwen/Qwen3.6-27B/tree/${QWEN_HF_REVISION}`}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <code className="text-sky-600 hover:underline">Qwen/Qwen3.6-27B</code>
-      </a>{' '}
-      <span className="text-slate-400">@ {QWEN_HF_REVISION.slice(0, 7)}</span>
-    </p>
-    <p>
-      <strong>Jacobian Lens:</strong>{' '}
-      <a
-        href={`${JLENS_HF_BLOB}/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt`}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <code className="text-sky-600 hover:underline">Qwen3.6-27B_jacobian_lens_n1000.pt</code>
-      </a>
-    </p>
-    <p>
-      <strong>J++ Lens:</strong>{' '}
-      <a
-        href={`${JLENS_HF_BLOB}/jpp/Salesforce-wikitext/Qwen3.6-27B_jpp_lens.pt`}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <code className="text-sky-600 hover:underline">Qwen3.6-27B_jpp_lens.pt</code>
-      </a>
-    </p>
-    <div className="flex flex-col gap-y-1">
-      <strong>Deployment</strong>
-      <ul className="ml-4 list-inside list-disc">
-        <li>
-          <strong>Model:</strong> <code>bf16</code>, no quantization
-        </li>
-        <li>
-          <strong>KV Cache:</strong> <code>bf16</code>
-        </li>
-        <li>
-          <strong>Lenses:</strong> <code>bf16</code>
-        </li>
-        <li>
-          <strong>Max Length:</strong> 4,096 tokens
-        </li>
-      </ul>
+// The revision with the J++ lenses for Gemma 3 12B and Llama 3.1 8B IT.
+const LENS_REVISION = 'b87d2a42d715f50e3a8359d9c29ccdd5514509d2';
+
+const MODEL_LENS_INFO: Record<string, ModelLensInfo> = {
+  'qwen3.6-27b': {
+    hfModelId: 'Qwen/Qwen3.6-27B',
+    hfModelRevision: '6a9e13bd6fc8f0983b9b99948120bc37f49c13e9',
+    lensRevision: 'e166deb5ad540932100ef803c8c9bcc2a5453694',
+    jlensPath: 'qwen3.6-27b/jlens/Salesforce-wikitext/Qwen3.6-27B_jacobian_lens_n1000.pt',
+    jppPath: 'qwen3.6-27b/jpp/Salesforce-wikitext/Qwen3.6-27B_jpp_lens.pt',
+    maxLength: 4096,
+  },
+  'gemma-3-12b': {
+    hfModelId: 'google/gemma-3-12b-pt',
+    jlensPath: 'gemma-3-12b/jlens/Salesforce-wikitext/gemma-3-12b-pt_jacobian_lens.pt',
+    jppPath: 'gemma-3-12b/jpp/Salesforce-wikitext/gemma-3-12b-pt_jpp_lens.pt',
+    maxLength: 1024,
+  },
+  'llama3.1-8b-it': {
+    hfModelId: 'meta-llama/Llama-3.1-8B-Instruct',
+    jlensPath: 'llama3.1-8b-it/jlens/Salesforce-wikitext/Llama-3.1-8B-Instruct_jacobian_lens.pt',
+    jppPath: 'llama3.1-8b-it/jpp/Salesforce-wikitext/Llama-3.1-8B-Instruct_jpp_lens.pt',
+    maxLength: 4096,
+  },
+  'deepseek-v4-flash': {
+    hfModelId: 'deepseek-ai/DeepSeek-V4-Flash',
+    jlensPath: 'deepseek-v4-flash/jlens/NeelNanda-pile-10k/deepseek-v4-flash_jacobian_lens_cblank.pt',
+    jppPath: 'deepseek-v4-flash/jpp/Salesforce-wikitext/DeepSeek-V4-Flash_jpp_lens.pt',
+    quantization: 'fp8',
+    kvCache: 'fp8',
+    maxLength: 2048,
+  },
+  'gemma-2-2b': {
+    hfModelId: 'google/gemma-2-2b',
+    jlensPath: 'gemma-2-2b/jlens/Salesforce-wikitext/gemma-2-2b_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'gemma-2-2b-it': {
+    hfModelId: 'google/gemma-2-2b-it',
+    jlensPath: 'gemma-2-2b-it/jlens/Salesforce-wikitext/gemma-2-2b-it_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'gemma-2-9b-it': {
+    hfModelId: 'google/gemma-2-9b-it',
+    jlensPath: 'gemma-2-9b-it/jlens/Salesforce-wikitext/gemma-2-9b-it_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'gemma-3-270m': {
+    hfModelId: 'google/gemma-3-270m',
+    jlensPath: 'gemma-3-270m/jlens/Salesforce-wikitext/gemma-3-270m_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'gemma-3-1b': {
+    hfModelId: 'google/gemma-3-1b-pt',
+    jlensPath: 'gemma-3-1b/jlens/Salesforce-wikitext/gemma-3-1b-pt_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'gemma-3-4b': {
+    hfModelId: 'google/gemma-3-4b-pt',
+    jlensPath: 'gemma-3-4b/jlens/Salesforce-wikitext/gemma-3-4b-pt_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'gpt-oss-20b': {
+    hfModelId: 'openai/gpt-oss-20b',
+    jlensPath: 'gpt-oss-20b/jlens/Salesforce-wikitext/gpt-oss-20b_jacobian_lens.pt',
+    quantization: 'mxfp4',
+    maxLength: 4096,
+  },
+  'gpt2-small': {
+    hfModelId: 'openai-community/gpt2',
+    jlensPath: 'gpt2-small/jlens/Salesforce-wikitext/gpt2_jacobian_lens.pt',
+    dtype: 'fp32',
+    maxLength: 1024,
+  },
+  'llama3.1-8b': {
+    hfModelId: 'meta-llama/Llama-3.1-8B',
+    jlensPath: 'llama3.1-8b/jlens/Salesforce-wikitext/Llama-3.1-8B_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'llama3.3-70b-it': {
+    hfModelId: 'meta-llama/Llama-3.3-70B-Instruct',
+    jlensPath: 'llama3.3-70b-it/jlens/Salesforce-wikitext/Llama-3.3-70B-Instruct_jacobian_lens.pt',
+    maxLength: 1024,
+  },
+  'qwen3-8b': {
+    hfModelId: 'Qwen/Qwen3-8B',
+    jlensPath: 'qwen3-8b/jlens/Salesforce-wikitext/Qwen3-8B_jacobian_lens.pt',
+    maxLength: 4096,
+  },
+  'qwen3-32b': {
+    hfModelId: 'Qwen/Qwen3-32B',
+    jlensPath: 'qwen3-32b/jlens/Salesforce-wikitext/Qwen3-32B_jacobian_lens.pt',
+    maxLength: 4096,
+  },
+};
+
+function LensFileLink({ revision, path }: { revision: string; path: string }) {
+  return (
+    <a
+      href={`https://huggingface.co/neuronpedia/jacobian-lens/blob/${revision}/${path}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <code className="text-sky-600 hover:underline">{path.split('/').pop()}</code>
+    </a>
+  );
+}
+
+function ModelLensInfoContent({ modelId, info }: { modelId: string; info: ModelLensInfo }) {
+  const jppCredit = JPP_CREDITS[modelId];
+  const lensRevision = info.lensRevision ?? LENS_REVISION;
+  const dtype = info.dtype ?? 'bf16';
+  return (
+    <div className="flex flex-col gap-y-1.5">
+      <p>
+        <strong>Model:</strong>{' '}
+        <a
+          href={`https://huggingface.co/${info.hfModelId}${info.hfModelRevision ? `/tree/${info.hfModelRevision}` : ''}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <code className="text-sky-600 hover:underline">{info.hfModelId}</code>
+        </a>
+        {info.hfModelRevision && <span className="text-slate-400"> @ {info.hfModelRevision.slice(0, 7)}</span>}
+      </p>
+      <p>
+        <strong>Jacobian Lens:</strong> <LensFileLink revision={lensRevision} path={info.jlensPath} />
+      </p>
+      {info.jppPath && jppLensAvailable(modelId) && (
+        <p>
+          <strong>J++ Lens:</strong> <LensFileLink revision={lensRevision} path={info.jppPath} />
+          {jppCredit && (
+            <span className="text-slate-400">
+              {' '}
+              by{' '}
+              <a href={jppCredit.href} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                {jppCredit.label}
+              </a>
+            </span>
+          )}
+        </p>
+      )}
+      <div className="flex flex-col gap-y-1">
+        <strong>Deployment</strong>
+        <ul className="ml-4 list-inside list-disc">
+          <li>
+            <strong>Model:</strong> <code>{dtype}</code>,{' '}
+            {info.quantization ? (
+              <>
+                <code>{info.quantization}</code> quantization
+              </>
+            ) : (
+              'no quantization'
+            )}
+          </li>
+          <li>
+            <strong>KV Cache:</strong> <code>{info.kvCache ?? dtype}</code>
+          </li>
+          <li>
+            <strong>Lenses:</strong> <code>{dtype}</code>
+          </li>
+          <li>
+            <strong>Max Length:</strong> {info.maxLength.toLocaleString('en-US')} tokens
+          </li>
+        </ul>
+      </div>
     </div>
-  </div>
-);
+  );
+}
+
+// The "?" that opens a model's lens info. It sits inside a button or a menu item,
+// so pointer and click events stop here and do not select the model.
+function ModelLensInfoHover({
+  modelId,
+  side,
+  className,
+}: {
+  modelId: string;
+  side: 'bottom' | 'right';
+  className?: string;
+}) {
+  const info = MODEL_LENS_INFO[modelId];
+  if (!info) {
+    return null;
+  }
+  const stop = (e: SyntheticEvent) => e.stopPropagation();
+  return (
+    <CustomTooltip
+      side={side}
+      delayDuration={0}
+      wide
+      trigger={
+        <span
+          role="button"
+          tabIndex={-1}
+          aria-label={`About ${info.hfModelId}`}
+          onClick={stop}
+          onPointerDown={stop}
+          onPointerUp={stop}
+          className={`items-center text-current opacity-70 transition-opacity hover:opacity-100 ${className ?? ''}`}
+        >
+          <QuestionMarkCircledIcon className="h-3 w-3" />
+        </span>
+      }
+    >
+      <ModelLensInfoContent modelId={modelId} info={info} />
+    </CustomTooltip>
+  );
+}
+
+// Absolute "?" at the right edge of a tab; the tab needs `sm:pr-7` to make room.
+const TAB_INFO_CLASS = 'right-2 top-1/2 hidden -translate-y-1/2 sm:absolute sm:block';
 
 const tabClass = (active: boolean, rounding: string) =>
   `relative flex h-7 cursor-pointer items-center justify-center border text-[10px] sm:text-[11px] font-medium transition-colors hover:z-20 hover:border-sky-700 hover:bg-sky-100 sm:px-3 ${rounding} ${
@@ -254,25 +427,7 @@ export default function JlensModelSelector({
             className={tabClass(modelId === 'qwen3.6-27b', 'rounded-l-md px-2.5 sm:rounded-l-lg sm:pr-7')}
           >
             Qwen <span className="hidden sm:inline sm:px-1">3.6</span> 27B
-            <CustomTooltip
-              side="bottom"
-              delayDuration={0}
-              wide
-              trigger={
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  aria-label="About Qwen 3.6 27B"
-                  onClick={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="right-2 top-1/2 hidden -translate-y-1/2 items-center text-current opacity-70 transition-opacity hover:opacity-100 sm:absolute sm:block"
-                >
-                  <QuestionMarkCircledIcon className="h-3 w-3" />
-                </span>
-              }
-            >
-              {QWEN_HOVER_INFO}
-            </CustomTooltip>
+            <ModelLensInfoHover modelId="qwen3.6-27b" side="bottom" className={TAB_INFO_CLASS} />
           </button>
           {/* <button
             type="button"
@@ -284,17 +439,19 @@ export default function JlensModelSelector({
           <button
             type="button"
             onClick={() => onModelChange('gemma-3-12b')}
-            className={`-ml-px ${tabClass(modelId === 'gemma-3-12b', 'px-2.5')}`}
+            className={`-ml-px ${tabClass(modelId === 'gemma-3-12b', 'px-2.5 sm:pr-7')}`}
           >
             Gemma <span className="hidden sm:inline sm:px-1">3</span> 12B
+            <ModelLensInfoHover modelId="gemma-3-12b" side="bottom" className={TAB_INFO_CLASS} />
           </button>
           <button
             type="button"
             onClick={() => onModelChange('deepseek-v4-flash')}
-            className={`-ml-px ${tabClass(modelId === 'deepseek-v4-flash', 'px-2.5')}`}
+            className={`-ml-px ${tabClass(modelId === 'deepseek-v4-flash', 'px-2.5 sm:pr-7')}`}
           >
             <span className="sm:hidden">DSv4</span>
             <span className="hidden sm:inline">DeepSeek V4 Flash</span>
+            <ModelLensInfoHover modelId="deepseek-v4-flash" side="bottom" className={TAB_INFO_CLASS} />
           </button>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
@@ -331,7 +488,10 @@ export default function JlensModelSelector({
                         mId === modelId ? 'bg-sky-100 text-sky-700' : 'text-slate-500'
                       } hover:bg-slate-100`}
                     >
-                      <span className="font-sans">{globalModels[mId]?.displayNameShort ?? mId}</span>
+                      <span className="flex flex-row items-center gap-x-1.5 whitespace-nowrap font-sans">
+                        {globalModels[mId]?.displayNameShort ?? mId}
+                        <ModelLensInfoHover modelId={mId} side="right" className="flex" />
+                      </span>
                       {FEATURED_MODEL_IDS.includes(mId) && (
                         <span className="flex flex-row items-center gap-x-0.5 text-[8.5px] font-bold uppercase text-emerald-600">
                           <StarFilledIcon className="h-2 w-2" /> Featured

@@ -234,7 +234,12 @@ export function JlensAnalysisPanel({
           {/* Mode toggle + layer range slider — only once there are results. */}
           {tokens.length > 0 && (
             <div className="flex flex-row items-center justify-center gap-x-2 px-2.5 pb-0 pt-2.5 sm:px-4 sm:pt-3.5">
-              <LensColumnsToggle columns={columns} setColumns={setColumns} jppAvailable={hasJppLens(layersByType)} />
+              <LensColumnsToggle
+                columns={columns}
+                setColumns={setColumns}
+                jppAvailable={hasJppLens(layersByType)}
+                modelId={analysis.oracle.modelId}
+              />
               {layerBounds && effectiveRange ? (
                 <LayerRangeSlider
                   bounds={layerBounds}

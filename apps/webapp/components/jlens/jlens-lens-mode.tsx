@@ -40,9 +40,22 @@ export function lensTypesOf(columns: LensColumn[]): LensType[] {
   return columns.filter((c): c is LensType => isLensTypeColumn(c));
 }
 
+// Who fitted each model's J++ Lens, shown in the J++ help card. The link goes
+// to the source files and the steps to reproduce them.
+export const JPP_CREDITS: Record<string, { label: string; href: string }> = {
+  'qwen3.6-27b': { label: 'Ayonrinde & Lindsey', href: 'https://huggingface.co/koayon/jpp-lenses' },
+  'deepseek-v4-flash': { label: 'Ayonrinde & Lindsey', href: 'https://huggingface.co/koayon/jpp-lenses' },
+  'llama3.1-8b-it': {
+    label: 'bubskee',
+    href: 'https://huggingface.co/bubskee/llama-3.1-8b-instruct-r-jpp-lenses',
+  },
+  'gemma-3-12b': { label: 'bubskee', href: 'https://huggingface.co/bubskee/gemma-3-12b-pt-r-jpp-lenses' },
+};
+
 // Hover help for the J++ toggle. A click in the card must not reach the
 // toggle: React events bubble through the portal to the button.
-function JppLensHelp() {
+function JppLensHelp({ modelId }: { modelId?: string }) {
+  const credit = modelId ? JPP_CREDITS[modelId] : undefined;
   return (
     <HoverCard openDelay={100} closeDelay={100}>
       <HoverCardTrigger asChild>
@@ -96,6 +109,15 @@ function JppLensHelp() {
           example
         </a>
         .
+        {credit && (
+          <div className="mt-1.5">
+            This model&apos;s J++ Lens was fitted by{' '}
+            <a href={credit.href} className="text-sky-700 underline" target="_blank" rel="noopener noreferrer">
+              {credit.label}
+            </a>
+            .
+          </div>
+        )}
       </HoverCardContent>
     </HoverCard>
   );
@@ -105,10 +127,12 @@ export function LensColumnsToggle({
   columns,
   setColumns,
   jppAvailable,
+  modelId,
 }: {
   columns: LensColumn[];
   setColumns: (c: LensColumn[]) => void;
   jppAvailable: boolean;
+  modelId?: string;
 }) {
   // The J++ button shows only where the server has the J++ Lens.
   const order = LENS_COLUMN_ORDER.filter(
@@ -151,7 +175,7 @@ export function LensColumnsToggle({
               } ${separator}`}
             >
               {LENS_COLUMN_LABELS[c].toUpperCase()}
-              {c === LensColumn.JPP_LENS && <JppLensHelp />}
+              {c === LensColumn.JPP_LENS && <JppLensHelp modelId={modelId} />}
             </button>
           );
         })}

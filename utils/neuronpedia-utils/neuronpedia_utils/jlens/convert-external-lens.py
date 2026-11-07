@@ -64,6 +64,17 @@ ATTRIBUTION = (
     "'Verbalizable Workspace' paper (https://github.com/anthropics/jlens), "
     "Apache-2.0. Fitted externally; converted via Neuronpedia convert-external-lens.py."
 )
+RLENS_ATTRIBUTION = (
+    "R-Lens by Camila Blank, Agam Bhatia and Neel Nanda ('R-lens: Making J-lens More "
+    "Faithful on Early Layers'): a Jacobian lens fitted with a relevance-propagation "
+    "backward pass, saved in the jlens format (https://github.com/anthropics/jlens, "
+    "Apache-2.0). Fitted externally; converted via Neuronpedia convert-external-lens.py."
+)
+# --method: (lens name, attribution).
+METHODS = {
+    "jlens": ("Jacobian lens", ATTRIBUTION),
+    "rlens": ("R-Lens", RLENS_ATTRIBUTION),
+}
 
 # Provenance keys that map onto a field config.yaml already has, so two lenses stay
 # comparable under one field name instead of one of them hiding in extra_metadata.
@@ -132,6 +143,26 @@ def parse_args() -> argparse.Namespace:
         "--force",
         action="store_true",
         help="overwrite a capture point the file already declares differently",
+    )
+    parser.add_argument(
+        "--method",
+        default="jlens",
+        choices=sorted(METHODS),
+        help="'rlens' for an R-Lens saved in the jlens format",
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        help="where the .pt came from, e.g. 'bubskee/qwen3-14b-jr-lenses@<sha>:j-lens/lens.pt'",
+    )
+    parser.add_argument(
+        "--target-layer",
+        type=int,
+        default=None,
+        help=(
+            "the block the maps transport to, when the file does not record it. "
+            "Without it, the last source layer is taken as the target"
+        ),
     )
     return parser.parse_args()
 
@@ -290,9 +321,10 @@ def write_config_yaml(
     target: int,
 ) -> Path:
     """config.yaml in run-all-fit-lens.py's shape, with the source fit's own fields carried through."""
+    lens_name, attribution = METHODS[args.method]
     header = [
-        "# Jacobian lens — converted by Neuronpedia convert-external-lens.py",
-        f"# {ATTRIBUTION}",
+        f"# {lens_name} — converted by Neuronpedia convert-external-lens.py",
+        f"# {attribution}",
         "#",
         "# This lens was NOT fitted by this repo, so the `fit` block below is the source",
         "# fit's parameters mapped onto our field names (null where it recorded nothing),",
@@ -336,6 +368,7 @@ def write_config_yaml(
             "max_chars": None,
         },
         "fit": {
+            "method": args.method,
             "n_prompts": provenance.get("n_prompts"),
             "dim_batch": None,
             "max_seq_len": provenance.get("t_max"),
@@ -352,6 +385,7 @@ def write_config_yaml(
         },
         "lens": {
             "file": lens_path.name,
+            "source": args.source,
             "d_model": d_model,
             "source_layers_first": layers[0],
             "source_layers_last": layers[-1],
@@ -363,7 +397,7 @@ def write_config_yaml(
         },
         "extra_metadata": extra or None,
         "command": shlex.join(sys.argv),
-        "attribution": ATTRIBUTION,
+        "attribution": attribution,
     }
 
     out_path = out_dir / "config.yaml"
@@ -384,6 +418,14 @@ def main() -> None:
         f"== reading {lens_path.name} ({lens_path.stat().st_size / 2**30:.2f} GiB) =="
     )
     checkpoint = torch.load(lens_path, map_location="cpu", weights_only=True)
+    if args.target_layer is not None:
+        recorded = (checkpoint.get("provenance") or {}).get("target_layer")
+        if recorded is not None and int(recorded) != args.target_layer:
+            raise SystemExit(
+                f"the file records target_layer {recorded}, not {args.target_layer}"
+            )
+        checkpoint["provenance"] = dict(checkpoint.get("provenance") or {})
+        checkpoint["provenance"]["target_layer"] = args.target_layer
     layers, d_model, target = validate_structure(checkpoint, lens_path)
     provenance: dict[str, Any] = dict(checkpoint.get("provenance") or {})
     dtypes = {str(checkpoint["J"][layer].dtype) for layer in layers}
@@ -395,7 +437,9 @@ def main() -> None:
 
     capture = build_capture_fields(args, provenance)
     hf_model_name = resolve_hf_model_name(args, provenance)
-    checkpoint["provenance"] = provenance | capture
+    checkpoint["provenance"] = provenance | capture | {"method": args.method}
+    if args.source:
+        checkpoint["provenance"]["source"] = args.source
     # Keep these consistent with J rather than trusting what was recorded; `validate_structure`
     # has already refused a genuine disagreement.
     checkpoint["source_layers"] = layers
