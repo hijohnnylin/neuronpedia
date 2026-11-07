@@ -96,6 +96,7 @@ model User {
   explanations                 Explanation[]
   triggeredExplanations        Explanation[]                 @relation(name: "triggeredByUser")
   canTriggerExplanations       Boolean                       @default(false)
+  canUploadExplanations        Boolean                       @default(false)
   neurons                      Neuron[]
   sources                      Source[]
   sourceSets                   SourceSet[]
@@ -232,19 +233,19 @@ model JlensShare {
   description String?
 
   // Sidebar predicted-token selections: [{ key: string, type: LensType }].
-  lockedTokens        Json    @default("[]")
+  lockedTokens        Json     @default("[]")
   // Selected chat token positions (indices into the token stream).
-  selectedPositions   Int[]   @default([])
+  selectedPositions   Int[]    @default([])
   // Lens columns shown on load, in display order: 'JACOBIAN_LENS' | 'ORACLE_LENS' | 'LOGIT_LENS'.
   lensColumns         String[] @default([])
   // Legacy lens tab: 'JACOBIAN_LENS' | 'LOGIT_LENS' | 'DIFF'. Read only when `lensColumns` is empty.
   activeLensModeTab   String
   topN                Int
-  hideNonWordTokens   Boolean @default(true)
+  hideNonWordTokens   Boolean  @default(true)
   // Run settings, restored on load (the same values the advanced panel + steer
   // panel control). Defaulted so pre-existing shares migrate cleanly.
-  temperature         Float   @default(0)
-  numCompletionTokens Int     @default(256)
+  temperature         Float    @default(0)
+  numCompletionTokens Int      @default(256)
 
   // Optional steered run saved with this share. The heavy steered token stream
   // + meta live in the S3 blob alongside the main run; these columns hold the
@@ -875,6 +876,20 @@ model Explanation {
 
   scores ExplanationScore[]
 
+  // Null means POSITIVE.
+  pole          ExplanationPole?
+  // Null means ACTIVATION.
+  aspect        ExplanationAspect?
+  // Signed, in the units that the explanation type states.
+  steerStrength Float?
+
+  // For explanations from another site: the page for this unit, and who wrote it there.
+  sourceUrl       String?
+  contributorName String?
+  contributorUrl  String?
+  // Fields that only one source has, for example a persona name or tags.
+  metadata        Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -892,6 +907,19 @@ model Explanation {
   @@index([typeName, explanationModelName])
   @@index([embedding], map: "Explanation_embedding_idx")
   @@index([embedding], map: "idx_explanation_embedding_null")
+}
+
+// Which sign of the activation an explanation describes.
+enum ExplanationPole {
+  POSITIVE
+  NEGATIVE
+  BOTH
+}
+
+// ACTIVATION: what makes the unit fire. STEERING: what the model does when the unit is pushed.
+enum ExplanationAspect {
+  ACTIVATION
+  STEERING
 }
 
 model ExplanationModelSettings {
@@ -942,6 +970,10 @@ model ExplanationType {
 
   creatorId String
   creator   User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  license    String?
+  licenseUrl String?
+  citation   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt

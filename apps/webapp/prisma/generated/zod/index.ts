@@ -64,7 +64,7 @@ export const SessionScalarFieldEnumSchema = z.enum(['id','sessionToken','userId'
 
 export const UserSecretScalarFieldEnumSchema = z.enum(['id','username','type','value','createdAt','updatedAt']);
 
-export const UserScalarFieldEnumSchema = z.enum(['id','name','bio','email','emailVerified','githubUsername','bot','image','admin','canTriggerExplanations','isProblemEditor','emailNewsletterNotification','emailUnsubscribeAll','emailUnsubscribeCode','createdAt']);
+export const UserScalarFieldEnumSchema = z.enum(['id','name','bio','email','emailVerified','githubUsername','bot','image','admin','canTriggerExplanations','canUploadExplanations','isProblemEditor','emailNewsletterNotification','emailUnsubscribeAll','emailUnsubscribeCode','createdAt']);
 
 export const GraphMetadataSubgraphScalarFieldEnumSchema = z.enum(['id','displayName','graphMetadataId','pinnedIds','supernodes','clerps','pruningThreshold','densityThreshold','userId','isFeaturedSolution','createdAt','updatedAt']);
 
@@ -112,13 +112,13 @@ export const EvalTypeScalarFieldEnumSchema = z.enum(['name','displayName','descr
 
 export const NeuronScalarFieldEnumSchema = z.enum(['modelId','layer','index','sourceSetName','creatorId','createdAt','maxActApprox','hasVector','vector','vectorLabel','vectorDefaultSteerStrength','hookName','topkCosSimIndices','topkCosSimValues','neuron_alignment_indices','neuron_alignment_values','neuron_alignment_l1','correlated_neurons_indices','correlated_neurons_pearson','correlated_neurons_l1','correlated_features_indices','correlated_features_pearson','correlated_features_l1','neg_str','neg_values','pos_str','pos_values','frac_nonzero','freq_hist_data_bar_heights','freq_hist_data_bar_values','logits_hist_data_bar_heights','logits_hist_data_bar_values','decoder_weights_dist','umap_cluster','umap_log_feature_sparsity','umap_x','umap_y']);
 
-export const ExplanationScalarFieldEnumSchema = z.enum(['id','modelId','layer','index','description','authorId','triggeredByUserId','notes','scoreV1','scoreV2','umap_x','umap_y','umap_cluster','umap_log_feature_sparsity','typeName','explanationModelName','createdAt','updatedAt']);
+export const ExplanationScalarFieldEnumSchema = z.enum(['id','modelId','layer','index','description','authorId','triggeredByUserId','notes','scoreV1','scoreV2','umap_x','umap_y','umap_cluster','umap_log_feature_sparsity','typeName','explanationModelName','pole','aspect','steerStrength','sourceUrl','contributorName','contributorUrl','metadata','createdAt','updatedAt']);
 
 export const ExplanationModelSettingsScalarFieldEnumSchema = z.enum(['id','temperature','maxTokens','topP','frequencyPenalty']);
 
 export const ExplanationModelTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','openRouterModelId','url','creatorName','createdAt','updatedAt']);
 
-export const ExplanationTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','isAttention','explainerModelSettingsId','settings','url','creatorName','creatorId','createdAt','updatedAt']);
+export const ExplanationTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','isAttention','explainerModelSettingsId','settings','url','creatorName','creatorId','license','licenseUrl','citation','createdAt','updatedAt']);
 
 export const ExplanationScoreScalarFieldEnumSchema = z.enum(['id','initiatedByUserId','value','explanationId','explanationScoreTypeName','explanationScoreModelName','jsonDetails','createdAt']);
 
@@ -195,6 +195,14 @@ export type UserSecretTypeType = `${z.infer<typeof UserSecretTypeSchema>}`
 export const ComputeServiceSchema = z.enum(['INFERENCE','GRAPH','NLA','AUTOINTERP','SPARSITY']);
 
 export type ComputeServiceType = `${z.infer<typeof ComputeServiceSchema>}`
+
+export const ExplanationPoleSchema = z.enum(['POSITIVE','NEGATIVE','BOTH']);
+
+export type ExplanationPoleType = `${z.infer<typeof ExplanationPoleSchema>}`
+
+export const ExplanationAspectSchema = z.enum(['ACTIVATION','STEERING']);
+
+export type ExplanationAspectType = `${z.infer<typeof ExplanationAspectSchema>}`
 
 export const SteerOutputTypeSchema = z.enum(['DEFAULT','STEERED']);
 
@@ -424,6 +432,7 @@ export const UserSchema = z.object({
   image: z.string().nullable(),
   admin: z.boolean(),
   canTriggerExplanations: z.boolean(),
+  canUploadExplanations: z.boolean(),
   isProblemEditor: z.boolean(),
   emailNewsletterNotification: z.boolean(),
   emailUnsubscribeAll: z.boolean(),
@@ -2353,6 +2362,8 @@ export const NeuronWithPartialRelationsSchema: z.ZodType<NeuronWithPartialRelati
 /////////////////////////////////////////
 
 export const ExplanationSchema = z.object({
+  pole: ExplanationPoleSchema.nullable(),
+  aspect: ExplanationAspectSchema.nullable(),
   id: z.cuid(),
   modelId: z.string(),
   layer: z.string(),
@@ -2369,6 +2380,11 @@ export const ExplanationSchema = z.object({
   umap_log_feature_sparsity: z.number().nullable(),
   typeName: z.string().nullable(),
   explanationModelName: z.string().nullable(),
+  steerStrength: z.number().nullable(),
+  sourceUrl: z.string().nullable(),
+  contributorName: z.string().nullable(),
+  contributorUrl: z.string().nullable(),
+  metadata: JsonValueSchema.nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })
@@ -2398,7 +2414,9 @@ export type ExplanationRelations = {
   activationsV1: ExplanationActivationV1WithRelations[];
 };
 
-export type ExplanationWithRelations = z.infer<typeof ExplanationSchema> & ExplanationRelations
+export type ExplanationWithRelations = Omit<z.infer<typeof ExplanationSchema>, "metadata"> & {
+  metadata?: JsonValueType | null;
+} & ExplanationRelations
 
 export const ExplanationWithRelationsSchema: z.ZodType<ExplanationWithRelations> = ExplanationSchema.merge(z.object({
   author: z.lazy(() => UserWithRelationsSchema),
@@ -2427,7 +2445,9 @@ export type ExplanationPartialRelations = {
   activationsV1?: ExplanationActivationV1PartialWithRelations[];
 };
 
-export type ExplanationPartialWithRelations = z.infer<typeof ExplanationPartialSchema> & ExplanationPartialRelations
+export type ExplanationPartialWithRelations = Omit<z.infer<typeof ExplanationPartialSchema>, "metadata"> & {
+  metadata?: JsonValueType | null;
+} & ExplanationPartialRelations
 
 export const ExplanationPartialWithRelationsSchema: z.ZodType<ExplanationPartialWithRelations> = ExplanationPartialSchema.merge(z.object({
   author: z.lazy(() => UserPartialWithRelationsSchema),
@@ -2441,7 +2461,9 @@ export const ExplanationPartialWithRelationsSchema: z.ZodType<ExplanationPartial
   activationsV1: z.lazy(() => ExplanationActivationV1PartialWithRelationsSchema).array(),
 })).partial()
 
-export type ExplanationWithPartialRelations = z.infer<typeof ExplanationSchema> & ExplanationPartialRelations
+export type ExplanationWithPartialRelations = Omit<z.infer<typeof ExplanationSchema>, "metadata"> & {
+  metadata?: JsonValueType | null;
+} & ExplanationPartialRelations
 
 export const ExplanationWithPartialRelationsSchema: z.ZodType<ExplanationWithPartialRelations> = ExplanationSchema.merge(z.object({
   author: z.lazy(() => UserPartialWithRelationsSchema),
@@ -2582,6 +2604,9 @@ export const ExplanationTypeSchema = z.object({
   url: z.string().nullable(),
   creatorName: z.string(),
   creatorId: z.string(),
+  license: z.string().nullable(),
+  licenseUrl: z.string().nullable(),
+  citation: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })

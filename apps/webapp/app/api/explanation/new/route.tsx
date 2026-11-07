@@ -1,43 +1,9 @@
-/* eslint-disable */
-
-// TODO: Bring back this endpoint but simplify (just explanation, no scoring)
-
+import { badRequest } from '@/lib/api-error';
+import { uploadExplanations, uploadExplanationsSchema } from '@/lib/db/explanation-upload';
 import { RequestAuthedUser, withAuthedUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
-import { array, number, object, string } from 'yup';
 
-// Hobby plans don't support > 60 seconds
-// export const maxDuration = 120;
-
-const uploadExplanationSchema = object({
-  feature: object({
-    modelId: string().required(),
-    layer: string().required(),
-    index: number().integer().required(),
-    explanation: string().required(),
-
-    // only required if it's autointerped
-    explanationModel: string(),
-
-    // only required for scoring
-    activations: array().of(
-      object({
-        id: string().required(),
-      }).required(),
-    ),
-    simulationScore: number(),
-    simulationActivations: array().of(
-      object({
-        simulation: object({
-          tokens: array().of(string().required()).required(),
-          expected_activations: array().of(number().required()).required(),
-        }).required(),
-        ev_correlation_score: number().required(),
-      }).required(),
-    ),
-    simulationModel: string(),
-  }).required(),
-});
+export const maxDuration = 120;
 
 /**
 {
@@ -46,11 +12,11 @@ const uploadExplanationSchema = object({
       "tags": [
         "Explanations"
       ],
-      "summary": "Create Explanation",
+      "summary": "Upload Explanations",
       "security": [{
           "apiKey": []
       }],
-      "description": "Upload an explanation for a feature. This the simple version that doesn't upload scoring information. To upload with scoring data, use [`SAELens`](https://github.com/jbloomAus/SAELens), under `sae_lens.analysis.neuronpedia_integration.autointerp_neuronpedia_features`.",
+      "description": "Upload up to 500 explanations at once. Your account needs upload access, and you can only upload to explanation types that you own: contact us to get both. The batch is all or nothing. An explanation that is already there (same feature, type, text, pole, aspect and strength) is skipped, so you can safely retry.",
       "requestBody": {
         "required": true,
         "content": {
@@ -58,42 +24,41 @@ const uploadExplanationSchema = object({
             "schema": {
               "type": "object",
               "properties": {
-                "feature": {
-                  "type": "object",
-                  "properties": {
-                    "modelId": {
-                      "required": true,
-                      "type": "string",
-                      "description": "The model ID"
-                    },
-                    "layer": {
-                      "required": true,
-                      "type": "string",
-                      "description": "The layer or SAE ID. For example, 6-res-jb."
-                    },
-                    "index": {
-                      "required": true,
-                      "type": "string",
-                      "description": "The index"
-                    },
-                    "explanation": {
-                      "required": true,
-                      "type": "string",
-                      "description": "The explanation"
-                    },
-                    "explanationModel": {
-                      "type": "string",
-                      "description": "Optional. The model used to generate the explanation. For example, gpt3.5-turbo."
-                    },
-                  },
-                  "example": {
-                    "modelId": "example-model",
-                    "layer": "0-test-np",
-                    "index": "0",
-                    "explanation": "This is an explanation text!",
-                    "explanationModel": "gpt3.5-turbo",
+                "explanations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["modelId", "layer", "index", "description", "typeName"],
+                    "properties": {
+                      "modelId": { "type": "string", "description": "The model ID, for example qwen3-8b." },
+                      "layer": { "type": "string", "description": "The source ID, for example 9-neurons." },
+                      "index": { "type": "string", "description": "The feature index." },
+                      "description": { "type": "string", "description": "The explanation. A short phrase is fine." },
+                      "typeName": { "type": "string", "description": "Your explanation type." },
+                      "explanationModelName": { "type": "string", "description": "Optional. The model that wrote the explanation." },
+                      "pole": { "type": "string", "enum": ["POSITIVE", "NEGATIVE", "BOTH"], "description": "Optional. Which sign of the activation this describes. Default POSITIVE." },
+                      "aspect": { "type": "string", "enum": ["ACTIVATION", "STEERING"], "description": "Optional. ACTIVATION is what makes the feature fire. STEERING is what the model does when the feature is pushed. Default ACTIVATION." },
+                      "steerStrength": { "type": "number", "description": "Optional, for STEERING only. Signed, in the units of your explanation type." },
+                      "sourceUrl": { "type": "string", "description": "Optional. The page for this feature on your site." },
+                      "contributorName": { "type": "string", "description": "Optional. Who wrote this explanation on your site." },
+                      "contributorUrl": { "type": "string", "description": "Optional. A link to that person." },
+                      "metadata": { "type": "object", "description": "Optional. Other fields to show with the explanation, at most 16 KB as JSON." }
+                    }
                   }
                 }
+              },
+              "example": {
+                "explanations": [
+                  {
+                    "modelId": "qwen3-8b",
+                    "layer": "9-neurons",
+                    "index": "10358",
+                    "description": "wine",
+                    "typeName": "my-site",
+                    "pole": "NEGATIVE",
+                    "sourceUrl": "https://example.com/qwen3-8b/9/10358"
+                  }
+                ]
               }
             }
           }
@@ -107,12 +72,17 @@ const uploadExplanationSchema = object({
               "schema": {
                 "type": "object",
                 "properties": {
-                  "message": {
-                    "type": "string"
+                  "created": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string" },
+                        "url": { "type": "string" }
+                      }
+                    }
                   },
-                  "url": {
-                    "type": "string"
-                  }
+                  "skipped": { "type": "number" }
                 }
               }
             }
@@ -124,118 +94,10 @@ const uploadExplanationSchema = object({
 }
 */
 
-export const POST = withAuthedUser(
-  async (request: RequestAuthedUser) =>
-    NextResponse.json({
-      message: 'This endpoint is not currently active.',
-    }),
-  // try {
-  //   var bodyJson = await request.json();
-  // } catch (error) {
-  //   return NextResponse.json({ message: "Invalid JSON body" }, { status: 400 });
-  // }
-
-  // try {
-  //   var body = await uploadExplanationSchema.validate(bodyJson);
-  // } catch (error) {
-  //   if (error instanceof ValidationError) {
-  //     return NextResponse.json({ message: error.message }, { status: 400 });
-  //   } else {
-  //     return NextResponse.json({ message: "Unknown Error" }, { status: 500 });
-  //   }
-  // }
-
-  // // ensure required values are there
-  // const bodyFeat = body.feature;
-  // const requirementsMetForScoring =
-  //   bodyFeat.activations !== undefined &&
-  //   bodyFeat.simulationScore !== undefined &&
-  //   bodyFeat.simulationActivations !== undefined &&
-  //   bodyFeat.simulationModel !== undefined;
-  // const requirementsMetForNotScoring =
-  //   bodyFeat.activations === undefined &&
-  //   bodyFeat.simulationScore === undefined &&
-  //   bodyFeat.simulationActivations === undefined &&
-  //   bodyFeat.simulationModel === undefined;
-
-  // if (!requirementsMetForScoring && !requirementsMetForNotScoring) {
-  //   return NextResponse.json(
-  //     {
-  //       message:
-  //         "Scoring requires that you supply all the following fields: activations, simulationScore, simulationActivations, and simulationModel.",
-  //     },
-  //     { status: 400 },
-  //   );
-  // }
-
-  // // get explainer user ID
-  // let explainerUser = await getExplai_UNUSED_nerUser();
-  // let explainerUserId = explainerUser.id;
-
-  // // validate feature exists and user has access
-  // let feat = body.feature;
-  // let feature = await neuronExistsAndUserHasAccess(
-  //   feat.modelId,
-  //   feat.layer,
-  //   feat.index.toString(),
-  //   request.user,
-  // );
-  // if (!feature) {
-  //   return NextResponse.json(
-  //     {
-  //       message: `Feature not found - ${
-  //         "modelId: " +
-  //         feat.modelId +
-  //         " layer: " +
-  //         feat.layer +
-  //         " index: " +
-  //         feat.index
-  //       }`,
-  //     },
-  //     { status: 400 },
-  //   );
-  // }
-
-  // var explanationActivations: ExplanationActivationV1WithoutIdAndExplanation[] =
-  //   [];
-  // if (requirementsMetForScoring) {
-  //   // add the explanation, score, and expactv1
-  //   body.feature.simulationActivations?.forEach((simulation, i) => {
-  //     if (
-  //       body.feature.activations &&
-  //       body.feature.simulationActivations &&
-  //       body.feature.simulationModel
-  //     ) {
-  //       // activations are returned in the same order so just match the index
-  //       explanationActivations.push({
-  //         activationId: body.feature.activations[i].id,
-  //         expectedValues:
-  //           body.feature.simulationActivations[i].simulation
-  //             .expected_activations,
-  //         score: simulation.ev_correlation_score,
-  //         scorerId: null, // means it's gpt - scorer is always same as explainer
-  //         scorerAuto_UNUSED_InterpModel: body.feature.simulationModel,
-  //         version: SCORER_VERSION,
-  //       });
-  //     }
-  //   });
-  // }
-
-  // await createExplanation(
-  //   feature.modelId,
-  //   feature.layer,
-  //   feature.index,
-  //   body.feature.explanation,
-  //   explainerUserId,
-  //   body.feature.explanationModel,
-  //   request.user.id,
-  //   body.feature.simulationScore,
-  //   explanationActivations,
-  //   request.user,
-  // );
-
-  // return NextResponse.json({
-  //   message: "Explanation created. Open url to see it in the example model.",
-  //   url: `${NEXT_PUBLIC_URL}/${feature.modelId}/${feature.layer}/${feature.index}`,
-  // });
-);
+export const POST = withAuthedUser(async (request: RequestAuthedUser) => {
+  const json = await request.json().catch(() => {
+    throw badRequest('The body must be valid JSON.');
+  });
+  const body = await uploadExplanationsSchema.validate(json, { abortEarly: true, stripUnknown: true });
+  return NextResponse.json(await uploadExplanations(body.explanations, request.user));
+});

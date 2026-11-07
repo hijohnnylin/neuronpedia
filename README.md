@@ -464,6 +464,16 @@ have the fast ones run on each commit, over the files you changed, with `make gi
 `make webapp-install` enables the same `.githooks/` hook for you through npm. It is per checkout and
 optional: see ["Checks Before You Commit"](CONTRIBUTING.md#checks-before-you-commit).
 
+# Acknowledgements
+
+Some neuron explanations on Neuronpedia come from other projects, used with their authors' permission. Each one links back to its page on the original site, and credits the person who wrote it when the site is crowdsourced. Thank you to:
+
+- [Neuron Lens](https://neuron-lens.com) by a9lim and treetown. Labels from the [`stdlogits/neuron-lens`](https://huggingface.co/datasets/stdlogits/neuron-lens) dataset, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- [Model Mapper](https://eiffel-tower-qwen.vercel.app/v2/) by James Phoenix. Neuron labels for Qwen3-8B, from [`jphoenix-dev/ModelMapper`](https://github.com/jphoenix-dev/ModelMapper), [MIT](https://github.com/jphoenix-dev/ModelMapper/blob/v0.2.0/LICENSE). DOI [10.5281/zenodo.23459925](https://doi.org/10.5281/zenodo.23459925).
+- [Neuron Persona Library](https://neuronpersonas.com) by Joshua Fonseca Rivera. The personas that models take on when single neurons are steered.
+- [Persona Neurons](https://willmayner.com/persona-neurons) by Will Mayner. Neurons that contribute most to persona vectors, from the [`wmayner/persona-neurons`](https://huggingface.co/datasets/wmayner/persona-neurons) dataset, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- [Neuronary](https://neuronary.org) by Lyra, and its contributors. Steering recipes, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+
 # Appendix
 
 ### 'Make' Commands Reference

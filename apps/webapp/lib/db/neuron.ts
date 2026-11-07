@@ -276,6 +276,25 @@ export const getNeuronOptimized = async (
       explanationModelName: true,
       typeName: true,
       scores: true,
+      pole: true,
+      aspect: true,
+      steerStrength: true,
+      sourceUrl: true,
+      contributorName: true,
+      contributorUrl: true,
+      metadata: true,
+      type: {
+        select: {
+          displayName: true,
+          description: true,
+          url: true,
+          creatorName: true,
+          settings: true,
+          license: true,
+          licenseUrl: true,
+          citation: true,
+        },
+      },
       triggeredByUser: {
         select: {
           id: true,

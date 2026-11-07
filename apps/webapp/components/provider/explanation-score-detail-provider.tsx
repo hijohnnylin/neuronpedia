@@ -1,7 +1,7 @@
 'use client';
 
 import { ExplanationScore } from '@prisma/client';
-import { Explanation, ExplanationWithPartialRelations } from 'prisma/generated/zod';
+import { ExplanationWithPartialRelations } from 'prisma/generated/zod';
 import { useMemo, useState } from 'react';
 import createContextWrapper from './provider-util';
 
@@ -10,8 +10,8 @@ export const [ExplanationScoreDetailContext, useExplanationScoreDetailContext] =
   setExplanationScoreDetailOpen: (open: boolean) => void;
   explanationScoreDetailScore: ExplanationScore | undefined;
   setExplanationScoreDetailScore: (score: ExplanationScore) => void;
-  explanationScoreDetailExplanation: Explanation | undefined;
-  setExplanationScoreDetailExplanation: (explanation: Explanation) => void;
+  explanationScoreDetailExplanation: ExplanationWithPartialRelations | undefined;
+  setExplanationScoreDetailExplanation: (explanation: ExplanationWithPartialRelations) => void;
   loadExplanationScoreDetail: (
     explanation: ExplanationWithPartialRelations,
     explanationScore: ExplanationScore,
@@ -23,7 +23,8 @@ export const [ExplanationScoreDetailContext, useExplanationScoreDetailContext] =
 export default function ExplanationScoreDetailProvider({ children }: { children: React.ReactNode }) {
   const [explanationScoreDetailOpen, setExplanationScoreDetailOpen] = useState(false);
   const [explanationScoreDetailScore, setExplanationScoreDetailScore] = useState<ExplanationScore>();
-  const [explanationScoreDetailExplanation, setExplanationScoreDetailExplanation] = useState<Explanation>();
+  const [explanationScoreDetailExplanation, setExplanationScoreDetailExplanation] =
+    useState<ExplanationWithPartialRelations>();
   const [explanationScoreDetailLoading, setExplanationScoreDetailLoading] = useState(false);
 
   function loadExplanationScoreDetail(

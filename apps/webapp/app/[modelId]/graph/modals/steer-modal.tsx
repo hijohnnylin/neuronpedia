@@ -921,6 +921,13 @@ export default function SteerModal() {
                               umap_y: explanation?.umap_y || 0,
                               umap_cluster: explanation?.umap_cluster || 0,
                               umap_log_feature_sparsity: explanation?.umap_log_feature_sparsity || 0,
+                              pole: explanation?.pole ?? null,
+                              aspect: explanation?.aspect ?? null,
+                              steerStrength: explanation?.steerStrength ?? null,
+                              sourceUrl: explanation?.sourceUrl ?? null,
+                              contributorName: explanation?.contributorName ?? null,
+                              contributorUrl: explanation?.contributorUrl ?? null,
+                              metadata: explanation?.metadata ?? null,
                             });
                             setManualLayer('');
                             setManualIndex('');
