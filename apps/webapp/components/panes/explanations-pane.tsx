@@ -336,11 +336,8 @@ export default function ExplanationsPane({
                     <div className="h-fill flex-1">
                       <ExplanationTagsRow explanation={explanation} />
                       <div className="flex-inline relative flex items-center">
-                        <h1
-                          className="cursor-text select-text py-0 text-xs font-medium leading-snug text-slate-700"
-                          title={explanation.description}
-                        >
-                          {explanation.description}
+                        <h1 className="cursor-text select-text py-0 text-xs font-medium leading-snug text-slate-700">
+                          <span title={explanation.description}>{explanation.description}</span>
                           <ExplanationMetadataButton metadata={explanation.metadata} />
                         </h1>
                       </div>
