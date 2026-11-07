@@ -8,7 +8,7 @@ import { MagnifyingGlassIcon } from '@radix-ui/react-icons';
 import copy from 'copy-to-clipboard';
 import { Check, Copy, Grid, Joystick, Play, Share, XIcon } from 'lucide-react';
 import { NeuronWithPartialRelations, SourceWithPartialRelations } from 'prisma/generated/zod';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactTextareaAutosize from 'react-textarea-autosize';
 import { Button } from './shadcn/button';
 import { LoadingSquare } from './svg/loading-square';
@@ -70,6 +70,7 @@ export default function ActivationSingleForm({
   const [customText, setCustomText] = useState('');
   const [activationResult, setActivationResult] = useState<Activation | undefined>();
   const [copyClicked, setCopyClicked] = useState(false);
+  const resultScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (copyClicked) {
       setTimeout(() => {
@@ -147,6 +148,22 @@ export default function ActivationSingleForm({
   }
 
   const resultPeak = activationResult ? peakOfResult(activationResult) : undefined;
+
+  // Scroll the result box (not the page) so that the peak token is in the middle.
+  useEffect(() => {
+    const container = resultScrollRef.current;
+    if (!container || !activationResult || isSubmitting) {
+      return;
+    }
+    const token = container.querySelector<HTMLElement>(
+      `[data-token-index="${peakOfResult(activationResult).tokenIndex}"]`,
+    );
+    if (!token) {
+      return;
+    }
+    const offset = token.getBoundingClientRect().top - container.getBoundingClientRect().top;
+    container.scrollTop += offset - container.clientHeight / 2 + token.offsetHeight / 2;
+  }, [activationResult, isSubmitting]);
 
   return (
     <div
@@ -253,7 +270,7 @@ export default function ActivationSingleForm({
                   {formatPeakValue(resultPeak?.value ?? 0)}
                 </div>
               </div>
-              <div className="max-h-72 flex-auto overflow-y-scroll px-3 text-sm sm:px-0">
+              <div ref={resultScrollRef} className="max-h-72 flex-auto overflow-y-scroll px-3 text-sm sm:px-0">
                 <ActivationItem
                   activation={activationResult}
                   overallMaxActivationValueInList={

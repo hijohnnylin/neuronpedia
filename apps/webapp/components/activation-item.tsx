@@ -436,6 +436,7 @@ export default function ActivationItem({
                     <Tooltip.Root disableHoverableContent>
                       <Tooltip.Trigger asChild>
                         <span
+                          data-token-index={tokenIndex}
                           className={`${centerAndBorderOnTokenIndex === tokenIndex ? CENTER_ME_CLASSNAME : ''} inline-block cursor-default whitespace-nowrap bg-origin-border font-mono ${
                             hasZPattern && zHoveredTargetIndex === tokenIndex
                               ? DFA_TARGET_TOKEN_CLASSNAME
