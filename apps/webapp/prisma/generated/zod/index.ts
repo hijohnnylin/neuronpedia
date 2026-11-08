@@ -120,6 +120,8 @@ export const ExplanationModelTypeScalarFieldEnumSchema = z.enum(['name','display
 
 export const ExplanationTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','isAttention','explainerModelSettingsId','settings','url','creatorName','creatorId','license','licenseUrl','citation','createdAt','updatedAt']);
 
+export const NeuronTokenListScalarFieldEnumSchema = z.enum(['id','modelId','layer','index','typeName','creatorId','name','pole','aspect','tokens','values','metadata','createdAt','updatedAt']);
+
 export const ExplanationScoreScalarFieldEnumSchema = z.enum(['id','initiatedByUserId','value','explanationId','explanationScoreTypeName','explanationScoreModelName','jsonDetails','createdAt']);
 
 export const ExplanationScoreTypeScalarFieldEnumSchema = z.enum(['name','displayName','description','featured','isAttention','scoreDescription','scorerModel','settings','url','creatorName','creatorId','createdAt','updatedAt']);
@@ -457,6 +459,7 @@ export type UserRelations = {
   secrets: UserSecretWithRelations[];
   accounts: AccountWithRelations[];
   explanations: ExplanationWithRelations[];
+  tokenLists: NeuronTokenListWithRelations[];
   triggeredExplanations: ExplanationWithRelations[];
   neurons: NeuronWithRelations[];
   sources: SourceWithRelations[];
@@ -500,6 +503,7 @@ export const UserWithRelationsSchema: z.ZodType<UserWithRelations> = UserSchema.
   secrets: z.lazy(() => UserSecretWithRelationsSchema).array(),
   accounts: z.lazy(() => AccountWithRelationsSchema).array(),
   explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListWithRelationsSchema).array(),
   triggeredExplanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
   neurons: z.lazy(() => NeuronWithRelationsSchema).array(),
   sources: z.lazy(() => SourceWithRelationsSchema).array(),
@@ -544,6 +548,7 @@ export type UserPartialRelations = {
   secrets?: UserSecretPartialWithRelations[];
   accounts?: AccountPartialWithRelations[];
   explanations?: ExplanationPartialWithRelations[];
+  tokenLists?: NeuronTokenListPartialWithRelations[];
   triggeredExplanations?: ExplanationPartialWithRelations[];
   neurons?: NeuronPartialWithRelations[];
   sources?: SourcePartialWithRelations[];
@@ -587,6 +592,7 @@ export const UserPartialWithRelationsSchema: z.ZodType<UserPartialWithRelations>
   secrets: z.lazy(() => UserSecretPartialWithRelationsSchema).array(),
   accounts: z.lazy(() => AccountPartialWithRelationsSchema).array(),
   explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListPartialWithRelationsSchema).array(),
   triggeredExplanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
   neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
   sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
@@ -630,6 +636,7 @@ export const UserWithPartialRelationsSchema: z.ZodType<UserWithPartialRelations>
   secrets: z.lazy(() => UserSecretPartialWithRelationsSchema).array(),
   accounts: z.lazy(() => AccountPartialWithRelationsSchema).array(),
   explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListPartialWithRelationsSchema).array(),
   triggeredExplanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
   neurons: z.lazy(() => NeuronPartialWithRelationsSchema).array(),
   sources: z.lazy(() => SourcePartialWithRelationsSchema).array(),
@@ -2290,6 +2297,7 @@ export type NeuronRelations = {
   creator?: UserWithRelations | null;
   activations: ActivationWithRelations[];
   explanations: ExplanationWithRelations[];
+  tokenLists: NeuronTokenListWithRelations[];
   comments: CommentWithRelations[];
   bookmarks: BookmarkWithRelations[];
   model: ModelWithRelations;
@@ -2305,6 +2313,7 @@ export const NeuronWithRelationsSchema: z.ZodType<NeuronWithRelations> = NeuronS
   creator: z.lazy(() => UserWithRelationsSchema).nullable(),
   activations: z.lazy(() => ActivationWithRelationsSchema).array(),
   explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListWithRelationsSchema).array(),
   comments: z.lazy(() => CommentWithRelationsSchema).array(),
   bookmarks: z.lazy(() => BookmarkWithRelationsSchema).array(),
   model: z.lazy(() => ModelWithRelationsSchema),
@@ -2321,6 +2330,7 @@ export type NeuronPartialRelations = {
   creator?: UserPartialWithRelations | null;
   activations?: ActivationPartialWithRelations[];
   explanations?: ExplanationPartialWithRelations[];
+  tokenLists?: NeuronTokenListPartialWithRelations[];
   comments?: CommentPartialWithRelations[];
   bookmarks?: BookmarkPartialWithRelations[];
   model?: ModelPartialWithRelations;
@@ -2336,6 +2346,7 @@ export const NeuronPartialWithRelationsSchema: z.ZodType<NeuronPartialWithRelati
   creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
   activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
   explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListPartialWithRelationsSchema).array(),
   comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
   bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
   model: z.lazy(() => ModelPartialWithRelationsSchema),
@@ -2351,6 +2362,7 @@ export const NeuronWithPartialRelationsSchema: z.ZodType<NeuronWithPartialRelati
   creator: z.lazy(() => UserPartialWithRelationsSchema).nullable(),
   activations: z.lazy(() => ActivationPartialWithRelationsSchema).array(),
   explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListPartialWithRelationsSchema).array(),
   comments: z.lazy(() => CommentPartialWithRelationsSchema).array(),
   bookmarks: z.lazy(() => BookmarkPartialWithRelationsSchema).array(),
   model: z.lazy(() => ModelPartialWithRelationsSchema),
@@ -2628,6 +2640,7 @@ export type ExplanationTypeRelations = {
   explainerModelSettings?: ExplanationModelSettingsWithRelations | null;
   creator: UserWithRelations;
   explanations: ExplanationWithRelations[];
+  tokenLists: NeuronTokenListWithRelations[];
 };
 
 export type ExplanationTypeWithRelations = z.infer<typeof ExplanationTypeSchema> & ExplanationTypeRelations
@@ -2636,6 +2649,7 @@ export const ExplanationTypeWithRelationsSchema: z.ZodType<ExplanationTypeWithRe
   explainerModelSettings: z.lazy(() => ExplanationModelSettingsWithRelationsSchema).nullable(),
   creator: z.lazy(() => UserWithRelationsSchema),
   explanations: z.lazy(() => ExplanationWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListWithRelationsSchema).array(),
 }))
 
 // EXPLANATION TYPE PARTIAL RELATION SCHEMA
@@ -2645,6 +2659,7 @@ export type ExplanationTypePartialRelations = {
   explainerModelSettings?: ExplanationModelSettingsPartialWithRelations | null;
   creator?: UserPartialWithRelations;
   explanations?: ExplanationPartialWithRelations[];
+  tokenLists?: NeuronTokenListPartialWithRelations[];
 };
 
 export type ExplanationTypePartialWithRelations = z.infer<typeof ExplanationTypePartialSchema> & ExplanationTypePartialRelations
@@ -2653,6 +2668,7 @@ export const ExplanationTypePartialWithRelationsSchema: z.ZodType<ExplanationTyp
   explainerModelSettings: z.lazy(() => ExplanationModelSettingsPartialWithRelationsSchema).nullable(),
   creator: z.lazy(() => UserPartialWithRelationsSchema),
   explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListPartialWithRelationsSchema).array(),
 })).partial()
 
 export type ExplanationTypeWithPartialRelations = z.infer<typeof ExplanationTypeSchema> & ExplanationTypePartialRelations
@@ -2661,6 +2677,86 @@ export const ExplanationTypeWithPartialRelationsSchema: z.ZodType<ExplanationTyp
   explainerModelSettings: z.lazy(() => ExplanationModelSettingsPartialWithRelationsSchema).nullable(),
   creator: z.lazy(() => UserPartialWithRelationsSchema),
   explanations: z.lazy(() => ExplanationPartialWithRelationsSchema).array(),
+  tokenLists: z.lazy(() => NeuronTokenListPartialWithRelationsSchema).array(),
+}).partial())
+
+/////////////////////////////////////////
+// NEURON TOKEN LIST SCHEMA
+/////////////////////////////////////////
+
+export const NeuronTokenListSchema = z.object({
+  pole: ExplanationPoleSchema,
+  aspect: ExplanationAspectSchema,
+  id: z.cuid(),
+  modelId: z.string(),
+  layer: z.string(),
+  index: z.string(),
+  typeName: z.string(),
+  creatorId: z.string(),
+  name: z.string(),
+  tokens: z.string().array(),
+  values: z.number().array(),
+  metadata: JsonValueSchema.nullable(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
+
+export type NeuronTokenList = z.infer<typeof NeuronTokenListSchema>
+
+/////////////////////////////////////////
+// NEURON TOKEN LIST PARTIAL SCHEMA
+/////////////////////////////////////////
+
+export const NeuronTokenListPartialSchema = NeuronTokenListSchema.partial()
+
+export type NeuronTokenListPartial = z.infer<typeof NeuronTokenListPartialSchema>
+
+// NEURON TOKEN LIST RELATION SCHEMA
+//------------------------------------------------------
+
+export type NeuronTokenListRelations = {
+  neuron: NeuronWithRelations;
+  type: ExplanationTypeWithRelations;
+  creator: UserWithRelations;
+};
+
+export type NeuronTokenListWithRelations = Omit<z.infer<typeof NeuronTokenListSchema>, "metadata"> & {
+  metadata?: JsonValueType | null;
+} & NeuronTokenListRelations
+
+export const NeuronTokenListWithRelationsSchema: z.ZodType<NeuronTokenListWithRelations> = NeuronTokenListSchema.merge(z.object({
+  neuron: z.lazy(() => NeuronWithRelationsSchema),
+  type: z.lazy(() => ExplanationTypeWithRelationsSchema),
+  creator: z.lazy(() => UserWithRelationsSchema),
+}))
+
+// NEURON TOKEN LIST PARTIAL RELATION SCHEMA
+//------------------------------------------------------
+
+export type NeuronTokenListPartialRelations = {
+  neuron?: NeuronPartialWithRelations;
+  type?: ExplanationTypePartialWithRelations;
+  creator?: UserPartialWithRelations;
+};
+
+export type NeuronTokenListPartialWithRelations = Omit<z.infer<typeof NeuronTokenListPartialSchema>, "metadata"> & {
+  metadata?: JsonValueType | null;
+} & NeuronTokenListPartialRelations
+
+export const NeuronTokenListPartialWithRelationsSchema: z.ZodType<NeuronTokenListPartialWithRelations> = NeuronTokenListPartialSchema.merge(z.object({
+  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+  type: z.lazy(() => ExplanationTypePartialWithRelationsSchema),
+  creator: z.lazy(() => UserPartialWithRelationsSchema),
+})).partial()
+
+export type NeuronTokenListWithPartialRelations = Omit<z.infer<typeof NeuronTokenListSchema>, "metadata"> & {
+  metadata?: JsonValueType | null;
+} & NeuronTokenListPartialRelations
+
+export const NeuronTokenListWithPartialRelationsSchema: z.ZodType<NeuronTokenListWithPartialRelations> = NeuronTokenListSchema.merge(z.object({
+  neuron: z.lazy(() => NeuronPartialWithRelationsSchema),
+  type: z.lazy(() => ExplanationTypePartialWithRelationsSchema),
+  creator: z.lazy(() => UserPartialWithRelationsSchema),
 }).partial())
 
 /////////////////////////////////////////

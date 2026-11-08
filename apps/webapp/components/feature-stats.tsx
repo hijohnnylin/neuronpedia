@@ -1,21 +1,27 @@
 'use client';
 
 import { useGlobalContext } from '@/components/provider/global-provider';
+import {
+  columnsForGroup,
+  groupTokenLists,
+  LOGITS_KEY,
+  MISSING_LOGIT_VALUE,
+  TokenColumn,
+  TokenColumnData,
+  TokenListDropdown,
+} from '@/components/token-list-columns';
 import useWindowSize from '@/lib/hooks/use-window-size';
-import { replaceHtmlAnomalies } from '@/lib/utils/activations';
 import { SignedLogHistogram, signedLogX } from '@/lib/utils/neuron-dashboard-histogram';
 import { getLayerNumFromSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle } from 'lucide-react';
 // import Plotly from 'plotly.js-dist-min';
 import { NeuronWithPartialRelations } from 'prisma/generated/zod';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
 // // https://github.com/plotly/react-plotly.js/issues/273
 import dynamic from 'next/dynamic';
-
-const MISSING_LOGIT_VALUE = -10000;
 
 const Plot = dynamic(
   () => Promise.resolve(import('plotly.js-dist-min').then((Plotly) => createPlotlyComponent(Plotly))),
@@ -38,6 +44,8 @@ export default function FeatureStats({
   forceMiniStats = false,
   activationMarkerValue,
   signedLogHistogram,
+  shownTokenList,
+  onShowTokenList,
 }: {
   currentNeuron: NeuronWithPartialRelations;
   vertical?: boolean;
@@ -48,18 +56,46 @@ export default function FeatureStats({
   activationMarkerValue?: number;
   // Exact log-binned counts. When set, the activation plot shows them, filtered by gate state.
   signedLogHistogram?: SignedLogHistogram;
+  // Set both to let the parent control which token lists are shown, for example from an explanation.
+  shownTokenList?: string;
+  onShowTokenList?: (key: string) => void;
 }) {
   const { getSourceSet, globalModels } = useGlobalContext();
-  const [maxLogit, setMaxLogit] = useState<number | undefined>();
   const [shownGates, setShownGates] = useState({ open: true, closed: false });
   const [showAllLogits, setShowAllLogits] = useState(false);
+  const [localShownList, setLocalShownList] = useState(LOGITS_KEY);
+  const shownList = shownTokenList ?? localShownList;
+  const setShownList = onShowTokenList ?? setLocalShownList;
   const { windowSize } = useWindowSize();
   const isMiniStats = Boolean(
     (embed && !embedPlots) || (windowSize.width && windowSize.width < 640) || vertical || forceMiniStats,
   );
-  const logitsCollapsible =
-    !isMiniStats &&
-    Math.max(currentNeuron?.pos_str.length || 0, currentNeuron?.neg_str.length || 0) > COLLAPSE_LOGITS_ABOVE;
+  const listGroups = useMemo(() => groupTokenLists(currentNeuron?.tokenLists || []), [currentNeuron?.tokenLists]);
+  const showListSelector = listGroups.length > 0 && !isMiniStats && !embed;
+  const shownGroup = showListSelector ? listGroups.find((g) => g.key === shownList) : undefined;
+  const columns: TokenColumnData[] = shownGroup
+    ? columnsForGroup(shownGroup)
+    : [
+        {
+          title: 'Negative Logits',
+          help: 'Top negative logits of the feature.',
+          tone: 'negative' as const,
+          tokens: currentNeuron?.neg_str || [],
+          values: currentNeuron?.neg_values || [],
+        },
+        {
+          title: 'Positive Logits',
+          help: 'Top positive logits of the feature.',
+          tone: 'positive' as const,
+          tokens: currentNeuron?.pos_str || [],
+          values: currentNeuron?.pos_values || [],
+        },
+      ].filter((c) => c.tokens.length > 0);
+  const maxColumnValue = Math.max(
+    0,
+    ...columns.flatMap((c) => c.values.filter((v) => v !== MISSING_LOGIT_VALUE).map((v) => Math.abs(v))),
+  );
+  const logitsCollapsible = !isMiniStats && Math.max(0, ...columns.map((c) => c.tokens.length)) > COLLAPSE_LOGITS_ABOVE;
   const showLogHistogram = Boolean(signedLogHistogram && signedLogHistogram.x.length > 0);
   const logHistogramMax = signedLogHistogram
     ? Math.max(
@@ -86,6 +122,7 @@ export default function FeatureStats({
 
   useEffect(() => {
     setShowAllLogits(false);
+    setLocalShownList(LOGITS_KEY);
   }, [currentNeuron?.modelId, currentNeuron?.layer, currentNeuron?.index]);
 
   const modelHasNeuronsSourceSet = (modelId: string) => {
@@ -115,15 +152,6 @@ export default function FeatureStats({
     });
     return colors;
   }
-
-  useEffect(() => {
-    if (currentNeuron) {
-      const negMax = Math.max(...(currentNeuron?.neg_values || []).map((value) => Math.abs(value)));
-      const posMax = Math.max(...(currentNeuron?.pos_values || []).map((value) => Math.abs(value)));
-      const max = Math.max(negMax, posMax);
-      setMaxLogit(max);
-    }
-  }, [currentNeuron]);
 
   return (
     <div className="w-full flex-row pt-0 text-[11px] text-slate-900 sm:flex">
@@ -277,116 +305,20 @@ export default function FeatureStats({
                   ))}
                 </div>
               )}
-            {currentNeuron?.neg_str.length > 0 && (
-              <div className="flex-1">
-                {!vertical && (
-                  <div className="mb-0 flex flex-row items-center gap-x-1 whitespace-pre text-[9px] font-bold uppercase text-slate-500 sm:mb-1 sm:text-[11px]">
-                    <div className="mb-0.5 flex flex-row items-center justify-center gap-x-1 font-sans text-[10px] font-normal uppercase text-slate-400 sm:mb-0">
-                      Negative Logits
-                    </div>
-                    <Tooltip.Provider delayDuration={300} skipDelayDuration={0}>
-                      <Tooltip.Root>
-                        <Tooltip.Trigger asChild>
-                          <button type="button">
-                            <HelpCircle className="h-2.5 w-2.5 text-slate-400 sm:h-2.5 sm:w-2.5" />
-                          </button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content
-                            className="z-20 rounded bg-slate-500 px-3 py-2 text-xs text-white"
-                            sideOffset={5}
-                          >
-                            Top negative logits of the feature.
-                            <Tooltip.Arrow className="fill-slate-500" />
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
-                    </Tooltip.Provider>
-                  </div>
-                )}
-                <div className="flex flex-col gap-y-0.5 text-[9px] sm:text-[11px]">
-                  {currentNeuron?.neg_str.map((s, i) => (
-                    <div
-                      className={`flex-row justify-between gap-x-1 ${isLogitRowHidden(i) ? 'hidden' : 'flex'}`}
-                      key={i}
-                    >
-                      <pre
-                        style={{
-                          backgroundColor: maxLogit
-                            ? `rgba(255, calc(255 * (1 - ${
-                                Math.abs(currentNeuron?.neg_values[i]) / maxLogit
-                              })), calc(255 * (1 - ${Math.abs(currentNeuron?.neg_values[i]) / maxLogit})), 0.5)`
-                            : undefined,
-                        }}
-                        className="max-w-[80px] overflow-x-hidden rounded-sm font-bold sm:max-w-[100px] sm:rounded"
-                      >
-                        {replaceHtmlAnomalies(s)}
-                      </pre>
-                      <div>
-                        {currentNeuron?.neg_values[i] === MISSING_LOGIT_VALUE
-                          ? 'N/A'
-                          : currentNeuron?.neg_values[i].toFixed(2)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="flex min-w-0 flex-1 flex-col">
+              {showListSelector && <TokenListDropdown groups={listGroups} shown={shownList} onShow={setShownList} />}
+              <div className="flex flex-row gap-x-3">
+                {columns.map((column, i) => (
+                  <TokenColumn
+                    key={`${shownList}-${i}`}
+                    column={column}
+                    maxValue={maxColumnValue}
+                    showHeader={!vertical}
+                    isRowHidden={isLogitRowHidden}
+                  />
+                ))}
               </div>
-            )}
-            {currentNeuron?.pos_str.length > 0 && (
-              <div className="flex-1">
-                {!vertical && (
-                  <div className="mb-0 flex flex-row items-center gap-x-1 whitespace-pre text-[9px] font-bold uppercase text-slate-500 sm:mb-1 sm:text-[11px]">
-                    <div className="mb-0.5 flex flex-row items-center justify-center gap-x-1 font-sans text-[10px] font-normal uppercase text-slate-400 sm:mb-0">
-                      POSITIVE LOGITS
-                    </div>
-                    <Tooltip.Provider delayDuration={300} skipDelayDuration={0}>
-                      <Tooltip.Root>
-                        <Tooltip.Trigger asChild>
-                          <button type="button">
-                            <HelpCircle className="h-2.5 w-2.5 text-slate-400 sm:h-2.5 sm:w-2.5" />
-                          </button>
-                        </Tooltip.Trigger>
-                        <Tooltip.Portal>
-                          <Tooltip.Content
-                            className="z-20 rounded bg-slate-500 px-3 py-2 text-xs text-white"
-                            sideOffset={5}
-                          >
-                            Top positive logits of the feature.
-                            <Tooltip.Arrow className="fill-slate-500" />
-                          </Tooltip.Content>
-                        </Tooltip.Portal>
-                      </Tooltip.Root>
-                    </Tooltip.Provider>
-                  </div>
-                )}
-                <div className="flex flex-col gap-y-0.5 text-[9px] sm:text-[11px]">
-                  {currentNeuron?.pos_str.map((s, i) => (
-                    <div
-                      className={`flex-row justify-between gap-x-1 ${isLogitRowHidden(i) ? 'hidden' : 'flex'}`}
-                      key={i}
-                    >
-                      <pre
-                        style={{
-                          backgroundColor: maxLogit
-                            ? `rgba(calc(255 - 239 * ${
-                                Math.abs(currentNeuron?.pos_values[i]) / maxLogit
-                              }), calc(255 - 70 * ${Math.abs(currentNeuron?.pos_values[i]) / maxLogit}), calc(255 - 126 * ${Math.abs(currentNeuron?.pos_values[i]) / maxLogit}), 0.5)`
-                            : undefined,
-                        }}
-                        className="max-w-[80px] overflow-x-hidden rounded-sm font-bold sm:max-w-[100px] sm:rounded"
-                      >
-                        {replaceHtmlAnomalies(s)}
-                      </pre>
-                      <div>
-                        {currentNeuron?.pos_values[i] === MISSING_LOGIT_VALUE
-                          ? 'N/A'
-                          : currentNeuron?.pos_values[i].toFixed(2)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
           {logitsCollapsible && (
             <button

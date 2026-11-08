@@ -304,7 +304,32 @@ export const getNeuronOptimized = async (
     },
     orderBy: [{ scoreV2: 'desc' }, { scoreV1: 'desc' }],
   });
-  const res = await Promise.all([activations, explanations]); // , comments]);
+  const tokenLists = prisma.neuronTokenList.findMany({
+    where: { modelId, layer, index },
+    select: {
+      id: true,
+      typeName: true,
+      name: true,
+      pole: true,
+      aspect: true,
+      tokens: true,
+      values: true,
+      metadata: true,
+      type: {
+        select: {
+          displayName: true,
+          description: true,
+          url: true,
+          creatorName: true,
+          license: true,
+          licenseUrl: true,
+          citation: true,
+        },
+      },
+    },
+    orderBy: [{ typeName: 'asc' }, { name: 'asc' }, { pole: 'asc' }],
+  });
+  const res = await Promise.all([activations, explanations, tokenLists]); // , comments]);
   if (!res || !neuronResult) {
     return null;
   }
@@ -314,9 +339,10 @@ export const getNeuronOptimized = async (
   neuron.correlated_features_l1 = [];
   neuron.correlated_features_pearson = [];
 
-  const [acts, exps] = res;
+  const [acts, exps, lists] = res;
   neuron.activations = acts;
   neuron.explanations = exps;
+  neuron.tokenLists = lists as NeuronWithPartialRelations['tokenLists'];
 
   return neuron;
 };

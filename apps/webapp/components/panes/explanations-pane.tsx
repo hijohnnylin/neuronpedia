@@ -8,6 +8,7 @@ import InterpretabilityCheckDialog from '@/components/interpretability-check-dia
 import { useExplanationScoreDetailContext } from '@/components/provider/explanation-score-detail-provider';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { Button } from '@/components/shadcn/button';
+import { LOGITS_KEY, TokenListGroup, tokenListKeyForExplanation } from '@/components/token-list-columns';
 import type { DescriptionResult } from '@/lib/api/nla-types';
 import type { InterpretabilityCheckResult } from '@/lib/external/interpretability-jev';
 import {
@@ -21,6 +22,7 @@ import { getNlaSaeFormat } from '@/lib/utils/nla';
 import { SAEFormat } from '@/lib/utils/saelens';
 import { getLayerNumFromSource } from '@/lib/utils/source';
 import {
+  ExplanationPartialWithRelations,
   ExplanationScoreWithPartialRelations,
   ExplanationWithPartialRelations,
   NeuronWithPartialRelations,
@@ -60,10 +62,30 @@ const MOBILE_EXPLANATIONS_SHOWN = 3;
 export default function ExplanationsPane({
   currentNeuron,
   setCurrentNeuron,
+  tokenListGroups = [],
+  shownTokenList,
+  onShowTokenList,
 }: {
   currentNeuron: NeuronWithPartialRelations | undefined;
   setCurrentNeuron: (neuron: NeuronWithPartialRelations) => void;
+  // A click on an explanation shows the token lists of its type in the stats.
+  tokenListGroups?: TokenListGroup[];
+  shownTokenList?: string;
+  onShowTokenList?: (key: string) => void;
 }) {
+  const tokenListKeyFor = (explanation: ExplanationPartialWithRelations) =>
+    onShowTokenList ? tokenListKeyForExplanation(tokenListGroups, explanation) : undefined;
+  function showTokenListFor(explanation: ExplanationPartialWithRelations, e: React.MouseEvent<HTMLElement>) {
+    const key = tokenListKeyFor(explanation);
+    if (!key || !onShowTokenList) {
+      return;
+    }
+    // Links, buttons and text selection keep their own behavior.
+    if ((e.target as HTMLElement).closest('a, button, input, textarea') || window.getSelection()?.toString()) {
+      return;
+    }
+    onShowTokenList(key === shownTokenList ? LOGITS_KEY : key);
+  }
   const {
     getSourceSet,
     explanationTypes,
@@ -325,7 +347,15 @@ export default function ExplanationsPane({
                   !showAllExplanations && explanationIndex >= MOBILE_EXPLANATIONS_SHOWN ? 'hidden sm:block' : ''
                 }`}
               >
-                <div className="py-2">
+                <div
+                  className={`py-2 ${
+                    tokenListKeyFor(explanation)
+                      ? `cursor-pointer ${tokenListKeyFor(explanation) === shownTokenList ? 'bg-sky-50' : 'hover:bg-slate-50'}`
+                      : ''
+                  }`}
+                  title={tokenListKeyFor(explanation) ? 'Click to show its token lists in the stats' : undefined}
+                  onClick={(e) => showTokenListFor(explanation, e)}
+                >
                   <div className="relative flex w-full flex-row items-center gap-3 px-2 sm:px-3">
                     {/* <div className="flex basis-1/6 flex-col items-center justify-center">
                                 <VoteWidget

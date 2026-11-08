@@ -31,6 +31,7 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
   const modelId = searchParams.get('modelId');
   const sourceId = searchParams.get('sourceId');
   const explanations = searchParams.get('explanations') || ExplanationImportType.TRUE;
+  const tokenLists = searchParams.get('tokenLists') !== 'false';
   const explanationBatchStartParam = searchParams.get('explanationBatchStart');
   let explanationBatchStart: number | null = null;
   if (!modelId || !sourceId) {
@@ -222,6 +223,16 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
             const endTime = new Date();
             const duration = (endTime.getTime() - startTime.getTime()) / 1000; // in seconds
             console.log(`Imported final batch of ${accumulatedLines.length} lines. Duration: ${duration} seconds`);
+          }
+        }
+
+        if (tokenLists) {
+          /* TOKEN LISTS */
+          const tokenListsPaths = await getFilesInPath(`${path}/token-lists/`, '.jsonl.gz');
+          for (const [index, tokenListsPath] of tokenListsPaths.entries()) {
+            enqueueProgress(controller, index / tokenListsPaths.length, `Importing Token Lists...`);
+            console.log('Importing token lists from', tokenListsPath);
+            await importJsonlString('NeuronTokenList', await downloadAndDecompressFile(tokenListsPath));
           }
         }
 

@@ -94,6 +94,7 @@ model User {
   admin                        Boolean                       @default(false)
   accounts                     Account[]
   explanations                 Explanation[]
+  tokenLists                   NeuronTokenList[]
   triggeredExplanations        Explanation[]                 @relation(name: "triggeredByUser")
   canTriggerExplanations       Boolean                       @default(false)
   canUploadExplanations        Boolean                       @default(false)
@@ -791,6 +792,7 @@ model Neuron {
   createdAt     DateTime              @default(now())
   activations   Activation[]
   explanations  Explanation[]
+  tokenLists    NeuronTokenList[]
   comments      Comment[]
   bookmarks     Bookmark[]
   model         Model                 @relation(fields: [modelId], references: [id], onDelete: Cascade)
@@ -979,7 +981,39 @@ model ExplanationType {
   updatedAt DateTime @default(now()) @updatedAt
 
   explanations Explanation[]
+  tokenLists   NeuronTokenList[]
 
+  @@index([creatorId])
+}
+
+// A ranked list of tokens or short strings with scores, for one pole of a neuron, for example a lens read.
+// The type gives the credit. The name tells the lists of one type apart, for example "Output Read".
+model NeuronTokenList {
+  id      String @id @default(cuid())
+  modelId String
+  layer   String
+  index   String
+  neuron  Neuron @relation(fields: [modelId, layer, index], references: [modelId, layer, index], onDelete: Cascade)
+
+  typeName  String
+  type      ExplanationType @relation(fields: [typeName], references: [name], onDelete: Cascade)
+  creatorId String
+  creator   User            @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  name     String
+  pole     ExplanationPole
+  // ACTIVATION: what drives the pole. STEERING: what the pole writes.
+  aspect   ExplanationAspect
+  tokens   String[]
+  // Same order as tokens. Empty when the source gives only a ranking.
+  values   Float[]           @db.Real
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([modelId, layer, index, typeName, name, pole])
+  @@index([typeName])
   @@index([creatorId])
 }
 

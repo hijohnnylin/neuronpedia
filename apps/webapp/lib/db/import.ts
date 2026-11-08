@@ -128,7 +128,7 @@ export async function importJsonlString(tableName: string, jsonlData: string) {
           WHEN data_type = 'ARRAY' THEN 
             udt_name::regtype::text || '[]'
           WHEN data_type = 'USER-DEFINED' THEN (
-            SELECT t.typname::text
+            SELECT quote_ident(t.typname::text)
             FROM pg_type t
             WHERE t.typname = c.udt_name
           )

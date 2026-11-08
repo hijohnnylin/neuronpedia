@@ -12,6 +12,7 @@ import ExplanationsPane from '@/components/panes/explanations-pane';
 import SaeLensConfigPane from '@/components/panes/saelens-config-pane';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
+import { groupTokenLists, LOGITS_KEY } from '@/components/token-list-columns';
 import VectorItem from '@/components/vector-item';
 import useNeuronDashboard from '@/lib/hooks/use-neuron-dashboard';
 import { NeuronDashboardDocs, NeuronDashboardDocsContext } from '@/lib/hooks/use-neuron-dashboard-doc';
@@ -100,6 +101,11 @@ export default function FeatureDashboard({
     () => (externalDashboard.status === 'ready' ? signedLogHistogram(externalDashboard.dashboard.record) : undefined),
     [externalDashboard],
   );
+  const [shownTokenList, setShownTokenList] = useState(LOGITS_KEY);
+  const tokenListGroups = useMemo(() => groupTokenLists(currentNeuron?.tokenLists || []), [currentNeuron?.tokenLists]);
+  useEffect(() => {
+    setShownTokenList(LOGITS_KEY);
+  }, [currentNeuron?.modelId, currentNeuron?.layer, currentNeuron?.index]);
   const [hideDeadWarning, setHideDeadWarning] = useState(false);
   const [testTextResult, setTestTextResult] = useState<Activation | undefined>();
   const pathname = usePathname();
@@ -297,7 +303,13 @@ export default function FeatureDashboard({
           )}
 
           {/* === EXPLANATIONS */}
-          <ExplanationsPane currentNeuron={currentNeuron} setCurrentNeuron={setCurrentNeuron} />
+          <ExplanationsPane
+            currentNeuron={currentNeuron}
+            setCurrentNeuron={setCurrentNeuron}
+            tokenListGroups={embed ? [] : tokenListGroups}
+            shownTokenList={shownTokenList}
+            onShowTokenList={setShownTokenList}
+          />
 
           {/* === COS SIM */}
           <CosSimPane currentNeuron={currentNeuron} />
@@ -374,6 +386,8 @@ export default function FeatureDashboard({
                     activationMarkerValue={activationMarkerValue}
                     forceMiniStats={forceMiniStats}
                     signedLogHistogram={logHistogram}
+                    shownTokenList={shownTokenList}
+                    onShowTokenList={setShownTokenList}
                   />
                 </div>
               )}
