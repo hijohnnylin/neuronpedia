@@ -92,9 +92,15 @@ export function orderMetadataEntries(metadata: Record<string, unknown>): [string
     .map(({ entry }) => entry);
 }
 
-// Explanations from other sites first. Otherwise keeps the order it was given.
-export function externalFirst<T extends { sourceUrl?: string | null }>(explanations: T[]): T[] {
-  return [...explanations].sort((a, b) => Number(!!b.sourceUrl) - Number(!!a.sourceUrl));
+// Explanations from other sites first, by type name, then Neuronpedia's. Otherwise keeps the order it was given.
+export function externalFirst<T extends { sourceUrl?: string | null; typeName?: string | null }>(
+  explanations: T[],
+): T[] {
+  return [...explanations].sort(
+    (a, b) =>
+      Number(!!b.sourceUrl) - Number(!!a.sourceUrl) ||
+      (a.sourceUrl && b.sourceUrl ? (a.typeName || '').localeCompare(b.typeName || '') : 0),
+  );
 }
 
 // The URL if it is http or https, else undefined. Do not render other schemes as links.

@@ -69,6 +69,18 @@ describe('externalFirst', () => {
     ]).map((e) => e.id);
     expect(ids).toEqual(['ext1', 'ext2', 'np1', 'np2']);
   });
+
+  it('sorts external explanations by type name and keeps Neuronpedia ones in order at the end', () => {
+    const ids = externalFirst([
+      { id: 'np1', typeName: 'np_max-act-logits' },
+      { id: 'persona1', typeName: 'neuron-personas', sourceUrl: 'https://a' },
+      { id: 'lens1', typeName: 'neuron-lens', sourceUrl: 'https://b' },
+      { id: 'np2', typeName: 'claude-autointerp' },
+      { id: 'mapper1', typeName: 'modelmapper', sourceUrl: 'https://c' },
+      { id: 'lens2', typeName: 'neuron-lens', sourceUrl: 'https://d' },
+    ]).map((e) => e.id);
+    expect(ids).toEqual(['mapper1', 'lens1', 'lens2', 'persona1', 'np1', 'np2']);
+  });
 });
 
 describe('safeHttpUrl', () => {
