@@ -29,7 +29,7 @@ from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityRes
 
 from neuronpedia_inference import health
 from neuronpedia_inference.args import parse_env_and_args
-from neuronpedia_inference.config import Config
+from neuronpedia_inference.config import Config, apply_bos_token
 from neuronpedia_inference.endpoints.activation.all import (
     router as activation_all_router,
 )
@@ -1078,6 +1078,7 @@ async def initialize(
         )
 
         Model._instance = model
+        apply_bos_token(model.tokenizer, config.bos_token)
         num_layers = model.n_layers
         config.set_num_layers(num_layers)
 

@@ -302,6 +302,7 @@ def paged_manager():
     config = SimpleNamespace(
         model_id="test-model",
         custom_hf_model_id=None,
+        weights_model_id="test-model",
         sae_dtype="float32",
         max_loaded_saes=500,
         sae_config=[{"set": "res-test", "saes": list(modules)}],

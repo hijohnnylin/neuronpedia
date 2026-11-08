@@ -5,6 +5,7 @@ from typing import Any
 
 from neuronpedia_inference.config import (
     Config,
+    directory_for_model,
     get_sae_lens_ids_from_neuronpedia_id,
     get_saelens_neuronpedia_directory_df,
     resolve_saelens_model_id,
@@ -152,7 +153,7 @@ class SAEManager:
         start_time = time.time()
         logger.info(f"Loading SAE: {sae_id}")
 
-        directory_df = get_saelens_neuronpedia_directory_df()
+        directory_df = directory_for_model(get_saelens_neuronpedia_directory_df(), self.config.weights_model_id)
         saelens_model_id = resolve_saelens_model_id(model_id, directory_df)
         sae_lens_release, sae_lens_id = get_sae_lens_ids_from_neuronpedia_id(
             model_id=saelens_model_id,

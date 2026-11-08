@@ -1,0 +1,17 @@
+[project]
+name = "neuronpedia-icalens"
+version = "0.1.0"
+description = "Convert ICA Lens artifacts to SAELens StandardSAE folders for Neuronpedia."
+requires-python = ">=3.10"
+dependencies = [
+    "huggingface-hub>=0.30.0",
+    "pyyaml>=6.0",
+    # Same floor as apps/inference, which loads the converted folders.
+    "sae-lens>=6.45.3",
+    "safetensors>=0.4.0",
+    "torch>=2.8.0",
+    "transformers>=4.50.0",
+]
+
+[tool.uv]
+package = false

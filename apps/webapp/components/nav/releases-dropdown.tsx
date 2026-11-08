@@ -20,7 +20,7 @@ export const featuredStarReleases = [
   'sae-bench',
   'jlens',
 ];
-export const communityReleases = ['drift-calibrator'];
+export const communityReleases = ['drift-calibrator', 'icalens'];
 export const betaReleases = ['sparse-circuits'];
 
 const RELEASE_GROUPS = [featuredStarReleases, communityReleases, betaReleases];

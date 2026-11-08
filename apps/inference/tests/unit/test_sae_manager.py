@@ -137,6 +137,28 @@ class TestLoadSaes:
             "google/gemma-2-2b-it",
         }
 
+    def test_overridden_model_loads_its_own_extra_rows(self):
+        # The -it pod keeps the base MODEL_ID, and base and -it ICA lenses share a set name.
+        config = build_config(
+            model_id="google/gemma-2-2b",
+            override_model_id="google/gemma-2-2b-it",
+            sae_sets=["icalens-res"],
+            include_sae=[r"^3-icalens-res$"],
+        )
+        releases: list[str] = []
+
+        def record_release(*args: Any, **kwargs: Any) -> StubSAE:  # noqa: ARG001
+            releases.append(kwargs["release"])
+            return StubSAE()
+
+        with (
+            patch.object(SAE, "from_pretrained", new=record_release),
+            patch("neuronpedia_inference.sae_manager.Config.get_instance", return_value=config),
+        ):
+            SAEManager(num_layers=26, device="cpu").load_saes()
+
+        assert releases == ["neuronpedia/icalens-gemma-2-2b-it"]
+
 
 class TestNeuronsSet:
     """Every pod serves the `neurons` set (mlp.hook_post), with or without SAE sets."""

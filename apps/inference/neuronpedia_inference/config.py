@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import re
@@ -6,6 +7,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import pandas as pd
+import yaml
 from sae_lens.loading.pretrained_saes_directory import get_pretrained_saes_directory
 
 logger = logging.getLogger(__name__)
@@ -152,6 +154,8 @@ class Config:
     exclude_sae_patterns: list[str] | None = field(init=False, default=None)
     model_kwargs: dict[str, Any] = field(init=False, default_factory=dict)
     sae_config: list[dict[str, str | list[str]]] = field(init=False, default_factory=list)
+    # BOS the SAE sets need when the tokenizer has none (extra_saes.yaml). Set on the tokenizer at load.
+    bos_token: str | None = field(init=False, default=None)
     # Activation endpoints start at token_limit and may be lowered at the end of
     # startup from the measured VRAM budget + widest SAE (see
     # startup_memory.compute_activation_token_limit). Never raised above token_limit.
@@ -177,6 +181,7 @@ class Config:
         "activation_token_limit",
         "device",
         "sae_sets",
+        "bos_token",
         "max_loaded_saes",
         "sae_gpu_budget_gib",
         "include_sae_patterns",
@@ -214,6 +219,11 @@ class Config:
             if cls._instance is None:
                 cls._instance = default
         return cls._instance
+
+    @property
+    def weights_model_id(self) -> str:
+        """HF id of the weights this pod runs. It picks between base and `-it` extra rows."""
+        return self.custom_hf_model_id or self.override_model_id or self.model_id
 
     def set_num_layers(self, num_layers: int) -> None:
         self.num_layers = num_layers
@@ -283,11 +293,12 @@ class Config:
         if not self.sae_sets:
             logger.info("No SAE sets configured; starting without SAEs")
             return []
-        directory_df = get_saelens_neuronpedia_directory_df()
         configured = self.custom_hf_model_id if self.custom_hf_model_id else self.model_id
+        directory_df = directory_for_model(get_saelens_neuronpedia_directory_df(), self.weights_model_id)
         selected_model = resolve_saelens_model_id(configured, directory_df)
         if selected_model != configured:
             logger.info("Resolved SAELens model id %r -> %r", configured, selected_model)
+        self.bos_token = required_bos_token(directory_df, selected_model, self.sae_sets)
         config_json = config_to_json(
             directory_df,
             selected_sets_neuronpedia=self.sae_sets,
@@ -328,6 +339,92 @@ class Config:
         return True
 
 
+EXTRA_SAES_PATH = Path(__file__).resolve().parent / "extra_saes.yaml"
+
+
+@functools.cache
+def _read_extra_saes(path: Path) -> dict[str, Any]:
+    """Parse the extra SAE registry once per process."""
+    if not path.exists():
+        return {}
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} must map release names to entries")
+    return data
+
+
+def extra_saes_directory_rows(saelens_df: pd.DataFrame, path: Path = EXTRA_SAES_PATH) -> list[dict[str, Any]]:
+    """Rows for SAEs that are in Hugging Face repos but not in SAELens' pretrained_saes.yaml.
+
+    Each release is a repo id and each `path` a folder in it, which SAE.from_pretrained
+    loads directly when the release is unknown to SAELens. `model` is the HF model id. A
+    row takes the SAELens model key that a pod configured with that id resolves to, so
+    adding a row never changes which existing SAEs a pod can see.
+    """
+    rows: list[dict[str, Any]] = []
+    known_releases = set(saelens_df["release"])
+    for release, entry in _read_extra_saes(path).items():
+        if release in known_releases:
+            raise ValueError(f"{path}: release {release!r} is also in SAELens' pretrained_saes.yaml")
+        if "/" not in release:
+            raise ValueError(f"{path}: release {release!r} must be a Hugging Face repo id")
+        model = resolve_saelens_model_id(entry["model"], saelens_df)
+        for sae in entry["saes"]:
+            rows.append(
+                {
+                    "release": release,
+                    "model": model,
+                    "neuronpedia_id": sae["neuronpedia"],
+                    "norm_scaling_factor": None,
+                    "sae_lens_id": sae["path"],
+                    "bos_token": entry.get("bos_token"),
+                    "hf_model": entry["model"],
+                }
+            )
+    return rows
+
+
+def directory_for_model(directory_df: pd.DataFrame, configured_model: str) -> pd.DataFrame:
+    """Drop extra rows fitted on another model than the pod's configured one.
+
+    An `-it` model takes its base model's SAELens key, so the base and `-it` rows of one
+    set share a key and would both match. Rows from SAELens have no `hf_model` and stay.
+    """
+    if "hf_model" not in directory_df:
+        return directory_df
+    hf_model = directory_df["hf_model"]
+    return directory_df.loc[hf_model.isna() | hf_model.isin(sorted(model_id_aliases(configured_model)))]
+
+
+def required_bos_token(directory_df: pd.DataFrame, model: str, sae_sets: list[str]) -> str | None:
+    """Return the BOS token that the SAE sets served for `model` need, or None for the tokenizer's own.
+
+    Every prompt gets one BOS, so sets that disagree on it cannot share a server.
+    """
+    if "bos_token" not in directory_df:
+        return None
+    rows = directory_df.loc[(directory_df["model"] == model) & directory_df["neuronpedia_set"].isin(sae_sets)]
+    by_token: dict[str | None, set[str]] = {}
+    for token, sae_set in zip(rows["bos_token"], rows["neuronpedia_set"], strict=True):
+        by_token.setdefault(token if isinstance(token, str) else None, set()).add(sae_set)
+    if len(by_token) > 1:
+        raise ValueError(f"SAE sets need different BOS tokens ({by_token}). Serve them on separate servers.")
+    return next(iter(by_token), None)
+
+
+def apply_bos_token(tokenizer: Any, token: str | None) -> None:
+    """Make `token` the tokenizer's BOS, so the endpoints put it before every prompt."""
+    if token is None or tokenizer.bos_token == token:
+        return
+    if tokenizer.bos_token is not None:
+        raise ValueError(f"SAEs need BOS {token!r}, but the tokenizer already has BOS {tokenizer.bos_token!r}")
+    if len(tokenizer.encode(token, add_special_tokens=False)) != 1:
+        raise ValueError(f"BOS {token!r} is not a single token for this tokenizer")
+    tokenizer.bos_token = token
+    logger.info("Using %r as BOS, as the SAE sets require", token)
+
+
 # this is an example of a Claude refactor gone wrong. way too confusing.
 def get_saelens_neuronpedia_directory_df():
     df = pd.DataFrame.from_records({k: v.__dict__ for k, v in get_pretrained_saes_directory().items()}).T
@@ -349,6 +446,9 @@ def get_saelens_neuronpedia_directory_df():
     )
     df_exploded = df_exploded.drop(columns=["neuronpedia_id_list"])
     df_exploded = df_exploded.reset_index(drop=True)
+    extra_rows = extra_saes_directory_rows(df_exploded)
+    if extra_rows:
+        df_exploded = pd.concat([df_exploded, pd.DataFrame(extra_rows)], ignore_index=True)
     df_exploded["neuronpedia_set"] = df_exploded["neuronpedia_id"].apply(
         lambda x: "-".join(x.split("/")[-1].split("-")[1:]) if x is not None else None
     )

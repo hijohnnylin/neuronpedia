@@ -1,0 +1,404 @@
+# SAEs that are not in SAELens' pretrained_saes.yaml. Merged into the SAE directory by
+# config.get_saelens_neuronpedia_directory_df.
+#
+# <release>: Hugging Face repo id. SAE.from_pretrained loads it directly.
+#   model: Hugging Face model id. Rows use the SAELens model key a pod resolves this to.
+#   bos_token: optional. The token the SAEs saw before each prompt, for a model whose
+#     tokenizer has no BOS. The server uses it as the BOS, so one pod cannot serve
+#     sets that disagree on it.
+#   saes:
+#     - path: folder in the repo, holding cfg.json and sae_weights.safetensors
+#       neuronpedia: <neuronpedia model id>/<source id>
+#
+# Private repos need an HF_TOKEN with read access.
+#
+# ICA Lens (arXiv 2606.11722), converted with
+# utils/neuronpedia-utils/neuronpedia_utils/icalens/convert_icalens_to_saelens.py.
+neuronpedia/icalens-gpt2-small:
+  model: openai-community/gpt2
+  saes:
+  - path: blocks.0.hook_resid_post
+    neuronpedia: gpt2-small/0-icalens-res
+  - path: blocks.1.hook_resid_post
+    neuronpedia: gpt2-small/1-icalens-res
+  - path: blocks.2.hook_resid_post
+    neuronpedia: gpt2-small/2-icalens-res
+  - path: blocks.3.hook_resid_post
+    neuronpedia: gpt2-small/3-icalens-res
+  - path: blocks.4.hook_resid_post
+    neuronpedia: gpt2-small/4-icalens-res
+  - path: blocks.5.hook_resid_post
+    neuronpedia: gpt2-small/5-icalens-res
+  - path: blocks.6.hook_resid_post
+    neuronpedia: gpt2-small/6-icalens-res
+  - path: blocks.7.hook_resid_post
+    neuronpedia: gpt2-small/7-icalens-res
+  - path: blocks.8.hook_resid_post
+    neuronpedia: gpt2-small/8-icalens-res
+  - path: blocks.9.hook_resid_post
+    neuronpedia: gpt2-small/9-icalens-res
+  - path: blocks.10.hook_resid_post
+    neuronpedia: gpt2-small/10-icalens-res
+  - path: blocks.11.hook_resid_post
+    neuronpedia: gpt2-small/11-icalens-res
+neuronpedia/icalens-gemma-2-2b:
+  model: google/gemma-2-2b
+  saes:
+  - path: blocks.0.hook_resid_post
+    neuronpedia: gemma-2-2b/0-icalens-res
+  - path: blocks.1.hook_resid_post
+    neuronpedia: gemma-2-2b/1-icalens-res
+  - path: blocks.2.hook_resid_post
+    neuronpedia: gemma-2-2b/2-icalens-res
+  - path: blocks.3.hook_resid_post
+    neuronpedia: gemma-2-2b/3-icalens-res
+  - path: blocks.4.hook_resid_post
+    neuronpedia: gemma-2-2b/4-icalens-res
+  - path: blocks.5.hook_resid_post
+    neuronpedia: gemma-2-2b/5-icalens-res
+  - path: blocks.6.hook_resid_post
+    neuronpedia: gemma-2-2b/6-icalens-res
+  - path: blocks.7.hook_resid_post
+    neuronpedia: gemma-2-2b/7-icalens-res
+  - path: blocks.8.hook_resid_post
+    neuronpedia: gemma-2-2b/8-icalens-res
+  - path: blocks.9.hook_resid_post
+    neuronpedia: gemma-2-2b/9-icalens-res
+  - path: blocks.10.hook_resid_post
+    neuronpedia: gemma-2-2b/10-icalens-res
+  - path: blocks.11.hook_resid_post
+    neuronpedia: gemma-2-2b/11-icalens-res
+  - path: blocks.12.hook_resid_post
+    neuronpedia: gemma-2-2b/12-icalens-res
+  - path: blocks.13.hook_resid_post
+    neuronpedia: gemma-2-2b/13-icalens-res
+  - path: blocks.14.hook_resid_post
+    neuronpedia: gemma-2-2b/14-icalens-res
+  - path: blocks.15.hook_resid_post
+    neuronpedia: gemma-2-2b/15-icalens-res
+  - path: blocks.16.hook_resid_post
+    neuronpedia: gemma-2-2b/16-icalens-res
+  - path: blocks.17.hook_resid_post
+    neuronpedia: gemma-2-2b/17-icalens-res
+  - path: blocks.18.hook_resid_post
+    neuronpedia: gemma-2-2b/18-icalens-res
+  - path: blocks.19.hook_resid_post
+    neuronpedia: gemma-2-2b/19-icalens-res
+  - path: blocks.20.hook_resid_post
+    neuronpedia: gemma-2-2b/20-icalens-res
+  - path: blocks.21.hook_resid_post
+    neuronpedia: gemma-2-2b/21-icalens-res
+  - path: blocks.22.hook_resid_post
+    neuronpedia: gemma-2-2b/22-icalens-res
+  - path: blocks.23.hook_resid_post
+    neuronpedia: gemma-2-2b/23-icalens-res
+  - path: blocks.24.hook_resid_post
+    neuronpedia: gemma-2-2b/24-icalens-res
+  - path: blocks.25.hook_resid_post
+    neuronpedia: gemma-2-2b/25-icalens-res
+neuronpedia/icalens-gemma-2-2b-it:
+  model: google/gemma-2-2b-it
+  saes:
+  - path: blocks.0.hook_resid_post
+    neuronpedia: gemma-2-2b-it/0-icalens-res
+  - path: blocks.1.hook_resid_post
+    neuronpedia: gemma-2-2b-it/1-icalens-res
+  - path: blocks.2.hook_resid_post
+    neuronpedia: gemma-2-2b-it/2-icalens-res
+  - path: blocks.3.hook_resid_post
+    neuronpedia: gemma-2-2b-it/3-icalens-res
+  - path: blocks.4.hook_resid_post
+    neuronpedia: gemma-2-2b-it/4-icalens-res
+  - path: blocks.5.hook_resid_post
+    neuronpedia: gemma-2-2b-it/5-icalens-res
+  - path: blocks.6.hook_resid_post
+    neuronpedia: gemma-2-2b-it/6-icalens-res
+  - path: blocks.7.hook_resid_post
+    neuronpedia: gemma-2-2b-it/7-icalens-res
+  - path: blocks.8.hook_resid_post
+    neuronpedia: gemma-2-2b-it/8-icalens-res
+  - path: blocks.9.hook_resid_post
+    neuronpedia: gemma-2-2b-it/9-icalens-res
+  - path: blocks.10.hook_resid_post
+    neuronpedia: gemma-2-2b-it/10-icalens-res
+  - path: blocks.11.hook_resid_post
+    neuronpedia: gemma-2-2b-it/11-icalens-res
+  - path: blocks.12.hook_resid_post
+    neuronpedia: gemma-2-2b-it/12-icalens-res
+  - path: blocks.13.hook_resid_post
+    neuronpedia: gemma-2-2b-it/13-icalens-res
+  - path: blocks.14.hook_resid_post
+    neuronpedia: gemma-2-2b-it/14-icalens-res
+  - path: blocks.15.hook_resid_post
+    neuronpedia: gemma-2-2b-it/15-icalens-res
+  - path: blocks.16.hook_resid_post
+    neuronpedia: gemma-2-2b-it/16-icalens-res
+  - path: blocks.17.hook_resid_post
+    neuronpedia: gemma-2-2b-it/17-icalens-res
+  - path: blocks.18.hook_resid_post
+    neuronpedia: gemma-2-2b-it/18-icalens-res
+  - path: blocks.19.hook_resid_post
+    neuronpedia: gemma-2-2b-it/19-icalens-res
+  - path: blocks.20.hook_resid_post
+    neuronpedia: gemma-2-2b-it/20-icalens-res
+  - path: blocks.21.hook_resid_post
+    neuronpedia: gemma-2-2b-it/21-icalens-res
+  - path: blocks.22.hook_resid_post
+    neuronpedia: gemma-2-2b-it/22-icalens-res
+  - path: blocks.23.hook_resid_post
+    neuronpedia: gemma-2-2b-it/23-icalens-res
+  - path: blocks.24.hook_resid_post
+    neuronpedia: gemma-2-2b-it/24-icalens-res
+  - path: blocks.25.hook_resid_post
+    neuronpedia: gemma-2-2b-it/25-icalens-res
+neuronpedia/icalens-qwen3.5-2b-pt:
+  model: Qwen/Qwen3.5-2B-Base
+  bos_token: <|endoftext|>
+  saes:
+  - path: blocks.0.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/0-icalens-res
+  - path: blocks.1.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/1-icalens-res
+  - path: blocks.2.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/2-icalens-res
+  - path: blocks.3.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/3-icalens-res
+  - path: blocks.4.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/4-icalens-res
+  - path: blocks.5.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/5-icalens-res
+  - path: blocks.6.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/6-icalens-res
+  - path: blocks.7.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/7-icalens-res
+  - path: blocks.8.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/8-icalens-res
+  - path: blocks.9.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/9-icalens-res
+  - path: blocks.10.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/10-icalens-res
+  - path: blocks.11.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/11-icalens-res
+  - path: blocks.12.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/12-icalens-res
+  - path: blocks.13.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/13-icalens-res
+  - path: blocks.14.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/14-icalens-res
+  - path: blocks.15.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/15-icalens-res
+  - path: blocks.16.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/16-icalens-res
+  - path: blocks.17.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/17-icalens-res
+  - path: blocks.18.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/18-icalens-res
+  - path: blocks.19.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/19-icalens-res
+  - path: blocks.20.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/20-icalens-res
+  - path: blocks.21.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/21-icalens-res
+  - path: blocks.22.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/22-icalens-res
+  - path: blocks.23.hook_resid_post
+    neuronpedia: qwen3.5-2b-pt/23-icalens-res
+neuronpedia/icalens-qwen3.5-9b-pt:
+  model: Qwen/Qwen3.5-9B-Base
+  bos_token: <|endoftext|>
+  saes:
+  - path: blocks.0.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/0-icalens-res
+  - path: blocks.1.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/1-icalens-res
+  - path: blocks.2.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/2-icalens-res
+  - path: blocks.3.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/3-icalens-res
+  - path: blocks.4.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/4-icalens-res
+  - path: blocks.5.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/5-icalens-res
+  - path: blocks.6.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/6-icalens-res
+  - path: blocks.7.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/7-icalens-res
+  - path: blocks.8.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/8-icalens-res
+  - path: blocks.9.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/9-icalens-res
+  - path: blocks.10.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/10-icalens-res
+  - path: blocks.11.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/11-icalens-res
+  - path: blocks.12.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/12-icalens-res
+  - path: blocks.13.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/13-icalens-res
+  - path: blocks.14.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/14-icalens-res
+  - path: blocks.15.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/15-icalens-res
+  - path: blocks.16.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/16-icalens-res
+  - path: blocks.17.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/17-icalens-res
+  - path: blocks.18.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/18-icalens-res
+  - path: blocks.19.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/19-icalens-res
+  - path: blocks.20.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/20-icalens-res
+  - path: blocks.21.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/21-icalens-res
+  - path: blocks.22.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/22-icalens-res
+  - path: blocks.23.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/23-icalens-res
+  - path: blocks.24.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/24-icalens-res
+  - path: blocks.25.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/25-icalens-res
+  - path: blocks.26.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/26-icalens-res
+  - path: blocks.27.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/27-icalens-res
+  - path: blocks.28.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/28-icalens-res
+  - path: blocks.29.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/29-icalens-res
+  - path: blocks.30.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/30-icalens-res
+  - path: blocks.31.hook_resid_post
+    neuronpedia: qwen3.5-9b-pt/31-icalens-res
+neuronpedia/icalens-qwen3.6-27b:
+  model: Qwen/Qwen3.6-27B
+  saes:
+  - path: blocks.0.hook_resid_post
+    neuronpedia: qwen3.6-27b/0-icalens-res
+  - path: blocks.1.hook_resid_post
+    neuronpedia: qwen3.6-27b/1-icalens-res
+  - path: blocks.2.hook_resid_post
+    neuronpedia: qwen3.6-27b/2-icalens-res
+  - path: blocks.3.hook_resid_post
+    neuronpedia: qwen3.6-27b/3-icalens-res
+  - path: blocks.4.hook_resid_post
+    neuronpedia: qwen3.6-27b/4-icalens-res
+  - path: blocks.5.hook_resid_post
+    neuronpedia: qwen3.6-27b/5-icalens-res
+  - path: blocks.6.hook_resid_post
+    neuronpedia: qwen3.6-27b/6-icalens-res
+  - path: blocks.7.hook_resid_post
+    neuronpedia: qwen3.6-27b/7-icalens-res
+  - path: blocks.8.hook_resid_post
+    neuronpedia: qwen3.6-27b/8-icalens-res
+  - path: blocks.9.hook_resid_post
+    neuronpedia: qwen3.6-27b/9-icalens-res
+  - path: blocks.10.hook_resid_post
+    neuronpedia: qwen3.6-27b/10-icalens-res
+  - path: blocks.11.hook_resid_post
+    neuronpedia: qwen3.6-27b/11-icalens-res
+  - path: blocks.12.hook_resid_post
+    neuronpedia: qwen3.6-27b/12-icalens-res
+  - path: blocks.13.hook_resid_post
+    neuronpedia: qwen3.6-27b/13-icalens-res
+  - path: blocks.14.hook_resid_post
+    neuronpedia: qwen3.6-27b/14-icalens-res
+  - path: blocks.15.hook_resid_post
+    neuronpedia: qwen3.6-27b/15-icalens-res
+  - path: blocks.16.hook_resid_post
+    neuronpedia: qwen3.6-27b/16-icalens-res
+  - path: blocks.17.hook_resid_post
+    neuronpedia: qwen3.6-27b/17-icalens-res
+  - path: blocks.18.hook_resid_post
+    neuronpedia: qwen3.6-27b/18-icalens-res
+  - path: blocks.19.hook_resid_post
+    neuronpedia: qwen3.6-27b/19-icalens-res
+  - path: blocks.20.hook_resid_post
+    neuronpedia: qwen3.6-27b/20-icalens-res
+  - path: blocks.21.hook_resid_post
+    neuronpedia: qwen3.6-27b/21-icalens-res
+  - path: blocks.22.hook_resid_post
+    neuronpedia: qwen3.6-27b/22-icalens-res
+  - path: blocks.23.hook_resid_post
+    neuronpedia: qwen3.6-27b/23-icalens-res
+  - path: blocks.24.hook_resid_post
+    neuronpedia: qwen3.6-27b/24-icalens-res
+  - path: blocks.25.hook_resid_post
+    neuronpedia: qwen3.6-27b/25-icalens-res
+  - path: blocks.26.hook_resid_post
+    neuronpedia: qwen3.6-27b/26-icalens-res
+  - path: blocks.27.hook_resid_post
+    neuronpedia: qwen3.6-27b/27-icalens-res
+  - path: blocks.28.hook_resid_post
+    neuronpedia: qwen3.6-27b/28-icalens-res
+  - path: blocks.29.hook_resid_post
+    neuronpedia: qwen3.6-27b/29-icalens-res
+  - path: blocks.30.hook_resid_post
+    neuronpedia: qwen3.6-27b/30-icalens-res
+  - path: blocks.31.hook_resid_post
+    neuronpedia: qwen3.6-27b/31-icalens-res
+  - path: blocks.32.hook_resid_post
+    neuronpedia: qwen3.6-27b/32-icalens-res
+  - path: blocks.33.hook_resid_post
+    neuronpedia: qwen3.6-27b/33-icalens-res
+  - path: blocks.34.hook_resid_post
+    neuronpedia: qwen3.6-27b/34-icalens-res
+  - path: blocks.35.hook_resid_post
+    neuronpedia: qwen3.6-27b/35-icalens-res
+  - path: blocks.36.hook_resid_post
+    neuronpedia: qwen3.6-27b/36-icalens-res
+  - path: blocks.37.hook_resid_post
+    neuronpedia: qwen3.6-27b/37-icalens-res
+  - path: blocks.38.hook_resid_post
+    neuronpedia: qwen3.6-27b/38-icalens-res
+  - path: blocks.39.hook_resid_post
+    neuronpedia: qwen3.6-27b/39-icalens-res
+  - path: blocks.40.hook_resid_post
+    neuronpedia: qwen3.6-27b/40-icalens-res
+  - path: blocks.41.hook_resid_post
+    neuronpedia: qwen3.6-27b/41-icalens-res
+  - path: blocks.42.hook_resid_post
+    neuronpedia: qwen3.6-27b/42-icalens-res
+  - path: blocks.43.hook_resid_post
+    neuronpedia: qwen3.6-27b/43-icalens-res
+  - path: blocks.44.hook_resid_post
+    neuronpedia: qwen3.6-27b/44-icalens-res
+  - path: blocks.45.hook_resid_post
+    neuronpedia: qwen3.6-27b/45-icalens-res
+  - path: blocks.46.hook_resid_post
+    neuronpedia: qwen3.6-27b/46-icalens-res
+  - path: blocks.47.hook_resid_post
+    neuronpedia: qwen3.6-27b/47-icalens-res
+  - path: blocks.48.hook_resid_post
+    neuronpedia: qwen3.6-27b/48-icalens-res
+  - path: blocks.49.hook_resid_post
+    neuronpedia: qwen3.6-27b/49-icalens-res
+  - path: blocks.50.hook_resid_post
+    neuronpedia: qwen3.6-27b/50-icalens-res
+  - path: blocks.51.hook_resid_post
+    neuronpedia: qwen3.6-27b/51-icalens-res
+  - path: blocks.52.hook_resid_post
+    neuronpedia: qwen3.6-27b/52-icalens-res
+  - path: blocks.53.hook_resid_post
+    neuronpedia: qwen3.6-27b/53-icalens-res
+  - path: blocks.54.hook_resid_post
+    neuronpedia: qwen3.6-27b/54-icalens-res
+  - path: blocks.55.hook_resid_post
+    neuronpedia: qwen3.6-27b/55-icalens-res
+  - path: blocks.56.hook_resid_post
+    neuronpedia: qwen3.6-27b/56-icalens-res
+  - path: blocks.57.hook_resid_post
+    neuronpedia: qwen3.6-27b/57-icalens-res
+  - path: blocks.58.hook_resid_post
+    neuronpedia: qwen3.6-27b/58-icalens-res
+  - path: blocks.59.hook_resid_post
+    neuronpedia: qwen3.6-27b/59-icalens-res
+  - path: blocks.60.hook_resid_post
+    neuronpedia: qwen3.6-27b/60-icalens-res
+  - path: blocks.61.hook_resid_post
+    neuronpedia: qwen3.6-27b/61-icalens-res
+  - path: blocks.62.hook_resid_post
+    neuronpedia: qwen3.6-27b/62-icalens-res
+  - path: blocks.63.hook_resid_post
+    neuronpedia: qwen3.6-27b/63-icalens-res
