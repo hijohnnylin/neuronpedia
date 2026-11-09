@@ -144,14 +144,6 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
             vertical
             filterToFeaturedReleases={false}
           />
-
-          <SearchExplanationsPane
-            filterToRelease={release}
-            initialModelId={defaultModelId}
-            initialSourceSetName={defaultSourceSet?.name || ''}
-            defaultTab={SearchExplanationsType.BY_RELEASE}
-            showTabs
-          />
         </div>
         {defaultSourceSet?.allowInferenceSearch && (
           <div className="mt-6 w-full max-w-screen-lg pb-0">
@@ -166,6 +158,16 @@ export default function PageRelease({ release }: { release: SourceReleaseWithRel
             layer={defaultSource?.id || ''}
             showModel
             filterToRelease={release.name}
+          />
+        </div>
+
+        <div className="w-full max-w-screen-lg">
+          <SearchExplanationsPane
+            filterToRelease={release}
+            initialModelId={defaultModelId}
+            initialSourceSetName={defaultSourceSet?.name || ''}
+            defaultTab={SearchExplanationsType.BY_RELEASE}
+            showTabs
           />
         </div>
       </div>

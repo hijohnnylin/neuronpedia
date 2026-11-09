@@ -114,14 +114,6 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
         </div>
       )}
 
-      <div className="mt-6 flex w-full max-w-screen-lg flex-col items-start justify-center gap-x-3 gap-y-5 sm:flex-row">
-        <SearchExplanationsPane
-          initialModelId={model.id}
-          initialSourceSetName={model.sourceSets && model.sourceSets.length > 0 ? model.sourceSets[0].name : ''}
-          defaultTab={SearchExplanationsType.BY_MODEL}
-          showTabs
-        />
-      </div>
       {firstSourceSet?.allowInferenceSearch && (
         <div className="mt-6 w-full max-w-screen-lg">
           <SearchInferenceModelPane model={model} />
@@ -134,6 +126,15 @@ export default async function PageModel({ model }: { model: ModelWithPartialRela
           sourceSet={firstSourceSet?.name || ''}
           layer={firstSource?.id || ''}
           showModel
+        />
+      </div>
+
+      <div className="mt-6 flex w-full max-w-screen-lg flex-col items-start justify-center gap-x-3 gap-y-5 sm:flex-row">
+        <SearchExplanationsPane
+          initialModelId={model.id}
+          initialSourceSetName={model.sourceSets && model.sourceSets.length > 0 ? model.sourceSets[0].name : ''}
+          defaultTab={SearchExplanationsType.BY_MODEL}
+          showTabs
         />
       </div>
     </div>

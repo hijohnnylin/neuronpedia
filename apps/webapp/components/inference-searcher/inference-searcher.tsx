@@ -69,6 +69,14 @@ export default function InferenceSearcher({
   const router = useRouter();
   const loadResultsInNewPage = q === undefined;
 
+  // BOS filtering is applied by /api/search-all (it's sent the
+  // `ignoreBos` flag), so only density is filtered here. Some sources (ICA, MLP neurons)
+  // are dense everywhere, so the filter is skipped when it would hide every result.
+  const sparseResults = searchResults.filter((result) => !(result.neuron && result.neuron.frac_nonzero > 0.01));
+  const allResultsDense = sparseResults.length === 0 && searchResults.length > 0;
+  const shownResults = hideDense && !allResultsDense ? sparseResults : searchResults;
+  const hiddenDenseCount = searchResults.length - shownResults.length;
+
   function makeUrl(query: string) {
     return `/${modelId}/?sourceSet=${sourceSet}&selectedLayers=${JSON.stringify(
       selectedLayers,
@@ -420,28 +428,38 @@ export default function InferenceSearcher({
                 </button>
               </div>
             )}
-            {searchResults
-              .filter((result) => {
-                // BOS filtering is applied by /api/search-all (it's sent the
-                // `ignoreBos` flag), so only density is filtered here.
-                if (hideDense && result.neuron && result.neuron?.frac_nonzero > 0.01) {
-                  return false;
-                }
-                return true;
-              })
-              .map((result) => {
-                const topExplanation = result.neuron?.explanations ? result.neuron?.explanations[0] : undefined;
-                return (
-                  <ResultItem
-                    key={`${result.layer}:${result.index}`}
-                    result={result}
-                    tokens={tokens}
-                    topExplanation={topExplanation}
-                    searchSortIndexes={searchSortIndexes}
-                    showDashboards={showDashboards}
-                  />
-                );
-              })}
+            {exploreState === InferenceActivationAllState.LOADED && hiddenDenseCount > 0 && (
+              <div className="flex w-full flex-row items-center justify-center gap-x-3 bg-slate-100 py-2 text-[13px] text-slate-600">
+                {hiddenDenseCount} of {searchResults.length} results are hidden because their density is above 1%.
+                <button
+                  type="button"
+                  className="rounded-md bg-sky-700 px-3 py-2 text-[10px] font-medium uppercase leading-none text-white transition-all hover:bg-sky-900"
+                  onClick={() => {
+                    setHideDense(false);
+                  }}
+                >
+                  Show Them
+                </button>
+              </div>
+            )}
+            {exploreState === InferenceActivationAllState.LOADED && hideDense && allResultsDense && (
+              <div className="flex w-full flex-row items-center justify-center bg-slate-100 py-2 text-[13px] text-slate-600">
+                All results have a density above 1%, so none are hidden.
+              </div>
+            )}
+            {shownResults.map((result) => {
+              const topExplanation = result.neuron?.explanations ? result.neuron?.explanations[0] : undefined;
+              return (
+                <ResultItem
+                  key={`${result.layer}:${result.index}`}
+                  result={result}
+                  tokens={tokens}
+                  topExplanation={topExplanation}
+                  searchSortIndexes={searchSortIndexes}
+                  showDashboards={showDashboards}
+                />
+              );
+            })}
           </div>
         </div>
       )}

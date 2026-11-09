@@ -139,19 +139,6 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
             </div>
           )}
 
-          <div className="flex w-full items-center justify-center">
-            <div className="flex w-full max-w-screen-lg">
-              <SearchExplanationsPane
-                initialModelId={sourceSet.modelId}
-                initialSourceSetName={sourceSet.name}
-                initialSelectedLayers={[defaultSourceId || '']}
-                filterToRelease={sourceSet.releases as SourceReleaseWithRelations}
-                defaultTab="bySource"
-                showTabs={false}
-              />
-            </div>
-          </div>
-
           {sourceSet.showUmap && (
             <div className="w-full pb-6">
               <UmapPane
@@ -166,8 +153,7 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
               />
             </div>
           )}
-          {/* Dashboards in files (R2) have no Neuron rows to browse. */}
-          {sourceSet.hasDashboards && !sourceSet.externalDashboardsUrl && (
+          {sourceSet.hasDashboards && (
             <div className="flex w-full flex-col gap-y-6">
               <BrowserPane
                 modelId={sourceSet.modelId}
@@ -178,6 +164,19 @@ export default function PageSourceSet({ sourceSet }: { sourceSet: SourceSetWithP
               />
             </div>
           )}
+
+          <div className="flex w-full items-center justify-center">
+            <div className="flex w-full max-w-screen-lg">
+              <SearchExplanationsPane
+                initialModelId={sourceSet.modelId}
+                initialSourceSetName={sourceSet.name}
+                initialSelectedLayers={[defaultSourceId || '']}
+                filterToRelease={sourceSet.releases as SourceReleaseWithRelations}
+                defaultTab="bySource"
+                showTabs={false}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

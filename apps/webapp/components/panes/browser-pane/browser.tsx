@@ -12,14 +12,28 @@ import PanelLoader from '@/components/panel-loader';
 import { useFeatureContext } from '@/components/provider/feature-provider';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { DEFAULT_SOURCESET } from '@/lib/env';
+import { NeuronDashboardDocsContext } from '@/lib/hooks/use-neuron-dashboard-doc';
+import {
+  applyNeuronDashboard,
+  emptyNeuron,
+  fetchNeuronDashboard,
+  NeuronDashboard,
+} from '@/lib/utils/neuron-dashboards';
 import { getFirstSourceSetForModel } from '@/lib/utils/source';
 import { Visibility } from '@prisma/client';
 import Link from 'next/link';
 import { NeuronWithPartialRelations, SourceSetWithPartialRelations } from 'prisma/generated/zod';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import InfiniteScroll from 'react-infinite-scroll-component';
 
 export const FEATURE_BROWSER_HEIGHT = 520;
+
+// Neurons per page when the source set's dashboards are files (R2), which have no Activation rows.
+const EXTERNAL_PAGE_SIZE = 25;
+
+function neuronKey(neuron: { modelId: string; layer: string; index: string }) {
+  return `${neuron.modelId}/${neuron.layer}/${neuron.index}`;
+}
 
 export default function Browser({
   defaultModelId,
@@ -38,7 +52,7 @@ export default function Browser({
   filterToRelease?: string;
   newWindowOnSaeChange?: boolean;
 }) {
-  const { globalModels, getFirstSourceForSourceSet } = useGlobalContext();
+  const { globalModels, getFirstSourceForSourceSet, getSourceSet } = useGlobalContext();
   const [modelId, setModelId] = useState(defaultModelId);
   const [sourceSet, setSourceSet] = useState(defaultSourceSet);
   const [layer, setLayer] = useState(defaultLayer);
@@ -47,6 +61,37 @@ export default function Browser({
   const [hasMore, setHasMore] = useState(true);
   const { currentFeature: currentNeuron, setCurrentFeature: setCurrentNeuron } = useFeatureContext();
   const [locked, setLocked] = useState(false);
+  const externalDashboardsUrl = getSourceSet(modelId, sourceSet)?.externalDashboardsUrl;
+  const [dashboards, setDashboards] = useState<Record<string, NeuronDashboard>>({});
+  const withDashboard = (neuron: NeuronWithPartialRelations) => {
+    const dashboard = dashboards[neuronKey(neuron)];
+    return dashboard ? applyNeuronDashboard(neuron, dashboard) : neuron;
+  };
+  const shownNeuron = currentNeuron ? withDashboard(currentNeuron) : undefined;
+  const currentDashboard = currentNeuron ? dashboards[neuronKey(currentNeuron)] : undefined;
+  const dashboardDocs = useMemo(
+    () =>
+      externalDashboardsUrl && currentDashboard
+        ? { baseUrl: externalDashboardsUrl, docRefs: currentDashboard.docRefs }
+        : null,
+    [externalDashboardsUrl, currentDashboard],
+  );
+
+  // A page of file-backed neurons by index, with each dashboard loaded from the files.
+  const loadExternalNeurons = (url: string, offset: number) => {
+    const total = globalModels[modelId]?.neuronsPerLayer || 0;
+    const end = Math.min(offset + EXTERNAL_PAGE_SIZE, total);
+    const page = Array.from({ length: Math.max(end - offset, 0) }, (_, i) =>
+      emptyNeuron(modelId, layer, String(offset + i), sourceSet),
+    );
+    page.forEach((neuron) => {
+      fetchNeuronDashboard(url, neuron)
+        .then((dashboard) => setDashboards((prev) => ({ ...prev, [neuronKey(neuron)]: dashboard })))
+        .catch((error) => console.error(`error loading neuron dashboard ${neuronKey(neuron)}:`, error));
+    });
+    setLoadedNeurons((prevItems) => (offset === 0 ? page : [...prevItems, ...page]));
+    setHasMore(end < total);
+  };
 
   if (index !== undefined) {
     setLocked(true);
@@ -109,6 +154,10 @@ export default function Browser({
   // TODO: fix this mess (3x duplicated code)
 
   const fetchMoreData = () => {
+    if (externalDashboardsUrl) {
+      loadExternalNeurons(externalDashboardsUrl, loadedNeurons.length);
+      return;
+    }
     fetch(`/api/features-offset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -144,6 +193,10 @@ export default function Browser({
   };
 
   useEffect(() => {
+    // The [modelId, layer] effect below also runs on mount and loads file-backed neurons.
+    if (externalDashboardsUrl) {
+      return;
+    }
     fetch(`/api/features-offset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -185,6 +238,10 @@ export default function Browser({
       setLoadedNeurons([]);
     }
     setHasMore(true);
+    if (externalDashboardsUrl) {
+      loadExternalNeurons(externalDashboardsUrl, 0);
+      return;
+    }
     fetch(`/api/features-offset`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -296,7 +353,7 @@ export default function Browser({
               {hasMore === false && (
                 <div className="bg-slate-50 py-5 text-center font-bold text-slate-300">No Features Found</div>
               )}
-              {loadedNeurons.map((neuron) => (
+              {loadedNeurons.map(withDashboard).map((neuron) => (
                 <button
                   type="button"
                   key={`${neuron?.layer}-${neuron?.index}`}
@@ -381,18 +438,20 @@ export default function Browser({
                 </a>
               </div>
               <div className="overflow-y-scroll overscroll-contain rounded-b-xl border border-slate-200">
-                {currentNeuron?.pos_str && currentNeuron?.pos_str?.length > 0 && (
+                {shownNeuron?.pos_str && shownNeuron?.pos_str?.length > 0 && (
                   <div className="border-b px-4 pb-2 pt-3">
-                    <FeatureStats currentNeuron={currentNeuron} />
+                    <FeatureStats currentNeuron={shownNeuron} />
                   </div>
                 )}
-                <ActivationsList
-                  feature={currentNeuron}
-                  defaultRange={currentNeuron.sourceSet?.defaultRange}
-                  defaultShowLineBreaks={currentNeuron.sourceSet?.defaultShowBreaks}
-                  showTest={false}
-                  activations={currentNeuron?.activations}
-                />
+                <NeuronDashboardDocsContext.Provider value={dashboardDocs}>
+                  <ActivationsList
+                    feature={shownNeuron}
+                    defaultRange={shownNeuron?.sourceSet?.defaultRange}
+                    defaultShowLineBreaks={shownNeuron?.sourceSet?.defaultShowBreaks}
+                    showTest={false}
+                    activations={shownNeuron?.activations}
+                  />
+                </NeuronDashboardDocsContext.Provider>
               </div>
             </div>
           ) : (

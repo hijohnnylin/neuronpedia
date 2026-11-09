@@ -31,7 +31,7 @@ export default function PageSource({
   simMatrixDemo?: string;
 }) {
   const release = source.set && source.set.releases ? source.set.releases : null;
-  // Dashboards in files (R2) have no Neuron rows to browse and no SAE evals.
+  // Dashboards in files (R2) have no SAE evals.
   const hasExternalDashboards = Boolean(source.set?.externalDashboardsUrl);
 
   return (
@@ -149,19 +149,6 @@ export default function PageSource({
             </div>
           )}
 
-          <div className="flex w-full items-center justify-center">
-            <div className="flex w-full max-w-screen-lg">
-              <SearchExplanationsPane
-                initialModelId={source.modelId}
-                initialSourceSetName={source.set?.name || ''}
-                initialSelectedLayers={[source.id]}
-                filterToRelease={release as SourceReleaseWithRelations}
-                defaultTab="bySource"
-                showTabs={false}
-              />
-            </div>
-          </div>
-
           {source.hasUmap && (
             <div className="w-full">
               <UmapPane
@@ -177,7 +164,7 @@ export default function PageSource({
             </div>
           )}
 
-          {source.hasDashboards && !hasExternalDashboards && (
+          {source.hasDashboards && (
             <BrowserPane
               modelId={source.modelId}
               sourceSet={source.set?.name || ''}
@@ -193,6 +180,19 @@ export default function PageSource({
               evals={source.evals as EvalWithPartialRelations[]}
             />
           )}
+
+          <div className="flex w-full items-center justify-center">
+            <div className="flex w-full max-w-screen-lg">
+              <SearchExplanationsPane
+                initialModelId={source.modelId}
+                initialSourceSetName={source.set?.name || ''}
+                initialSelectedLayers={[source.id]}
+                filterToRelease={release as SourceReleaseWithRelations}
+                defaultTab="bySource"
+                showTabs={false}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
