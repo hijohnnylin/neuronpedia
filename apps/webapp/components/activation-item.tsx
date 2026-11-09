@@ -300,7 +300,7 @@ export default function ActivationItem({
       )}
       <div
         // if it's the smallest range and we're split in dfa mode, then force it to be stacked
-        className={`flex-1 ${
+        className={`min-w-0 flex-1 ${
           effectiveDfa === true &&
           dfaSplit === true &&
           currentRange === ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[0].size &&

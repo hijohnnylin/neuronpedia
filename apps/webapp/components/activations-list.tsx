@@ -415,8 +415,8 @@ export default function ActivationsList({
                 ))}
               </div>
             </div>
-            {/* Right column: Bottom activations (lowest to highest) */}
-            <div className={`flex-1 ${activeMobileColumn === 'bottom' ? '' : 'hidden sm:block'}`}>
+            {/* Right column: Bottom activations (lowest to highest). min-w-0 keeps both columns the same width. */}
+            <div className={`min-w-0 flex-1 ${activeMobileColumn === 'bottom' ? '' : 'hidden sm:block'}`}>
               <div className="hidden flex-row items-center gap-x-1 bg-slate-100 px-3 py-2 font-mono text-[10px] font-bold uppercase text-slate-600 sm:flex">
                 <div className="rounded-sm bg-rose-400 px-1 py-[1px]">Negative</div> Activations
               </div>
@@ -434,7 +434,8 @@ export default function ActivationsList({
                   >
                     {columnIntervalHeader(bottomItems, activationIndex, 'bottom')}
                     <div className="flex w-full flex-row items-center justify-center">
-                      <div className="flex w-full flex-auto flex-col text-left text-sm">
+                      {/* A token wider than the column is cut at its edge. Its tooltip shows all of it. */}
+                      <div className="flex w-full min-w-0 flex-auto flex-col overflow-clip text-left text-sm">
                         {activation.tokens && (
                           <ActivationItem
                             key={`bottom-${ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size}-${activationIndex}${showLineBreaks}`}
@@ -463,7 +464,7 @@ export default function ActivationsList({
             </div>
             {/* Left column: Top activations (highest to lowest) */}
             <div
-              className={`flex-1 border-r border-slate-200 ${activeMobileColumn === 'top' ? '' : 'hidden sm:block'}`}
+              className={`min-w-0 flex-1 border-r border-slate-200 ${activeMobileColumn === 'top' ? '' : 'hidden sm:block'}`}
             >
               <div className="hidden flex-row items-center gap-x-1 bg-slate-100 px-3 py-2 font-mono text-[10px] font-bold uppercase text-slate-600 sm:flex">
                 <div className="rounded-sm bg-emerald-400 px-1 py-[1px]">Positive</div> Activations
@@ -480,7 +481,7 @@ export default function ActivationsList({
                   >
                     {columnIntervalHeader(topItems, activationIndex, 'top')}
                     <div className="flex w-full flex-row items-center justify-center">
-                      <div className="flex w-full flex-auto flex-col text-left text-sm">
+                      <div className="flex w-full min-w-0 flex-auto flex-col overflow-clip text-left text-sm">
                         {activation.tokens && (
                           <ActivationItem
                             key={`top-${ACTIVATION_DISPLAY_DEFAULT_CONTEXT_TOKENS[selectedRange].size}-${activationIndex}${showLineBreaks}`}
