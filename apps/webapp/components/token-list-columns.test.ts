@@ -1,4 +1,10 @@
-import { groupTokenLists, tokenListKeyForExplanation } from '@/components/token-list-columns';
+import {
+  groupTokenLists,
+  hrefWithTokenList,
+  TOKEN_LIST_PARAM,
+  tokenListKeyForExplanation,
+  tokenListKeyFromParam,
+} from '@/components/token-list-columns';
 import { NeuronTokenListPartialWithRelations } from 'prisma/generated/zod';
 import { describe, expect, it } from 'vitest';
 
@@ -35,5 +41,47 @@ describe('tokenListKeyForExplanation', () => {
     expect(
       tokenListKeyForExplanation(groups, { typeName: 'np_max-act-logits', pole: null, aspect: null }),
     ).toBeUndefined();
+  });
+});
+
+describe('token list URL param', () => {
+  const lensGroups = groupTokenLists([
+    list('jacobian-lens', 'J-Lens', 'POSITIVE', 'STEERING'),
+    list('jacobian-lens', 'J++ Lens', 'POSITIVE', 'STEERING'),
+    list('neuron-lens', 'Output Read', 'POSITIVE', 'STEERING'),
+  ]);
+  const page = 'https://www.neuronpedia.org/qwen3.6-27b/32-icalens-res/43';
+
+  it('writes a param that reads back to the same group', () => {
+    lensGroups.forEach((g) => {
+      const href = hrefWithTokenList(page, g);
+      const value = new URL(href, page).searchParams.get(TOKEN_LIST_PARAM);
+      expect(tokenListKeyFromParam(lensGroups, value)).toBe(g.key);
+    });
+  });
+
+  it('keeps the param readable', () => {
+    expect(hrefWithTokenList(page, lensGroups[0])).toBe(
+      '/qwen3.6-27b/32-icalens-res/43?tokenlist=jacobian-lens:J-Lens',
+    );
+    expect(hrefWithTokenList(page, lensGroups[1])).toBe(
+      '/qwen3.6-27b/32-icalens-res/43?tokenlist=jacobian-lens:J%2B%2B+Lens',
+    );
+    expect(hrefWithTokenList(page, lensGroups[2])).toBe(
+      '/qwen3.6-27b/32-icalens-res/43?tokenlist=neuron-lens:Output+Read',
+    );
+  });
+
+  it('removes the param for the logits and keeps other params and the hash', () => {
+    const href = `${page}?embed=true&tokenlist=jacobian-lens:J-Lens#top`;
+    expect(hrefWithTokenList(href, undefined)).toBe('/qwen3.6-27b/32-icalens-res/43?embed=true#top');
+    expect(hrefWithTokenList(href, lensGroups[2])).toBe(
+      '/qwen3.6-27b/32-icalens-res/43?embed=true&tokenlist=neuron-lens:Output+Read#top',
+    );
+  });
+
+  it('gives nothing for a missing or unknown param', () => {
+    expect(tokenListKeyFromParam(lensGroups, null)).toBeUndefined();
+    expect(tokenListKeyFromParam(lensGroups, 'jacobian-lens:R-Lens')).toBeUndefined();
   });
 });

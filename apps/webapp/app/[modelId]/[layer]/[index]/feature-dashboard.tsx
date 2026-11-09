@@ -13,7 +13,7 @@ import ExplanationsPane from '@/components/panes/explanations-pane';
 import SaeLensConfigPane from '@/components/panes/saelens-config-pane';
 import { useGlobalContext } from '@/components/provider/global-provider';
 import { BreadcrumbLink, BreadcrumbPage } from '@/components/shadcn/breadcrumbs';
-import { groupTokenLists, LOGITS_KEY } from '@/components/token-list-columns';
+import { groupTokenLists, hrefWithTokenList, LOGITS_KEY, tokenListKeyFromParam } from '@/components/token-list-columns';
 import VectorItem from '@/components/vector-item';
 import useNeuronDashboard from '@/lib/hooks/use-neuron-dashboard';
 import { NeuronDashboardDocs, NeuronDashboardDocsContext } from '@/lib/hooks/use-neuron-dashboard-doc';
@@ -34,7 +34,7 @@ import { Columns2, Download, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Activation, NeuronWithPartialRelations, SourceWithPartialRelations } from 'prisma/generated/zod';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BookmarkButton from './bookmark-button';
 
 export default function FeatureDashboard({
@@ -51,6 +51,8 @@ export default function FeatureDashboard({
   forceMiniStats = false,
   activationMarkerValue,
   compare,
+  initialTokenList,
+  syncTokenListToUrl = false,
 }: {
   initialNeuron?: NeuronWithPartialRelations | undefined;
   embed?: boolean;
@@ -66,6 +68,10 @@ export default function FeatureDashboard({
   activationMarkerValue?: number;
   // Set when this dashboard is one column of the split view.
   compare?: FeatureCompareLinks;
+  // The TOKEN_LIST_PARAM value to show first.
+  initialTokenList?: string;
+  // Set only where this dashboard owns the page URL, so that a link opens the shown list.
+  syncTokenListToUrl?: boolean;
 }) {
   const [currentNeuron, setCurrentNeuron] = useState<NeuronWithPartialRelations | undefined>(initialNeuron);
   const { getReleaseForSourceSet, getSource, getSourceSet, globalModels } = useGlobalContext();
@@ -106,10 +112,30 @@ export default function FeatureDashboard({
     () => (externalDashboard.status === 'ready' ? signedLogHistogram(externalDashboard.dashboard.record) : undefined),
     [externalDashboard],
   );
-  const [shownTokenList, setShownTokenList] = useState(LOGITS_KEY);
   const tokenListGroups = useMemo(() => groupTokenLists(currentNeuron?.tokenLists || []), [currentNeuron?.tokenLists]);
+  const [shownTokenList, setShownTokenList] = useState(
+    () => tokenListKeyFromParam(groupTokenLists(initialNeuron?.tokenLists || []), initialTokenList) ?? LOGITS_KEY,
+  );
+  const showTokenList = (key: string) => {
+    setShownTokenList(key);
+    if (syncTokenListToUrl) {
+      window.history.replaceState(
+        null,
+        '',
+        hrefWithTokenList(
+          window.location.href,
+          tokenListGroups.find((g) => g.key === key),
+        ),
+      );
+    }
+  };
+  const tokenListNeuronId = useRef(`${currentNeuron?.modelId}/${currentNeuron?.layer}/${currentNeuron?.index}`);
   useEffect(() => {
-    setShownTokenList(LOGITS_KEY);
+    const id = `${currentNeuron?.modelId}/${currentNeuron?.layer}/${currentNeuron?.index}`;
+    if (id !== tokenListNeuronId.current) {
+      tokenListNeuronId.current = id;
+      setShownTokenList(LOGITS_KEY);
+    }
   }, [currentNeuron?.modelId, currentNeuron?.layer, currentNeuron?.index]);
   const [hideDeadWarning, setHideDeadWarning] = useState(false);
   const [testTextResult, setTestTextResult] = useState<Activation | undefined>();
@@ -353,7 +379,7 @@ export default function FeatureDashboard({
             setCurrentNeuron={setCurrentNeuron}
             tokenListGroups={embed ? [] : tokenListGroups}
             shownTokenList={shownTokenList}
-            onShowTokenList={setShownTokenList}
+            onShowTokenList={showTokenList}
           />
 
           {/* === COS SIM */}
@@ -432,7 +458,7 @@ export default function FeatureDashboard({
                     forceMiniStats={forceMiniStats}
                     signedLogHistogram={logHistogram}
                     shownTokenList={shownTokenList}
-                    onShowTokenList={setShownTokenList}
+                    onShowTokenList={showTokenList}
                   />
                 </div>
               )}

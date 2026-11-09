@@ -72,6 +72,7 @@ export default async function Page(props: {
   const embedSteer = searchParams.embedsteer !== 'false'; // default embed steer
   const embedTestField = searchParams.embedtestfield !== 'false'; // default embed test field
   const defaultTestText = searchParams.defaulttesttext ? (searchParams.defaulttesttext as string) : undefined;
+  const tokenList = typeof searchParams.tokenlist === 'string' ? searchParams.tokenlist : undefined; // TOKEN_LIST_PARAM
 
   const compareId = embed ? null : parseCompareValue(searchParams[COMPARE_PARAM]);
   const user = await makeAuthedUserFromSessionOrReturnNull();
@@ -100,6 +101,8 @@ export default async function Page(props: {
         embedActivations={embedActivations}
         embedLink={embedLink}
         embedSteer={embedSteer}
+        initialTokenList={tokenList}
+        syncTokenListToUrl
       />
     </div>
   );

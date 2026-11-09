@@ -61,6 +61,26 @@ export function tokenListKeyForExplanation(
   return best?.key;
 }
 
+// The query param that names the shown group, as "<typeName>:<name>". Type names have no colon.
+export const TOKEN_LIST_PARAM = 'tokenlist';
+
+export function tokenListKeyFromParam(groups: TokenListGroup[], value: string | null | undefined) {
+  return value ? groups.find((g) => `${g.typeName}:${g.name}` === value)?.key : undefined;
+}
+
+// The path and query of href, with the param set to the group, or removed when there is no group.
+export function hrefWithTokenList(href: string, group: Pick<TokenListGroup, 'typeName' | 'name'> | undefined) {
+  const url = new URL(href);
+  url.searchParams.delete(TOKEN_LIST_PARAM);
+  const params = [url.searchParams.toString()];
+  if (group) {
+    const encode = (s: string) => encodeURIComponent(s).replace(/%20/g, '+');
+    params.push(`${TOKEN_LIST_PARAM}=${encode(group.typeName)}:${encode(group.name)}`);
+  }
+  const query = params.filter(Boolean).join('&');
+  return `${url.pathname}${query ? `?${query}` : ''}${url.hash}`;
+}
+
 export function columnsForGroup(group: TokenListGroup): TokenColumnData[] {
   const sourceName = group.lists[0]?.type?.displayName || group.typeName;
   return POLE_ORDER.flatMap((pole) =>
