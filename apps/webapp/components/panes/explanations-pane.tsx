@@ -127,6 +127,7 @@ export default function ExplanationsPane({
   const [interpretableLoading, setInterpretableLoading] = useState(false);
   const [interpretableResult, setInterpretableResult] = useState<InterpretabilityCheckResult | null>(null);
   const [interpretableError, setInterpretableError] = useState<string | null>(null);
+  const [showGenerateAutoInterp, setShowGenerateAutoInterp] = useState(false);
 
   useEffect(() => {
     if (explanationTypesFiltered.length > 0) {
@@ -174,9 +175,6 @@ export default function ExplanationsPane({
     return getNlaSaeFormat(currentNeuron.modelId, layerNum);
   })();
   const isNlaSupported = nlaSaeFormat !== undefined;
-  // Intrusion detection reads Activation rows; features served from R2 dashboard files have none
-  const showInterpretableCheck = !getSourceSet(currentNeuron?.modelId || '', currentNeuron?.sourceSetName || '')
-    ?.externalDashboardsUrl;
 
   // On demand and not saved: the result is about the feature, not any explanation.
   const handleCheckInterpretable = async () => {
@@ -371,7 +369,7 @@ export default function ExplanationsPane({
                           <ExplanationMetadataButton metadata={explanation.metadata} />
                         </h1>
                       </div>
-                      <div className="mt-1 flex flex-row items-center justify-between font-mono text-xs text-slate-400">
+                      <div className="mt-0.5 flex flex-row items-center justify-between font-mono text-xs text-slate-400">
                         {(() => {
                           // CASE: explanation from another site
                           if (explanation.sourceUrl) {
@@ -922,11 +920,63 @@ export default function ExplanationsPane({
           )}
         </div>
       )}
-      <div className="flex w-full flex-col rounded-b-md border-t border-slate-200 px-3 py-3 pt-3">
+      {/* Hidden on mobile, which includes compare columns. */}
+      <div className="hidden w-full flex-col rounded-b-md border-t border-slate-200 px-3 py-3 pt-3 sm:flex">
         <div className="mb-1.5 w-full text-center text-[10px] font-normal uppercase leading-none text-slate-400">
-          New Auto-Interp
+          Auto-Interp Tools
         </div>
-        <div className="flex w-full min-w-0 flex-row items-center justify-center gap-x-1 text-slate-500">
+        <div className="flex w-full flex-row gap-x-2.5">
+          <button
+            type="button"
+            onClick={() => setShowGenerateAutoInterp(!showGenerateAutoInterp)}
+            aria-expanded={showGenerateAutoInterp}
+            className={`flex h-8 flex-1 items-center justify-center rounded px-2 text-[9px] font-medium uppercase leading-tight transition-all ${
+              showGenerateAutoInterp ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'
+            }`}
+          >
+            Generate Auto-Interp
+          </button>
+          <button
+            type="button"
+            onClick={handleCheckInterpretable}
+            disabled={interpretableLoading || !currentNeuron?.index}
+            className="flex h-8 flex-1 flex-row items-center justify-center gap-x-1 rounded bg-slate-200 px-2 text-[9px] font-medium uppercase leading-tight text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+          >
+            {interpretableLoading ? (
+              <LoadingSpinner size={16} className="text-sky-700" />
+            ) : (
+              <>
+                Intrusion Detection
+                {/* Clicks on the help icon or its tooltip link must not start a check. */}
+                <span role="presentation" onClick={(e) => e.stopPropagation()}>
+                  <CustomTooltip trigger={<HelpCircle className="h-3 w-3 shrink-0 text-slate-400" />} side="top">
+                    <p className="leading-relaxed">
+                      Tests whether this feature is interpretable from its contexts alone, with no explanation. Shows a
+                      model groups of four activating texts plus one intruder and asks it to find the odd one out.
+                    </p>
+                    <p className="mt-2 leading-relaxed">
+                      Based on the intruder detection task in{' '}
+                      <a
+                        href="https://arxiv.org/pdf/2507.08473"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sky-700 underline hover:text-sky-900"
+                      >
+                        Paulo &amp; Belrose (2025)
+                      </a>
+                      .
+                    </p>
+                  </CustomTooltip>
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+        <div
+          className={`${
+            showGenerateAutoInterp ? 'mt-2 flex' : 'hidden'
+          } w-full min-w-0 flex-row items-center justify-center gap-x-1 text-slate-500`}
+        >
           <div className="flex min-w-[calc(50%-35px)] max-w-[calc(50%-35px)] flex-1 flex-col items-center">
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
@@ -1122,52 +1172,50 @@ export default function ExplanationsPane({
           </button>
         </div>
       </div>
-      {/* Extra tools. One column on mobile, side by side with a divider from sm up. */}
-      {(isNlaSupported || showInterpretableCheck) && (
-        <div className="flex w-full flex-col divide-y divide-slate-200 border-t border-slate-200 px-3 py-3 sm:flex-row sm:divide-x sm:divide-y-0">
-          {isNlaSupported && (
-            <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
-              <Popover.Root open={nlaPopoverOpen} onOpenChange={setNlaPopoverOpen}>
-                <Popover.Trigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleNlaExplain}
-                    disabled={nlaLoading || !currentNeuron?.source?.hfRepoId || !currentNeuron?.source?.hfFolderId}
-                    className="flex h-9 w-[140px] items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
-                  >
-                    {nlaLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Explain With NLA'}
-                  </button>
-                </Popover.Trigger>
-                <Popover.Portal>
-                  <Popover.Content
-                    className="z-50 min-h-[320px] w-[320px] rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-lg"
-                    sideOffset={6}
-                    side="bottom"
-                    onInteractOutside={() => setNlaPopoverOpen(false)}
-                  >
-                    {nlaError && <div className="text-xs text-red-500">{nlaError}</div>}
-                    {!nlaError && nlaLoading && !nlaPartialText && (
-                      <div className="flex items-center justify-center gap-x-2 py-2 text-xs text-slate-400">
-                        <LoadingSquare size={18} />
-                        <span>Generating NLA explanation...</span>
+      {isNlaSupported && (
+        <div className="flex w-full flex-col border-t border-slate-200 px-3 py-3">
+          <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
+            <Popover.Root open={nlaPopoverOpen} onOpenChange={setNlaPopoverOpen}>
+              <Popover.Trigger asChild>
+                <button
+                  type="button"
+                  onClick={handleNlaExplain}
+                  disabled={nlaLoading || !currentNeuron?.source?.hfRepoId || !currentNeuron?.source?.hfFolderId}
+                  className="flex h-9 w-[140px] items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
+                >
+                  {nlaLoading ? <LoadingSpinner size={16} className="text-sky-700" /> : 'Explain With NLA'}
+                </button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  className="z-50 min-h-[320px] w-[320px] rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-lg"
+                  sideOffset={6}
+                  side="bottom"
+                  onInteractOutside={() => setNlaPopoverOpen(false)}
+                >
+                  {nlaError && <div className="text-xs text-red-500">{nlaError}</div>}
+                  {!nlaError && nlaLoading && !nlaPartialText && (
+                    <div className="flex items-center justify-center gap-x-2 py-2 text-xs text-slate-400">
+                      <LoadingSquare size={18} />
+                      <span>Generating NLA explanation...</span>
+                    </div>
+                  )}
+                  {!nlaError && nlaLoading && nlaPartialText && (
+                    <div className="flex flex-col gap-y-2">
+                      <div className="whitespace-pre-wrap border-l-2 border-slate-200 pl-2 text-xs font-medium leading-snug text-slate-700">
+                        {nlaPartialText}
                       </div>
-                    )}
-                    {!nlaError && nlaLoading && nlaPartialText && (
-                      <div className="flex flex-col gap-y-2">
-                        <div className="whitespace-pre-wrap border-l-2 border-slate-200 pl-2 text-xs font-medium leading-snug text-slate-700">
-                          {nlaPartialText}
-                        </div>
-                        <div className="flex items-center gap-x-1.5 text-[10px] text-slate-400">
-                          <LoadingSquare size={14} />
-                        </div>
+                      <div className="flex items-center gap-x-1.5 text-[10px] text-slate-400">
+                        <LoadingSquare size={14} />
                       </div>
-                    )}
-                    {nlaResult && (
-                      <div className="flex flex-col gap-y-2">
-                        <div className="whitespace-pre-wrap text-xs font-medium leading-snug text-slate-700">
-                          {nlaResult.description}
-                        </div>
-                        {/* {nlaResult.cosine_similarity !== null && (
+                    </div>
+                  )}
+                  {nlaResult && (
+                    <div className="flex flex-col gap-y-2">
+                      <div className="whitespace-pre-wrap text-xs font-medium leading-snug text-slate-700">
+                        {nlaResult.description}
+                      </div>
+                      {/* {nlaResult.cosine_similarity !== null && (
                         <div className="flex items-center gap-x-1">
                           <span className="text-[10px] text-slate-400">Cos Sim</span>
                           <span
@@ -1185,57 +1233,19 @@ export default function ExplanationsPane({
                           </span>
                         </div>
                       )} */}
-                      </div>
-                    )}
-                    <Popover.Arrow className="fill-slate-200" />
-                  </Popover.Content>
-                </Popover.Portal>
-              </Popover.Root>
-              <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
-                <p className="leading-relaxed">
-                  Generates an explanation with a Natural Language Autoencoder, which reads the {`feature's`} decoder
-                  vector directly instead of its activating texts.
-                </p>
-              </CustomTooltip>
-            </div>
-          )}
-          {showInterpretableCheck && (
-            <div className="flex flex-1 items-center justify-center gap-x-1.5 py-1.5 sm:py-0">
-              <button
-                type="button"
-                onClick={handleCheckInterpretable}
-                disabled={interpretableLoading || !currentNeuron?.index}
-                className="flex h-9 w-[140px] flex-col items-center justify-center rounded bg-slate-200 px-3 text-[10px] font-medium leading-tight text-slate-500 transition-all hover:bg-slate-300 disabled:bg-slate-300"
-              >
-                {interpretableLoading ? (
-                  <LoadingSpinner size={16} className="text-sky-700" />
-                ) : (
-                  <>
-                    <span>Interpretable Score</span>
-                    <span className="text-[8px] uppercase text-slate-400">Intrusion Detection</span>
-                  </>
-                )}
-              </button>
-              <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
-                <p className="leading-relaxed">
-                  Tests whether this feature is interpretable from its contexts alone, with no explanation. Shows a
-                  model groups of four activating texts plus one intruder and asks it to find the odd one out.
-                </p>
-                <p className="mt-2 leading-relaxed">
-                  Based on the intruder detection task in{' '}
-                  <a
-                    href="https://arxiv.org/pdf/2507.08473"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sky-700 underline hover:text-sky-900"
-                  >
-                    Paulo &amp; Belrose (2025)
-                  </a>
-                  .
-                </p>
-              </CustomTooltip>
-            </div>
-          )}
+                    </div>
+                  )}
+                  <Popover.Arrow className="fill-slate-200" />
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+            <CustomTooltip trigger={<HelpCircle className="h-3.5 w-3.5 text-slate-400" />} side="top">
+              <p className="leading-relaxed">
+                Generates an explanation with a Natural Language Autoencoder, which reads the {`feature's`} decoder
+                vector directly instead of its activating texts.
+              </p>
+            </CustomTooltip>
+          </div>
         </div>
       )}
       <InterpretabilityCheckDialog

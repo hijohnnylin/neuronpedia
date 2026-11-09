@@ -4,6 +4,7 @@ import ActivationsList from '@/components/activations-list';
 import BreadcrumbsComponent from '@/components/breadcrumbs-component';
 import ExplanationScoreDetailDialog from '@/components/explanation-score-detail-dialog';
 import FeatureSelector from '@/components/feature-selector/feature-selector';
+import SelectorLinkButton from '@/components/feature-selector/selector-link-button';
 import FeatureStats from '@/components/feature-stats';
 import ConnectedNeuronsPane from '@/components/panes/connected-neurons-pane';
 import CosSimPane from '@/components/panes/cossim-pane';
@@ -17,6 +18,7 @@ import VectorItem from '@/components/vector-item';
 import useNeuronDashboard from '@/lib/hooks/use-neuron-dashboard';
 import { NeuronDashboardDocs, NeuronDashboardDocsContext } from '@/lib/hooks/use-neuron-dashboard-doc';
 import { CIRCUIT_SPARSITY_MODELS } from '@/lib/utils/circuit-sparsity';
+import { FeatureCompareLinks, getComparePath } from '@/lib/utils/feature-compare';
 import { signedLogHistogram } from '@/lib/utils/neuron-dashboard-histogram';
 import { applyNeuronDashboard } from '@/lib/utils/neuron-dashboards';
 import { getFeaturePath } from '@/lib/utils/neuron-identifier';
@@ -28,7 +30,7 @@ import {
   isSteerableNeuronLayer,
   NEURONS_SOURCESET,
 } from '@/lib/utils/source';
-import { Download } from 'lucide-react';
+import { Columns2, Download, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Activation, NeuronWithPartialRelations, SourceWithPartialRelations } from 'prisma/generated/zod';
@@ -48,6 +50,7 @@ export default function FeatureDashboard({
   embedSteer = true,
   forceMiniStats = false,
   activationMarkerValue,
+  compare,
 }: {
   initialNeuron?: NeuronWithPartialRelations | undefined;
   embed?: boolean;
@@ -61,6 +64,8 @@ export default function FeatureDashboard({
   embedSteer?: boolean;
   forceMiniStats?: boolean;
   activationMarkerValue?: number;
+  // Set when this dashboard is one column of the split view.
+  compare?: FeatureCompareLinks;
 }) {
   const [currentNeuron, setCurrentNeuron] = useState<NeuronWithPartialRelations | undefined>(initialNeuron);
   const { getReleaseForSourceSet, getSource, getSourceSet, globalModels } = useGlobalContext();
@@ -168,9 +173,11 @@ export default function FeatureDashboard({
 
   return (
     <div className="relative mx-auto flex w-full flex-col gap-x-3 pt-0 sm:mt-0">
-      <ExplanationScoreDetailDialog />
+      {/* The split view renders one dialog for both columns, and no breadcrumbs. */}
+      {!compare && <ExplanationScoreDetailDialog />}
 
       {!embed &&
+        !compare &&
         (!neuronHasVectorInDatabase(currentNeuron) ||
           (neuronHasVectorInDatabase(currentNeuron) &&
             !shouldHideBreadcrumbsAndSelectorForNeuronVector(currentNeuron))) && (
@@ -219,8 +226,18 @@ export default function FeatureDashboard({
         (!neuronHasVectorInDatabase(currentNeuron) ||
           (neuronHasVectorInDatabase(currentNeuron) &&
             !shouldHideBreadcrumbsAndSelectorForNeuronVector(currentNeuron))) && (
-          <div className="fixed left-0 right-0 top-12 z-20 mb-0 flex justify-center gap-y-2 border-b bg-white px-2 pb-2 pt-1 shadow-[rgba(0,0,0,0.2)_0px_4px_3px_-3px] sm:static sm:top-16 sm:z-0 sm:mb-2 sm:flex-row sm:gap-y-0 sm:border-b-0 sm:border-t-0 sm:bg-transparent sm:px-2 sm:pb-0 sm:pt-3 sm:shadow-[0]">
-            <div className="flex w-full flex-1 select-none flex-row justify-center gap-x-3 overflow-hidden px-0 pb-1 text-center font-sans text-xs font-bold leading-none text-slate-700 sm:gap-x-5 sm:px-0 sm:pt-0 sm:text-base">
+          <div
+            className={
+              compare
+                ? 'sticky top-0 z-20 flex flex-row items-start justify-between gap-x-2 border-b border-slate-200 bg-slate-50 px-2 pb-1 pt-2'
+                : 'fixed left-0 right-0 top-12 z-20 mb-0 flex justify-center gap-y-2 border-b bg-white px-2 pb-2 pt-1 shadow-[rgba(0,0,0,0.2)_0px_4px_3px_-3px] sm:static sm:top-16 sm:z-0 sm:mb-2 sm:flex-row sm:gap-y-0 sm:border-b-0 sm:border-t-0 sm:bg-transparent sm:px-2 sm:pb-0 sm:pt-3 sm:shadow-[0]'
+            }
+          >
+            <div
+              className={`flex w-full flex-1 select-none flex-row ${
+                compare ? 'justify-start' : 'justify-center'
+              } gap-x-3 overflow-hidden px-0 pb-1 text-center font-sans text-xs font-bold leading-none text-slate-700 sm:gap-x-5 sm:px-0 sm:pt-0 sm:text-base`}
+            >
               <FeatureSelector
                 filterToPublic
                 showNextPrev
@@ -235,8 +252,32 @@ export default function FeatureDashboard({
                 defaultIndex={currentNeuron?.index || pathname.split('/')[3]}
                 openInNewTab={false}
                 filterToFeaturedReleases={false}
+                getHref={compare?.hrefFor}
+                nextPrevBelowIndex={!!compare}
+                trailing={
+                  !compare &&
+                  currentNeuron && (
+                    <SelectorLinkButton
+                      href={getComparePath(currentNeuron, currentNeuron)}
+                      title="Compare side by side"
+                      label="Compare"
+                      icon={<Columns2 className="h-4 w-4" />}
+                      className="hidden sm:flex"
+                    />
+                  )
+                }
               />
             </div>
+            {compare && (
+              // A viewport query, so `force-mobile` does not change it. On a phone, the notice bar closes.
+              <SelectorLinkButton
+                href={compare.closeHref}
+                title="Close this column"
+                label="Close"
+                icon={<X className="h-4 w-4" />}
+                className="shrink-0 max-[639px]:hidden"
+              />
+            )}
             <div className="hidden flex-row items-start justify-start gap-x-2 px-0 pt-1 sm:flex">
               {allowTest() && !isNeuronLayer && (
                 <button
@@ -284,7 +325,11 @@ export default function FeatureDashboard({
       {/* === MAIN CONTENT */}
       <div
         className={`relative ${
-          embed || neuronHasVectorInDatabase(currentNeuron) ? 'sm:pt-2' : 'mt-16 sm:pt-0'
+          // On mobile the selector is fixed, so the content clears it. In compare mode it is in the flow.
+          embed || neuronHasVectorInDatabase(currentNeuron) ? 'sm:pt-2' : compare ? '' : 'mt-16 sm:pt-0'
+        } ${
+          // The column clips this 1px overhang, so the panels' side borders do not double the column divider.
+          compare ? '-mx-px' : ''
         } flex h-full flex-col sm:mt-0 sm:flex-row sm:gap-x-2 sm:gap-y-0 ${
           forceMiniStats ? 'sm:px-0' : 'pt-2 sm:px-2'
         }`}

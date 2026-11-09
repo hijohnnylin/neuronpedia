@@ -1,11 +1,14 @@
 import { getNeuronOptimized, neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
 import { userCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
+import { COMPARE_PARAM, parseCompareValue } from '@/lib/utils/feature-compare';
 import { emptyNeuron } from '@/lib/utils/neuron-dashboards';
 import { getNeuronLayerTitle, isNeuronLayerSource, NEURONS_SOURCESET } from '@/lib/utils/source';
+import { AuthenticatedUser } from '@/lib/with-user';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import FeatureCompare from './feature-compare';
 import FeatureDashboard from './feature-dashboard';
 
 export async function generateMetadata(props: {
@@ -35,6 +38,25 @@ export async function generateMetadata(props: {
   };
 }
 
+// Returns null when the feature does not exist or the user cannot see it.
+async function loadNeuron(
+  modelId: string,
+  layer: string,
+  index: string,
+  user: AuthenticatedUser | null,
+): Promise<NeuronWithPartialRelations | null> {
+  try {
+    const neuron = await getNeuronOptimized(modelId, layer, index, user);
+    if (neuron) {
+      return neuron;
+    }
+    // A neuron layer page renders without a Neuron row.
+    return layer.match(/^-?\d+$/) ? emptyNeuron(modelId, layer, index, NEURONS_SOURCESET) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export default async function Page(props: {
   params: Promise<{ modelId: string; layer: string; index: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -51,26 +73,18 @@ export default async function Page(props: {
   const embedTestField = searchParams.embedtestfield !== 'false'; // default embed test field
   const defaultTestText = searchParams.defaulttesttext ? (searchParams.defaulttesttext as string) : undefined;
 
-  const { modelId } = params;
-  let neuron: NeuronWithPartialRelations | null = null;
-
-  try {
-    neuron = await getNeuronOptimized(
-      modelId,
-      params.layer,
-      params.index,
-      await makeAuthedUserFromSessionOrReturnNull(),
-    );
-
-    if (!neuron) {
-      if (params.layer.match(/^-?\d+$/)) {
-        neuron = emptyNeuron(modelId, params.layer, params.index, NEURONS_SOURCESET);
-      } else {
-        notFound();
-      }
-    }
-  } catch (e) {
+  const compareId = embed ? null : parseCompareValue(searchParams[COMPARE_PARAM]);
+  const user = await makeAuthedUserFromSessionOrReturnNull();
+  const [neuron, compareNeuron] = await Promise.all([
+    loadNeuron(params.modelId, params.layer, params.index, user),
+    compareId ? loadNeuron(compareId.modelId, compareId.layer, compareId.index, user) : null,
+  ]);
+  if (!neuron) {
     notFound();
+  }
+
+  if (compareId) {
+    return <FeatureCompare leftNeuron={neuron} rightNeuron={compareNeuron} rightId={compareId} />;
   }
 
   return (

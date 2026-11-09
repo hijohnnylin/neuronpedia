@@ -1,13 +1,24 @@
 /** @type {import('tailwindcss').Config} */
 const plugin = require('tailwindcss/plugin');
 
+// Tailwind's default breakpoints. They are declared as variants below, not as `theme.screens`,
+// so that a `.force-mobile` subtree (for example one column of a split view) gets the mobile layout
+// on a wide viewport. Tailwind registers screen variants after user plugins, so a plugin cannot
+// override `sm` while `theme.screens` defines it.
+const SCREENS = { sm: '640px', md: '768px', lg: '1024px', xl: '1280px', '2xl': '1536px' };
+
 module.exports = {
   content: ['./app/**/*.{js,ts,jsx,tsx}', './components/**/*.{js,ts,jsx,tsx}'],
   future: {
     hoverOnlyWhenSupported: true,
   },
   theme: {
+    screens: {},
+    container: {
+      screens: SCREENS,
+    },
     extend: {
+      maxWidth: Object.fromEntries(Object.entries(SCREENS).map(([name, width]) => [`screen-${name}`, width])),
       backgroundSize: {
         'size-200': '200% 200%',
       },
@@ -130,6 +141,15 @@ module.exports = {
     plugin(({ addVariant }) => {
       addVariant('radix-side-top', '&[data-side="top"]');
       addVariant('radix-side-bottom', '&[data-side="bottom"]');
+    }),
+    // `:where()` keeps the specificity of each responsive class the same as Tailwind's own.
+    plugin(({ addVariant }) => {
+      Object.entries(SCREENS).forEach(([name, minWidth]) => {
+        addVariant(name, `@media (min-width: ${minWidth}) { &:where(:not(.force-mobile *)) }`);
+      });
+      Object.entries(SCREENS).forEach(([name, minWidth]) => {
+        addVariant(`max-${name}`, [`@media not all and (min-width: ${minWidth}) { & }`, '&:where(.force-mobile *)']);
+      });
     }),
   ],
 };
