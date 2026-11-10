@@ -1,0 +1,112 @@
+---
+title: '"Neuron"pedia and ICA Lens'
+description: '8.6M Neurons for 9 Models, 1.3M Community Explanations, and ICA Lens'
+date: 2026-11-09
+author: Community Collaborators
+image: ASSET_BASE_URL/blog/community.png
+imagePreview: ASSET_BASE_URL/blog/community.png
+---
+
+<div className="mt-2"></div>
+
+**What's New**
+
+- ➡️ [**8.6M Neurons**](/neurons): MLP neuron dashboards for 9 models spanning Qwen, Llama, and Gemma. Inference (search, steer, etc) enabled for several models.
+- ➡️ [**1.3M Community Explanations**](/qwen3-8b/0/11524): Neurons labels and explanations from five external sources (imported with permission): [Neuron Lens](https://neuron-lens.com), [Neuronary](https://neuronary.org), [Model Mapper](https://eiffel-tower-qwen.vercel.app/v2/), [Neuron Persona Library](https://neuronpersonas.com), [Persona Neurons](https://willmayner.com/persona-neurons).
+- ➡️ [**ICA Lens**](/icalens): Independent components of the residual stream for 6 models, by [Liu & Han et al](https://liusida.github.io/ica-lens-paper/).
+
+**Other Updates**
+
+- **Compare Dashboards**: Click Compare on a dashboard to view two dashboards side by side.
+- [**More Workspace Lenses**](https://huggingface.co/neuronpedia/jacobian-lens): More J++ Lenses and batch of R-Lenses from Bobby Faber.
+
+_**Newsletter Bug**_: Our email sender had a bug which caused some unsubscribe links to not work as expected. This is now fixed, our apologies.
+
+---
+
+## Neuron Dashboards
+
+Browse 8.6 million neuron dashboards via the [MLP Neurons](/neurons) release page, or jump to specific models here:
+
+- **Qwen**: [Qwen3 8B](/qwen3-8b), [Qwen3 14B](/qwen3-14b), [Qwen3 32B](/qwen3-32b), [Qwen3.5 4B](/qwen3.5-4b)
+- **Gemma**: [Gemma 4 12B](/gemma-4-12b), [Gemma 4 12B IT](/gemma-4-12b-it), [Gemma 4 31B IT](/gemma-4-31b-it)
+- **Llama**: [Llama 3.1 8B IT](/llama3.1-8b-it), [Llama 3.3 70B IT](/llama3.3-70b-it)
+
+#### Inference (Steer, TopK Search, Activation Testing)
+
+Inference is enabled for several of these models, so you can do the usual activation testing, steering, search by topK, and more.
+
+Here's a [TopK search for Qwen3 8B](https://www.neuronpedia.org/search-topk-by-token?modelId=qwen3-8b&source=20&text=In+his+%27I+Have+a+Dream%27+speech%2C+Martin+Luther+King+Jr.+envisioned+a+future+where+people+would+be+judged+by+their+character%2C+not+the+color+of+their+skin.+This+speech+is+iconic+in+the+civil+rights+movement.&densityThreshold=0.5&ignoreBos=false&sortBy=frequency)'s neurons:
+
+<img src="ASSET_BASE_URL/blog/topksearch.jpg" alt="TopK Search for Qwen 3 8B neurons for an MLK quote" />
+
+And here's a steer on a Qwen ["airplanes" neuron](https://www.neuronpedia.org/qwen3-8b/steer?saved=cmwa7g3gp000zveaeo159qnvz&source=24&index=2665&strength=152.25):
+
+<img src="ASSET_BASE_URL/blog/planesteer.jpg" alt="Airplane steer for Qwen 3 8B" />
+
+---
+
+## Community Explanations
+
+Neuronpedia now hosts imported explanations from five neuron-explaining platforms onto Neuronpedia, with permission from their authors and links back to the original sources:
+
+- [**Neuron Lens**](https://neuron-lens.com) by a9lim and treetown | [example](https://www.neuronpedia.org/gemma-4-12b/23/735): Labels for every MLP neuron of Qwen3 8B and Gemma 4 12B, plus input, output, and driver token lists.
+- [**Neuronary**](https://neuronary.org) by Lyra and contributors | [example](https://www.neuronpedia.org/qwen3.5-4b/15/4041): Neuron steering recipes for Qwen3.5 4B.
+- [**Model Mapper**](https://eiffel-tower-qwen.vercel.app/v2/) by James Phoenix | [example](https://www.neuronpedia.org/qwen3-8b/31/7508): Neuron labels and generated words for Qwen3 8B.
+- [**Neuron Persona Library**](https://neuronpersonas.com) by Joshua Fonseca Rivera | [example](https://www.neuronpedia.org/qwen3-8b/7/271): The personas that models take on when you steer a single neuron.
+- [**Persona Neurons**](https://willmayner.com/persona-neurons) by Will Mayner | [example](https://www.neuronpedia.org/qwen3-8b/17/7974): Neurons that contribute most to persona vectors.
+
+Here's the same Qwen3 8B ["airplanes" neuron](https://www.neuronpedia.org/qwen3-8b/24/2665), as explained by three different sources:
+
+<img src="ASSET_BASE_URL/blog/plane.gif" alt="Comparing explanations" />
+
+#### Token Lists
+
+Notice in the above example that clicking certain explanations changes the top logits to different lists more relevant to that explanation or explanation method. These are "Token Lists", a new feature on Neuronpedia that which show lists of tokens associated with a neuron or latent. Token lists are directly linkable. For example, here's the link showing tokens found via the fitted Jacobian Lens for that same Qwen airplanes neuron: [https://www.neuronpedia.org/qwen3-8b/24/2665?tokenlist=jacobian-lens:J-Lens](https://www.neuronpedia.org/qwen3-8b/24/2665?tokenlist=jacobian-lens:J-Lens)
+
+🙋 **Opportunity to Contribute**: Want to upload your labels? We have a gated upload API for explanations, available upon request. [Contact us](mailto:johnny@neuronpedia.org?subject=Neuron%20Explanations) and we'll set you up.
+
+---
+
+## ICA Lens
+
+#### [Release](/icalens) | [Paper by Liu, Han et al.](https://arxiv.org/abs/2606.11722) | [Code](https://github.com/liusida/ica-lens-paper) | [Tweet](https://x.com/feijianghan/status/2112654366599504277)
+
+ICA Lens revisits independent component analysis as a way to find interpretable directions in the residual stream, with no dictionary training needed.
+
+Neuronpedia hosts ICA Lenses for 6 models. Each lens is for one layer, and the number of directions per lens is the model's hidden size (d_model). Each direction has its own full dashboard, like SAE latents and neurons. Using the dropdown above the logits, you can switch to viewing the tokens through J-Lens or R-Lens as well.
+
+- [**GPT-2 Small**](/gpt2-small/icalens-res): 12 layers. Example: [US states](/gpt2-small/6-icalens-res/31).
+- [**Gemma 2 2B**](/gemma-2-2b/icalens-res): 26 layers. Example: [months](/gemma-2-2b/12-icalens-res/65).
+- [**Gemma 2 2B IT**](/gemma-2-2b-it/icalens-res): 26 layers. Example: [possessive pronouns](/gemma-2-2b-it/12-icalens-res/19).
+- [**Qwen3.5 2B Base**](/qwen3.5-2b-pt/icalens-res): 6 layers (every 4th). Example: [first names](/qwen3.5-2b-pt/12-icalens-res/74).
+- [**Qwen3.5 9B Base**](/qwen3.5-9b-pt/icalens-res): 8 layers (every 4th). Example: [music](/qwen3.5-9b-pt/16-icalens-res/352).
+- [**Qwen3.6 27B**](/qwen3.6-27b/icalens-res): 16 layers (every 4th). Example: [cost and price](/qwen3.6-27b/32-icalens-res/77).
+
+Most ICA lenses are inference enabled, too. For example, here's steering on a ["legal system" direction](https://www.neuronpedia.org/gpt2-small/8-icalens-res/51) in GPT2-Small [(steer link)](https://www.neuronpedia.org/gpt2-small/steer?saved=cmw8mpwvb001qhnlw96cvp9o5&source=8-icalens-res&index=51&strength=208.98):
+
+<img src="ASSET_BASE_URL/blog/legal.jpg" alt="GPT2-Small" />
+
+Just like with SAEs and neurons, you can use Inference Search to find top directions in a model's ICA lenses using custom text. Here's an inference search with text about [food in Italy](https://www.neuronpedia.org/gemma-2-2b-it/?sourceSet=icalens-res&selectedLayers=[]&sortIndexes=[15,16]&ignoreBos=true&q=In%20the%20heart%20of%20Tuscany%2C%20a%20family-owned%20vineyard%20pairs%20its%20robust%20Chianti%20with%20a%20hearty%20wild%20boar%20ragù%2C%20creating%20an%20unforgettable%20taste%20of%20Italian%20countryside%20cuisine.) in Gemma 2 2B IT:
+
+<img src="ASSET_BASE_URL/blog/italy.jpg" alt="Italian food" />
+
+---
+
+## Compare Dashboards
+
+Inspired by the previously featured [NP-Feature-Compare](https://np-feature-compare.netlify.app/?left=gemma-3-4b%2F9-gemmascope-2-res-16k%2F83&right=gemma-3-4b-it%2F9-gemmascope-2-res-16k%2F83) by Melissa Wessel, you can now compare two dashboards side by side on Neuronpedia directly.
+
+Here, we [compare a neuron](https://www.neuronpedia.org/gemma-4-12b/32/3?compare=gemma-4-12b-it/32/3) in Gemma 4 12B with the same neuron in its instruct variant:
+
+<img src="ASSET_BASE_URL/blog/gifts.jpg" alt="Comparing explanations" />
+
+---
+
+## More Workspace Lenses
+
+The Neuronpedia [Workspace Lenses](https://huggingface.co/neuronpedia/jacobian-lens) Huggingface has been updated with R-Lens and J++ lens from Bobby Faber. Two J++ lenses are enabled for custom chats on Neuronpedia: [gemma-3-12b-it](https://www.neuronpedia.org/gemma-3-12b/jlens) and [llama-3.1-8b-it](https://neuronpedia.org/llama3.1-8b-it/jlens).
+
+---
+
+As always, please [contact us](https://www.neuronpedia.org/contact) with your questions, feedback, and suggestions.
