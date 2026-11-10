@@ -24,6 +24,7 @@ export type NeuronModelRow = {
 };
 
 const LABEL_CLASS = 'mb-0.5 font-sans text-[10px] font-medium uppercase text-slate-500';
+const DEFAULT_MODEL_ID = 'qwen3-8b';
 
 export default function NeuronsHome({
   release,
@@ -33,8 +34,9 @@ export default function NeuronsHome({
   models: NeuronModelRow[];
 }) {
   const router = useRouter();
-  const defaultModel = models.find((m) => m.searchable) || models[0];
-  const searchModel = models.find((m) => m.searchable);
+  const defaultModel =
+    models.find((m) => m.modelId === DEFAULT_MODEL_ID) || models.find((m) => m.searchable) || models[0];
+  const searchModel = defaultModel?.searchable ? defaultModel : models.find((m) => m.searchable);
   const [jumpModelId, setJumpModelId] = useState(defaultModel?.modelId || '');
   // Search by release runs on the server, so it needs the neurons source sets to be in this release.
   const linkedRelease = (release.sourceSets?.length || 0) > 0 ? release : undefined;
