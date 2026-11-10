@@ -17,6 +17,7 @@ const BADGE_CLASSES = {
   negative: 'bg-rose-50 text-rose-600',
   both: 'bg-sky-50 text-sky-700',
   steer: 'bg-amber-50 text-amber-700',
+  knockout: 'bg-violet-50 text-violet-700',
 };
 
 export function ExplanationBadgeView({ explanation }: { explanation: ExplanationPartialWithRelations }) {

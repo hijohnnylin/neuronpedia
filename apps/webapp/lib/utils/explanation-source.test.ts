@@ -36,6 +36,10 @@ describe('getExplanationBadge', () => {
     expect(getExplanationBadge({ pole: 'NEGATIVE', aspect: 'STEERING' })?.label).toBe('Steer \u2193');
     expect(getExplanationBadge({ aspect: 'STEERING' })?.label).toBe('Steer \u2191');
   });
+
+  it('marks steering on both poles as a knockout', () => {
+    expect(getExplanationBadge({ pole: 'BOTH', aspect: 'STEERING' })?.label).toBe('Knockout');
+  });
 });
 
 describe('formatMetadataKey', () => {

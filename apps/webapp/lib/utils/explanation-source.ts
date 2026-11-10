@@ -1,7 +1,7 @@
 import { EXPLANATIONTYPE_NP_MIN_ACT_LOGITS } from '@/lib/utils/autointerp';
 import type { ExplanationAspect, ExplanationPole } from '@prisma/client';
 
-export type ExplanationBadgeKind = 'negative' | 'both' | 'steer';
+export type ExplanationBadgeKind = 'negative' | 'both' | 'steer' | 'knockout';
 
 export type ExplanationBadge = {
   kind: ExplanationBadgeKind;
@@ -25,6 +25,14 @@ function formatStrength(strength: number): string {
 
 // One badge for what differs from the default: a positive pole that describes activations.
 export function getExplanationBadge(explanation: BadgeFields): ExplanationBadge | null {
+  // Steering on both poles means the unit is switched off, not pushed one way.
+  if (explanation.aspect === 'STEERING' && explanation.pole === 'BOTH') {
+    return {
+      kind: 'knockout',
+      label: 'Knockout',
+      tooltip: "This names what the model needs this unit for: switching it off lowers the model's answers for these.",
+    };
+  }
   if (explanation.aspect === 'STEERING') {
     const negative = explanation.pole === 'NEGATIVE';
     const strength =
