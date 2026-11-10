@@ -22,6 +22,8 @@ const getPageData = async (slug: string): Promise<{ meta: PostMetaData; content:
 export async function generateMetadata(props: Props): Promise<Metadata> {
   const params = await props.params;
   const { meta } = await getPageData(params.slug);
+  // Give one image only. With more, X and other sites can show the blog image instead of the post image.
+  const previewImage = meta.imagePreview || `${ASSET_BASE_URL}/blog/the-residual-stream.jpg`;
   return {
     title: { absolute: `${meta.title} | The Residual Stream` },
     description: meta.description,
@@ -29,27 +31,13 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       card: 'summary_large_image',
       title: `${meta.title} | The Residual Stream`,
       description: meta.description,
-      images: [
-        {
-          url: meta.imagePreview,
-        },
-        {
-          url: `${ASSET_BASE_URL}/blog/the-residual-stream.jpg`,
-        },
-      ],
+      images: [{ url: previewImage }],
     },
     openGraph: {
       title: `${meta.title} | The Residual Stream`,
       description: meta.description,
       url: `/blog/${params.slug}`,
-      images: [
-        {
-          url: meta.imagePreview,
-        },
-        {
-          url: `${ASSET_BASE_URL}/blog/the-residual-stream.jpg`,
-        },
-      ],
+      images: [{ url: previewImage }],
       locale: 'en_US',
       type: 'website',
       siteName: 'Neuronpedia',
