@@ -14,6 +14,8 @@ export const DELIMITER_BETWEEN_SOURCESET_AND_ADDITIONAL_INFO = '__';
 
 export const EMBED_LAYER_STRING = 'e'; // embed for pythia-70m-deduped is "e-res-sm"
 export const NEURONS_SOURCESET = 'neurons';
+// The release that holds the neurons source set of each model. Its page is /neurons.
+export const NEURONS_RELEASE = 'neurons';
 
 export function isNeuronLayerSource(source: string) {
   // this just means if it's an integer
@@ -32,6 +34,30 @@ export function isSteerableNeuronLayer(
     source?.inferenceEnabled &&
     isNeuronLayerSource(source.id || ''),
   );
+}
+
+// ICA Lens source sets are named "icalens-<hook>", e.g. "icalens-res".
+export const ICALENS_SOURCESET_PREFIX = 'icalens-';
+
+// Neurons and ICA Lens components fire on about half of all tokens, so a density filter hides all of them.
+export function sourceSetIgnoresDensity(sourceSetName: string) {
+  return sourceSetName === NEURONS_SOURCESET || sourceSetName.startsWith(ICALENS_SOURCESET_PREFIX);
+}
+
+// For release filters. The neurons release holds every neurons source set, even one with no releaseName.
+export function isSourceSetInRelease(
+  sourceSet: { name?: string | null; releaseName?: string | null } | undefined,
+  releaseName: string,
+) {
+  if (releaseName === NEURONS_RELEASE) {
+    return sourceSet?.name === NEURONS_SOURCESET;
+  }
+  return sourceSet?.releaseName === releaseName;
+}
+
+// On a model change from a neurons source set, stay on neurons if the new model has neuron layers to offer.
+export function keepNeuronsOnModelChange(currentSourceSet: string, newModelNeuronLayers: string[]) {
+  return currentSourceSet === NEURONS_SOURCESET && newModelNeuronLayers.length > 0;
 }
 
 // For the source dropdown, eg "Neurons Layer 6"

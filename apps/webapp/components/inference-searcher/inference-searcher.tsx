@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/shadcn/button';
 import { DEFAULT_MODELID, DEFAULT_SOURCESET } from '@/lib/env';
 import { replaceHtmlAnomalies } from '@/lib/utils/activations';
-import { getFirstSourceSetForModel } from '@/lib/utils/source';
+import { getFirstSourceSetForModel, keepNeuronsOnModelChange, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { SourceSetWithPartialRelations } from '@/prisma/generated/zod';
 import { useRouter } from '@bprogress/next';
 import { Visibility } from '@prisma/client';
@@ -91,6 +91,12 @@ export default function InferenceSearcher({
 
   const modelIdChanged = (newModelId: string) => {
     setModelId(newModelId);
+    const neuronLayers = getSourcesForSourceSet(newModelId, NEURONS_SOURCESET, false, true, false);
+    if (keepNeuronsOnModelChange(sourceSet, neuronLayers)) {
+      setAvailableLayers(neuronLayers);
+      setSelectedLayers([]);
+      return;
+    }
     const newSourceSet = getFirstSourceSetForModel(
       globalModels[newModelId],
       Visibility.PUBLIC,

@@ -7,7 +7,9 @@ import {
   getSourceSetNameFromSource,
   isCanonicalSource,
   isNeuronLayerSource,
+  isSourceSetInRelease,
   isSteerableNeuronLayer,
+  NEURONS_RELEASE,
   NEURONS_SOURCESET,
 } from '@/lib/utils/source';
 import { SourceReleaseWithPartialRelations, SourceSetWithPartialRelations } from '@/prisma/generated/zod';
@@ -23,7 +25,7 @@ import { useGlobalContext } from '../provider/global-provider';
 const ATTENTION_HEADS_RELEASE = '__attention_heads__';
 
 // Sentinel name for the "MLP Neurons" pseudo-release. The neurons source set has no release.
-const NEURONS_RELEASE = '__mlp_neurons__';
+const NEURONS_PSEUDO_RELEASE = '__mlp_neurons__';
 
 // Models that have no attention head data, so the "Attention Heads" release/source is hidden for them.
 const MODELS_WITHOUT_HEAD_DATA = ['circuitgpt-python', 'deepseek-r1-llama-8b'];
@@ -90,7 +92,7 @@ export default function SourceSelector({
     let sourceSets = getSourceSetsForModelId(modelId);
     sourceSets = sourceSets
       .filter((ss) => ss.modelId === modelId && ss.name !== NEURONS_SOURCESET)
-      .filter((ss) => (filterToRelease ? ss.releaseName === filterToRelease : true))
+      .filter((ss) => (filterToRelease ? isSourceSetInRelease(ss, filterToRelease) : true))
       .filter((ss) =>
         // filter to sourcesets that have at least one source with inference enabled
         filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true,
@@ -110,11 +112,12 @@ export default function SourceSelector({
   );
 
   // Neuron layers to offer. Inference pickers need SAE sources, except steering, which can take
-  // steerable neuron layers. Not for release-filtered pickers. Like the release list, ignores filterToPublic.
+  // steerable neuron layers. Release-filtered pickers offer them only for the neurons release.
+  // Like the release list, ignores filterToPublic.
   const neuronsSourceSet = getSourceSet(modelId, NEURONS_SOURCESET);
   const neuronLayers: string[] =
     (filterToInferenceEnabled && !includeSteerableNeurons) ||
-    filterToRelease ||
+    (filterToRelease && !isSourceSetInRelease(neuronsSourceSet, filterToRelease)) ||
     (filterToOnlyHasDashboards && !neuronsSourceSet?.hasDashboards)
       ? []
       : (neuronsSourceSet?.sources || [])
@@ -126,7 +129,7 @@ export default function SourceSelector({
           )
           .toSorted((a, b) => getLayerNumFromSource(a) - getLayerNumFromSource(b));
 
-  const showHeads = includeHeads && !MODELS_WITHOUT_HEAD_DATA.includes(modelId);
+  const showHeads = includeHeads && !MODELS_WITHOUT_HEAD_DATA.includes(modelId) && filterToRelease !== NEURONS_RELEASE;
   // Same filters as the release menu below
   const hasSaeSources = releases
     .filter((r) => (filterToRelease ? r.name === filterToRelease : true))
@@ -134,7 +137,7 @@ export default function SourceSelector({
     .some((r) =>
       r.sourceSets
         ?.filter((ss) => ss.modelId === modelId && ss.name !== NEURONS_SOURCESET)
-        .filter((ss) => (filterToRelease ? ss.releaseName === filterToRelease : true))
+        .filter((ss) => (filterToRelease ? isSourceSetInRelease(ss, filterToRelease) : true))
         .filter((ss) => (filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true))
         .filter((ss) => (filterToOnlyHasDashboards ? ss.hasDashboards : true))
         .some((ss) =>
@@ -155,7 +158,7 @@ export default function SourceSelector({
       return ATTENTION_HEADS_RELEASE;
     }
     if (defaultSource && isNeuronLayerSource(defaultSource)) {
-      return NEURONS_RELEASE;
+      return NEURONS_PSEUDO_RELEASE;
     }
     return release?.name;
   }
@@ -186,7 +189,7 @@ export default function SourceSelector({
       let sourceSets = getSourceSetsForModelId(modelId);
       sourceSets = sourceSets
         .filter((ss) => ss.modelId === modelId && ss.name !== NEURONS_SOURCESET)
-        .filter((ss) => (filterToRelease ? ss.releaseName === filterToRelease : true))
+        .filter((ss) => (filterToRelease ? isSourceSetInRelease(ss, filterToRelease) : true))
         .filter((ss) => (filterToPublic ? ss.visibility === 'PUBLIC' : true))
         .filter((ss) => (filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true))
         .filter((ss) => (filterToOnlyHasDashboards ? ss.hasDashboards : true))
@@ -378,10 +381,10 @@ export default function SourceSelector({
                 </DropdownMenu.Sub>
               ))}
             {neuronLayers.length > 0 && (
-              <DropdownMenu.Sub open={releaseOpen === NEURONS_RELEASE}>
+              <DropdownMenu.Sub open={releaseOpen === NEURONS_PSEUDO_RELEASE}>
                 <DropdownMenu.SubTrigger
                   onMouseEnter={() => {
-                    setReleaseOpen(NEURONS_RELEASE);
+                    setReleaseOpen(NEURONS_PSEUDO_RELEASE);
                   }}
                   className="group flex w-full max-w-[340px] flex-1 cursor-pointer flex-row items-center justify-between gap-x-1 border-b border-b-slate-100 bg-white px-3 py-3 text-xs font-medium hover:bg-sky-100 hover:text-slate-600 focus:outline-none data-[state=open]:bg-sky-100 data-[state=open]:text-slate-600"
                 >
@@ -414,7 +417,7 @@ export default function SourceSelector({
                         <button
                           type="button"
                           onClick={() => {
-                            setReleaseOpen(NEURONS_RELEASE);
+                            setReleaseOpen(NEURONS_PSEUDO_RELEASE);
                             sourceChangedCallback?.(layer);
                             setDropdownOpen(false);
                           }}
@@ -433,7 +436,8 @@ export default function SourceSelector({
               </DropdownMenu.Sub>
             )}
             {releases
-              .filter((r) => r.sourceSets?.some((ss) => ss.modelId === modelId))
+              // Neurons have their own "MLP Neurons" item above
+              .filter((r) => r.sourceSets?.some((ss) => ss.modelId === modelId && ss.name !== NEURONS_SOURCESET))
               .filter((r) => (filterToRelease ? r.name === filterToRelease : true))
               .filter((r) => (filterToFeaturedReleases ? r.featured : true))
               .sort((a, b) => {
@@ -473,7 +477,7 @@ export default function SourceSelector({
                       </DropdownMenu.Label>
                       {releaseFiltered.sourceSets
                         ?.filter((ss) => ss.modelId === modelId && ss.name !== NEURONS_SOURCESET)
-                        .filter((ss) => (filterToRelease ? ss.releaseName === filterToRelease : true))
+                        .filter((ss) => (filterToRelease ? isSourceSetInRelease(ss, filterToRelease) : true))
                         .filter((ss) => (filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true))
                         .filter((ss) => (filterToOnlyHasDashboards ? ss.hasDashboards : true))
                         .sort((a, b) => {

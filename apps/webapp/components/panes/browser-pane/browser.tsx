@@ -19,7 +19,12 @@ import {
   fetchNeuronDashboard,
   NeuronDashboard,
 } from '@/lib/utils/neuron-dashboards';
-import { getFirstSourceSetForModel } from '@/lib/utils/source';
+import {
+  getFirstSourceSetForModel,
+  getLayerNumFromSource,
+  keepNeuronsOnModelChange,
+  NEURONS_SOURCESET,
+} from '@/lib/utils/source';
 import { Visibility } from '@prisma/client';
 import Link from 'next/link';
 import { NeuronWithPartialRelations, SourceSetWithPartialRelations } from 'prisma/generated/zod';
@@ -52,7 +57,7 @@ export default function Browser({
   filterToRelease?: string;
   newWindowOnSaeChange?: boolean;
 }) {
-  const { globalModels, getFirstSourceForSourceSet, getSourceSet } = useGlobalContext();
+  const { globalModels, getFirstSourceForSourceSet, getSourceSet, getSourcesForSourceSet } = useGlobalContext();
   const [modelId, setModelId] = useState(defaultModelId);
   const [sourceSet, setSourceSet] = useState(defaultSourceSet);
   const [layer, setLayer] = useState(defaultLayer);
@@ -118,6 +123,14 @@ export default function Browser({
   }, [index]);
 
   const modelIdChanged = (newModelId: string) => {
+    const neuronLayers = getSourcesForSourceSet(newModelId, NEURONS_SOURCESET).toSorted(
+      (a, b) => getLayerNumFromSource(a) - getLayerNumFromSource(b),
+    );
+    if (keepNeuronsOnModelChange(sourceSet, neuronLayers)) {
+      setModelId(newModelId);
+      setLayer(neuronLayers[0]);
+      return;
+    }
     const newSourceSet = getFirstSourceSetForModel(
       globalModels[newModelId],
       Visibility.PUBLIC,

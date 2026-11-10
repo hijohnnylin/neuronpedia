@@ -9,7 +9,7 @@ import { DEFAULT_MODELID, DEFAULT_SOURCE, DEFAULT_SOURCESET, NEXT_PUBLIC_SEARCH_
 import useWindowSize from '@/lib/hooks/use-window-size';
 import { SearchTopKResult } from '@/lib/utils/inference';
 import { INFERENCE_EXAMPLE_TEXTS } from '@/lib/utils/inference-example-texts';
-import { getFirstSourceSetForModel, getSourceSetNameFromSource } from '@/lib/utils/source';
+import { getFirstSourceSetForModel, getSourceSetNameFromSource, sourceSetIgnoresDensity } from '@/lib/utils/source';
 import { Visibility } from '@prisma/client';
 import * as Slider from '@radix-ui/react-slider';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
@@ -367,7 +367,11 @@ export default function SearchTopkByToken({
         </div>
 
         <div className={`mt-4 w-full flex-col gap-y-2 ${hideSettings ? 'hidden' : 'flex'}`}>
-          <div className="flex flex-col items-center justify-center gap-y-1 rounded-md border border-slate-300 bg-white px-5 py-5 pt-3">
+          <div
+            className={`flex-col items-center justify-center gap-y-1 rounded-md border border-slate-300 bg-white px-5 py-5 pt-3 ${
+              sourceSetIgnoresDensity(sourceSet) ? 'hidden' : 'flex'
+            }`}
+          >
             <div className="flex w-full flex-row items-center justify-between">
               <label htmlFor="density-slider" className="text-[11px] font-medium text-slate-500">
                 Density Threshold: <span className="font-mono">{(densityThreshold * 100).toFixed(2)}%</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import { NEURONS_SOURCESET } from '@/lib/utils/source';
+import { isSourceSetInRelease, NEURONS_SOURCESET } from '@/lib/utils/source';
 import * as Select from '@radix-ui/react-select';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { useGlobalContext } from '../provider/global-provider';
@@ -28,7 +28,7 @@ export default function SourceSetSelector({
   const { getSourceSetsForModelId, getSourceSet } = useGlobalContext();
 
   const sourceSets = getSourceSetsForModelId(modelId)
-    .filter((ss) => (filterToRelease ? ss.releaseName === filterToRelease : true))
+    .filter((ss) => (filterToRelease ? isSourceSetInRelease(ss, filterToRelease) : true))
     .filter((ss) => (filterToOnlyVisible ? ss.visibility === 'PUBLIC' : true))
     // check that the sourceSet has at least one source that supports activation testing
     .filter((ss) => (filterToInferenceEnabled ? ss.sources?.some((s) => s.inferenceEnabled) : true))

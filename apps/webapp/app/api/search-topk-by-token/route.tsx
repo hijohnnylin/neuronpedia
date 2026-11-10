@@ -2,7 +2,7 @@ import { ActivationTopkByTokenBatchResponse, ActivationTopkByTokenResponse } fro
 import { getNeuronsForTopkSearcherExplanationOnly } from '@/lib/db/neuron';
 import { assertUserCanAccessModelAndSource } from '@/lib/db/userCanAccess';
 import { getActivationsTopKByToken, SearchTopKResult } from '@/lib/utils/inference';
-import { getSourceSetNameFromSource } from '@/lib/utils/source';
+import { getSourceSetNameFromSource, sourceSetIgnoresDensity } from '@/lib/utils/source';
 import { RequestOptionalUser, withOptionalUser } from '@/lib/with-user';
 import { NextResponse } from 'next/server';
 import { boolean, mixed, number, object, string, ValidationError } from 'yup';
@@ -165,7 +165,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     }
 
     // remove all that are below the density threshold
-    if (densityThreshold !== -1) {
+    if (densityThreshold !== -1 && !sourceSetIgnoresDensity(getSourceSetNameFromSource(source))) {
       toReturn.results = toReturn.results.map((r) => {
         // A feature with no density stats (a neuron with no row) is kept.
         r.topFeatures = r.topFeatures.filter(

@@ -2,6 +2,7 @@
 
 import { DEFAULT_MODELID } from '@/lib/env';
 import { compareModelIdsBySize } from '@/lib/utils/general';
+import { isSourceSetInRelease } from '@/lib/utils/source';
 import * as Select from '@radix-ui/react-select';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { useGlobalContext } from '../provider/global-provider';
@@ -69,12 +70,9 @@ export default function ModelSelector({
                 })
                 .filter((mId) => {
                   if (filterToRelease) {
-                    const ssets = getSourceSetsForModelId(mId).filter((ss) => {
-                      if (filterToRelease) {
-                        return ss.releaseName === filterToRelease;
-                      }
-                      return true;
-                    });
+                    const ssets = getSourceSetsForModelId(mId)
+                      .filter((ss) => isSourceSetInRelease(ss, filterToRelease))
+                      .filter((ss) => !filterToInferenceEnabled || ss.sources?.some((s) => s.inferenceEnabled));
                     return ssets.length > 0;
                   }
                   return true;
