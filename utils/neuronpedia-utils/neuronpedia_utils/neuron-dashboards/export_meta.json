@@ -1,0 +1,51 @@
+{
+  "_note": "Rows for convert_to_export.py. Existing rows copy production; a row without createdAt gets the export time.",
+  "dataset": "FineWeb 70%, FineWeb-2 15%, code 10%, FineMath 5% (100M tokens)",
+  "models": {
+    "qwen3-32b": {
+      "model": {"id": "qwen3-32b", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 64, "neuronsPerLayer": 25600, "createdAt": "2026-05-10T20:34:26.119", "owner": "Alibaba", "updatedAt": "2026-05-10T20:34:26.119", "website": "https://huggingface.co/Qwen", "displayName": "Qwen3-32B", "displayNameShort": "QWEN3-32B", "visibility": "PUBLIC", "instruct": true, "tlensId": null, "inferenceEnabled": true, "dimension": 5120, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": false, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "Qwen/Qwen3-32B"},
+      "sourceset": {"description": "Qwen3-32B MLP Neurons", "createdAt": "2026-10-19T04:42:06.547", "allowInferenceSearch": true},
+      "source": {"createdAt": "2026-10-19T04:42:06.547", "inferenceEnabled": true}
+    },
+    "gemma-4-31b-it": {
+      "model": {"id": "gemma-4-31b-it", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 60, "neuronsPerLayer": 21504, "createdAt": "2026-05-10T20:34:26.119", "owner": "Google Deepmind", "updatedAt": "2026-05-10T20:34:26.119", "website": null, "displayName": "Gemma-4-31B-IT", "displayNameShort": "GEMMA-4-31B-IT", "visibility": "PUBLIC", "instruct": true, "tlensId": null, "inferenceEnabled": true, "dimension": 5376, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": false, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "google/gemma-4-31B-it"},
+      "sourceset": {"description": "Gemma-4-31B-IT MLP Neurons", "createdAt": "2026-10-19T04:42:06.547", "allowInferenceSearch": true},
+      "source": {"createdAt": "2026-10-19T04:42:06.547", "inferenceEnabled": true}
+    },
+    "llama3.3-70b-it": {
+      "model": {"id": "llama3.3-70b-it", "creatorId": "clv11fvwx0000tvseo6bb28jm", "layers": 80, "neuronsPerLayer": 28672, "createdAt": "2025-05-29T19:18:53.114", "owner": "Meta", "updatedAt": "2025-05-29T19:18:53.114", "website": null, "displayName": "Llama3.3-70B-IT", "displayNameShort": "LLAMA3.3-70B-IT", "visibility": "PUBLIC", "instruct": true, "tlensId": "meta-llama/Llama-3.3-70B-Instruct", "inferenceEnabled": true, "dimension": 8192, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": false, "defaultGraphSourceSetName": null, "openRouterId": "meta-llama/llama-3.3-70b-instruct:exacto", "hfRepoId": "meta-llama/Llama-3.3-70B-Instruct"},
+      "sourceset": {"description": "Llama3.3-70B-IT MLP Neurons", "createdAt": "2026-10-19T04:42:06.547", "allowInferenceSearch": true},
+      "source": {"createdAt": "2026-10-19T04:42:06.547", "inferenceEnabled": true}
+    },
+    "qwen3-8b": {
+      "model": {"id": "qwen3-8b", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 36, "neuronsPerLayer": 12288, "createdAt": "2026-04-26T01:50:31.995", "owner": "Alibaba", "updatedAt": "2026-04-26T01:50:31.995", "website": "https://huggingface.co/Qwen", "displayName": "Qwen3-8B", "displayNameShort": "QWEN3-8B", "visibility": "PUBLIC", "instruct": true, "tlensId": null, "inferenceEnabled": false, "dimension": 4096, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": true, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "Qwen/Qwen3-8B"},
+      "sourceset": {"description": "Qwen3-8B MLP Neurons", "allowInferenceSearch": false},
+      "source": {"inferenceEnabled": false}
+    },
+    "qwen3.5-4b": {
+      "model": {"id": "qwen3.5-4b", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 32, "neuronsPerLayer": 9216, "createdAt": "2026-05-29T01:53:54.255", "owner": "Alibaba", "updatedAt": "2026-05-29T01:53:54.255", "website": "https://huggingface.co/Qwen", "displayName": "Qwen3.5-4B", "displayNameShort": "QWEN3.5-4B", "visibility": "PUBLIC", "instruct": true, "tlensId": null, "inferenceEnabled": false, "dimension": 2560, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": false, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "Qwen/Qwen3.5-4B"},
+      "sourceset": {"description": "Qwen3.5-4B MLP Neurons", "allowInferenceSearch": false},
+      "source": {"inferenceEnabled": false}
+    },
+    "gemma-4-12b": {
+      "model": {"id": "gemma-4-12b", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 48, "neuronsPerLayer": 15360, "owner": "Google Deepmind", "website": null, "displayName": "Gemma-4-12B", "displayNameShort": "GEMMA-4-12B", "visibility": "PUBLIC", "instruct": false, "tlensId": null, "inferenceEnabled": false, "dimension": 3840, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": false, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "google/gemma-4-12B"},
+      "sourceset": {"description": "Gemma-4-12B MLP Neurons", "allowInferenceSearch": false},
+      "source": {"inferenceEnabled": false}
+    },
+    "gemma-4-12b-it": {
+      "model": {"id": "gemma-4-12b-it", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 48, "neuronsPerLayer": 15360, "owner": "Google Deepmind", "website": null, "displayName": "Gemma-4-12B-IT", "displayNameShort": "GEMMA-4-12B-IT", "visibility": "PUBLIC", "instruct": true, "tlensId": null, "inferenceEnabled": false, "dimension": 3840, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": false, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "google/gemma-4-12B-it"},
+      "sourceset": {"description": "Gemma-4-12B-IT MLP Neurons", "allowInferenceSearch": false},
+      "source": {"inferenceEnabled": false}
+    },
+    "llama3.1-8b-it": {
+      "model": {"id": "llama3.1-8b-it", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 32, "neuronsPerLayer": 14336, "createdAt": "2025-09-11T01:18:03.351", "owner": "Meta", "updatedAt": "2025-09-11T08:50:03.351", "website": "https://huggingface.co/meta-llama", "displayName": "Llama3.1-8B-IT", "displayNameShort": "LLAMA3.1-8B-IT", "visibility": "PUBLIC", "instruct": true, "tlensId": "meta-llama/Llama-3.1-8B-Instruct", "inferenceEnabled": true, "dimension": 4096, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": false, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "meta-llama/Llama-3.1-8B-Instruct"},
+      "sourceset": {"description": "Llama3.1-8B-IT MLP Neurons", "allowInferenceSearch": false},
+      "source": {"inferenceEnabled": false}
+    },
+    "qwen3-14b": {
+      "model": {"id": "qwen3-14b", "creatorId": "clkht01d40000jv08hvalcvly", "layers": 40, "neuronsPerLayer": 17408, "createdAt": "2026-04-26T01:52:12.359", "owner": "Alibaba", "updatedAt": "2026-04-26T01:52:12.359", "website": "https://huggingface.co/Qwen", "displayName": "Qwen3-14B", "displayNameShort": "QWEN3-14B", "visibility": "PUBLIC", "instruct": true, "tlensId": null, "inferenceEnabled": false, "dimension": 5120, "defaultSourceId": null, "defaultSourceSetName": null, "thinking": true, "defaultGraphSourceSetName": null, "openRouterId": null, "hfRepoId": "Qwen/Qwen3-14B"},
+      "sourceset": {"description": "Qwen3-14B MLP Neurons", "allowInferenceSearch": false},
+      "source": {"inferenceEnabled": false}
+    }
+  }
+}
