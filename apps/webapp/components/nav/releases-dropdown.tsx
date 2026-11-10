@@ -20,7 +20,7 @@ export const featuredStarReleases = [
   'sae-bench',
   'jlens',
 ];
-export const communityReleases = ['drift-calibrator', 'icalens'];
+export const communityReleases = ['drift-calibrator', 'icalens', 'neurons'];
 export const betaReleases = ['sparse-circuits'];
 
 const RELEASE_GROUPS = [featuredStarReleases, communityReleases, betaReleases];
@@ -55,7 +55,7 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
         <DropdownMenu.Content
           align="center"
           sideOffset={-3}
-          className="forceShowScrollBar z-50 max-h-[550px] w-full cursor-pointer overflow-hidden overflow-y-scroll rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+          className="forceShowScrollBar z-50 max-h-[640px] w-full cursor-pointer overflow-hidden overflow-y-scroll rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
         >
           {sortReleases(releases.filter((release) => release.featured)).map((release) => (
             <DropdownMenu.Item
