@@ -83,6 +83,14 @@ export default function NavBarButtons() {
         </span>
       </Link>
 
+      <Link
+        href="/neuron-evolution"
+        prefetch={false}
+        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+      >
+        Neuron Evolution
+      </Link>
+
       <ReleasesDropdown />
 
       <DropdownMenu.Root open={jumpToOpen}>
