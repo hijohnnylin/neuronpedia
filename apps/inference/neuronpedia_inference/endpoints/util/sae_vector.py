@@ -1,8 +1,9 @@
 import logging
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
-from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
 from neuronpedia_inference.schemas import (
     UtilSaeVectorRequest,
     UtilSaeVectorResponse,
@@ -20,7 +21,13 @@ async def sae_vector(request: UtilSaeVectorRequest):
     source = request.source
     index = request.index
 
-    sae = SAEManager.get_instance().get_sae(source)
+    sae_manager = SAEManager.get_instance()
+    if sae_manager.get_sae_type(source) == SAE_TYPE.NEURONS:
+        return JSONResponse(
+            content={"error": f"Source {source} is an MLP neuron layer, which has no SAE vector"},
+            status_code=400,
+        )
+    sae = sae_manager.get_sae(source)
 
     result = sae.W_enc[:, index].detach().tolist()
 

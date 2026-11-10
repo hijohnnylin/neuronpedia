@@ -1,4 +1,4 @@
-"""search-all with rank_by_percentile: rank neurons by how rare their activation is for them.
+"""search-all, /activation/source and topk-by-token: rank neurons by how rare their activation is for them.
 
 CPU-only, with small synthetic tables in the dashboard format.
 """
@@ -15,12 +15,16 @@ import torch
 from safetensors.torch import save_file
 
 from neuronpedia_inference.endpoints.activation.all import ActivationProcessor, rank_by_percentile_error
+from neuronpedia_inference.endpoints.activation.source import top_neurons_per_token
+from neuronpedia_inference.endpoints.activation.topk_by_token import top_features_by_token
 from neuronpedia_inference.inference_utils.neuron_act_range import (
     MIN_SCALE_FRACTION_OF_LAYER_MEDIAN,
     NeuronActRangeError,
     load_neuron_rarity_table,
     neuron_rarity,
+    top_rare_neurons,
 )
+from neuronpedia_inference.sae_manager import SAE_TYPE
 from tests.unit.test_activation_all_topk import (
     N_FEATURES,
     N_TOKENS,
@@ -32,6 +36,9 @@ from tests.unit.test_activation_all_topk import (
 )
 
 MODULE = "neuronpedia_inference.endpoints.activation.all"
+SOURCE_MODULE = "neuronpedia_inference.endpoints.activation.source"
+TOPK_MODULE = "neuronpedia_inference.endpoints.activation.topk_by_token"
+RANGE_MODULE = "neuronpedia_inference.inference_utils.neuron_act_range"
 LEVELS = [1e-5, 1e-4, 1e-3, 0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99, 0.999, 0.9999, 0.99999]
 N_CORPUS_TOKENS = 10**8
 TOP_RARITY = math.log10(N_CORPUS_TOKENS)
@@ -338,3 +345,91 @@ def test_requests_that_cannot_be_served_get_a_400(rank: bool, source_set: str, p
         error = rank_by_percentile_error(request)
 
     assert (error.status_code if error is not None else None) == status
+
+
+def test_rarity_per_token_matches_one_call_per_token(tmp_path: Path):
+    """A [d_mlp, n_tokens] input gives the same rarity as one [d_mlp] call per token."""
+    quantiles, table_max, table_min = _random_table(1, 40, seed=5)
+    path = _write_table(tmp_path, quantiles, table_max, table_min)
+    acts = torch.randn(40, 7, generator=torch.Generator().manual_seed(6)) * table_max[0].unsqueeze(1)
+
+    got, got_low = neuron_rarity(path, 0, acts, acts)
+
+    for token in range(7):
+        want, want_low = neuron_rarity(path, 0, acts[:, token], acts[:, token])
+        assert torch.equal(got[:, token], want)
+        assert torch.equal(got_low[:, token], want_low)
+
+
+def _two_scale_table(tmp_path: Path) -> str:
+    """Neuron 0 has a scale 100 times larger than neuron 1: its 99th percentile is 30, neuron 1's 0.3."""
+    steps = torch.tensor([float(i - 6) for i in range(len(LEVELS))])
+    quantiles = torch.stack((steps * 10, steps * 0.1)).unsqueeze(0)
+    return _write_table(tmp_path, quantiles, torch.tensor([[200.0, 2.0]]))
+
+
+@pytest.mark.parametrize(("has_table", "top_neuron"), [(True, 1), (False, 0)], ids=["by-rarity", "by-value"])
+def test_source_top_neurons_rank_by_rarity_when_there_is_a_table(tmp_path: Path, has_table: bool, top_neuron: int):
+    """Neuron 0 at 20 is ordinary for it; neuron 1 at 1.0 is past its 99.999th percentile."""
+    config = MagicMock()
+    config.neuron_act_range_path = _two_scale_table(tmp_path) if has_table else None
+    # Five tokens with a chunk of two, so the last chunk is partial.
+    acts = torch.tensor([[20.0, 1.0]] * 5)
+
+    with (
+        patch(f"{SOURCE_MODULE}.Config.get_instance", return_value=config),
+        patch(f"{RANGE_MODULE}.RANK_CHUNK_TOKENS", 2),
+    ):
+        values, indices = top_neurons_per_token(acts, 0, 1)
+
+    assert indices.tolist() == [[token, top_neuron] for token in range(5)]
+    assert values.tolist() == [acts[0, top_neuron].item()] * 5
+
+
+def test_source_top_neurons_drop_entries_ranked_zero():
+    """A token whose neurons are all 0 keeps none of them."""
+    config = MagicMock()
+    config.neuron_act_range_path = None
+    acts = torch.tensor([[0.0, 0.0, 0.0], [0.0, -2.0, 1.0]])
+
+    with patch(f"{SOURCE_MODULE}.Config.get_instance", return_value=config):
+        values, indices = top_neurons_per_token(acts, 0, 2)
+
+    assert indices.tolist() == [[1, 1], [1, 2]]
+    assert values.tolist() == [-2.0, 1.0]
+
+
+def test_chunked_top_rare_neurons_match_one_pass(tmp_path: Path):
+    """Ranking in chunks of 3 tokens gives the same top-k as ranking all 10 at once."""
+    quantiles, table_max, table_min = _random_table(1, 40, seed=7)
+    path = _write_table(tmp_path, quantiles, table_max, table_min)
+    acts = torch.randn(10, 40, generator=torch.Generator().manual_seed(8)) * table_max[0]
+
+    whole = top_rare_neurons(path, 0, acts, 5)
+    with patch(f"{RANGE_MODULE}.RANK_CHUNK_TOKENS", 3):
+        chunked = top_rare_neurons(path, 0, acts, 5)
+
+    for got, want in zip(chunked, whole, strict=True):
+        assert torch.equal(got, want)
+    assert torch.equal(whole[0], acts.gather(1, whole[1]))
+
+
+@pytest.mark.parametrize(
+    ("has_table", "sae_type", "top_neuron"),
+    [(True, SAE_TYPE.NEURONS, 1), (False, SAE_TYPE.NEURONS, 0), (True, SAE_TYPE.SAELENS, 0)],
+    ids=["neurons-by-rarity", "neurons-no-table-by-value", "sae-by-value"],
+)
+def test_topk_by_token_ranks_neurons_by_rarity_when_there_is_a_table(
+    tmp_path: Path, has_table: bool, sae_type: str, top_neuron: int
+):
+    """Neuron 0 at 20 is ordinary for it; neuron 1 at 1.0 is past its 99.999th percentile."""
+    config = MagicMock()
+    config.neuron_act_range_path = _two_scale_table(tmp_path) if has_table else None
+    # [n_features, n_tokens], as the endpoints hold it.
+    activations_by_index = torch.tensor([[20.0, 1.0]] * 3).T
+
+    with patch(f"{TOPK_MODULE}.Config.get_instance", return_value=config):
+        values, indices = top_features_by_token(activations_by_index, sae_type, "0", 1)
+
+    assert indices.tolist() == [[top_neuron]] * 3
+    assert values.tolist() == [[activations_by_index[top_neuron, 0].item()]] * 3

@@ -6,11 +6,12 @@ from fastapi.responses import JSONResponse
 from interp_engine import special_token_positions
 
 from neuronpedia_inference.config import Config
-from neuronpedia_inference.endpoints.activation.topk_by_token import build_token_results
+from neuronpedia_inference.endpoints.activation.topk_by_token import build_token_results, top_features_by_token
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     capture_padded_cache_async,
 )
+from neuronpedia_inference.inference_utils.neuron_act_range import NeuronActRangeError
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import activation_topk_by_token_batch_cost
 from neuronpedia_inference.sae_manager import SAEManager
@@ -106,7 +107,7 @@ async def activation_topk_by_token_batch(
     # Process all prompts in batch
     try:
         batch_results = await process_topk_batch(model, source, top_k, ignore_bos, all_tokens, all_str_tokens)
-    except BackendUnsupported as e:
+    except (BackendUnsupported, NeuronActRangeError) as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
     logger.info("Returning %d results", len(batch_results))
@@ -179,7 +180,7 @@ async def process_topk_batch(
         # raises when k exceeds the axis it reduces, which turned an over-large top_k into
         # a 500.
         effective_top_k = max(1, min(top_k, activations_by_index.shape[0]))
-        top_k_values, top_k_indices = torch.topk(activations_by_index.T, k=effective_top_k)
+        top_k_values, top_k_indices = top_features_by_token(activations_by_index, sae_type, source, effective_top_k)
 
         # From the full id tensor, before any slicing, so it stays aligned with
         # the ids it was derived from.

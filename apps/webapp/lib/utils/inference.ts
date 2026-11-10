@@ -605,6 +605,8 @@ export const runInferenceActivationSource = async (
   source: string,
   prompts: string[],
   user: AuthenticatedUser | null,
+  // For MLP neuron layers only: the top neurons to return per token
+  topK?: number,
 ) => {
   const serverHost = await resolveHost(inferenceTarget(modelId, { sourceId: source, user }));
 
@@ -615,6 +617,7 @@ export const runInferenceActivationSource = async (
       prompts,
       model: transformerLensModelId,
       source,
+      topK,
     },
   });
 };

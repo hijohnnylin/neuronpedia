@@ -11,6 +11,7 @@ const activationSourceSchema = yup.object({
   customText: yup.lazy((value) =>
     Array.isArray(value) ? yup.array().of(yup.string().required()).min(1).max(4).required() : yup.string().required(),
   ),
+  topK: yup.number().integer().min(1).max(128).optional(),
 });
 
 /**
@@ -18,7 +19,7 @@ const activationSourceSchema = yup.object({
  * /api/activation/source:
  *   post:
  *     summary: All Feature Activations in a Source/SAE
- *     description: Gets activation values for all features in a source/SAE when processing custom input text(s). It returns the activations and tokenized prompts only, without any of the dashboards or explanations.
+ *     description: Gets activation values for all features in a source/SAE when processing custom input text(s). It returns the activations and tokenized prompts only, without any of the dashboards or explanations. For an MLP neuron layer (eg 5), each token returns only its top topK neurons.
  *     tags:
  *       - Activations
  *     requestBody:
@@ -51,6 +52,12 @@ const activationSourceSchema = yup.object({
  *                 description: The custom text to process. Either a single string or an array of strings. If it's a single string, the max is a 1024 token text. If it's an array, the max is 4 strings of 256 tokens max each.
  *                 required: true
  *                 default: Hello world
+ *               topK:
+ *                 description: For an MLP neuron layer only, the number of top neurons to return per token. Not used for SAEs.
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 128
+ *                 default: 64
  *     responses:
  *       200:
  *         description: Successful response, with activation data
@@ -75,7 +82,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     );
   }
 
-  const { modelId, source, customText } = validatedBody;
+  const { modelId, source, customText, topK } = validatedBody;
 
   const sourceSetName = getSourceSetNameFromSource(source);
   try {
@@ -88,6 +95,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     source,
     customText instanceof Array ? customText : [customText],
     request.user,
+    topK,
   );
 
   return NextResponse.json(activation);

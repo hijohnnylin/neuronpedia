@@ -11,7 +11,7 @@ from neuronpedia_inference.engine_adapter import (
 )
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import similarity_matrix_cost
-from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
 from neuronpedia_inference.schemas import (
     SimilarityMatrixRequest,
     SimilarityMatrixResponse,
@@ -32,7 +32,13 @@ async def similarity_matrix(request: SimilarityMatrixRequest):
     model = Model.get_instance()
     source = request.sourceId
 
-    sae = SAEManager.get_instance().get_sae(source)
+    sae_manager = SAEManager.get_instance()
+    if sae_manager.get_sae_type(source) == SAE_TYPE.NEURONS:
+        return JSONResponse(
+            content={"error": f"Source {source} is an MLP neuron layer, which has no temporal SAE"},
+            status_code=400,
+        )
+    sae = sae_manager.get_sae(source)
 
     # if the sae architecture is not temporal, throw error
     if sae.cfg.architecture() != "temporal":
@@ -85,9 +91,11 @@ async def similarity_matrix(request: SimilarityMatrixRequest):
     cosine_sim_LL = pred_LD_normalized @ pred_LD_normalized.T
     cosine_sim_np = cosine_sim_LL.detach().cpu().numpy()
 
-    # remove the bos token
-    str_tokens = str_tokens[1:]
-    cosine_sim_np = cosine_sim_np[1:, 1:]
+    # Remove the BOS token. With no BOS (Qwen3), position 0 is a real token, so keep it.
+    bos_token_id = model.tokenizer.bos_token_id
+    if bos_token_id is not None and len(tokens) > 0 and int(tokens[0]) == bos_token_id:
+        str_tokens = str_tokens[1:]
+        cosine_sim_np = cosine_sim_np[1:, 1:]
 
     return JSONResponse(
         content={"similarity_matrix": cosine_sim_np.tolist(), "tokens": str_tokens},

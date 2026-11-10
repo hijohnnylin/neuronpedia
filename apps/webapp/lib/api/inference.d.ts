@@ -766,6 +766,7 @@ export interface components {
     /**
      * ActivationSourceRequest
      * @description For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.
+     *     For an MLP neuron layer (eg 5), each token returns only its top topK neurons.
      */
     ActivationSourceRequest: {
       /**
@@ -783,6 +784,11 @@ export interface components {
        * @description The source (eg 5-gemmascope-res-16k)
        */
       source: string;
+      /**
+       * Topk
+       * @description For an MLP neuron layer, the number of top neurons to return per token (default 64, max 128). Not used for SAEs.
+       */
+      topK?: number | null;
     };
     /**
      * ActivationSourceResponse
@@ -837,7 +843,7 @@ export interface components {
       source: string;
       /**
        * Topk
-       * @description The number of features to include for each token position.
+       * @description The number of features to include for each token position. For an MLP neuron layer on a server started with NEURON_ACT_RANGE_PATH, neurons rank by how rare each activation is for that neuron (its percentile), not by the raw value. The returned values stay raw.
        */
       topK?: number | null;
     };
@@ -902,7 +908,7 @@ export interface components {
       source: string;
       /**
        * Topk
-       * @description The number of features to include for each token position.
+       * @description The number of features to include for each token position. For an MLP neuron layer on a server started with NEURON_ACT_RANGE_PATH, neurons rank by how rare each activation is for that neuron (its percentile), not by the raw value. The returned values stay raw.
        */
       topK?: number | null;
     };

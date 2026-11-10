@@ -795,7 +795,7 @@
         "type": "object"
       },
       "ActivationSourceRequest": {
-        "description": "For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.",
+        "description": "For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.\nFor an MLP neuron layer (eg 5), each token returns only its top topK neurons.",
         "properties": {
           "model": {
             "description": "Name of the model to test activations on",
@@ -814,6 +814,20 @@
             "description": "The source (eg 5-gemmascope-res-16k)",
             "title": "Source",
             "type": "string"
+          },
+          "topK": {
+            "anyOf": [
+              {
+                "maximum": 128.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For an MLP neuron layer, the number of top neurons to return per token (default 64, max 128). Not used for SAEs.",
+            "title": "Topk"
           }
         },
         "required": [
@@ -917,7 +931,7 @@
                 "type": "null"
               }
             ],
-            "description": "The number of features to include for each token position.",
+            "description": "The number of features to include for each token position. For an MLP neuron layer on a server started with NEURON_ACT_RANGE_PATH, neurons rank by how rare each activation is for that neuron (its percentile), not by the raw value. The returned values stay raw.",
             "title": "Topk"
           }
         },
@@ -1025,7 +1039,7 @@
                 "type": "null"
               }
             ],
-            "description": "The number of features to include for each token position.",
+            "description": "The number of features to include for each token position. For an MLP neuron layer on a server started with NEURON_ACT_RANGE_PATH, neurons rank by how rare each activation is for that neuron (its percentile), not by the raw value. The returned values stay raw.",
             "title": "Topk"
           }
         },

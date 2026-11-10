@@ -22,6 +22,12 @@ RANK_BY_PERCENTILE_DESCRIPTION = (
     "Needs a server started with NEURON_ACT_RANGE_PATH. The returned values stay raw."
 )
 
+TOPK_BY_TOKEN_TOP_K_DESCRIPTION = (
+    "The number of features to include for each token position. For an MLP neuron layer on a server "
+    "started with NEURON_ACT_RANGE_PATH, neurons rank by how rare each activation is for that neuron "
+    "(its percentile), not by the raw value. The returned values stay raw."
+)
+
 RANKED_BY_LOWEST_DESCRIPTION = (
     "Set only with rankByPercentile. True when the neuron ranked by its lowest sort-token activation, "
     "which was rarer for it than its highest."
@@ -234,9 +240,7 @@ class ActivationTopkByTokenRequest(BaseSchema):
     source: StrictStr = Field(
         description='Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with "index", or not at NPActivationAllRequest.'
     )
-    top_k: StrictInt | None = Field(
-        default=None, description="The number of features to include for each token position."
-    )
+    top_k: StrictInt | None = Field(default=None, description=TOPK_BY_TOKEN_TOP_K_DESCRIPTION)
     ignore_bos: StrictBool = Field(
         description="Whether or not to include features whose highest activation value is the BOS token."
     )
@@ -261,9 +265,7 @@ class ActivationTopkByTokenBatchRequest(BaseSchema):
     source: StrictStr = Field(
         description='Source identifier - could be an SAE ID (eg 5-gemmascope-res-16k). Must be specified with "index", or not at NPActivationAllRequest.'
     )
-    top_k: StrictInt | None = Field(
-        default=None, description="The number of features to include for each token position."
-    )
+    top_k: StrictInt | None = Field(default=None, description=TOPK_BY_TOKEN_TOP_K_DESCRIPTION)
     ignore_bos: StrictBool = Field(
         description="Whether or not to include features whose highest activation value is the BOS token."
     )
@@ -287,11 +289,19 @@ class ActivationTopkByTokenBatchResponse(BaseSchema):
 class ActivationSourceRequest(BaseSchema):
     """
     For a given prompt, get the top activating features for a source (eg 0-gemmascope-res-65k or 5-gemmascope-res-65k), and return the results as a 3D array of prompt x prompt_token x feature_index.
+    For an MLP neuron layer (eg 5), each token returns only its top topK neurons.
     """
 
     prompts: list[StrictStr] = Field(description="Input text prompt to get activations for")
     model: StrictStr = Field(description="Name of the model to test activations on")
     source: StrictStr = Field(description="The source (eg 5-gemmascope-res-16k)")
+    top_k: StrictInt | None = Field(
+        default=None,
+        ge=1,
+        le=128,
+        description="For an MLP neuron layer, the number of top neurons to return per token (default 64, max 128). "
+        "Not used for SAEs.",
+    )
 
 
 class ActivationSourceResult(BaseSchema):

@@ -7,9 +7,10 @@ from interp_engine import special_token_positions
 
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.engine_adapter import BackendUnsupported, capture_cache_async
+from neuronpedia_inference.inference_utils.neuron_act_range import NeuronActRangeError, top_rare_neurons
 from neuronpedia_inference.inference_utils.token_limit import reject_if_over_token_limit
 from neuronpedia_inference.memory_cost import activation_topk_by_token_cost
-from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
 from neuronpedia_inference.schemas import (
     ActivationTopkByTokenFeature,
     ActivationTopkByTokenRequest,
@@ -153,7 +154,10 @@ async def activation_topk_by_token(
     # when k exceeds the axis it reduces, which turned an over-large top_k into a 500.
     n_features = activations_by_index.shape[0]
     effective_top_k = max(1, min(top_k, n_features))
-    top_k_values, top_k_indices = torch.topk(activations_by_index.T, k=effective_top_k)
+    try:
+        top_k_values, top_k_indices = top_features_by_token(activations_by_index, sae_type, source, effective_top_k)
+    except NeuronActRangeError as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
 
     # From the full id tensor, before any slicing, so it stays aligned with the
     # ids it was derived from.
@@ -170,6 +174,23 @@ async def activation_topk_by_token(
         results=results,
         tokens=str_tokens,
     )
+
+
+def top_features_by_token(
+    activations_by_index: torch.Tensor, sae_type: str, source: str, k: int
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Top ``k`` features at each token of ``activations_by_index`` ``[n_features, n_tokens]``.
+
+    Returns ``(values, indices)``, each ``[n_tokens, k]``. MLP neurons rank by rarity when the
+    server has a neuron activation range table, because raw neuron scales differ by orders of
+    magnitude. Everything else ranks by value. Shared by the batch and non-batch endpoints.
+    """
+    path = Config.get_instance().neuron_act_range_path
+    if sae_type == SAE_TYPE.NEURONS and path:
+        values, indices, _ = top_rare_neurons(path, int(source), activations_by_index.T, k)
+        return values, indices
+    top = torch.topk(activations_by_index.T, k=k)
+    return top.values, top.indices
 
 
 # Keep the get_activations_by_index function from the original code

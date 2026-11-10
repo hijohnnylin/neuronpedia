@@ -7,6 +7,9 @@ coverage and the goal is to lock in their request/response contracts.
 
 from __future__ import annotations
 
+from collections import Counter
+
+import pytest
 from fastapi.testclient import TestClient
 
 from tests.conftest import (
@@ -80,6 +83,50 @@ def test_activation_source(client: TestClient):
     assert isinstance(data, dict)
     # Response carries per-prompt activation content for the requested source.
     assert data
+
+
+@pytest.mark.parametrize(("top_k", "expected"), [(None, 64), (5, 5), (128, 128)], ids=["default", "5", "max"])
+def test_activation_source_keeps_top_neurons_per_token(client: TestClient, top_k: int | None, expected: int):
+    body: dict[str, object] = {"prompts": [TEST_PROMPT], "model": MODEL_ID, "source": "0"}
+    if top_k is not None:
+        body["topK"] = top_k
+    resp = client.post("/v1/activation/source", json=body, headers=HEADERS)
+    assert resp.status_code == 200, resp.text
+    result = resp.json()["results"][0]
+    per_token = Counter(int(token) for entries in result["activeFeatures"].values() for token, _ in entries)
+    # Every token after BOS keeps exactly top_k of gpt2-small's 3072 neurons.
+    assert set(per_token) == set(range(1, len(result["tokens"])))
+    assert set(per_token.values()) == {expected}
+
+
+@pytest.mark.parametrize("top_k", [0, 129])
+def test_activation_source_rejects_top_k_out_of_range(client: TestClient, top_k: int):
+    resp = client.post(
+        "/v1/activation/source",
+        json={"prompts": [TEST_PROMPT], "model": MODEL_ID, "source": "0", "topK": top_k},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 422, resp.text
+
+
+def test_sae_vector_rejects_neuron_layer(client: TestClient):
+    resp = client.post(
+        "/v1/util/sae-vector",
+        json={"model": MODEL_ID, "source": "0", "index": 5},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 400, resp.text
+    assert "MLP neuron layer" in resp.json()["error"]
+
+
+def test_similarity_matrix_pred_rejects_neuron_layer(client: TestClient):
+    resp = client.post(
+        "/v1/util/similarity-matrix-pred",
+        json={"modelId": MODEL_ID, "sourceId": "0", "index": 0, "text": TEST_PROMPT},
+        headers=HEADERS,
+    )
+    assert resp.status_code == 400, resp.text
+    assert "MLP neuron layer" in resp.json()["error"]
 
 
 def test_activation_topk_by_token_batch(client: TestClient):

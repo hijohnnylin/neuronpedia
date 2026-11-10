@@ -3,7 +3,8 @@
 Raw MLP neuron activations are not comparable across neurons: scales differ by orders of
 magnitude, and a dense neuron reaches half its max on ordinary text while a sparse one almost
 never fires. With `rankByPercentile`, search-all ranks each neuron by how rare its activation is
-for that neuron on the dashboard corpus. Both tails count, because a gated MLP neuron can be
+for that neuron on the dashboard corpus. /activation/source and topk-by-token rank the
+neurons at each token the same way whenever the table is loaded. Both tails count, because a gated MLP neuron can be
 strongly negative. High side: rarity = -log10(1 - p), so the 99th percentile is 2, the 99.999th
 is 5 and the corpus max is log10(n_tokens). Low side: rarity = -log10(p), so the 1st percentile
 is 2 and the corpus min is log10(n_tokens).
@@ -28,6 +29,9 @@ import torch
 # A neuron whose corpus extreme is near zero would turn any small activation into a rare one. Its
 # knots are raised to this share of its layer's median extreme on that side.
 MIN_SCALE_FRACTION_OF_LAYER_MEDIAN = 0.05
+
+# Tokens ranked per pass in `top_rare_neurons`. This bounds the [d_mlp, n_tokens] temporaries.
+RANK_CHUNK_TOKENS = 128
 
 NO_TABLE_MESSAGE = (
     "rankByPercentile needs a neuron activation range table, and this server was started without NEURON_ACT_RANGE_PATH."
@@ -113,23 +117,27 @@ def load_neuron_rarity_table(path: str) -> NeuronRarityTable:
 def _tail_rarity(curve: TailCurve, layer: int, distance: torch.Tensor) -> torch.Tensor:
     """Rarity at ``distance`` into one tail, per neuron of a layer.
 
+    ``distance`` is ``[d_mlp]`` or ``[d_mlp, n_tokens]``, and the result has the same shape.
     0 at or below the first knot, log10(n_tokens) at the corpus extreme, and log10(d / extreme)
     more beyond it.
     """
     knots = curve.knots[layer].to(distance.device)
     rarity = curve.rarity.to(distance.device)
     d = distance.to(torch.float32)
+    if d.ndim == 1:
+        d = d.unsqueeze(1)
     n_knots = knots.shape[1]
-    hi = torch.searchsorted(knots, d.unsqueeze(1)).squeeze(1).clamp(max=n_knots - 1)
+    hi = torch.searchsorted(knots, d.contiguous()).clamp(max=n_knots - 1)
     lo = (hi - 1).clamp(min=0)
-    k_lo = knots.gather(1, lo.unsqueeze(1)).squeeze(1)
-    k_hi = knots.gather(1, hi.unsqueeze(1)).squeeze(1)
+    k_lo = knots.gather(1, lo)
+    k_hi = knots.gather(1, hi)
     span = k_hi - k_lo
     t = torch.where(span > 0, (d - k_lo) / span.clamp(min=1e-30), torch.ones_like(d)).clamp(0.0, 1.0)
     out = rarity[lo] + t * (rarity[hi] - rarity[lo])
-    out = torch.where(d <= knots[:, 0], torch.zeros_like(d), out)
-    top = knots[:, -1]
-    return torch.where(d > top, rarity[-1] + torch.log10(d / top), out)
+    out = torch.where(d <= knots[:, :1], torch.zeros_like(d), out)
+    top = knots[:, -1:]
+    out = torch.where(d > top, rarity[-1] + torch.log10(d / top), out)
+    return out.reshape(distance.shape)
 
 
 def neuron_rarity(
@@ -137,8 +145,9 @@ def neuron_rarity(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Rarity of each neuron of a layer, and whether its low side is the rarer one.
 
-    ``highest`` and ``lowest`` are each neuron's highest and lowest activation, ``[d_mlp]``. The
-    rarity is the larger of the two tails' rarities, float32 on their device. Raises
+    ``highest`` and ``lowest`` are each neuron's highest and lowest activation, ``[d_mlp]`` or
+    ``[d_mlp, n_tokens]``. The rarity is the larger of the two tails' rarities, float32 on their
+    device. Raises
     NeuronActRangeError when it cannot be served.
     """
     if not path:
@@ -157,3 +166,27 @@ def neuron_rarity(
     low = _tail_rarity(table.low, layer, -lowest)
     low_is_rarer = low > high
     return torch.where(low_is_rarer, low, high), low_is_rarer
+
+
+def top_rare_neurons(
+    path: str, layer: int, acts: torch.Tensor, k: int
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """The ``k`` rarest neurons at each token of ``acts`` ``[n_tokens, d_mlp]``.
+
+    Returns ``(values, indices, rarity)``, each ``[n_tokens, k]`` and rarest first. The values
+    are float32. Ranks ``RANK_CHUNK_TOKENS`` tokens per pass. Raises NeuronActRangeError when
+    it cannot be served.
+    """
+    k = min(k, acts.shape[1])
+    values = [torch.zeros((0, k), device=acts.device)]
+    indices = [torch.zeros((0, k), dtype=torch.long, device=acts.device)]
+    rarities = [torch.zeros((0, k), device=acts.device)]
+    for start in range(0, acts.shape[0], RANK_CHUNK_TOKENS):
+        chunk = acts[start : start + RANK_CHUNK_TOKENS].float()
+        by_neuron = chunk.T
+        rarity = neuron_rarity(path, layer, by_neuron, by_neuron)[0].T
+        top_rarity, top_index = torch.topk(rarity, k, dim=1)
+        values.append(chunk.gather(1, top_index))
+        indices.append(top_index)
+        rarities.append(top_rarity)
+    return torch.cat(values), torch.cat(indices), torch.cat(rarities)

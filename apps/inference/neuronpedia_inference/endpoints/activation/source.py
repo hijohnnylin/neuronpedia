@@ -7,12 +7,14 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from neuronpedia_inference.config import Config
+from neuronpedia_inference.endpoints.activation.single import bos_positions
 from neuronpedia_inference.engine_adapter import (
     BackendUnsupported,
     capture_padded_cache_async,
 )
+from neuronpedia_inference.inference_utils.neuron_act_range import NeuronActRangeError, top_rare_neurons
 from neuronpedia_inference.memory_cost import activation_source_cost
-from neuronpedia_inference.sae_manager import SAEManager
+from neuronpedia_inference.sae_manager import SAE_TYPE, SAEManager
 from neuronpedia_inference.schemas import (
     ActivationSourceRequest,
     ActivationSourceResponse,
@@ -33,6 +35,9 @@ router = APIRouter()
 MAX_BATCH_SIZE = 4
 
 ROUND_DECIMALS = 3
+
+# Top neurons per token for an MLP neuron layer when the request gives no topK.
+DEFAULT_NEURON_TOP_K = 64
 
 
 @router.post("/activation/source", responses={200: {"model": ActivationSourceResponse}})
@@ -74,7 +79,7 @@ async def activation_source(
         logger.info("Activations result processed successfully")
 
         return ActivationSourceResponse(results=result)
-    except BackendUnsupported as e:
+    except (BackendUnsupported, NeuronActRangeError) as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
     except Exception as e:
         # An allocation OOM here is retryable and does not poison the CUDA context, so it
@@ -90,6 +95,26 @@ async def activation_source(
             content={"error": "An error occurred while processing the request"},
             status_code=500,
         )
+
+
+def top_neurons_per_token(acts: torch.Tensor, layer: int, k: int) -> tuple[torch.Tensor, torch.Tensor]:
+    """The top ``k`` MLP neurons at each token of ``acts`` ``[seq_len, d_mlp]``.
+
+    Returns ``(values, indices)``: the activation of each kept entry and its
+    ``[token_index, neuron_index]``, in token order. With a neuron activation range table,
+    neurons rank by rarity, because raw scales differ by orders of magnitude. Without one,
+    they rank by absolute value. Entries with a rank of 0 are dropped.
+    """
+    path = Config.get_instance().neuron_act_range_path
+    k = min(k, acts.shape[1])
+    if path:
+        values, top_neuron, rank_key = top_rare_neurons(path, layer, acts, k)
+    else:
+        rank_key, top_neuron = torch.topk(acts.float().abs(), k, dim=1)
+        values = acts.float().gather(1, top_neuron)
+    token = torch.arange(acts.shape[0], device=acts.device).unsqueeze(1).expand_as(top_neuron)
+    keep = rank_key > 0
+    return values[keep], torch.stack((token[keep], top_neuron[keep]), dim=1)
 
 
 class ActivationProcessor:
@@ -161,7 +186,9 @@ class ActivationProcessor:
         hook_name = sae_manager.get_sae_hook(request.source)
 
         cache = await capture_padded_cache_async(model, padded_tokens, original_lengths, [hook_name])
-        sae = sae_manager.get_sae(request.source)
+        is_neurons = sae_manager.get_sae_type(request.source) == SAE_TYPE.NEURONS
+        # MLP neuron layers have no SAE to load.
+        sae = None if is_neurons else sae_manager.get_sae(request.source)
         device = Config.get_instance().device
 
         # Convert feature_activation_data to sparse format for all prompts
@@ -176,18 +203,26 @@ class ActivationProcessor:
             # the GPU and (via the host copy below) in RAM. It also skips the padding.
             with torch.no_grad():
                 activation_data = cache[hook_name][i : i + 1, :seq_len].to(device)
-                prompt_activations = sae.encode(activation_data)[0].float().cpu().numpy()
+                if sae is None:
+                    top_k = request.top_k if request.top_k is not None else DEFAULT_NEURON_TOP_K
+                    values, indices = top_neurons_per_token(activation_data[0], int(request.source), top_k)
+                    token_indices = indices[:, 0].cpu().numpy()
+                    feature_indices = indices[:, 1].cpu().numpy()
+                    activation_values = values.float().cpu().numpy()
+                else:
+                    prompt_activations = sae.encode(activation_data)[0].float().cpu().numpy()
+                    nonzero_indices = np.nonzero(prompt_activations)
+                    token_indices = nonzero_indices[0]
+                    feature_indices = nonzero_indices[1]
+                    activation_values = prompt_activations[nonzero_indices]
 
-            # Find non-zero activations
-            nonzero_indices = np.nonzero(prompt_activations)
-            token_indices = nonzero_indices[0]
-            feature_indices = nonzero_indices[1]
-            activation_values = prompt_activations[nonzero_indices]
+            # BOS positions are skipped. With no BOS token (Qwen3), position 0 is a real token.
+            bos_indices = set(bos_positions(all_tokens[i], model.tokenizer.bos_token_id))
 
             # Build sparse dictionary: feature_index -> [[token_index, activation_value], ...]
             active_features: dict[str, list[list[float]]] = {}
             for token_idx, feature_idx, activation_value in zip(token_indices, feature_indices, activation_values):
-                if token_idx == 0:
+                if int(token_idx) in bos_indices:
                     continue
                 feature_key = str(int(feature_idx))
                 if feature_key not in active_features:
