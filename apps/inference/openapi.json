@@ -1498,6 +1498,20 @@
         "title": "LensErrorResponse",
         "type": "object"
       },
+      "LensOracleClearCacheResponse": {
+        "description": "What ``/v1/lens/oracle/clear-cache`` dropped.",
+        "properties": {
+          "clearedReads": {
+            "title": "Clearedreads",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clearedReads"
+        ],
+        "title": "LensOracleClearCacheResponse",
+        "type": "object"
+      },
       "LensOracleRequest": {
         "description": "One oracle-lens read: the activation at ``position``, in words, at each layer.",
         "properties": {
@@ -3999,6 +4013,25 @@
           }
         },
         "summary": "Lens Oracle"
+      }
+    },
+    "/v1/lens/oracle/clear-cache": {
+      "post": {
+        "description": "Drop every cached oracle read, so the next reads run on the model.",
+        "operationId": "lensOracleClearCachePost",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LensOracleClearCacheResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Lens Oracle Clear Cache"
       }
     },
     "/v1/lens/prompt": {

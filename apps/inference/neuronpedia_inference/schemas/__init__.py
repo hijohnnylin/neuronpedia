@@ -62,6 +62,7 @@ from neuronpedia_inference.schemas.common import (
 from neuronpedia_inference.schemas.lens import (
     LensChatMessage,
     LensErrorResponse,
+    LensOracleClearCacheResponse,
     LensOracleRequest,
     LensPromptRequest,
     LensSteerToken,
@@ -139,6 +140,7 @@ __all__ = [
     "HealthResponse",
     "LensChatMessage",
     "LensErrorResponse",
+    "LensOracleClearCacheResponse",
     "LensOracleRequest",
     "LensPromptRequest",
     "LensSteerToken",

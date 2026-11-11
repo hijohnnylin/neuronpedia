@@ -251,6 +251,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/lens/oracle/clear-cache': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Lens Oracle Clear Cache
+     * @description Drop every cached oracle read, so the next reads run on the model.
+     */
+    post: operations['lensOracleClearCachePost'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/v1/lens/prompt': {
     parameters: {
       query?: never;
@@ -1096,6 +1116,14 @@ export interface components {
       suggestedToken?: string | null;
       /** Token */
       token?: string | null;
+    };
+    /**
+     * LensOracleClearCacheResponse
+     * @description What ``/v1/lens/oracle/clear-cache`` dropped.
+     */
+    LensOracleClearCacheResponse: {
+      /** Clearedreads */
+      clearedReads: number;
     };
     /**
      * LensOracleRequest
@@ -2564,6 +2592,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  lensOracleClearCachePost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LensOracleClearCacheResponse'];
         };
       };
     };

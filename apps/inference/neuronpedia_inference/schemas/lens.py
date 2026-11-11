@@ -169,6 +169,13 @@ class LensPromptRequest(BaseSchema):
     fail_if_busy: bool = False
 
 
+class LensOracleClearCacheResponse(BaseSchema):
+    """What ``/v1/lens/oracle/clear-cache`` dropped."""
+
+    # Reads in the cache before the clear. One read is one position at one layer.
+    cleared_reads: int
+
+
 class LensOracleRequest(BaseSchema):
     """One oracle-lens read: the activation at ``position``, in words, at each layer."""
 

@@ -41,7 +41,7 @@ from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.lens.prompt import LensErrorMessage, _acquire_request_lock
 from neuronpedia_inference.engine_adapter import BackendUnsupported, assert_residual_available
 from neuronpedia_inference.memory_cost import lens_cost
-from neuronpedia_inference.schemas import LensOracleRequest, PublicFrameSchema
+from neuronpedia_inference.schemas import LensOracleClearCacheResponse, LensOracleRequest, PublicFrameSchema
 from neuronpedia_inference.shared import Model, RequestBusy, RequestTooLarge, budget
 
 logger = logging.getLogger(__name__)
@@ -239,6 +239,12 @@ class _ReadCache:
         self._reads.move_to_end(key)
         while len(self._reads) > self.size:
             self._reads.popitem(last=False)
+
+    def clear(self) -> int:
+        """Drop every read. Returns how many there were."""
+        count = len(self._reads)
+        self._reads.clear()
+        return count
 
 
 READ_CACHE = _ReadCache(_CACHE_SIZE)
@@ -486,3 +492,11 @@ async def lens_oracle(request: LensOracleRequest, http_request: Request):
     if error is not None:
         return JSONResponse(content=error, status_code=500)
     return JSONResponse(content={"meta": meta, "reads": reads, "done": done})
+
+
+@router.post("/lens/oracle/clear-cache", responses={200: {"model": LensOracleClearCacheResponse}})
+async def lens_oracle_clear_cache():
+    """Drop every cached oracle read, so the next reads run on the model."""
+    cleared = READ_CACHE.clear()
+    logger.info("[ORACLE] Cleared %d cached reads", cleared)
+    return LensOracleClearCacheResponse(cleared_reads=cleared)

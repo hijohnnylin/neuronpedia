@@ -7,6 +7,7 @@ import asyncio
 import pytest
 from interp_engine.oracle import ALL_LAYERS, FAST_LAYERS, OraclePartial, OracleRead
 
+from neuronpedia_inference.endpoints.lens import oracle as oracle_module
 from neuronpedia_inference.endpoints.lens.oracle import (
     ORACLE_REGISTRY,
     _each_position,
@@ -45,6 +46,19 @@ def test_the_cache_keys_on_the_prefix_and_evicts_the_oldest():
     cache.put(cache.key("ao", [2], 20, 2, 96), read)
     assert cache.get(k1) is read
     assert cache.get(cache.key("ao", [1], 20, 2, 96)) is None
+
+
+def test_clear_drops_every_read_and_the_route_reports_the_count(monkeypatch: pytest.MonkeyPatch):
+    cache = _ReadCache(size=4)
+    monkeypatch.setattr(oracle_module, "READ_CACHE", cache)
+    read = OracleRead(layer=20, text="- a\n", bullets=["a"], token_ids=[1], finish="bullets")
+    cache.put(cache.key("ao", [1], 20, 2, 96), read)
+    cache.put(cache.key("ao", [2], 20, 2, 96), read)
+
+    response = asyncio.run(oracle_module.lens_oracle_clear_cache())
+    assert response.model_dump() == {"clearedReads": 2}
+    assert cache.get(cache.key("ao", [1], 20, 2, 96)) is None
+    assert cache.clear() == 0
 
 
 def _read(layer: int, text: str) -> OracleRead:
