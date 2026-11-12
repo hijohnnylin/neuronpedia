@@ -53,6 +53,12 @@ model Session {
   @@index([userId])
 }
 
+// Same values as the SES suppression list reasons.
+enum EmailSuppressionReason {
+  BOUNCE
+  COMPLAINT
+}
+
 enum UserSecretType {
   NEURONPEDIA
   OPENAI
@@ -139,6 +145,9 @@ model User {
   emailNewsletterNotification Boolean @default(true)
   emailUnsubscribeAll         Boolean @default(false)
   emailUnsubscribeCode        String  @default(cuid())
+  // Set from the SES suppression list. A suppressed user also has emailUnsubscribeAll = true.
+  emailSuppressedReason       EmailSuppressionReason?
+  emailSuppressedAt           DateTime?
 
   createdAt DateTime @default(now())
 

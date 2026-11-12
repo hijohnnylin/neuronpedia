@@ -64,7 +64,7 @@ export const SessionScalarFieldEnumSchema = z.enum(['id','sessionToken','userId'
 
 export const UserSecretScalarFieldEnumSchema = z.enum(['id','username','type','value','createdAt','updatedAt']);
 
-export const UserScalarFieldEnumSchema = z.enum(['id','name','bio','email','emailVerified','githubUsername','bot','image','admin','canTriggerExplanations','canUploadExplanations','isProblemEditor','emailNewsletterNotification','emailUnsubscribeAll','emailUnsubscribeCode','createdAt']);
+export const UserScalarFieldEnumSchema = z.enum(['id','name','bio','email','emailVerified','githubUsername','bot','image','admin','canTriggerExplanations','canUploadExplanations','isProblemEditor','emailNewsletterNotification','emailUnsubscribeAll','emailUnsubscribeCode','emailSuppressedReason','emailSuppressedAt','createdAt']);
 
 export const GraphMetadataSubgraphScalarFieldEnumSchema = z.enum(['id','displayName','graphMetadataId','pinnedIds','supernodes','clerps','pruningThreshold','densityThreshold','userId','isFeaturedSolution','createdAt','updatedAt']);
 
@@ -189,6 +189,10 @@ export const QueryModeSchema = z.enum(['default','insensitive']);
 export const NullsOrderSchema = z.enum(['first','last']);
 
 export const JsonNullValueFilterSchema: z.ZodType<Prisma.JsonNullValueFilter> = z.enum(['DbNull','JsonNull','AnyNull',]).transform((value) => value === 'JsonNull' ? Prisma.JsonNull : value === 'DbNull' ? Prisma.DbNull : value === 'AnyNull' ? Prisma.AnyNull : value);
+
+export const EmailSuppressionReasonSchema = z.enum(['BOUNCE','COMPLAINT']);
+
+export type EmailSuppressionReasonType = `${z.infer<typeof EmailSuppressionReasonSchema>}`
 
 export const UserSecretTypeSchema = z.enum(['NEURONPEDIA','OPENAI','GOOGLE','ANTHROPIC','OPENROUTER']);
 
@@ -424,6 +428,7 @@ export const UserSecretWithPartialRelationsSchema: z.ZodType<UserSecretWithParti
 /////////////////////////////////////////
 
 export const UserSchema = z.object({
+  emailSuppressedReason: EmailSuppressionReasonSchema.nullable(),
   id: z.cuid(),
   name: z.string().regex(new RegExp(/^[a-zA-Z0-9-.]+$/), "Name should contain only numbers, letters, dashes, and periods.",).min(1).max(39).transform((val) => val.toLowerCase()),
   bio: z.string().nullable(),
@@ -439,6 +444,7 @@ export const UserSchema = z.object({
   emailNewsletterNotification: z.boolean(),
   emailUnsubscribeAll: z.boolean(),
   emailUnsubscribeCode: z.cuid(),
+  emailSuppressedAt: z.coerce.date().nullable(),
   createdAt: z.coerce.date(),
 })
 

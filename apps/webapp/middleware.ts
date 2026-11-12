@@ -39,6 +39,8 @@ const NORMAL_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api/graph/tokenize', limit: 300 },
   { endpoint: '/api/graph/parse-chat-prompt', limit: 300 },
   { endpoint: '/api/auth/signin', limit: 5 },
+  // Gmail and Yahoo one-click unsubscribes come from a few shared mail-server IPs.
+  { endpoint: '/api/email/unsubscribe', limit: 500, exact: true },
   { endpoint: '/api/explorer/url-metadata', limit: 120 },
   { endpoint: '/api/explorer/node/submit-urls', limit: 30 },
   { endpoint: '/api/explorer/node/new', limit: 60 },
@@ -87,6 +89,7 @@ const HIGHER_RATE_LIMITS: RateLimitEntry[] = [
   { endpoint: '/api/graph/tokenize', limit: 300 },
   { endpoint: '/api/graph/parse-chat-prompt', limit: 300 },
   { endpoint: '/api/auth/signin', limit: 5 },
+  { endpoint: '/api/email/unsubscribe', limit: 500, exact: true },
   { endpoint: '/api/saelens/latent-decoder', limit: 3600 },
   { endpoint: '/api/nla/explain-saelens', limit: 120 },
   { endpoint: '/api/nla/completion', limit: 240 },

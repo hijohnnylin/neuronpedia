@@ -158,25 +158,29 @@ export const updateUserAccount = async (
 
 // ========================== MARK: EMAIL
 
-export const setUserEmailUnsubscribeNewsletter = async (unsubscribeCode: string) =>
-  prisma.user.update({
-    where: {
-      emailUnsubscribeCode: unsubscribeCode,
-    },
-    data: {
-      emailNewsletterNotification: false,
-    },
-  });
+export type EmailUnsubscribeList = 'newsletter' | 'all';
 
-export const setUserEmailUnsubscribeAll = async (unsubscribeCode: string) =>
-  prisma.user.update({
+export const isValidEmailUnsubscribeCode = async (unsubscribeCode: string) =>
+  unsubscribeCode !== '' &&
+  (await prisma.user.count({
     where: {
       emailUnsubscribeCode: unsubscribeCode,
     },
-    data: {
-      emailUnsubscribeAll: true,
+  })) > 0;
+
+// Returns false if no user has this code.
+export const setUserEmailUnsubscribe = async (unsubscribeCode: string, list: EmailUnsubscribeList) => {
+  if (unsubscribeCode === '') {
+    return false;
+  }
+  const result = await prisma.user.updateMany({
+    where: {
+      emailUnsubscribeCode: unsubscribeCode,
     },
+    data: list === 'newsletter' ? { emailNewsletterNotification: false } : { emailUnsubscribeAll: true },
   });
+  return result.count > 0;
+};
 
 export const setUserEmailNewsletterNotification = async (userId: string, notify: boolean) =>
   prisma.user.update({

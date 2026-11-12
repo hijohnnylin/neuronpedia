@@ -61,6 +61,15 @@ export const EmailTemplates: {
   },
 };
 
+// List-Unsubscribe-Post makes the header one-click (RFC 8058), so the client POSTs to the URL.
+const unsubscribeHeaders = (unsubscribeCode: string | undefined): Record<string, string> =>
+  unsubscribeCode
+    ? {
+        'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/api/email/unsubscribe?list=all&code=${unsubscribeCode}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      }
+    : {};
+
 export const sendEmail = async (
   emailAddress: string,
   unsubscribeCode: string | undefined,
@@ -90,14 +99,7 @@ export const sendEmail = async (
                 Data: htmlToText(html),
               },
             },
-            Headers: unsubscribeCode
-              ? [
-                  {
-                    Name: 'List-Unsubscribe',
-                    Value: `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
-                  },
-                ]
-              : [],
+            Headers: Object.entries(unsubscribeHeaders(unsubscribeCode)).map(([Name, Value]) => ({ Name, Value })),
           },
         },
       });
@@ -115,11 +117,7 @@ export const sendEmail = async (
         subject,
         html,
         text: htmlToText(html),
-        headers: unsubscribeCode
-          ? {
-              'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
-            }
-          : {},
+        headers: unsubscribeHeaders(unsubscribeCode),
       });
       if (resendDotComResult.error) {
         console.error('Resend email failed to send', resendDotComResult);
@@ -135,11 +133,7 @@ export const sendEmail = async (
           subject,
           html,
           text: htmlToText(html),
-          headers: unsubscribeCode
-            ? {
-                'List-Unsubscribe': `<${NEXT_PUBLIC_URL}/unsubscribe-all?code=${unsubscribeCode}>`,
-              }
-            : undefined,
+          headers: unsubscribeHeaders(unsubscribeCode),
         };
         await smtpTransporter.sendMail(mailOptions);
       } catch (error) {
