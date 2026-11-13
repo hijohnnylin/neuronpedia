@@ -53,6 +53,10 @@ _RANKED_BY_LOWEST_COL = 6
 MAX_NUM_RESULTS = 1000
 
 
+class ActivationRequestError(ValueError):
+    """The activation request is well-formed but cannot be served as specified."""
+
+
 class ActivationTopKRequest(Protocol):
     """Shared fields used by single-prompt and batch activation top-K helpers."""
 
@@ -126,7 +130,7 @@ async def activation_all(
         logger.info("Activations result processed successfully")
 
         return result
-    except (BackendUnsupported, NeuronActRangeError) as e:
+    except (ActivationRequestError, BackendUnsupported, NeuronActRangeError) as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
     except Exception as e:
         # An allocation OOM here is retryable and does not poison the CUDA context, so it
@@ -164,10 +168,9 @@ class ActivationProcessor:
         tokens, str_tokens, cache = await self._tokenize_and_get_cache(request.prompt, prepend_bos, request)
 
         # ensure sort_by_token_indexes doesn't have any out of range indexes
-        # TODO: return a better error for this (currently returns a 500 error)
         for token_index in request.sort_by_token_indexes:
             if token_index >= len(str_tokens) or token_index < 0:
-                raise ValueError(
+                raise ActivationRequestError(
                     f"Sort by token index {token_index} is out of range for the given prompt, which only has {len(str_tokens)} tokens."
                 )
 
@@ -199,7 +202,7 @@ class ActivationProcessor:
             truncate=False,
         )[0]
         if len(tokens) > config.activation_token_limit:
-            raise ValueError(f"Text too long: {len(tokens)} tokens, max is {config.activation_token_limit}")
+            raise ActivationRequestError(f"Text too long: {len(tokens)} tokens, max is {config.activation_token_limit}")
 
         str_tokens = model.to_str_tokens(text, prepend_bos=prepend_bos)
 
