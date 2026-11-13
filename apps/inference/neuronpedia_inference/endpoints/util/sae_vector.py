@@ -29,7 +29,7 @@ async def sae_vector(request: UtilSaeVectorRequest):
         )
     sae = sae_manager.get_sae(source)
 
-    result = sae.W_enc[:, index].detach().tolist()
+    result = sae.W_dec[index].detach().tolist()
 
     logger.info("Returning result: %s", result)
 
