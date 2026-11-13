@@ -180,7 +180,7 @@ export default function InferenceSearcher({
         } flex w-full flex-col items-start justify-center transition-all sm:max-w-screen-lg`}
       >
         <div className="flex flex-col items-center justify-center">
-          <div className="mb-2 flex w-auto flex-row items-center justify-center gap-x-2 text-center font-sans text-xs font-medium uppercase leading-none text-slate-500">
+          <div className="mb-2 flex w-auto flex-row flex-wrap items-center justify-center gap-x-2 gap-y-2 text-center font-sans text-xs font-medium uppercase leading-none text-slate-500">
             {showModels && (
               <div className="flex flex-col font-mono">
                 <ModelSelector

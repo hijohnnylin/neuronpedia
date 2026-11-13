@@ -931,7 +931,7 @@ export default async function Page() {
       </div>
 
       <div className="flex w-full flex-1 flex-col items-center justify-center gap-x-3 gap-y-12 bg-slate-50 px-2 py-12 sm:px-8 sm:py-16">
-        <div className="flex max-w-screen-xl flex-1 flex-col items-center gap-x-8 gap-y-8 rounded-xl px-2 sm:flex-row sm:px-0 sm:pb-0">
+        <div className="flex w-full max-w-screen-xl flex-1 flex-col items-center gap-x-8 gap-y-8 rounded-xl px-2 sm:flex-row sm:px-0 sm:pb-0">
           <div className="flex flex-col sm:basis-1/3">
             <div className="text-3xl font-black text-slate-800">Search</div>
             <div className="mt-3 text-[15px] font-medium text-slate-700">
@@ -1028,11 +1028,12 @@ export default async function Page() {
               </Link>
             </div>
           </div>
-          <div className="flex w-full flex-1 sm:basis-2/3 sm:px-0">
+          <div className="flex w-full min-w-0 flex-1 sm:basis-2/3 sm:px-0">
             <iframe
               title="Jedi Feature"
               src="https://neuronpedia.org/gpt2-small/0-res-jb/14057?embed=true&embedexplanation=true&embedplots=true"
-              style={{ width: '100%', height: '540px' }}
+              // iOS Safari sizes an iframe to its content width and ignores width: 100%.
+              style={{ width: '1px', minWidth: '100%', height: '540px' }}
               scrolling="no"
               className="overflow-hidden rounded-lg border"
             />
