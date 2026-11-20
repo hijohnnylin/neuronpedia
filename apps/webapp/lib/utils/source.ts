@@ -22,6 +22,27 @@ export function isNeuronLayerSource(source: string) {
   return /^-?\d+$/.test(source);
 }
 
+// A neuron page with no Neuron row must be inside the model. A count of 0 means it is not known.
+// Only the plain form passes ("7", not "07" or "-0"), so each neuron has one URL.
+export function isNeuronInModelRange(
+  model: { layers?: number | null; neuronsPerLayer?: number | null },
+  layer: string,
+  index: string,
+) {
+  const layerNum = Number(layer);
+  const indexNum = Number(index);
+  if (!/^\d+$/.test(layer) || !/^\d+$/.test(index) || String(layerNum) !== layer || String(indexNum) !== index) {
+    return false;
+  }
+  if (model.layers && layerNum >= model.layers) {
+    return false;
+  }
+  if (model.neuronsPerLayer && indexNum >= model.neuronsPerLayer) {
+    return false;
+  }
+  return true;
+}
+
 // Neuron steering is on only for neuron layers with file dashboards (SourceSet.externalDashboardsUrl)
 // and inference. Older neuron sets have no pod that steers neurons.
 export function isSteerableNeuronLayer(

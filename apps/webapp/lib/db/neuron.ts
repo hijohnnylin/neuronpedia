@@ -213,6 +213,8 @@ export const getNeuronOptimized = async (
   layer: string,
   index: string,
   user: AuthenticatedUser | null = null,
+  // Loads only the top activations by max value. Omit to load all of them.
+  activationsLimit?: number,
 ) => {
   await assertUserCanAccessModelAndSource(modelId, layer, user);
 
@@ -250,6 +252,9 @@ export const getNeuronOptimized = async (
       },
     },
   });
+  if (!neuronResult) {
+    return null;
+  }
 
   // separate parallel queries instead of one query because Prisma creates insane requests to DB otherwise
   const activations = prisma.activation.findMany({
@@ -259,7 +264,7 @@ export const getNeuronOptimized = async (
       index,
       creatorId: {
         in:
-          neuronResult?.hasVector && neuronResult?.creatorId
+          neuronResult.hasVector && neuronResult.creatorId
             ? [neuronResult.creatorId].concat(PUBLIC_ACTIVATIONS_USER_IDS)
             : PUBLIC_ACTIVATIONS_USER_IDS,
       },
@@ -267,6 +272,7 @@ export const getNeuronOptimized = async (
     orderBy: {
       maxValue: 'desc',
     },
+    ...(activationsLimit ? { take: activationsLimit } : {}),
   });
   const explanations = prisma.explanation.findMany({
     where: { modelId, layer, index },
@@ -330,9 +336,6 @@ export const getNeuronOptimized = async (
     orderBy: [{ typeName: 'asc' }, { name: 'asc' }, { pole: 'asc' }],
   });
   const res = await Promise.all([activations, explanations, tokenLists]); // , comments]);
-  if (!res || !neuronResult) {
-    return null;
-  }
   const neuron = neuronResult as NeuronWithPartialRelations;
   // this does not work correctly, so always set it to blank
   neuron.correlated_features_indices = [];

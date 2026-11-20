@@ -88,6 +88,34 @@ function HeadIndexDropdown({
   );
 }
 
+// A link, or a disabled box with no href. Crawlers follow every href, so a disabled step must not have one.
+function LinkOrDisabled({
+  href,
+  disabled,
+  className,
+  title,
+  children,
+}: {
+  href: string;
+  disabled: boolean;
+  className: string;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  if (disabled) {
+    return (
+      <span title={title} aria-label={title} aria-disabled className={className}>
+        {children}
+      </span>
+    );
+  }
+  return (
+    <Link href={href} title={title} aria-label={title} className={className}>
+      {children}
+    </Link>
+  );
+}
+
 // A short link under a selector box. A real link, so ctrl-click opens a new tab.
 function StepLink({
   href,
@@ -103,18 +131,16 @@ function StepLink({
   heightClassName?: string;
 }) {
   return (
-    <Link
+    <LinkOrDisabled
       href={href}
+      disabled={disabled}
       title={title}
-      aria-label={title}
-      aria-disabled={disabled}
-      tabIndex={disabled ? -1 : undefined}
       className={`flex ${heightClassName} flex-1 select-none flex-row items-center justify-center gap-x-0.5 whitespace-pre rounded-sm bg-slate-200 font-mono text-[8px] font-medium uppercase leading-none text-slate-500 hover:bg-sky-700 hover:text-white ${
         disabled ? 'pointer-events-none opacity-40' : ''
       }`}
     >
       {children}
-    </Link>
+    </LinkOrDisabled>
   );
 }
 
@@ -293,7 +319,8 @@ export default function FeatureSelector({
       <div className="flex items-start justify-center gap-x-1 sm:gap-x-2">
         {showNextPrev && !nextPrevBelowIndex && (
           <div className="flex flex-row divide-x divide-slate-300 overflow-hidden rounded bg-slate-200">
-            <Link
+            <LinkOrDisabled
+              disabled={!(parseInt(defaultIndex, 10) > 0)}
               className={`group hidden h-10 min-h-[40px] select-none flex-col items-center justify-center px-1.5 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white sm:flex ${
                 parseInt(defaultIndex, 10) > 0 ? '' : 'pointer-events-none opacity-50'
               }`}
@@ -303,9 +330,10 @@ export default function FeatureSelector({
               <div className="mt-0.5 text-center text-[8px] font-medium uppercase leading-none text-slate-400 group-hover:text-white">
                 Prev
               </div>
-            </Link>
+            </LinkOrDisabled>
 
-            <Link
+            <LinkOrDisabled
+              disabled={isNeuronPage && !hasNextIndex}
               className={`group hidden h-10 min-h-[40px] select-none flex-col items-center justify-center px-1.5 text-[11px] font-medium uppercase text-slate-500 hover:bg-sky-700 hover:text-white sm:flex ${
                 isNeuronPage && !hasNextIndex ? 'pointer-events-none opacity-50' : ''
               }`}
@@ -315,7 +343,7 @@ export default function FeatureSelector({
               <div className="mt-0.5 text-center text-[8px] font-medium uppercase leading-none text-slate-400 group-hover:text-white">
                 Next
               </div>
-            </Link>
+            </LinkOrDisabled>
           </div>
         )}
         {showModel && !modelOnSeparateRow && (

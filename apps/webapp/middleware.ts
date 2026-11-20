@@ -213,3 +213,8 @@ export default async function middleware(request: NextRequest) {
   }
   return res;
 }
+
+// Static files skip the rate limiter, so they do not use up a visitor's limit or call Redis.
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?)$).*)'],
+};

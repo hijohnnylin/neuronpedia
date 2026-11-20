@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { AuthenticatedUser } from '@/lib/with-user';
 import { Model, Visibility } from '@prisma/client';
+import { cache } from 'react';
 import { AllowUnlistedFor, userCanAccessClause } from './userCanAccess';
 
 // for globalModels, return unlisted to everyone, but filter them out in the UI
@@ -54,6 +55,14 @@ export const getModelById = async (modelId: string, user?: AuthenticatedUser | n
   });
   return model;
 };
+
+// No access check: check access first. Cached per request, so a page and its metadata share one query.
+export const getModelLayerCounts = cache(async (modelId: string) =>
+  prisma.model.findUnique({
+    where: { id: modelId },
+    select: { layers: true, neuronsPerLayer: true },
+  }),
+);
 
 // The reverse of the model id in the URL: given what HuggingFace calls a model, find ours.
 //

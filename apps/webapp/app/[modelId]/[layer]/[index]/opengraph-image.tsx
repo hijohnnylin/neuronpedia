@@ -8,7 +8,7 @@ import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
 import { NEXT_PUBLIC_URL } from '@/lib/env';
 import { makeActivationBackgroundColorWithDFA, replaceHtmlAnomalies } from '@/lib/utils/activations';
 import { applyNeuronDashboard, emptyNeuron, fetchNeuronDashboard } from '@/lib/utils/neuron-dashboards';
-import { getSourceSetNameFromSource } from '@/lib/utils/source';
+import { getSourceSetNameFromSource, isNeuronInModelRange, isNeuronLayerSource } from '@/lib/utils/source';
 import { Activation } from '@prisma/client';
 import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
@@ -22,16 +22,33 @@ export const size = {
 
 export const contentType = 'image/png';
 
+// The image shows the top 3 activations.
+const IMAGE_ACTIVATIONS = 3;
+
 export default async function Image({ params }: { params: { modelId: string; layer: string; index: string } }) {
   const user = await makeAuthedUserFromSessionOrReturnNull();
-  let currentNeuron = await getNeuronOptimized(params.modelId, params.layer, params.index, user);
-  const sourceSetName = currentNeuron?.sourceSetName || getSourceSetNameFromSource(params.layer);
+  const sourceSetName = getSourceSetNameFromSource(params.layer);
   const sourceSet = await getSourceSet(params.modelId, sourceSetName, user);
   if (!sourceSet) {
     notFound();
   }
+  // DFA picks its top activations from all of them by a different value, so it needs every row.
+  let currentNeuron = await getNeuronOptimized(
+    params.modelId,
+    params.layer,
+    params.index,
+    user,
+    sourceSet.showDfa ? undefined : IMAGE_ACTIVATIONS,
+  );
   // A source set with file dashboards keeps stats and examples there, and its neurons may have no row.
   if (sourceSet.externalDashboardsUrl) {
+    if (
+      !currentNeuron &&
+      isNeuronLayerSource(params.layer) &&
+      !isNeuronInModelRange(sourceSet.model, params.layer, params.index)
+    ) {
+      notFound();
+    }
     const dashboard = await fetchNeuronDashboard(sourceSet.externalDashboardsUrl, params).catch(() => null);
     if (!dashboard) {
       notFound();

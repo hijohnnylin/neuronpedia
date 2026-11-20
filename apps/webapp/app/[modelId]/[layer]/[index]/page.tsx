@@ -1,15 +1,23 @@
+import { getModelLayerCounts } from '@/lib/db/model';
 import { getNeuronOptimized, neuronExistsAndUserHasAccess } from '@/lib/db/neuron';
 import { makeAuthedUserFromSessionOrReturnNull } from '@/lib/db/user';
 import { userCanAccessModelAndSourceSet } from '@/lib/db/userCanAccess';
 import { COMPARE_PARAM, parseCompareValue } from '@/lib/utils/feature-compare';
 import { emptyNeuron } from '@/lib/utils/neuron-dashboards';
-import { getNeuronLayerTitle, isNeuronLayerSource, NEURONS_SOURCESET } from '@/lib/utils/source';
+import { getNeuronLayerTitle, isNeuronInModelRange, isNeuronLayerSource, NEURONS_SOURCESET } from '@/lib/utils/source';
 import { AuthenticatedUser } from '@/lib/with-user';
 import { NeuronWithPartialRelations } from '@/prisma/generated/zod';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import FeatureCompare from './feature-compare';
 import FeatureDashboard from './feature-dashboard';
+
+// A neuron page renders without a Neuron row, so a URL past the model's last layer or neuron must be a 404.
+// Otherwise crawlers follow the layer and index links to new pages without end.
+async function neuronPageInModelRange(modelId: string, layer: string, index: string) {
+  const model = await getModelLayerCounts(modelId);
+  return model ? isNeuronInModelRange(model, layer, index) : false;
+}
 
 export async function generateMetadata(props: {
   params: Promise<{ modelId: string; layer: string; index: string }>;
@@ -22,8 +30,8 @@ export async function generateMetadata(props: {
   const visible =
     (await neuronExistsAndUserHasAccess(params.modelId, params.layer, params.index)) ||
     (isNeuronLayer &&
-      /^\d+$/.test(params.index) &&
-      (await userCanAccessModelAndSourceSet(params.modelId, NEURONS_SOURCESET, null, true)));
+      (await userCanAccessModelAndSourceSet(params.modelId, NEURONS_SOURCESET, null, true)) &&
+      (await neuronPageInModelRange(params.modelId, params.layer, params.index)));
   if (!visible) {
     title = '';
   }
@@ -51,7 +59,9 @@ async function loadNeuron(
       return neuron;
     }
     // A neuron layer page renders without a Neuron row.
-    return layer.match(/^-?\d+$/) ? emptyNeuron(modelId, layer, index, NEURONS_SOURCESET) : null;
+    return isNeuronLayerSource(layer) && (await neuronPageInModelRange(modelId, layer, index))
+      ? emptyNeuron(modelId, layer, index, NEURONS_SOURCESET)
+      : null;
   } catch (e) {
     return null;
   }
