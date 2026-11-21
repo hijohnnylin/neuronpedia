@@ -4,6 +4,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+from neuronpedia_inference.sae_manager import SAEManager
 from neuronpedia_inference.schemas import (
     UtilSaeVectorRequest,
     UtilSaeVectorResponse,
@@ -85,6 +86,26 @@ def test_sae_vector_valid_request(client: TestClient):
         assert abs(actual - expected) <= ABS_TOLERANCE, (
             f"Vector element difference {abs(actual - expected)} exceeds tolerance {ABS_TOLERANCE}"
         )
+
+
+def test_sae_vector_is_decoder_row(client: TestClient):
+    """
+    The vector is the feature's decoder row -- the direction steering adds -- not its encoder column.
+    """
+    request = UtilSaeVectorRequest(
+        model=MODEL_ID,
+        source=SAE_SELECTED_SOURCES[0],
+        index=FEATURE_INDEX_5,
+    )
+    response = client.post(
+        ENDPOINT,
+        json=request.model_dump(),
+        headers={"X-SECRET-KEY": X_SECRET_KEY},
+    )
+    assert response.status_code == 200
+
+    sae = SAEManager.get_instance().get_sae(SAE_SELECTED_SOURCES[0])
+    assert response.json()["vector"] == sae.W_dec[FEATURE_INDEX_5].detach().tolist()
 
 
 def test_sae_vector_invalid_source(client: TestClient):
