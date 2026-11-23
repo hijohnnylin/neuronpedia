@@ -2,7 +2,7 @@ import Plotly from 'plotly.js-dist-min';
 // import { Data } from "plotly.js";
 import { UMAP_HEIGHT, UMAP_INITIAL_COLORS, useUmapContext } from '@/components/provider/umap-provider';
 import createPlotlyComponent from 'react-plotly.js/factory';
-import { getLogSparsityColorFromValue } from './umap-plot-active';
+import { getLogSparsityColorFromValue } from './umap-constants';
 
 const Plot = createPlotlyComponent(Plotly);
 
