@@ -374,6 +374,9 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
   if (!hasMessages && !text) {
     return NextResponse.json({ error: 'Provide `messages` (or `text`).' }, { status: 400 });
   }
+  if (!nlaSourceId) {
+    return NextResponse.json({ error: 'nlaSourceId is required' }, { status: 400 });
+  }
   // Rough guard on total input size; the NLA server enforces the exact
   // rendered-length cap after templating.
   const approxChars = hasMessages ? messages.reduce((sum, m) => sum + m.content.length, 0) : (text?.length ?? 0);
