@@ -125,7 +125,7 @@ import * as yup from 'yup';
  *                   type: integer
  *                   description: Number of links in the generated graph
  *       400:
- *         description: Bad request - validation error, prompt too long, or duplicate slug
+ *         description: Bad request - invalid JSON body, validation error, prompt too long, or duplicate slug
  *         content:
  *           application/json:
  *             schema:
@@ -133,7 +133,7 @@ import * as yup from 'yup';
  *               properties:
  *                 error:
  *                   type: string
- *                   enum: ["Validation error", "Prompt Too Long", "Model + Slug/ID Exists", "Invalid scan or slug"]
+ *                   enum: ["Validation error", "Invalid JSON body", "Prompt Too Long", "Model + Slug/ID Exists", "Invalid scan or slug"]
  *                 message:
  *                   type: string
  *                   description: Detailed error message
@@ -174,7 +174,10 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     try {
       body = await request.json();
     } catch {
-      throw new Error('Invalid JSON body');
+      return NextResponse.json(
+        { error: 'Invalid JSON body', message: 'The request body must be valid JSON.' },
+        { status: 400 },
+      );
     }
     const validatedData = await graphGenerateSchemaClient.validate(body);
 
