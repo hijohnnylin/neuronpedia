@@ -1,5 +1,6 @@
 'use client';
 
+import { describeImportError } from '@/lib/utils/import-error';
 import { getS3ModelsToSources } from '@/lib/utils/s3';
 import { getSourceSetNameFromSource } from '@/lib/utils/source';
 import { createContext, useContext, useMemo, useState } from 'react';
@@ -107,7 +108,7 @@ export function ImportProvider({ children }: { children: React.ReactNode }) {
       refreshGlobal();
     } catch (e) {
       updateImportState(modelId, sourceId, {
-        error: `Error: ${JSON.stringify(e)}`,
+        error: `Error: ${describeImportError(e)}`,
       });
       throw e;
     } finally {
