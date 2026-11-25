@@ -19,6 +19,7 @@ import {
 } from '@/lib/utils/autointerp';
 import { externalFirst } from '@/lib/utils/explanation-source';
 import { getNlaSaeFormat } from '@/lib/utils/nla';
+import { responseErrorMessage } from '@/lib/utils/response-error';
 import { SAEFormat } from '@/lib/utils/saelens';
 import { getLayerNumFromSource } from '@/lib/utils/source';
 import {
@@ -193,11 +194,10 @@ export default function ExplanationsPane({
           index: currentNeuron.index,
         }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setInterpretableError(data.message || data.error || `Error: ${res.status}`);
+        setInterpretableError(await responseErrorMessage(res));
       } else {
-        setInterpretableResult(data as InterpretabilityCheckResult);
+        setInterpretableResult((await res.json()) as InterpretabilityCheckResult);
       }
     } catch (e) {
       setInterpretableError(e instanceof Error ? e.message : 'Unknown error');
