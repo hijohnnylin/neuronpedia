@@ -68,6 +68,8 @@ class StubTokenizer:
 
 
 class StubModel:
+    d_model = 8
+
     def __init__(self):
         self.tokenizer = StubTokenizer()
         self.tok = Tokenize(self.tokenizer, device="cpu")
