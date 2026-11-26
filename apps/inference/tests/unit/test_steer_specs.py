@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 import torch
 from interp_engine import AddSpec, OrthogonalDecompSpec, ProjectionCapSpec
 
-from neuronpedia_inference.endpoints.steer.completion import features_to_steering_specs, steer_write_targets
-from neuronpedia_inference.inference_utils.steering import SteeringSettings
+from neuronpedia_inference.endpoints.steer import completion
+from neuronpedia_inference.endpoints.steer.completion import (
+    check_steer_vector_widths,
+    features_to_steering_specs,
+    steer_write_targets,
+)
+from neuronpedia_inference.inference_utils.steering import SteeringSettings, SteerVectorError
 from neuronpedia_inference.schemas import NPSteerMethod, NPSteerVector
 
 
@@ -75,3 +82,39 @@ def test_write_targets_are_sorted_and_deduplicated_per_point() -> None:
         _vector("ln_final.hook_normalized", [1.0]),
     ]
     assert steer_write_targets(features) == {"resid_post": [1, 5], "z": [3]}
+
+
+@pytest.fixture
+def widths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A model with d_model 4, 2 heads of width 3, and MLP width 5."""
+    model = SimpleNamespace(d_model=4, n_heads=2, head_dim=3)
+    sae_manager = SimpleNamespace(mlp_width=5, mlp_width_uniform=True)
+    monkeypatch.setattr(completion.Model, "get_instance", lambda: model)
+    monkeypatch.setattr(completion.SAEManager, "get_instance", lambda: sae_manager)
+
+
+@pytest.mark.usefixtures("widths")
+def test_vectors_that_fit_their_hooks_pass() -> None:
+    check_steer_vector_widths(
+        [
+            _vector("blocks.0.hook_resid_pre", [0.0] * 4),
+            _vector("blocks.2.hook_resid_post", [0.0] * 4),
+            _vector("blocks.1.attn.hook_z", [0.0] * 6),
+            _vector("blocks.3.mlp.hook_post", [0.0] * 5),
+            _vector("ln_final.hook_normalized", [0.0]),
+        ]
+    )
+
+
+@pytest.mark.usefixtures("widths")
+@pytest.mark.parametrize(
+    ("hook", "length", "needed"),
+    [
+        ("blocks.2.hook_resid_post", 3, 4),
+        ("blocks.1.attn.hook_z", 4, 6),
+        ("blocks.3.mlp.hook_post", 4, 5),
+    ],
+)
+def test_a_vector_of_the_wrong_width_is_refused(hook: str, length: int, needed: int) -> None:
+    with pytest.raises(SteerVectorError, match=f"has {length} values, but this model needs {needed}"):
+        check_steer_vector_widths([_vector(hook, [0.0] * length)])

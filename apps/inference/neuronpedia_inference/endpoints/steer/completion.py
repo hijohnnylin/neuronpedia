@@ -34,6 +34,7 @@ from neuronpedia_inference.inference_utils.sampling import (
 from neuronpedia_inference.inference_utils.steering import (
     NeuronSteerError,
     SteeringSettings,
+    SteerVectorError,
     format_sse_message,
     process_features_vectorized,
     refuse_split_neuron_steer,
@@ -141,6 +142,10 @@ async def completion(request: SteerCompletionRequest, http_request: Request):
         except NeuronSteerError as exc:
             return JSONResponse(content={"error": str(exc)}, status_code=400)
     elif request.vectors is not None:
+        try:
+            check_steer_vector_widths(request.vectors)
+        except SteerVectorError as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
         features = request.vectors
 
     else:
@@ -275,6 +280,33 @@ def steer_write_targets(features: Sequence[NPSteerFeature | NPSteerVector]) -> d
             continue
         targets.setdefault(spec.point, set()).update(spec.layers)
     return {point: sorted(layers) for point, layers in targets.items()}
+
+
+def check_steer_vector_widths(vectors: Sequence[NPSteerVector]) -> None:
+    """Raise :class:`SteerVectorError` when a vector's length does not fit the point its hook writes.
+
+    The engine adds the vector inside the forward pass. A wrong length fails there and kills the
+    engine for every request on the pod, so it is asked here, where the answer can be a 400.
+    Hooks :func:`steer_target` cannot map are left to :func:`features_to_steering_specs`.
+    """
+    model = Model.get_instance()
+    sae_manager = SAEManager.get_instance()
+    for vector in vectors:
+        try:
+            point = steer_target(vector.hook).name
+        except ValueError:
+            continue
+        if point in ("embeddings", "resid_post"):
+            width: int | None = int(model.d_model)
+        elif point == "z":
+            width = int(model.n_heads) * int(model.head_dim)
+        else:
+            width = sae_manager.mlp_width if sae_manager.mlp_width_uniform else None
+        if width and len(vector.steering_vector) != width:
+            raise SteerVectorError(
+                f"The steering vector for hook {vector.hook!r} has {len(vector.steering_vector)} values, "
+                f"but this model needs {width} at that hook"
+            )
 
 
 def _steer_op(method: NPSteerMethod, vector: list[float], coeff: float, *, normalize: bool) -> SteeringOp:

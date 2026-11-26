@@ -19,6 +19,7 @@ from interp_engine import (
 from neuronpedia_inference.config import Config
 from neuronpedia_inference.endpoints.steer.completion import (
     _generate_text,
+    check_steer_vector_widths,
     features_to_steering_specs,
     resolve_max_new_tokens,
     steer_write_targets,
@@ -38,6 +39,7 @@ from neuronpedia_inference.inference_utils.sampling import (
 from neuronpedia_inference.inference_utils.steering import (
     NeuronSteerError,
     SteeringSettings,
+    SteerVectorError,
     format_sse_message,
     process_features_vectorized,
     refuse_split_neuron_steer,
@@ -284,6 +286,10 @@ async def completion_chat(request: SteerCompletionChatRequest, http_request: Req
         except NeuronSteerError as exc:
             return JSONResponse(content={"error": str(exc)}, status_code=400)
     elif request.vectors is not None:
+        try:
+            check_steer_vector_widths(request.vectors)
+        except SteerVectorError as exc:
+            return JSONResponse(content={"error": str(exc)}, status_code=400)
         features = request.vectors
     elif not wants_steering:
         # Nothing will be steered, so there is nothing to steer with.

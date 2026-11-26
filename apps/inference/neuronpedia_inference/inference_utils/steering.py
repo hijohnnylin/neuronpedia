@@ -86,6 +86,10 @@ class NeuronSteerError(ValueError):
     """A neuron steer this pod cannot run. The handlers answer it with a 400."""
 
 
+class SteerVectorError(ValueError):
+    """A raw steering vector that does not fit this model. The handlers answer it with a 400."""
+
+
 def neuron_steering_vector(index: int, d_mlp: int | None) -> list[float]:
     """One-hot over the MLP neurons, so an additive steer adds its strength to one neuron's activation."""
     if not d_mlp:
