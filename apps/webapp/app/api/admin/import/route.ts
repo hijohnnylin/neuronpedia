@@ -240,7 +240,8 @@ export const GET = withOptionalUser(async (request: RequestOptionalUser) => {
         controller.close();
       } catch (error) {
         console.error('Error importing data:', error);
-        controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ message: error })}\n\n`));
+        const message = error instanceof Error ? error.message : String(error);
+        controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ message })}\n\n`));
         controller.close();
       }
     },
