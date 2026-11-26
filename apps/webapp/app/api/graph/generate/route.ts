@@ -174,7 +174,7 @@ export const POST = withOptionalUser(async (request: RequestOptionalUser) => {
     try {
       body = await request.json();
     } catch {
-      throw new Error('Invalid JSON body');
+      return NextResponse.json({ error: 'Invalid JSON', message: 'Invalid JSON body' }, { status: 400 });
     }
     const validatedData = await graphGenerateSchemaClient.validate(body);
 
