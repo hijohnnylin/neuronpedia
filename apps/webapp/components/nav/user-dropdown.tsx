@@ -7,18 +7,25 @@ import { Bookmark, ExternalLink, LayoutList, LogOut, Menu, MoveUpLeft, Settings,
 import { Session } from 'next-auth';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import NavBarButtons from './navbar-buttons';
 
 export default function UserDropdown({ session }: { session: Session | null }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { name } = session?.user || {};
   const { user, showUserPopover, setShowUserPopover } = useGlobalContext();
 
+  useEffect(() => {
+    setShowUserPopover(false);
+  }, [pathname, setShowUserPopover]);
+
   return (
-    <div className="relative z-50 flex items-center text-left">
+    <div className={`relative z-50 items-center text-left ${session ? 'flex' : 'flex 2xl:hidden'}`}>
       <Popover
         content={
-          <div className="z-50 w-full rounded-md bg-white p-2 text-slate-500 sm:w-44">
+          <div className="w-full rounded-md bg-white p-2 text-slate-500 md:max-h-[var(--radix-popover-content-available-height)] md:w-[min(17rem,calc(100vw-1rem))] md:overflow-y-auto md:overscroll-contain 2xl:w-44">
             {user && (
               <>
                 <Link
@@ -39,14 +46,16 @@ export default function UserDropdown({ session }: { session: Session | null }) {
               </>
             )}
             <div
-              className={`mx-auto flex w-full flex-col items-center justify-center gap-3 border-slate-200 pb-4 ${
+              className={`flex w-full flex-col gap-0.5 border-slate-200 pb-2 [&>a>div]:items-start [&>a]:min-h-11 [&>a]:justify-start [&>a]:rounded-md [&>a]:px-3 [&>button]:min-h-11 [&>button]:justify-start [&>button]:rounded-md [&>button]:px-3 [&_[data-nav-badge]]:hidden ${
                 user && 'mb-4 mt-4 border-b border-t pt-4'
-              } sm:hidden`}
-              onClick={() => {
-                setShowUserPopover(false);
+              } 2xl:hidden`}
+              onClick={(event) => {
+                if (event.target instanceof Element && event.target.closest('a[href]')) {
+                  setShowUserPopover(false);
+                }
               }}
             >
-              <NavBarButtons />
+              <NavBarButtons placement="menu" />
             </div>
             {user && (
               <>
@@ -111,33 +120,21 @@ export default function UserDropdown({ session }: { session: Session | null }) {
         openPopover={showUserPopover}
         setOpenPopover={setShowUserPopover}
       >
-        {session ? (
-          <button
-            type="button"
-            className={`flex cursor-pointer select-none flex-row items-center justify-center gap-x-1 rounded-md border border-slate-200 px-2 py-2 text-slate-500 transition-all focus:outline-none sm:ml-2.5 sm:rounded-full sm:px-2 sm:py-2 ${
-              showUserPopover ? 'shadow-0 bg-white hover:bg-white' : 'bg-white hover:bg-slate-50 hover:shadow'
-            }`}
-            onClick={() => setShowUserPopover(!showUserPopover)}
-          >
-            <div className="flex flex-col items-center justify-center gap-y-0.5 text-xs font-medium leading-none text-slate-500">
-              <User className="h-4 w-4" />
-            </div>
-          </button>
-        ) : (
-          <div className="ml-2 block sm:hidden">
-            <button
-              type="button"
-              className={`flex h-10 cursor-pointer select-none items-center justify-center rounded-md border border-slate-200 px-2.5 py-1 text-slate-500 transition-all focus:outline-none sm:rounded-lg sm:px-4 sm:py-2 ${
-                showUserPopover
-                  ? 'shadow-0 bg-white hover:bg-white'
-                  : 'bg-white shadow hover:bg-slate-50 hover:shadow sm:shadow-md'
-              }`}
-              onClick={() => setShowUserPopover(!showUserPopover)}
-            >
-              <Menu />
-            </button>
-          </div>
-        )}
+        <button
+          type="button"
+          aria-expanded={showUserPopover}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 2xl:h-8 2xl:w-8 2xl:rounded-full"
+          onClick={() => setShowUserPopover(!showUserPopover)}
+        >
+          <Menu aria-hidden className="h-5 w-5 2xl:hidden" />
+          <span className="sr-only 2xl:hidden">{session ? 'Navigation and account menu' : 'Navigation menu'}</span>
+          {session && (
+            <>
+              <User aria-hidden className="hidden h-4 w-4 2xl:block" />
+              <span className="hidden 2xl:sr-only 2xl:block">Account menu</span>
+            </>
+          )}
+        </button>
       </Popover>
     </div>
   );

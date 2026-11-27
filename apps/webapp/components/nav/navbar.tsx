@@ -40,19 +40,22 @@ export default function NavBar({ session }: { session: Session | null }) {
   return (
     <>
       <SignInModal />
-      <div className="fixed top-0 z-20 w-full select-none border-b border-slate-200 bg-white px-5 transition-all sm:pr-8">
+      <nav
+        aria-label="Main navigation"
+        className="fixed top-0 z-20 w-full select-none border-b border-slate-200 bg-white pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] transition-all sm:pl-[max(1.25rem,env(safe-area-inset-left))] sm:pr-[max(1.25rem,env(safe-area-inset-right))] 2xl:pr-[max(2rem,env(safe-area-inset-right))]"
+      >
         <GithubCorner
           href="https://github.com/hijohnnylin/neuronpedia#readme"
           size={36}
-          className="hidden sm:inline"
+          className="hidden 2xl:inline"
           target="_blank"
           rel="noreferrer"
         />
-        <div className="relative flex h-12 items-center justify-between sm:mx-auto sm:h-12">
-          <div className="flex flex-row gap-8 sm:mt-0">
-            <Link href="/#" className="flex items-center justify-center text-base sm:text-[16px]">
+        <div className="relative flex h-12 items-center justify-between gap-x-2">
+          <div className="flex min-w-0 items-center">
+            <Link href="/#" className="flex min-w-0 items-center text-base">
               {!SITE_NAME_VERCEL_DEPLOY && (
-                <div className="mr-1.5 h-6 w-6 sm:h-5 sm:w-5">
+                <div className="mr-1.5 h-6 w-6 shrink-0 sm:h-5 sm:w-5">
                   <Image
                     src="/logo.png"
                     alt="Neuronpedia logo - a computer chip with a rounded viewfinder border around it"
@@ -63,7 +66,7 @@ export default function NavBar({ session }: { session: Session | null }) {
                 </div>
               )}
               {SITE_NAME_VERCEL_DEPLOY ? (
-                <p className="ml-1.5 font-medium text-[#7B3F00] sm:mt-0">{SITE_NAME_VERCEL_DEPLOY}</p>
+                <p className="ml-1.5 truncate font-medium text-[#7B3F00]">{SITE_NAME_VERCEL_DEPLOY}</p>
               ) : (
                 // The wordmark and, under it, which tool of the site this is. A column rather than
                 // the label living inside the wordmark, because the mark itself is a row here: on
@@ -95,7 +98,7 @@ export default function NavBar({ session }: { session: Session | null }) {
               {DEMO_MODE ? (
                 <CustomTooltip
                   trigger={
-                    <div className="ml-1.5 flex h-5 items-center justify-center rounded bg-emerald-600 px-2 text-[9px] font-bold leading-none text-white">
+                    <div className="ml-1.5 hidden h-5 shrink-0 items-center justify-center rounded bg-emerald-600 px-2 text-[9px] font-bold leading-none text-white md:flex">
                       DEMO MODE
                     </div>
                   }
@@ -105,7 +108,7 @@ export default function NavBar({ session }: { session: Session | null }) {
               ) : IS_LOCALHOST ? (
                 <CustomTooltip
                   trigger={
-                    <div className="ml-1.5 flex h-5 items-center justify-center rounded bg-emerald-600 px-2 text-[9px] font-bold leading-none text-white">
+                    <div className="ml-1.5 hidden h-5 shrink-0 items-center justify-center rounded bg-emerald-600 px-2 text-[9px] font-bold leading-none text-white md:flex">
                       LOCALHOST
                     </div>
                   }
@@ -118,32 +121,24 @@ export default function NavBar({ session }: { session: Session | null }) {
             </Link>
           </div>
 
-          <div className="flex-inline flex items-center">
-            <div className="hidden select-none items-center justify-end gap-0 gap-x-0.5 font-light text-slate-500 sm:flex">
-              <NavBarButtons />
+          <div className="flex shrink-0 items-center gap-x-2">
+            <div className="hidden items-center justify-end gap-x-0.5 font-light text-slate-500 md:flex">
+              <NavBarButtons placement="bar" />
             </div>
 
-            {session ? (
-              <UserDropdown session={session} />
-            ) : NEXT_PUBLIC_ENABLE_SIGNIN ? (
-              <>
-                <button
-                  type="button"
-                  className="flex h-9 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm transition-all duration-75 hover:bg-slate-50 focus:outline-none sm:ml-2.5 sm:h-8"
-                  onClick={() => {
-                    setSignInModalOpen(true);
-                  }}
-                >
-                  <p className="w-full whitespace-nowrap text-center text-xs font-normal text-slate-600">Sign In</p>
-                </button>
-                <UserDropdown session={session} />
-              </>
-            ) : (
-              ''
+            {!session && NEXT_PUBLIC_ENABLE_SIGNIN && (
+              <button
+                type="button"
+                className="flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 2xl:h-8"
+                onClick={() => setSignInModalOpen(true)}
+              >
+                Sign In
+              </button>
             )}
+            <UserDropdown session={session} />
           </div>
         </div>
-      </div>
+      </nav>
     </>
   );
 }

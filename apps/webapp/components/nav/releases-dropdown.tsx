@@ -38,7 +38,13 @@ export function sortReleases<T extends { name?: string | null; createdAt?: Date 
   );
 }
 
-export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: boolean }) {
+export default function ReleasesDropdown({
+  breadcrumb = false,
+  className = '',
+}: {
+  breadcrumb?: boolean;
+  className?: string;
+}) {
   const router = useRouter();
   const { releases } = useGlobalContext();
   return (
@@ -46,7 +52,7 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
       <DropdownMenu.Trigger
         className={`flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 ${
           breadcrumb ? '-mx-1.5' : 'text-[13px]'
-        } transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white`}
+        } transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${className}`}
       >
         <span>Releases</span>
         <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
@@ -54,8 +60,9 @@ export default function ReleasesDropdown({ breadcrumb = false }: { breadcrumb?: 
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           align="center"
-          sideOffset={-3}
-          className="forceShowScrollBar z-50 max-h-[640px] w-full cursor-pointer overflow-hidden overflow-y-scroll rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+          sideOffset={4}
+          collisionPadding={8}
+          className="forceShowScrollBar z-[60] max-h-[min(640px,var(--radix-dropdown-menu-content-available-height))] max-w-[calc(100vw-1rem)] cursor-pointer overflow-hidden overflow-y-scroll rounded-md bg-white text-xs font-medium text-sky-700 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
         >
           {sortReleases(releases.filter((release) => release.featured)).map((release) => (
             <DropdownMenu.Item
