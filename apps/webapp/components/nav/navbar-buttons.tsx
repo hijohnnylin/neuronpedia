@@ -53,7 +53,10 @@ export default function NavBarButtons({ placement }: { placement: 'bar' | 'menu'
         className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         Jacobian Lens
-        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+        <span
+          data-nav-badge
+          className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white"
+        >
           NEW
         </span>
       </Link>
@@ -66,7 +69,10 @@ export default function NavBarButtons({ placement }: { placement: 'bar' | 'menu'
           <div>Natural Language</div>
           <div>Autoencoders</div>
         </div>
-        <span className="absolute -right-1 -top-1 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white">
+        <span
+          data-nav-badge
+          className="absolute -right-1 -top-1 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white"
+        >
           MAY 26
         </span>
       </Link>
@@ -76,7 +82,10 @@ export default function NavBarButtons({ placement }: { placement: 'bar' | 'menu'
         className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         Assistant Axis
-        <span className="absolute -right-1 -top-1.5 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white">
+        <span
+          data-nav-badge
+          className="absolute -right-1 -top-1.5 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white"
+        >
           JAN 26
         </span>
       </Link>
@@ -385,7 +394,10 @@ export default function NavBarButtons({ placement }: { placement: 'bar' | 'menu'
         className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         interp-engine
-        <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
+        <span
+          data-nav-badge
+          className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white"
+        >
           NEW
         </span>
       </Link>

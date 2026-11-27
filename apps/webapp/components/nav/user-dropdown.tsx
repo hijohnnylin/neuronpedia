@@ -25,7 +25,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
     <div className={`relative z-50 items-center text-left ${session ? 'flex' : 'flex 2xl:hidden'}`}>
       <Popover
         content={
-          <div className="w-full rounded-md bg-white p-2 text-slate-500 md:max-h-[var(--radix-popover-content-available-height)] md:w-[min(20rem,calc(100vw-1rem))] md:overflow-y-auto md:overscroll-contain 2xl:w-44">
+          <div className="w-full rounded-md bg-white p-2 text-slate-500 md:max-h-[var(--radix-popover-content-available-height)] md:w-[min(17rem,calc(100vw-1rem))] md:overflow-y-auto md:overscroll-contain 2xl:w-44">
             {user && (
               <>
                 <Link
@@ -46,7 +46,7 @@ export default function UserDropdown({ session }: { session: Session | null }) {
               </>
             )}
             <div
-              className={`mx-auto flex w-full flex-col items-center justify-center gap-3 border-slate-200 pb-4 ${
+              className={`flex w-full flex-col gap-0.5 border-slate-200 pb-2 [&>a>div]:items-start [&>a]:min-h-11 [&>a]:justify-start [&>a]:rounded-md [&>a]:px-3 [&>button]:min-h-11 [&>button]:justify-start [&>button]:rounded-md [&>button]:px-3 [&_[data-nav-badge]]:hidden ${
                 user && 'mb-4 mt-4 border-b border-t pt-4'
               } 2xl:hidden`}
               onClick={(event) => {
