@@ -22,7 +22,7 @@ export default function Leaflet({
   return (
     <>
       <div
-        className="group fixed inset-x-0 top-0 z-40 flex max-h-[calc(100vh-3rem)] w-screen flex-col overflow-y-auto bg-white transition-transform duration-200 ease-out sm:hidden"
+        className="group fixed inset-x-0 top-0 z-40 flex max-h-[calc(100dvh-3rem)] w-full flex-col overflow-y-auto overscroll-contain bg-white transition-transform duration-200 ease-out md:hidden"
         style={{ transform: visible ? 'translateY(0)' : 'translateY(-100%)' }}
       >
         <div className="sticky top-0 z-50 flex justify-end bg-white px-2 pt-2">

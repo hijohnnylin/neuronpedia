@@ -20,7 +20,15 @@ import { useState } from 'react';
 import InferenceActivationAllProvider from '../provider/inference-activation-all-provider';
 import ReleasesDropdown from './releases-dropdown';
 
-export default function NavBarButtons() {
+const SEARCH_PAGES = [
+  { href: '/search-explanations', label: 'Search Explanations' },
+  { href: '/search', label: 'Search via Inference' },
+  { href: '/search-topk-by-token', label: 'Search TopK by Token' },
+];
+
+export default function NavBarButtons({ placement }: { placement: 'bar' | 'menu' }) {
+  const primaryVisibility = placement === 'menu' ? 'min-h-11 md:hidden' : 'max-2xl:min-h-11';
+  const secondaryVisibility = placement === 'bar' ? 'max-2xl:hidden' : '';
   const router = useRouter();
   const { getSourceSetsForModelId, globalModels, releases, getDefaultModel } = useGlobalContext();
   const [jumpToOpen, setJumpToOpen] = useState(false);
@@ -32,7 +40,7 @@ export default function NavBarButtons() {
     <>
       {IS_LOCALHOST && !DEMO_MODE && (
         <Link
-          className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+          className={`flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
           href="/admin"
           prefetch={false}
         >
@@ -42,7 +50,7 @@ export default function NavBarButtons() {
 
       <Link
         href="/qwen3.6-27b/jlens"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         Jacobian Lens
         <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
@@ -52,7 +60,7 @@ export default function NavBarButtons() {
 
       <Link
         href="/llama3.3-70b-it/nla"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         <div className="flex flex-col items-center justify-center gap-y-[1px] px-1 text-xs font-normal leading-tight sm:text-[11px]">
           <div>Natural Language</div>
@@ -65,7 +73,7 @@ export default function NavBarButtons() {
 
       <Link
         href="/llama3.3-70b-it/assistant-axis"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         Assistant Axis
         <span className="absolute -right-1 -top-1.5 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white">
@@ -75,35 +83,32 @@ export default function NavBarButtons() {
 
       <Link
         href="/gemma-2-2b/graph"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 data-[state=open]:bg-sky-700 data-[state=open]:text-white ${primaryVisibility}`}
       >
         Circuit Tracer
-        <span className="absolute -right-1 -top-1.5 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white">
+        <span
+          className={`absolute -right-1 -top-1.5 flex h-3.5 items-center justify-center whitespace-nowrap rounded-full bg-emerald-600 px-1.5 text-[8px] font-semibold text-white ${secondaryVisibility}`}
+        >
           APR 26
         </span>
       </Link>
 
-      <ReleasesDropdown />
+      <ReleasesDropdown className={primaryVisibility} />
 
-      <DropdownMenu.Root open={jumpToOpen}>
+      <DropdownMenu.Root open={jumpToOpen} onOpenChange={setJumpToOpen}>
         <DropdownMenu.Trigger
-          onClick={() => {
-            setJumpToOpen(!jumpToOpen);
-          }}
-          className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+          className={`flex cursor-pointer items-center whitespace-nowrap rounded-full px-1 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 data-[state=open]:bg-sky-700 data-[state=open]:text-white ${primaryVisibility}`}
         >
           Jump To
           <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            sideOffset={-3}
-            onPointerDownOutside={() => {
-              setJumpToOpen(false);
-            }}
-            className="z-30 flex min-w-[8rem] flex-col divide-slate-100 overflow-hidden rounded-md bg-white p-1 py-1 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+            sideOffset={4}
+            collisionPadding={8}
+            className="z-[60] flex max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] max-w-[calc(100vw-1rem)] flex-col divide-slate-100 overflow-y-auto overscroll-contain rounded-md bg-white p-1 py-1 shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
           >
-            <div className="flex w-full flex-row justify-between border-b border-b-slate-100 px-7 py-4">
+            <div className="flex w-full flex-wrap justify-between gap-3 border-b border-b-slate-100 px-3 py-4 sm:px-7">
               <div
                 onSelect={(e) => {
                   e.preventDefault();
@@ -144,7 +149,7 @@ export default function NavBarButtons() {
                 />
               </div>
             </div>
-            <div className="px-7 py-4">
+            <div className="px-3 py-4 sm:px-7">
               <JumpToSAE
                 modelId={jumpToModelModelId}
                 layer={defaultSource}
@@ -158,7 +163,7 @@ export default function NavBarButtons() {
               onSelect={(e) => {
                 e.preventDefault();
               }}
-              className="flex cursor-pointer flex-col items-start border-t border-b-slate-100 px-7 py-4 text-sm font-medium text-sky-700 outline-none"
+              className="flex cursor-pointer flex-col items-start border-t border-b-slate-100 px-3 py-4 text-sm font-medium text-sky-700 outline-none sm:px-7"
             >
               <div className="text-[10px] font-medium uppercase text-slate-500">Jump to Feature</div>
               <FeatureSelector
@@ -183,19 +188,34 @@ export default function NavBarButtons() {
       {/* <ModelsDropdown isInBreadcrumb={false} /> */}
 
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
+        <DropdownMenu.Trigger
+          className={`flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 data-[state=open]:bg-sky-700 data-[state=open]:text-white ${primaryVisibility}`}
+        >
           Search
           <ChevronDown className="ml-0.5 h-3.5 w-3.5" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            sideOffset={-3}
+            sideOffset={4}
+            collisionPadding={8}
             onChange={(e) => {
               e.preventDefault();
             }}
-            className="z-30 min-w-[600px] max-w-[600px] overflow-hidden rounded-md bg-white shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)]"
+            className="z-[60] max-h-[var(--radix-dropdown-menu-content-available-height)] w-[min(18rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain rounded-md bg-white shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] sm:w-[min(600px,calc(100vw-1rem))]"
           >
-            <div className="flex items-center border-b border-slate-200 px-8 pb-6 pt-6 text-sm font-medium text-sky-700 outline-none">
+            <div className="grid gap-1 p-2 sm:hidden">
+              {SEARCH_PAGES.map(({ href, label }) => (
+                <DropdownMenu.Item key={href} asChild>
+                  <Link
+                    href={href}
+                    className="flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-sky-700 outline-none focus:bg-sky-100"
+                  >
+                    {label}
+                  </Link>
+                </DropdownMenu.Item>
+              ))}
+            </div>
+            <div className="hidden items-center border-b border-slate-200 px-8 py-6 text-sm font-medium text-sky-700 outline-none sm:flex">
               <div className="flex w-full flex-col items-start justify-center text-[15px] text-slate-600">
                 <div className="text-xl font-semibold leading-none tracking-tight text-slate-800">
                   Search Explanations
@@ -206,7 +226,7 @@ export default function NavBarButtons() {
                 <ExplanationsSearcher initialSelectedLayers={[]} showTabs fromNav />
               </div>
             </div>
-            <div className="flex items-center px-8 pb-2 pt-7 text-sm font-medium text-sky-700 outline-none">
+            <div className="hidden items-center px-8 pb-2 pt-7 text-sm font-medium text-sky-700 outline-none sm:flex">
               <div className="flex w-full flex-col items-start justify-center text-[15px] text-slate-600">
                 <div className="text-xl font-semibold leading-none tracking-tight text-slate-800">
                   Search via Inference
@@ -226,7 +246,7 @@ export default function NavBarButtons() {
                 </InferenceActivationAllProvider>
               </div>
             </div>
-            <div className="flex items-center border-t border-slate-200 px-8 pb-4 pt-6 text-sm font-medium text-sky-700 outline-none">
+            <div className="hidden items-center border-t border-slate-200 px-8 pb-4 pt-6 text-sm font-medium text-sky-700 outline-none sm:flex">
               <div className="flex w-full flex-col items-start justify-center text-[15px] text-slate-600">
                 <div className="text-xl font-semibold leading-none tracking-tight text-slate-800">
                   Search TopK by Token
@@ -333,7 +353,7 @@ export default function NavBarButtons() {
         href="/steer"
         prefetch={false}
         rel="noreferrer"
-        className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 data-[state=open]:bg-sky-700 data-[state=open]:text-white ${primaryVisibility}`}
       >
         Steer
       </Link>
@@ -353,7 +373,7 @@ export default function NavBarButtons() {
         href="https://neuronpedia-datasets.s3.us-east-1.amazonaws.com/index.html?prefix=v1/"
         target="_blank"
         rel="noreferrer"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         Exports
       </Link>
@@ -362,7 +382,7 @@ export default function NavBarButtons() {
         href="https://interp-engine.org"
         target="_blank"
         rel="noreferrer"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         interp-engine
         <span className="absolute -right-1 -top-1.5 flex h-3.5 w-8 items-center justify-center rounded-full bg-red-600 text-[8px] font-bold text-white">
@@ -430,7 +450,9 @@ export default function NavBarButtons() {
       </DropdownMenu.Root>
 
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger className="flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 pr-2.5 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white">
+        <DropdownMenu.Trigger
+          className={`flex cursor-pointer items-center whitespace-nowrap rounded-full px-1.5 py-1 pr-2.5 text-[13px] transition-all hover:bg-sky-100 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
+        >
           Docs
           <ChevronDown className="-mr-0.5 ml-0.5 h-3.5 w-3.5" />
         </DropdownMenu.Trigger>
@@ -468,13 +490,13 @@ export default function NavBarButtons() {
         href="https://join.slack.com/t/opensourcemechanistic/shared_invite/zt-4fi8qynnl-n2QrsTx3eJZHFHJ3Qzab4A"
         target="_blank"
         rel="noreferrer"
-        className="flex cursor-pointer items-center whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-medium text-emerald-700 transition-all hover:bg-emerald-200 hover:text-emerald-700 focus:outline-none data-[state=open]:bg-emerald-700 data-[state=open]:text-white sm:mr-1"
+        className={`flex cursor-pointer items-center whitespace-nowrap rounded-full bg-emerald-100 px-3 py-1 text-[13px] font-medium text-emerald-700 transition-all hover:bg-emerald-200 hover:text-emerald-700 focus:outline-none data-[state=open]:bg-emerald-700 data-[state=open]:text-white sm:mr-1 ${secondaryVisibility}`}
       >
         <MessagesSquare className="mr-1.5 h-3.5 w-3.5" /> Community
       </Link>
       <Link
         href="/blog"
-        className="relative flex cursor-pointer items-center whitespace-nowrap rounded-full bg-sky-100 px-3 py-1 text-[13px] font-medium text-sky-700 transition-all hover:bg-sky-200 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white"
+        className={`relative flex cursor-pointer items-center whitespace-nowrap rounded-full bg-sky-100 px-3 py-1 text-[13px] font-medium text-sky-700 transition-all hover:bg-sky-200 hover:text-sky-700 focus:outline-none data-[state=open]:bg-sky-700 data-[state=open]:text-white ${secondaryVisibility}`}
       >
         <RssIcon className="mr-1.5 h-3.5 w-3.5" /> Blog
       </Link>
